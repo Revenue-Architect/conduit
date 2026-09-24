@@ -46,6 +46,16 @@ import '../utils/file_utils.dart';
 import 'code_execution_display.dart';
 import 'follow_up_suggestions.dart';
 import 'usage_stats_modal.dart';
+import '../../hermes/providers/hermes_providers.dart' show hermesConfigProvider;
+import '../../hermes/services/hermes_artifact_client.dart'
+    show supportsHermesArtifactDownloads;
+import '../../hermes/services/hermes_identifier.dart'
+    show validateHermesOpaqueIdentifier;
+import '../../hermes/services/hermes_media_parser.dart';
+import '../../hermes/services/hermes_rich_output_parser.dart';
+import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
+import '../../hermes/widgets/hermes_a2ui_surface.dart';
+import '../../hermes/widgets/hermes_artifact_view.dart';
 
 // Wrap only standalone base64 image lines so <details> attributes stay intact.
 final _standaloneBase64ImagePattern = RegExp(
@@ -200,6 +210,20 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
   bool get _uiTreatsAsStreaming =>
       _activeVersionIndex < 0 && _turnPhase == ChatTurnPhase.running;
+
+  bool get _isHermesAssistantMessage {
+    final message = _chatMessage;
+    return message?.role == 'assistant' &&
+        message?.metadata?['transport'] == kHermesTransport;
+  }
+
+  bool get _shouldRenderHermesArtifacts =>
+      _isHermesAssistantMessage &&
+      !_uiTreatsAsStreaming &&
+      supportsHermesArtifactDownloads(ref.read(hermesConfigProvider));
+
+  bool get _shouldRenderHermesA2ui =>
+      _isHermesAssistantMessage && !_uiTreatsAsStreaming;
 
   // press state handled by shared ChatActionButton
 
@@ -631,8 +655,23 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
     // A grouped response is one answer, so read it whole rather than stopping
     // at this row's share of it.
-    final rawText =
+    final responseText =
         widget.resolveGroupedResponseText?.call() ?? _displayedContent;
+    final responseSegments = _shouldRenderHermesA2ui
+        ? parseHermesRichOutput(responseText)
+        : null;
+    final rawText = responseSegments == null
+        ? (_shouldRenderHermesArtifacts
+              ? parseHermesMedia(responseText).cleanText
+              : responseText)
+        : responseSegments
+              .whereType<MarkdownSegment>()
+              .map(
+                (segment) => _shouldRenderHermesArtifacts
+                    ? parseHermesMedia(segment.content).cleanText
+                    : segment.content,
+              )
+              .join();
     final speechText = await _buildTtsPlainTextOnDemand(rawText);
     if (!mounted || speechText.trim().isEmpty) {
       return;
@@ -646,14 +685,55 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     required List<ChatSourceReference> activeSources,
   }) {
     final children = <Widget>[];
-    final trimmedContent = displayedContent.trim();
-    if (trimmedContent.isNotEmpty) {
-      final markdownWidget = _buildEnhancedMarkdownContent(
-        displayedContent,
-        responseBuilder: responseBuilder,
-        activeSources: activeSources,
-      );
-      children.add(RepaintBoundary(child: markdownWidget));
+    final richSegments = _shouldRenderHermesA2ui
+        ? parseHermesRichOutput(displayedContent)
+        : <HermesRichOutputSegment>[MarkdownSegment(displayedContent)];
+    final sessionId = validateHermesOpaqueIdentifier(
+      _chatMessage?.metadata?['hermesSessionId'],
+    );
+    var segmentIndex = 0;
+    for (final segment in richSegments) {
+      if (segment is MarkdownSegment) {
+        final media = _shouldRenderHermesArtifacts
+            ? parseHermesMedia(segment.content)
+            : null;
+        final markdownContent = media?.cleanText ?? segment.content;
+        if (markdownContent.trim().isNotEmpty) {
+          final markdownWidget = _buildEnhancedMarkdownContent(
+            markdownContent,
+            responseBuilder: responseBuilder,
+            activeSources: activeSources,
+          );
+          children.add(RepaintBoundary(child: markdownWidget));
+        }
+        if (media != null) {
+          for (final artifact in media.artifacts) {
+            children.add(
+              Padding(
+                key: ValueKey(
+                  'hermes-artifact:${sessionId ?? ''}:${artifact.path}:$segmentIndex',
+                ),
+                padding: const EdgeInsets.only(top: Spacing.sm),
+                child: HermesArtifactView(
+                  artifact: artifact,
+                  sessionId: sessionId,
+                ),
+              ),
+            );
+            segmentIndex++;
+          }
+        }
+      } else if (segment is A2uiSegment) {
+        children.add(
+          HermesA2uiSurface(
+            key: ValueKey<String>('hermes-a2ui:$_messageId:$segmentIndex'),
+            payload: segment.content,
+            onInteraction: widget.readOnly ? null : _handleFollowUpTap,
+            isBusy: _uiTreatsAsStreaming,
+          ),
+        );
+        segmentIndex++;
+      }
     }
 
     if (children.isEmpty) return const SizedBox.shrink();
@@ -1055,6 +1135,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
   Widget _buildDocumentationMessage() {
     widget.debugOnShellBuild?.call();
+    if (_isHermesAssistantMessage && !_uiTreatsAsStreaming) {
+      // Watch only for eligible messages so switching Gateway/auth settings
+      // changes presentation without making unrelated chats depend on Hermes.
+      ref.watch(hermesConfigProvider);
+    }
     final displayStatusHistory = filterVisibleStatusUpdates(
       widget.message.statusHistory,
       isStreaming: _uiTreatsAsStreaming,

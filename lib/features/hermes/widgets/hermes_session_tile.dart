@@ -387,6 +387,7 @@ Future<void> openHermesSession(
       hermesMessagesToChatMessages(
         raw,
         modelId: hermesModel.id,
+        sessionId: session.id,
         trustedLocalDocumentKeys: trustedDocuments,
       )..addAll(
         hermesPendingDesktopDecisionMessages(

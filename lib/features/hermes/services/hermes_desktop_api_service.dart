@@ -270,6 +270,19 @@ final class HermesDesktopApiService
     _observingLifecycle = true;
   }
 
+  /// Reuses the authenticated Gateway credentials for same-origin artifact
+  /// downloads. Native PKCE tokens are refreshed and persisted by this service.
+  Future<Map<String, String>?> artifactAuthorizationHeaders() async {
+    if (_closed || config.desktopAuthKind != HermesDesktopAuthKind.nativePkce) {
+      return null;
+    }
+    try {
+      return await _headers(authenticated: true);
+    } on StateError {
+      return null;
+    }
+  }
+
   Stream<HermesDesktopTurnState> get turnStates => _turnStates.stream;
   Stream<HermesDesktopTurnState> turnStatesFor(String storedId) =>
       Stream<HermesDesktopTurnState>.multi((controller) {

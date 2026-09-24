@@ -117,6 +117,7 @@ List<ChatMessage> restoreHermesDesktopRunningMessage(
 List<ChatMessage> hermesMessagesToChatMessages(
   List<Map<String, dynamic>> raw, {
   String? modelId,
+  String? sessionId,
   Map<String, List<HermesPreparedDocument>> trustedLocalDocumentsByMessageId =
       const <String, List<HermesPreparedDocument>>{},
   Set<String> trustedLocalDocumentKeys = const <String>{},
@@ -193,21 +194,21 @@ List<ChatMessage> hermesMessagesToChatMessages(
                 itemMetadata['response_id'],
           )
         : null;
-    final sessionId = acceptedRole == 'assistant'
-        ? validateHermesOpaqueIdentifier(
-            item['session_id'] ?? itemMetadata['session_id'],
-          )
+    final messageSessionId = acceptedRole == 'assistant'
+        ? (validateHermesOpaqueIdentifier(sessionId) ??
+              validateHermesOpaqueIdentifier(
+                item['session_id'] ?? itemMetadata['session_id'],
+              ))
         : null;
     final transportMetadata = <String, dynamic>{
+      if (acceptedRole == 'assistant') 'transport': 'hermesRun',
       if (responseId != null) ...{
-        'transport': 'hermesRun',
         'hermesTransportMode': 'responses',
         'hermesResponseId': responseId,
       } else if (runId != null) ...{
-        'transport': 'hermesRun',
         'hermesRunId': runId,
       },
-      'hermesSessionId': ?sessionId,
+      'hermesSessionId': ?messageSessionId,
     };
 
     messages.add(

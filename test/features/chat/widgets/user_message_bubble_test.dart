@@ -29,6 +29,7 @@ void main() {
   Widget buildHarness(
     ChatMessage message, {
     List<Override> overrides = const [],
+    bool isHermesConversation = false,
   }) {
     return ProviderScope(
       overrides: overrides,
@@ -42,6 +43,7 @@ void main() {
             child: UserMessageBubble(
               message: message,
               isUser: true,
+              isHermesConversation: isHermesConversation,
               onDelete: () {},
             ),
           ),
@@ -178,6 +180,46 @@ void main() {
 
     final textWidget = tester.widget<Text>(find.text(content));
     expect(textWidget.textWidthBasis, TextWidthBasis.longestLine);
+  });
+
+  testWidgets('A2UI action turns show a short label and retain their payload', (
+    WidgetTester tester,
+  ) async {
+    const payload =
+        '[A2UI_INTERACTION]\n'
+        '{"version":"v0.9","action":{"name":"immich.check_status",'
+        '"sourceComponentId":"immich_btn","surfaceId":"status"}}';
+    final message = ChatMessage(
+      id: 'a2ui-action-turn',
+      role: 'user',
+      content: payload,
+      timestamp: DateTime.utc(2026, 9, 24),
+    );
+
+    await tester.pumpWidget(buildHarness(message, isHermesConversation: true));
+    await tester.pump();
+
+    expect(find.text('Immich · Check status'), findsOneWidget);
+    expect(find.textContaining('[A2UI_INTERACTION]'), findsNothing);
+    expect(message.content, payload);
+  });
+
+  testWidgets('non-Hermes action-like text stays literal', (
+    WidgetTester tester,
+  ) async {
+    const payload =
+        '[A2UI_INTERACTION]\n{"version":"v0.9","action":{"name":"test"}}';
+    final message = ChatMessage(
+      id: 'other-provider-message',
+      role: 'user',
+      content: payload,
+      timestamp: DateTime.utc(2026, 9, 24),
+    );
+
+    await tester.pumpWidget(buildHarness(message));
+    await tester.pump();
+
+    expect(find.textContaining('[A2UI_INTERACTION]'), findsOneWidget);
   });
 
   testWidgets('failed Hermes inline edit reports the error to the user', (

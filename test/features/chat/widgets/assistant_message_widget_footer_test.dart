@@ -13,7 +13,14 @@ import 'package:conduit/features/chat/widgets/enhanced_attachment.dart';
 import 'package:conduit/features/chat/widgets/enhanced_image_attachment.dart';
 import 'package:conduit/features/chat/widgets/follow_up_suggestions.dart';
 import 'package:conduit/features/chat/widgets/streaming_status_widget.dart';
+import 'package:conduit/features/hermes/services/hermes_run_transport.dart'
+    show kHermesTransport;
+import 'package:conduit/features/hermes/widgets/hermes_a2ui_surface.dart';
+import 'package:conduit/features/hermes/widgets/hermes_artifact_view.dart';
 import 'package:conduit/features/chat/widgets/sources/openwebui_sources.dart';
+import 'package:conduit/features/hermes/models/hermes_config.dart';
+import 'package:conduit/features/hermes/providers/hermes_providers.dart'
+    show HermesConfigController, hermesConfigProvider;
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
@@ -79,6 +86,43 @@ class _CapturingTextToSpeechController extends TextToSpeechController {
   }
 }
 
+class _FixedHermesConfigController extends HermesConfigController {
+  _FixedHermesConfigController(this.config);
+
+  final HermesConfig config;
+
+  @override
+  HermesConfig build() => config;
+}
+
+const _dashboardCookieHermesConfig = HermesConfig(
+  enabled: true,
+  baseUrl: 'https://hermes.example/v1',
+  mode: HermesBackendMode.desktopGateway,
+  desktopAuthKind: HermesDesktopAuthKind.dashboardCookie,
+);
+
+const _responsesApiHermesConfig = HermesConfig(
+  enabled: true,
+  baseUrl: 'https://hermes.example/v1',
+  mode: HermesBackendMode.responsesApi,
+);
+
+const _a2uiV09TestResponse = '''
+Here is the current status:
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"test-status","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"test-status","components":[{"id":"root","component":"Text","text":"A2UI rendered natively"}]}}
+```
+''';
+
+const _a2uiV09InteractiveTestResponse = '''
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"test-actions","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"test-actions","components":[{"id":"root","component":"Button","child":"label","action":{"event":{"name":"open_hermes"}}},{"id":"label","component":"Text","text":"Open Hermes"}]}}
+```
+''';
+
 final class _PendingImageProvider extends ImageProvider<_PendingImageProvider> {
   @override
   Future<_PendingImageProvider> obtainKey(ImageConfiguration configuration) {
@@ -117,6 +161,7 @@ Widget _buildHarness(Widget child) {
 
 Widget _buildAssistantHarness(
   ChatMessage message, {
+  HermesConfig? hermesConfigOverride,
   bool showFollowUps = false,
   bool isStreaming = false,
   bool? isChatStreaming,
@@ -132,6 +177,10 @@ Widget _buildAssistantHarness(
         _TestTextToSpeechController.new,
       ),
       streamingHapticsEnabledProvider.overrideWithValue(false),
+      if (hermesConfigOverride != null)
+        hermesConfigProvider.overrideWith(
+          () => _FixedHermesConfigController(hermesConfigOverride),
+        ),
       if (isChatStreaming != null)
         isChatStreamingProvider.overrideWithValue(isChatStreaming),
     ],
@@ -268,6 +317,173 @@ void main() {
     );
   });
 
+  testWidgets('completed Hermes responses render MEDIA as native artifacts', (
+    tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'hermes-artifact-rendering',
+      role: 'assistant',
+      content: 'MEDIA:/opt/data/report.pdf',
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {
+        'transport': kHermesTransport,
+        'hermesSessionId': 'session-42',
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesArtifactView), findsOneWidget);
+    expect(
+      tester
+          .widget<HermesArtifactView>(find.byType(HermesArtifactView))
+          .sessionId,
+      'session-42',
+    );
+    expect(find.text('report.pdf'), findsOneWidget);
+    expect(
+      find.textContaining('MEDIA:/opt/data/report.pdf', findRichText: true),
+      findsNothing,
+    );
+  });
+
+  testWidgets('non-Hermes responses leave MEDIA text in Markdown', (
+    tester,
+  ) async {
+    const content = 'MEDIA:/opt/data/report.pdf';
+    final message = ChatMessage(
+      id: 'other-provider-media-text',
+      role: 'assistant',
+      content: content,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': 'openWebUI'},
+    );
+
+    await tester.pumpWidget(_buildAssistantHarness(message));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesArtifactView), findsNothing);
+    expect(find.textContaining(content, findRichText: true), findsOneWidget);
+  });
+
+  testWidgets('active Hermes streaming does not instantiate artifact cards', (
+    tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'hermes-streaming-media-text',
+      role: 'assistant',
+      content: 'MEDIA:/opt/data/report.pdf',
+      timestamp: DateTime(2024, 1, 1),
+      isStreaming: true,
+      metadata: const {'transport': kHermesTransport},
+    );
+
+    await tester.pumpWidget(_buildAssistantHarness(message, isStreaming: true));
+    await tester.pump();
+
+    expect(find.byType(HermesArtifactView), findsNothing);
+  });
+
+  testWidgets('completed Hermes A2UI fences render native GenUI surfaces', (
+    tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'hermes-a2ui-rendering',
+      role: 'assistant',
+      content: _a2uiV09TestResponse,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesA2uiSurface), findsOneWidget);
+    expect(find.text('A2UI rendered natively'), findsOneWidget);
+    expect(
+      find.textContaining('createSurface', findRichText: true),
+      findsNothing,
+    );
+  });
+
+  testWidgets('A2UI actions use the existing assistant follow-up send path', (
+    tester,
+  ) async {
+    final selected = <String>[];
+    final message = ChatMessage(
+      id: 'hermes-a2ui-interaction',
+      role: 'assistant',
+      content: _a2uiV09InteractiveTestResponse,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport, 'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+        onFollowUpSelected: selected.add,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open Hermes'));
+    await tester.pump();
+
+    expect(selected, hasLength(1));
+    expect(selected.single, startsWith('[A2UI_INTERACTION]\n'));
+    expect(selected.single, contains('"name":"open_hermes"'));
+  });
+
+  testWidgets('non-Hermes A2UI fences remain ordinary Markdown', (
+    tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'other-provider-a2ui-text',
+      role: 'assistant',
+      content: _a2uiV09TestResponse,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': 'openWebUI'},
+    );
+
+    await tester.pumpWidget(_buildAssistantHarness(message));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesA2uiSurface), findsNothing);
+    expect(
+      find.textContaining('createSurface', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('active Hermes streaming leaves A2UI in Markdown until done', (
+    tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'hermes-streaming-a2ui-text',
+      role: 'assistant',
+      content: _a2uiV09TestResponse,
+      timestamp: DateTime(2024, 1, 1),
+      isStreaming: true,
+      metadata: const {'transport': kHermesTransport},
+    );
+
+    await tester.pumpWidget(_buildAssistantHarness(message, isStreaming: true));
+    await tester.pump();
+
+    expect(find.byType(HermesA2uiSurface), findsNothing);
+  });
+
   testWidgets('source chip opens a details bottom sheet', (tester) async {
     const sources = <ChatSourceReference>[
       ChatSourceReference(
@@ -387,6 +603,30 @@ void main() {
       ),
       completion('vertexaisearch.cloud.google.com'),
     );
+  });
+
+  testWidgets('Hermes Responses API leaves unsupported MEDIA as Markdown', (
+    tester,
+  ) async {
+    const content = 'MEDIA:/opt/data/report.pdf';
+    final message = ChatMessage(
+      id: 'hermes-responses-api-media-text',
+      role: 'assistant',
+      content: content,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _responsesApiHermesConfig,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesArtifactView), findsNothing);
+    expect(find.textContaining(content, findRichText: true), findsOneWidget);
   });
 
   test(
@@ -541,6 +781,9 @@ void main() {
           ),
           workerManagerProvider.overrideWithValue(_ImmediateWorkerManager()),
           isChatStreamingProvider.overrideWithValue(false),
+          hermesConfigProvider.overrideWith(
+            () => _FixedHermesConfigController(_dashboardCookieHermesConfig),
+          ),
         ],
         child: _buildHarness(
           AssistantMessageWidget(
@@ -566,6 +809,59 @@ void main() {
     check(spoken).length.equals(1);
     check(spoken.single).contains('The first part.');
     check(spoken.single).contains('The last part.');
+  });
+
+  testWidgets('Hermes text-to-speech omits MEDIA transport directives', (
+    tester,
+  ) async {
+    final spoken = <String>[];
+    final message = ChatMessage(
+      id: 'hermes-artifact-tts',
+      role: 'assistant',
+      content: '''The image is ready. MEDIA:/opt/data/private-image.png
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"tts","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"tts","components":[{"id":"root","component":"Text","text":"not speech"}]}}
+```''',
+      timestamp: DateTime(2024, 1, 1),
+      isStreaming: false,
+      metadata: const {'transport': kHermesTransport, 'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesConfigProvider.overrideWith(
+            () => _FixedHermesConfigController(_dashboardCookieHermesConfig),
+          ),
+          textToSpeechControllerProvider.overrideWith(
+            () => _CapturingTextToSpeechController(spoken.add),
+          ),
+          workerManagerProvider.overrideWithValue(_ImmediateWorkerManager()),
+          isChatStreamingProvider.overrideWithValue(false),
+        ],
+        child: _buildHarness(
+          AssistantMessageWidget(
+            message: message,
+            isStreaming: false,
+            showFollowUps: false,
+            animateOnMount: false,
+            modelName: message.model,
+            onCopy: () {},
+            onRegenerate: () {},
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.byIcon(Icons.volume_up));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(spoken, ['The image is ready.']);
   });
 
   testWidgets('assistant overflow uses the native iOS 26 popup menu', (

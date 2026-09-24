@@ -247,7 +247,10 @@ void main() {
     check(messages).length.equals(2);
     check(messages.first.content).equals('safe');
     check(messages.first.id).not((value) => value.contains('provider value'));
-    check(messages.last.metadata).isNull();
+    expect(
+      messages.last.metadata,
+      equals(<String, dynamic>{'transport': 'hermesRun'}),
+    );
   });
 
   test(

@@ -380,6 +380,22 @@ void main() {
       check(messages[1].role).equals('assistant');
       check(messages[1].content).equals('Hello there');
       check(messages[1].model).equals('hermes:agent:default');
+      check(messages[1].metadata?['transport']).equals('hermesRun');
+      check(messages[0].metadata?['transport']).isNull();
+    });
+
+    test('tags restored Hermes assistant rows and binds the session id', () {
+      final messages = hermesMessagesToChatMessages([
+        {'id': 'user-1', 'role': 'user', 'content': 'Show the image'},
+        {
+          'id': 'assistant-1',
+          'role': 'assistant',
+          'content': 'MEDIA:/tmp/a.png',
+        },
+      ], sessionId: 'session-1');
+
+      check(messages.last.metadata?['transport']).equals('hermesRun');
+      check(messages.last.metadata?['hermesSessionId']).equals('session-1');
     });
 
     test('restores persisted tool activity onto its assistant row', () {

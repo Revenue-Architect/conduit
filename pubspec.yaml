@@ -40,6 +40,8 @@ dependencies:
   
   # UI Components - Markdown Rendering
   markdown: ^7.3.0
+  # Pin GenUI because it is alpha and this integration targets A2UI v0.9.
+  genui: 0.10.3
   pdfrx: ^2.4.7
   archive: ^4.0.9
   xml: ^7.0.1
@@ -68,6 +70,9 @@ dependencies:
   permission_handler: ^13.0.2
   image_picker: ^1.2.3
   file_picker: ^13.0.0
+  # Use the native Android/iOS file intent for Hermes artifacts. `url_launcher`
+  # does not support file: URLs on mobile platforms.
+  open_filex: 4.7.0
   receive_sharing_intent: ^1.9.0
   flutter_image_compress: ^2.5.1
   path_provider: ^2.1.4

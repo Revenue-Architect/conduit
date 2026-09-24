@@ -46,6 +46,7 @@ import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_decision_projection.dart';
 import '../../hermes/services/hermes_desktop_api_service.dart';
+import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
 import '../../hermes/services/hermes_local_document_trust_store.dart';
 import '../../hermes/services/hermes_message_mapper.dart';
 import '../../hermes/services/hermes_pending_decision_store.dart';
@@ -1120,6 +1121,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           hermesMessagesToChatMessages(
             raw,
             modelId: model.id,
+            sessionId: storedId,
             trustedLocalDocumentKeys: trustedKeys,
           )..addAll(
             hermesPendingDesktopDecisionMessages(pending, modelId: model.id),
@@ -3325,9 +3327,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             chatMessageByIdProvider(messageId),
           );
           if (latestMessage == null) return const SizedBox.shrink();
+          final isHermesConversation = isNativeHermesConversation(
+            rowRef.watch(activeConversationProvider),
+          );
           return UserMessageBubble(
             message: latestMessage,
             isUser: true,
+            isHermesConversation: isHermesConversation,
             readOnly: rowRef.watch(activeConversationReadOnlyProvider),
             isStreaming: latestMessage.isStreaming,
             modelName: rowMetadata.displayModelName,
@@ -3339,7 +3345,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 // User content is stored raw (never presentation-escaped) and
                 // owns its markup; copy it verbatim — the assistant clipboard
                 // sanitizer would decode entities the user actually typed.
-                Clipboard.setData(ClipboardData(text: currentMessage.content));
+                Clipboard.setData(
+                  ClipboardData(
+                    text: isHermesConversation
+                        ? (hermesA2uiInteractionLabel(currentMessage.content) ??
+                              currentMessage.content)
+                        : currentMessage.content,
+                  ),
+                );
               }
             },
             onDelete: () => _deleteMessageGroup(<String>[messageId]),

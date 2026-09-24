@@ -21,6 +21,7 @@ import '../../tools/providers/tools_providers.dart';
 import '../providers/chat_providers.dart';
 import '../utils/file_utils.dart';
 import '../utils/message_targeting.dart';
+import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
 import 'enhanced_attachment.dart';
 import 'enhanced_image_attachment.dart';
 
@@ -52,6 +53,7 @@ class UserMessageBubble extends ConsumerStatefulWidget {
   final dynamic message;
   final bool isUser;
   final bool isStreaming;
+  final bool isHermesConversation;
   final String? modelName;
   final VoidCallback? onCopy;
   final VoidCallback onDelete;
@@ -68,6 +70,7 @@ class UserMessageBubble extends ConsumerStatefulWidget {
     required this.message,
     required this.isUser,
     this.isStreaming = false,
+    this.isHermesConversation = false,
     this.modelName,
     this.onCopy,
     required this.onDelete,
@@ -728,14 +731,17 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
     super.dispose();
   }
 
-  List<ConduitContextMenuAction> _buildMessageActions(BuildContext context) {
+  List<ConduitContextMenuAction> _buildMessageActions(
+    BuildContext context, {
+    bool isA2uiInteraction = false,
+  }) {
     // Don't show menu while editing - return empty list
     if (_isEditing) return [];
 
     final l10n = AppLocalizations.of(context)!;
 
     return [
-      if (!widget.readOnly)
+      if (!widget.readOnly && !isA2uiInteraction)
         ConduitContextMenuAction(
           cupertinoIcon: CupertinoIcons.pencil,
           materialIcon: Icons.edit_outlined,
@@ -775,10 +781,15 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
 
   Widget _buildUserMessage() {
     final theme = context.conduitTheme;
+    final rawContent = widget.message.content as String;
+    final interactionLabel = widget.isHermesConversation
+        ? hermesA2uiInteractionLabel(rawContent)
+        : null;
+    final visibleContent = interactionLabel ?? rawContent;
     final hasImages =
         widget.message.attachmentIds != null &&
         widget.message.attachmentIds!.isNotEmpty;
-    final hasText = widget.message.content.isNotEmpty;
+    final hasText = visibleContent.isNotEmpty;
     final filePartitions = _currentFilePartitions();
     final hasFilesFromArray = filePartitions?.hasRenderableFiles ?? false;
     // Prefer input/textPrimary colors during inline editing to avoid low contrast
@@ -797,7 +808,10 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
       bottomLeft: Radius.circular(AppBorderRadius.chatBubble),
       bottomRight: Radius.circular(AppBorderRadius.md),
     );
-    final actions = _buildMessageActions(context);
+    final actions = _buildMessageActions(
+      context,
+      isA2uiInteraction: interactionLabel != null,
+    );
     final attachmentContent = hasFilesFromArray
         ? _buildUserFileImages(filePartitions!)
         : hasImages
@@ -878,7 +892,7 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                                 ),
                               )
                             : Text(
-                                widget.message.content,
+                                visibleContent,
                                 style: AppTypography.chatMessageStyle.copyWith(
                                   color: theme.chatBubbleUserText,
                                 ),
