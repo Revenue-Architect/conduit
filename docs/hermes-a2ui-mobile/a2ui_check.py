@@ -29,6 +29,7 @@ import re
 import sys
 
 CATALOG = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+ACTION_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$")
 
 KNOWN = {
     "Text", "Image", "Icon", "Video", "AudioPlayer", "Row", "Column", "List", "Card",
@@ -85,6 +86,22 @@ def _has_positive_weight(component):
     return isinstance(weight, int) and not isinstance(weight, bool) and weight > 0
 
 
+def _safe_context_value(value, depth=0):
+    if depth > 3:
+        return False
+    if isinstance(value, bool):
+        return True
+    if _num(value):
+        return True
+    if isinstance(value, str):
+        return len(value) <= 2048
+    if isinstance(value, list):
+        return len(value) <= 32 and all(_safe_context_value(v, depth + 1) for v in value)
+    if isinstance(value, dict):
+        return set(value) == {"path"} and isinstance(value["path"], str) and len(value["path"]) <= 256
+    return False
+
+
 def check_components(name, comps, errors, warnings):
     if not isinstance(comps, list) or not comps:
         errors.append(f"{name}: updateComponents has no components list")
@@ -131,24 +148,33 @@ def check_components(name, comps, errors, warnings):
                         break
         if ctype == "Button":
             act = c.get("action")
-            if not isinstance(act, dict) or "event" not in act or "functionCall" in act:
+            if not isinstance(act, dict) or set(act) != {"event"}:
                 errors.append(f"{name}: Button {cid!r} action must contain only an 'event'")
-            elif "event" in act:
+            else:
                 ev = act.get("event")
-                if not isinstance(ev, dict) or not ev.get("name"):
+                if not isinstance(ev, dict) or not isinstance(ev.get("name"), str):
                     errors.append(f"{name}: Button {cid!r} event missing 'name'")
-                elif "context" in ev and not isinstance(ev["context"], dict):
-                    errors.append(f"{name}: Button {cid!r} event context must be an object")
+                elif set(ev) - {"name", "context"} or len(ev["name"]) > 80 or not ACTION_NAME.fullmatch(ev["name"]):
+                    errors.append(f"{name}: Button {cid!r} event name/context is not supported")
+                elif "context" in ev:
+                    context = ev["context"]
+                    if not isinstance(context, dict) or len(context) > 16:
+                        errors.append(f"{name}: Button {cid!r} event context must be a small object")
+                    elif any(
+                        not isinstance(k, str) or not k or len(k) > 80 or not _safe_context_value(v)
+                        for k, v in context.items()
+                    ):
+                        errors.append(f"{name}: Button {cid!r} event context contains an unsafe value")
         if ctype == "Tabs":
             tabs = c.get("tabs")
             if not isinstance(tabs, list) or not tabs:
                 errors.append(f"{name}: Tabs {cid!r} needs a non-empty tabs array")
             else:
                 for t in tabs:
-                    if not isinstance(t, dict) or not t.get("title") or not t.get("child"):
-                        errors.append(f"{name}: Tabs {cid!r} entries need 'title' and 'child'")
-                    elif t["child"] not in by_id:
-                        errors.append(f"{name}: Tabs {cid!r} child {t['child']!r} not found")
+                    if not isinstance(t, dict) or not t.get("label") or not t.get("content"):
+                        errors.append(f"{name}: Tabs {cid!r} entries need 'label' and 'content'")
+                    elif t["content"] not in by_id:
+                        errors.append(f"{name}: Tabs {cid!r} content {t['content']!r} not found")
         if ctype == "Modal":
             for k in ("trigger", "content"):
                 if not isinstance(c.get(k), str) or c[k] not in by_id:
@@ -169,8 +195,8 @@ def check_components(name, comps, errors, warnings):
                 parents.setdefault(r, []).append(cid)
         if ctype == "Tabs" and isinstance(c.get("tabs"), list):
             for tab in c["tabs"]:
-                if isinstance(tab, dict) and tab.get("child") in by_id:
-                    parents.setdefault(tab["child"], []).append(cid)
+                if isinstance(tab, dict) and tab.get("content") in by_id:
+                    parents.setdefault(tab["content"], []).append(cid)
         if ctype == "Modal":
             for key in ("trigger", "content"):
                 if isinstance(c.get(key), str) and c[key] in by_id:
@@ -198,8 +224,8 @@ def check_components(name, comps, errors, warnings):
                 stack.extend([x for x in c["children"] if isinstance(x, str)])
             if isinstance(c.get("tabs"), list):
                 for t in c["tabs"]:
-                    if isinstance(t, dict) and isinstance(t.get("child"), str):
-                        stack.append(t["child"])
+                    if isinstance(t, dict) and isinstance(t.get("content"), str):
+                        stack.append(t["content"])
             for k in ("trigger", "content"):
                 if isinstance(c.get(k), str):
                     stack.append(c[k])
@@ -281,6 +307,15 @@ def main():
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
         if args.from_md:
+            for match in re.finditer(r"```(?:json|jsonl)\s*\n(.*?)```", text, re.S | re.I):
+                if re.search(
+                    r'"(?:surfaceUpdate|beginRendering|dataModelUpdate|createSurface|updateComponents)"\s*:',
+                    match.group(1),
+                ):
+                    errors.append(
+                        f"{path}: A2UI-like JSON is fenced as json/jsonl; "
+                        "Conduit requires a fenced a2ui block with v0.9 createSurface/updateComponents"
+                    )
             blocks = re.findall(r"```a2ui\s*\n(.*?)```", text, re.S)
             if not blocks:
                 errors.append(f"{path}: no fenced a2ui blocks found")

@@ -154,6 +154,67 @@ void main() {
     expect(result.payload, input);
   });
 
+  test('accepts the validated synthetic meal-plan form from device QA', () {
+    final input = File('test/fixtures/hermes/a2ui/meal-plan-form.jsonl')
+        .readAsStringSync();
+
+    final result = normalizeHermesA2uiPayload(input, catalog: catalog);
+
+    expect(result.isReady, isTrue);
+    expect(result.changed, isFalse);
+  });
+
+  test('accepts bounded event context and rejects context function calls', () {
+    const valid =
+        '''
+{"version":"v0.9","createSurface":{"surfaceId":"context","catalogId":"$_catalogId"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"context","components":[{"id":"root","component":"Button","child":"label","action":{"event":{"name":"trip.view_details","context":{"trip":"montreal","day":2,"selected":{"path":"/pace"}}}}},{"id":"label","component":"Text","text":"View details"}]}}
+''';
+
+    expect(normalizeHermesA2uiPayload(valid, catalog: catalog).isReady, isTrue);
+
+    final unsafe = valid.replaceFirst(
+      '"selected":{"path":"/pace"}',
+      '"selected":{"call":"openUrl","args":{"url":"https://invalid.example"}}',
+    );
+    expect(
+      normalizeHermesA2uiPayload(unsafe, catalog: catalog).isReady,
+      isFalse,
+    );
+  });
+
+  test('repairs v0.9 spec-style Tabs for pinned GenUI', () {
+    const input =
+        '''
+{"version":"v0.9","createSurface":{"surfaceId":"tabs","catalogId":"$_catalogId"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"tabs","components":[{"id":"root","component":"Tabs","tabs":[{"title":"Plan","child":"plan"},{"title":"Notes","child":"notes"}]},{"id":"plan","component":"Text","text":"Saturday itinerary"},{"id":"notes","component":"Text","text":"Illustrative data"}]}}
+''';
+
+    final result = normalizeHermesA2uiPayload(input, catalog: catalog);
+
+    expect(result.isReady, isTrue);
+    expect(result.changed, isTrue);
+    final update = jsonDecode(result.payload.split('\n').last);
+    final root = update['updateComponents']['components'].first;
+    expect(root['tabs'], [
+      {'label': 'Plan', 'content': 'plan'},
+      {'label': 'Notes', 'content': 'notes'},
+    ]);
+  });
+
+  test('accepts varied travel, budget, and project surfaces', () {
+    for (final fixture in const [
+      'travel-itinerary.jsonl',
+      'budget-planner.jsonl',
+      'project-sprint.jsonl',
+    ]) {
+      final input = File('test/fixtures/hermes/a2ui/$fixture')
+          .readAsStringSync();
+      final result = normalizeHermesA2uiPayload(input, catalog: catalog);
+      expect(result.isReady, isTrue, reason: fixture);
+    }
+  });
+
   test('stacks rows that mix charts or controls with other children', () {
     const input =
         '''

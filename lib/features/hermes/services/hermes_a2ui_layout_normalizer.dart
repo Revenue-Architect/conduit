@@ -170,11 +170,51 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
             rawComponents.length > hermesA2uiMaxComponents ||
             rawComponents.any(
               (component) => component is! Map<String, dynamic>,
-            ) ||
-            !_validBySchema(A2uiSchemas.updateComponentsSchema(catalog), {
-              'surfaceId': surfaceId,
-              'components': rawComponents,
-            }, schemaRegistry)) {
+            )) {
+          return const HermesA2uiNormalizationResult.invalid();
+        }
+
+        final schemaComponents = <Map<String, dynamic>>[];
+        for (final rawComponent in rawComponents) {
+          final component = Map<String, dynamic>.from(
+            rawComponent as Map<String, dynamic>,
+          );
+          if (component['component'] == 'Tabs' && component['tabs'] is List) {
+            final normalizedTabs = <Map<String, dynamic>>[];
+            for (final rawTab in component['tabs'] as List) {
+              if (rawTab is! Map<String, dynamic>) {
+                return const HermesA2uiNormalizationResult.invalid();
+              }
+              final tab = Map<String, dynamic>.from(rawTab);
+              final usesSpecNames =
+                  tab.containsKey('title') || tab.containsKey('child');
+              if (usesSpecNames) {
+                // The published v0.9 catalog uses title/child, while pinned
+                // Flutter GenUI 0.10.3 consumes label/content. Repair the
+                // standard spelling at read time so saved replies survive.
+                if (tab.containsKey('label') || tab.containsKey('content')) {
+                  return const HermesA2uiNormalizationResult.invalid();
+                }
+                final title = tab.remove('title');
+                final child = tab.remove('child');
+                if (title is! String || child is! String) {
+                  return const HermesA2uiNormalizationResult.invalid();
+                }
+                tab['label'] = title;
+                tab['content'] = child;
+                changed = true;
+              }
+              normalizedTabs.add(tab);
+            }
+            component['tabs'] = normalizedTabs;
+          }
+          schemaComponents.add(component);
+        }
+
+        if (!_validBySchema(A2uiSchemas.updateComponentsSchema(catalog), {
+          'surfaceId': surfaceId,
+          'components': schemaComponents,
+        }, schemaRegistry)) {
           return const HermesA2uiNormalizationResult.invalid();
         }
 
@@ -184,10 +224,8 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
         );
         final normalizedComponents = <Map<String, dynamic>>[];
         final idsInUpdate = <String>{};
-        for (final rawComponent in rawComponents) {
-          final component = Map<String, dynamic>.from(
-            rawComponent as Map<String, dynamic>,
-          );
+        for (final rawComponent in schemaComponents) {
+          final component = Map<String, dynamic>.from(rawComponent);
           final id = component['id'];
           final type = component['component'];
           if (id is! String ||
@@ -382,10 +420,44 @@ bool _hasHermesEventAction(Object? action) {
   }
   final event = action['event'] as Map<String, dynamic>;
   final name = event['name'];
-  return event.length == 1 &&
-      name is String &&
-      name.length <= 80 &&
-      _actionNamePattern.hasMatch(name);
+  if (event.keys.any((key) => key != 'name' && key != 'context') ||
+      name is! String ||
+      name.length > 80 ||
+      !_actionNamePattern.hasMatch(name)) {
+    return false;
+  }
+
+  if (!event.containsKey('context')) return true;
+  final context = event['context'];
+  if (context is! Map<String, dynamic> || context.length > 16) return false;
+  return context.entries.every(
+    (entry) =>
+        entry.key.isNotEmpty &&
+        entry.key.length <= 80 &&
+        _isSafeHermesEventContextValue(entry.value, depth: 0),
+  );
+}
+
+bool _isSafeHermesEventContextValue(Object? value, {required int depth}) {
+  if (depth > 3) return false;
+  if (value is bool) return true;
+  if (value is num) return value.isFinite;
+  if (value is String) return value.length <= 2048;
+  if (value is List) {
+    return value.length <= 32 &&
+        value.every(
+          (item) => _isSafeHermesEventContextValue(item, depth: depth + 1),
+        );
+  }
+  if (value is Map<String, dynamic>) {
+    // A2UI context values may bind to the surface data model. Keep that
+    // useful declarative form, but reject function-call objects and arbitrary
+    // nested maps at this client safety boundary.
+    return value.length == 1 &&
+        value['path'] is String &&
+        (value['path'] as String).length <= 256;
+  }
+  return false;
 }
 
 bool _hasPositiveWeight(Map<String, dynamic> component) =>

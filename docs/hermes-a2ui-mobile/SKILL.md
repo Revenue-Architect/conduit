@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
-description: "Compose native A2UI v0.9 interfaces in Conduit for diverse data, decisions, forms, workflows, and interactive answers."
-version: 0.6.0
+description: "Use when a compact native visual or interaction would improve a Conduit answer: plans, schedules, budgets, choices, comparisons, checklists, forms, itineraries, status, and dashboards across any topic. Users need not say A2UI, GenUI, visual, or name components. Compose A2UI v0.9 when it adds value."
+version: 0.8.1
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,7 +13,9 @@ metadata:
 
 # A2UI Mobile Skill
 
-Create concise, visual-first native interfaces that Hermes can render in Conduit. Use an A2UI surface when interaction, status scanning, comparison, or a native control materially improves on Markdown. Do not turn ordinary prose into a decorative card.
+If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
+
+Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Use it when interaction, scanning, comparison, or a native control materially improves on Markdown. Do not turn ordinary prose into a decorative card.
 
 ## Choose the right output
 
@@ -65,6 +67,8 @@ When A2UI is the main answer:
 ## Components available in Conduit
 
 Built-in components include `Card`, `Column`, `Row`, `Text`, `Icon`, `Divider`, `List`, `Tabs`, `Button`, `ChoicePicker`, `CheckBox`, `TextField`, `Slider`, and `DateTimeInput`.
+
+For `Tabs`, pinned Flutter GenUI 0.10.3 requires entries shaped as `{"label":"Overview","content":"overview-component-id"}`. Do not use the upstream v0.9 `title`/`child` spelling for new Conduit output. Conduit repairs that older spelling at read time for saved messages.
 
 Conduit also provides these data-only visual components:
 

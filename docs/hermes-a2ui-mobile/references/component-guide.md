@@ -21,7 +21,7 @@ Source of truth: `catalog-v0_9-basic.json` and `common-types-v0_9.json` in this 
 | Column | children | justify: start center end spaceBetween spaceAround spaceEvenly stretch; align | `weight` allowed on direct children only |
 | Row | children | justify; align | Every direct width-consuming child needs a positive integer `weight`; use a Column for long text or cramped controls. |
 | List | children | direction: vertical horizontal; align | |
-| Tabs | tabs: [{"title","child"}] | | Each tab needs title + child id |
+| Tabs | tabs: [{"label","content"}] | activeTab | Pinned GenUI 0.10.3 uses label + content component id; Conduit repairs older title + child payloads at read time |
 | Modal | trigger, content | | Both are component ids; trigger is usually a Button |
 | Button | child, action | variant: default primary borderless | In this client, use only `{"event":{"name":"...","context":{...}}}`; no function calls |
 | TextField | label | value, variant: shortText longText number obscured, validationRegexp | |

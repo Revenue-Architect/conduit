@@ -88,6 +88,99 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('renders a native meal-plan form with varied controls', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final payload = File('test/fixtures/hermes/a2ui/meal-plan-form.jsonl')
+        .readAsStringSync();
+    final interactions = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HermesA2uiSurface(
+              payload: payload,
+              onInteraction: interactions.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Surface), findsOneWidget);
+    expect(find.text('One-day meal plan'), findsOneWidget);
+    expect(find.text('Meal name'), findsOneWidget);
+    expect(find.text('Vegetarian'), findsOneWidget);
+    expect(find.text('Servings'), findsOneWidget);
+    expect(find.text('Preview plan'), findsOneWidget);
+    await tester.ensureVisible(find.text('Preview plan'));
+    await tester.tap(find.text('Preview plan'));
+    await tester.pump();
+
+    expect(interactions, hasLength(1));
+    final interaction = jsonDecode(
+      interactions.single.substring('[A2UI_INTERACTION]\n'.length),
+    ) as Map<String, dynamic>;
+    expect(
+      (interaction['action'] as Map<String, dynamic>)['name'],
+      'meal.preview_plan',
+    );
+    expect((interaction['action'] as Map<String, dynamic>)['context'], {
+      'surface': 'meal-plan-form-01',
+    });
+  });
+
+  for (final scenario in const [
+    (
+      fixture: 'travel-itinerary.jsonl',
+      expected: ['Fictional Montreal weekend', 'Pace', 'View details'],
+    ),
+    (
+      fixture: 'budget-planner.jsonl',
+      expected: ['Synthetic monthly budget', 'Weekly spend', 'Review plan'],
+    ),
+    (
+      fixture: 'project-sprint.jsonl',
+      expected: ['Synthetic sprint plan', 'QA complete', 'Show summary'],
+    ),
+  ]) {
+    testWidgets('renders ${scenario.fixture} at narrow width and large text', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final payload = File('test/fixtures/hermes/a2ui/${scenario.fixture}')
+          .readAsStringSync();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: HermesA2uiSurface(payload: payload),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(tester.takeException(), isNull, reason: scenario.fixture);
+      expect(find.byType(Surface), findsOneWidget, reason: scenario.fixture);
+      for (final text in scenario.expected) {
+        expect(find.text(text), findsOneWidget, reason: scenario.fixture);
+      }
+    });
+  }
+
   testWidgets(
     'visuals have readable fallbacks under unbounded row constraints',
     (tester) async {

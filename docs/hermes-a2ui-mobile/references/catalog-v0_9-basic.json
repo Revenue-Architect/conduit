@@ -405,21 +405,21 @@
             },
             "tabs": {
               "type": "array",
-              "description": "An array of objects, where each object defines a tab with a title and a child component.",
+              "description": "An array of objects, where each object defines a tab label and content component for pinned Flutter GenUI 0.10.3.",
               "minItems": 1,
               "items": {
                 "type": "object",
                 "properties": {
-                  "title": {
-                    "description": "The tab title.",
+                  "label": {
+                    "description": "The tab label.",
                     "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/DynamicString"
                   },
-                  "child": {
+                  "content": {
                     "$ref": "https://a2ui.org/specification/v0_9/common_types.json#/$defs/ComponentId",
-                    "description": "The ID of the child component."
+                    "description": "The ID of the content component."
                   }
                 },
-                "required": ["title", "child"],
+                "required": ["label", "content"],
                 "additionalProperties": false
               }
             }
