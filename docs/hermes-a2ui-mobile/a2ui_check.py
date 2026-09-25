@@ -15,6 +15,7 @@ Checks per payload (a JSONL file or one fenced block = one reply payload):
   - network asset components are unavailable; use authenticated MEDIA: instead
   - MiniChart needs >= 2 points, each with a numeric value
 
+Errors: a direct width-dependent Row child without a positive integer weight.
 Warnings (do not fail): components unreachable from root; payload with several surfaces
 (Conduit convention is one surface per reply); unweighted Row mixing Text+Button
 (Conduit stacks it, so add weight only if side-by-side layout is intended).
@@ -35,6 +36,15 @@ KNOWN = {
     "Slider", "DateTimeInput",
     # Conduit app components
     "StatusBadge", "MetricTile", "MiniChart",
+}
+
+# Keep in sync with _stackInRowComponentTypes in Conduit's read-time normalizer.
+# These supported component types need a bounded, allocated share of horizontal
+# space when placed directly in a Row. MetricTile-only rows remain comparable
+# when each tile has a positive weight; otherwise the client repairs old data.
+ROW_WIDTH_DEPENDENT = {
+    "MetricTile", "MiniChart", "StatusBadge", "Slider", "TextField",
+    "ChoicePicker", "DateTimeInput", "Card", "Column", "Row", "List", "Tabs",
 }
 
 REQUIRED = {
@@ -68,6 +78,11 @@ def _num(v):
         return math.isfinite(v)
     except OverflowError:
         return False
+
+
+def _has_positive_weight(component):
+    weight = component.get("weight")
+    return isinstance(weight, int) and not isinstance(weight, bool) and weight > 0
 
 
 def check_components(name, comps, errors, warnings):
@@ -192,14 +207,22 @@ def check_components(name, comps, errors, warnings):
         if orphans:
             warnings.append(f"{name}: unreachable from root: {orphans}")
 
-    # Phone-layout heuristic: unweighted Row mixing Text + Button
+    # Phone-layout validation: width-dependent direct children need flex space.
     for c in comps:
         if isinstance(c, dict) and c.get("component") == "Row" and isinstance(c.get("children"), list):
             kids = [by_id[k] for k in c["children"] if k in by_id]
             types = [k.get("component") for k in kids]
+            for child in kids:
+                child_type = child.get("component")
+                if child_type in ROW_WIDTH_DEPENDENT and not _has_positive_weight(child):
+                    errors.append(
+                        f"{name}: Row {c.get('id')!r} has width-dependent child "
+                        f"{child.get('id')!r} ({child_type}) without a positive integer weight; "
+                        "add weight to the direct child or use a Column"
+                    )
             if "Text" in types and "Button" in types:
                 texts = [k for k in kids if k.get("component") == "Text"]
-                if any("weight" not in k for k in texts):
+                if any(not _has_positive_weight(k) for k in texts):
                     warnings.append(
                         f"{name}: Row {c.get('id')!r} mixes Text+Button without weight; "
                         "Conduit stacks such rows (add weight only if side-by-side is intended)"

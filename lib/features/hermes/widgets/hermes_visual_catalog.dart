@@ -122,6 +122,11 @@ Widget _buildStatusBadge(CatalogItemContext context) {
   final stateLabel = state.label;
   final semanticLabel = [label, stateLabel, ?detail].join('. ');
 
+  final icon = Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Icon(state.icon, color: color, size: 22),
+  );
+
   return Semantics(
     label: semanticLabel,
     child: ExcludeSemantics(
@@ -133,32 +138,44 @@ Widget _buildStatusBadge(CatalogItemContext context) {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(state.icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: theme.textTheme.titleSmall),
-                    Text(
-                      stateLabel,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isBounded = constraints.hasBoundedWidth;
+              final details = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBounded ? label : _shortDisplayText(label, 18),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  Text(
+                    stateLabel,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
                     ),
-                    if (detail != null)
-                      Text(detail, style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                  if (detail != null)
+                    Text(
+                      isBounded ? detail : _shortDisplayText(detail, 20),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                ],
+              );
+              return isBounded
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        icon,
+                        const SizedBox(width: 10),
+                        Expanded(child: details),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [icon, const SizedBox(height: 6), details],
+                    );
+            },
           ),
         ),
       ),
@@ -205,67 +222,84 @@ Widget _buildMetricTile(CatalogItemContext context) {
   final semantics = [
     label,
     valueText,
+    if (hasRange)
+      'Range ${_formatNumber(min)} to ${_formatNumber(max)}${unit == null ? '' : ' $unit'}',
     ?rangeText,
     ?_withPrefix(source, 'Source: '),
     ?_withPrefix(asOf, 'As of '),
   ].join('. ');
 
-  return Semantics(
-    label: semantics,
-    child: ExcludeSemantics(
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(
-                valueText,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (hasRange && inRange) ...[
-                const SizedBox(height: 10),
-                LinearProgressIndicator(
-                  value: ((value - min) / (max - min))
-                      .clamp(0.0, 1.0)
-                      .toDouble(),
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(8),
-                  color: color,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_formatNumber(min)} – ${_formatNumber(max)}${unit == null ? '' : ' $unit'}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-              if (rangeText != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  rangeText,
-                  style: theme.textTheme.bodySmall?.copyWith(color: color),
-                ),
-              ],
-              if (source != null || asOf != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  [?source, ?asOf].join(' · '),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final isBounded = constraints.hasBoundedWidth;
+      return Semantics(
+        label: semantics,
+        child: ExcludeSemantics(
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBounded ? label : _shortDisplayText(label, 18),
+                    style: theme.textTheme.titleSmall,
                   ),
-                ),
-              ],
-            ],
+                  const SizedBox(height: 4),
+                  Text(
+                    valueText,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (hasRange && inRange && constraints.hasBoundedWidth) ...[
+                    const SizedBox(height: 10),
+                    LinearProgressIndicator(
+                      value: ((value - min) / (max - min))
+                          .clamp(0.0, 1.0)
+                          .toDouble(),
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(8),
+                      color: color,
+                    ),
+                  ],
+                  if (hasRange) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_formatNumber(min)} – ${_formatNumber(max)}${unit == null ? '' : ' $unit'}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                  if (rangeText != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      isBounded ? rangeText : _shortDisplayText(rangeText, 18),
+                      style: theme.textTheme.bodySmall?.copyWith(color: color),
+                    ),
+                  ],
+                  if (source != null || asOf != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      [
+                        if (source != null)
+                          isBounded ? source : _shortDisplayText(source, 12),
+                        if (asOf != null)
+                          isBounded ? asOf : _shortDisplayText(asOf, 12),
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -319,105 +353,131 @@ Widget _buildMiniChart(CatalogItemContext context) {
   final summary =
       '$label, ${points.length} observations, from ${points.first.label} ${_formatNumber(points.first.value)}${unit == null ? '' : ' $unit'} to ${points.last.label} ${_formatNumber(points.last.value)}${unit == null ? '' : ' $unit'}, range ${_formatNumber(minimum)} to ${_formatNumber(maximum)}${unit == null ? '' : ' $unit'}.';
 
-  return Semantics(
-    label: [
-      summary,
-      if (source != null) 'Source: $source',
-      if (asOf != null) 'As of $asOf',
-    ].join(' '),
-    child: ExcludeSemantics(
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.titleSmall),
-              const SizedBox(height: 12),
-              Row(
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      if (!constraints.hasBoundedWidth) {
+        final compactMessage = [
+          '${points.length} samples',
+          'Latest ${_formatNumber(points.last.value)}${unit == null ? '' : ' $unit'}',
+          if (source != null) 'Source: ${_shortDisplayText(source, 12)}',
+          if (asOf != null) 'As of ${_shortDisplayText(asOf, 12)}',
+        ].join('\n');
+        return Semantics(
+          label: [
+            summary,
+            if (source != null) 'Source: $source',
+            if (asOf != null) 'As of $asOf',
+          ].join(' '),
+          child: ExcludeSemantics(
+            child: _chartFallback(
+              context,
+              _shortDisplayText(label, 18),
+              compactMessage,
+            ),
+          ),
+        );
+      }
+      return Semantics(
+        label: [
+          summary,
+          if (source != null) 'Source: $source',
+          if (asOf != null) 'As of $asOf',
+        ].join(' '),
+        child: ExcludeSemantics(
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 52,
-                    height: 132,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _formatAxisNumber(maximum),
-                          style: theme.textTheme.labelSmall,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
+                  Text(label, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 52,
+                        height: 132,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              _formatAxisNumber(maximum),
+                              style: theme.textTheme.labelSmall,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              _formatAxisNumber(minimum),
+                              style: theme.textTheme.labelSmall,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Text(
-                          _formatAxisNumber(minimum),
-                          style: theme.textTheme.labelSmall,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 132,
+                          child: CustomPaint(
+                            key: const ValueKey<String>('hermes-mini-chart'),
+                            painter: _MiniChartPainter(
+                              points: points,
+                              kind: kind as String,
+                              color: color,
+                              gridColor: theme.colorScheme.outlineVariant,
+                              baseline: math.min(0, minimum),
+                            ),
+                            child: const SizedBox.expand(),
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      height: 132,
-                      child: CustomPaint(
-                        key: const ValueKey<String>('hermes-mini-chart'),
-                        painter: _MiniChartPainter(
-                          points: points,
-                          kind: kind as String,
-                          color: color,
-                          gridColor: theme.colorScheme.outlineVariant,
-                          baseline: math.min(0, minimum),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          points.first.label,
+                          style: theme.textTheme.labelSmall,
                         ),
-                        child: const SizedBox.expand(),
+                      ),
+                      if (points.length > 2)
+                        Text(
+                          '${points.length} samples',
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      Expanded(
+                        child: Text(
+                          points.last.label,
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (unit != null || source != null || asOf != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      [?unit, ?source, ?asOf].join(' · '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      points.first.label,
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ),
-                  if (points.length > 2)
-                    Text(
-                      '${points.length} samples',
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  Expanded(
-                    child: Text(
-                      points.last.label,
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ),
-                ],
-              ),
-              if (unit != null || source != null || asOf != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  [?unit, ?source, ?asOf].join(' · '),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -461,6 +521,11 @@ String? _boundedText(Object? value, {required int maxLength}) {
   final trimmed = value.trim();
   return trimmed.isEmpty ? null : trimmed;
 }
+
+String _shortDisplayText(String value, int maxCharacters) =>
+    value.length <= maxCharacters
+    ? value
+    : '${value.substring(0, maxCharacters - 1)}…';
 
 bool _optionalTextIsValid(
   Map<String, Object?> data,

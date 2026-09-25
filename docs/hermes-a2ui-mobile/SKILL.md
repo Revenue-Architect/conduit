@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
 description: "Compose native A2UI v0.9 interfaces in Conduit for diverse data, decisions, forms, workflows, and interactive answers."
-version: 0.5.0
+version: 0.6.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -34,7 +34,7 @@ Infer the user's task and select the smallest useful composition. These are star
 | Decide among options | Distinct Buttons for a few immediate choices; ChoicePicker for a single or multi-selection that needs confirmation |
 | Enter or update information | Only the needed TextField, CheckBox, Slider, ChoicePicker, or DateTimeInput controls, then one clear submit action |
 | Review a checklist or sequence | List or Column of short items; CheckBox only if the user must mark items; no fake completion state |
-| Compare items | Equal-weight Row for two short MetricTiles, or stacked Cards/List for longer descriptions; state the basis and units |
+| Compare items | Equal-weight Row for short MetricTiles, or stacked Cards/List for longer descriptions; state the basis and units |
 | Explore grouped details | Tabs when groups are distinct and each has useful content; otherwise a Column or specific details action |
 | See change over time | MiniChart for one series of 2–60 observed samples; MetricTile for one value; Chart.js for complex visualization |
 | Get a diagram, image, or report | Mermaid, `MEDIA:`, or a document artifact respectively; A2UI may complement but should not replace the actual artifact |
@@ -79,7 +79,9 @@ Do not place remote image URLs in `Image`; that component is unavailable for age
 ## Phone layout
 
 - Design for about 300 logical pixels of content width inside the phone chat column. Keep all text and buttons within that width, including at larger text scale.
-- Prefer a `Column` for mixed content and actions. Use a `Row` only for short comparable values; use `List` for repeated items and `Tabs` for genuinely distinct groups.
+- Prefer a `Column` for mixed content and actions. Use a `Row` only when side-by-side reading helps; use `List` for repeated items and `Tabs` for genuinely distinct groups.
+- Every direct `MetricTile`, `MiniChart`, `StatusBadge`, `Slider`, `TextField`, `ChoicePicker`, `DateTimeInput`, `Card`, `Column`, `Row`, `List`, or `Tabs` child in a `Row` must have a positive integer `weight`. This applies to overview dashboards as well as comparison cards. For two short comparable metrics, use `weight: 1` on both tiles. Conduit's read-time repair protects saved older messages, but author new output correctly.
+- Use a `Column` when a value or label is long, when a chart or control needs room, or when a weighted interactive row would be cramped or make reading order unclear. Do not force a side-by-side layout just to make a dashboard compact.
 - Never put a long sentence beside a button in a `Row`. If a short row is essential, give the wrapping `Text` child an integer `weight` of 1 and keep the button label short. Conduit repairs the known unweighted Text+Button row by stacking it, but generated output should already be correct.
 - Keep multiple actions vertically stacked. Give each a semantic event name identifying intent and target, such as `item.inspect` with a small `context` containing the item ID. Do not reuse one ambiguous action for different targets.
 - Keep titles and labels short. Avoid broad tables, paragraphs inside cards, nested card stacks, and long button labels.

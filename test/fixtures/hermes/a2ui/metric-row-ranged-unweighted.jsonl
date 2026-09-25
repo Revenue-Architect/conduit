@@ -1,0 +1,2 @@
+{"version":"v0.9","createSurface":{"surfaceId":"synthetic-metric","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"synthetic-metric","components":[{"id":"root","component":"Row","children":["cpu"]},{"id":"cpu","component":"MetricTile","label":"CPU use","value":65,"unit":"%","min":0,"max":100,"state":"ok","source":"Synthetic test data"}]}}

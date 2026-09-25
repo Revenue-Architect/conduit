@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:checks/checks.dart';
 import 'package:conduit/core/models/chat_message.dart';
@@ -167,10 +169,23 @@ Widget _buildAssistantHarness(
   bool? isChatStreaming,
   bool disableAnimations = false,
   bool showActionBar = true,
+  bool scrollable = false,
   VoidCallback? onCopy,
   VoidCallback? onRegenerate,
   FutureOr<void> Function(String suggestion)? onFollowUpSelected,
 }) {
+  final assistantMessage = AssistantMessageWidget(
+    message: message,
+    isStreaming: isStreaming,
+    showFollowUps: showFollowUps,
+    showActionBar: showActionBar,
+    animateOnMount: false,
+    modelName: message.model,
+    onCopy: onCopy ?? () {},
+    onRegenerate: onRegenerate ?? () {},
+    onDelete: () {},
+    onFollowUpSelected: onFollowUpSelected,
+  );
   return ProviderScope(
     overrides: [
       textToSpeechControllerProvider.overrideWith(
@@ -194,18 +209,9 @@ Widget _buildAssistantHarness(
         child: child!,
       ),
       home: Scaffold(
-        body: AssistantMessageWidget(
-          message: message,
-          isStreaming: isStreaming,
-          showFollowUps: showFollowUps,
-          showActionBar: showActionBar,
-          animateOnMount: false,
-          modelName: message.model,
-          onCopy: onCopy ?? () {},
-          onRegenerate: onRegenerate ?? () {},
-          onDelete: () {},
-          onFollowUpSelected: onFollowUpSelected,
-        ),
+        body: scrollable
+            ? SingleChildScrollView(child: assistantMessage)
+            : assistantMessage,
       ),
     ),
   );
@@ -414,6 +420,92 @@ void main() {
     expect(
       find.textContaining('createSurface', findRichText: true),
       findsNothing,
+    );
+  });
+
+  testWidgets('Hermes Markdown and a saved metric dashboard both render', (
+    tester,
+  ) async {
+    final payload = File(
+      'test/fixtures/hermes/a2ui/synthetic-22-component-dashboard.jsonl',
+    ).readAsStringSync();
+    final selected = <String>[];
+    final message = ChatMessage(
+      id: 'hermes-a2ui-saved-metric-row',
+      role: 'assistant',
+      content: 'Here is the synthetic overview.\n```a2ui\n$payload\n```',
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport, 'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+        scrollable: true,
+        onFollowUpSelected: selected.add,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesA2uiSurface), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Here is the synthetic overview.',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Synthetic system overview'), findsOneWidget);
+    expect(find.text('65 %'), findsOneWidget);
+    expect(
+      find.textContaining('createSurface', findRichText: true),
+      findsNothing,
+    );
+    await tester.ensureVisible(find.text('Refresh'));
+    await tester.tap(find.text('Refresh'));
+    await tester.pump();
+
+    expect(selected, hasLength(1));
+    expect(selected.single, startsWith('[A2UI_INTERACTION]\n'));
+    final interaction = jsonDecode(
+      selected.single.substring('[A2UI_INTERACTION]\n'.length),
+    ) as Map<String, dynamic>;
+    expect(
+      (interaction['action'] as Map<String, dynamic>)['name'],
+      'dashboard.refresh',
+    );
+  });
+
+  testWidgets('Hermes ordinary json fences remain Markdown code', (
+    tester,
+  ) async {
+    const content = '''
+Example JSON, not a UI:
+```json
+{"version":"v0.9","createSurface":{"surfaceId":"example"}}
+```
+''';
+    final message = ChatMessage(
+      id: 'hermes-json-example',
+      role: 'assistant',
+      content: content,
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport, 'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HermesA2uiSurface), findsNothing);
+    expect(
+      find.textContaining('createSurface', findRichText: true),
+      findsOneWidget,
     );
   });
 

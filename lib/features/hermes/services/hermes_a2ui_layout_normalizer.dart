@@ -16,9 +16,33 @@ import 'package:json_schema_builder/json_schema_builder.dart';
 const hermesA2uiMaxPayloadBytes = 256 * 1024;
 const hermesA2uiMaxComponents = 100;
 const hermesA2uiMaxComponentDepth = 12;
+// Longer or data-bound Text in an unweighted Row is too unpredictable to
+// compare side by side on a phone; stack it instead.
+const _maxShortUnweightedRowTextLength = 36;
 const _basicCatalogId =
     'https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json';
 const _catalogSchemaId = 'https://a2ui.org/specification/v0_9/catalog.json';
+
+// Unweighted direct children of these supported types are stacked: MiniChart,
+// StatusBadge, Slider, TextField, ChoicePicker, DateTimeInput, Card, Column,
+// Row, List, and Tabs. They either contain their own flex layout or need the
+// full row width to remain legible. Asset components (Image, AudioPlayer, and
+// Video) are unavailable in the no-asset catalog. MetricTile is intentionally
+// excluded: rows made only of comparable metric tiles stay side-by-side and
+// each unweighted tile receives a flex weight instead.
+const _stackInRowComponentTypes = {
+  'MiniChart',
+  'StatusBadge',
+  'Slider',
+  'TextField',
+  'ChoicePicker',
+  'DateTimeInput',
+  'Card',
+  'Column',
+  'Row',
+  'List',
+  'Tabs',
+};
 final _actionNamePattern = RegExp(
   r'^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$',
 );
@@ -60,8 +84,11 @@ class HermesA2uiNormalizationResult {
 }
 
 /// Validates and repairs a completed A2UI v0.9 block before GenUI receives it.
-/// Only a Row with both an unweighted Text child and a Button child becomes a
-/// Column. Component IDs, order, properties, and event actions are preserved.
+/// Unweighted MetricTile-only rows receive flex weights for comparison. Rows
+/// containing charts, badges, width-dependent built-in controls/media, mixed
+/// metric content, or an unweighted Text beside a Button become Columns.
+/// Existing positive weights, component IDs, order, values, and actions remain
+/// unchanged.
 ///
 /// The block is limited to the registered catalog, bounded in size, checked
 /// against GenUI's component schemas without network access, and checked for a
@@ -155,6 +182,7 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
           surfaceId,
           () => <String, Map<String, dynamic>>{},
         );
+        final normalizedComponents = <Map<String, dynamic>>[];
         final idsInUpdate = <String>{};
         for (final rawComponent in rawComponents) {
           final component = Map<String, dynamic>.from(
@@ -175,6 +203,7 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
             return const HermesA2uiNormalizationResult.invalid();
           }
           components[id] = component;
+          normalizedComponents.add(component);
         }
         if (components.length > hermesA2uiMaxComponents) {
           return const HermesA2uiNormalizationResult.invalid();
@@ -182,9 +211,7 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
         updatedSurfaceIds.add(surfaceId);
         message['updateComponents'] = {
           ...update,
-          'components': rawComponents
-              .map((component) => Map<String, dynamic>.from(component as Map))
-              .toList(growable: false),
+          'components': normalizedComponents,
         };
 
       case 'updateDataModel':
@@ -264,9 +291,11 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
 
       var hasButton = false;
       Map<String, dynamic>? unweightedText;
+      final children = <Map<String, dynamic>>[];
       for (final childId in childIds.cast<String>()) {
         final child = componentsById[childId];
         if (child == null) continue;
+        children.add(child);
         if (child['component'] == 'Button') hasButton = true;
         if (child['component'] == 'Text') {
           final weight = child['weight'];
@@ -274,7 +303,50 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
         }
       }
 
-      if (hasButton && unweightedText != null) {
+      final childTypes = children
+          .map((child) => child['component'])
+          .whereType<String>()
+          .toSet();
+      final allMetricTiles =
+          children.isNotEmpty &&
+          children.every((child) => child['component'] == 'MetricTile');
+      if (allMetricTiles) {
+        for (final child in children) {
+          // An explicitly weighted tile is already safe and may encode a
+          // deliberate unequal comparison. Never rewrite it.
+          if (child.containsKey('weight')) continue;
+          child['weight'] = 1;
+          changed = true;
+        }
+        continue;
+      }
+
+      final hasUnweightedWidthDependentChild = children.any(
+        (child) =>
+            _stackInRowComponentTypes.contains(child['component']) &&
+            !_hasPositiveWeight(child),
+      );
+      final hasUnweightedMetricTile = children.any(
+        (child) =>
+            child['component'] == 'MetricTile' && !_hasPositiveWeight(child),
+      );
+      final hasLongUnweightedText = children.any((child) {
+        if (child['component'] != 'Text' || _hasPositiveWeight(child)) {
+          return false;
+        }
+        final text = child['text'];
+        return text is! String ||
+            text.trim().length > _maxShortUnweightedRowTextLength;
+      });
+      final mixedMetricRow =
+          childTypes.contains('MetricTile') && hasUnweightedMetricTile;
+      final mustStack =
+          (hasButton && unweightedText != null) ||
+          hasUnweightedWidthDependentChild ||
+          hasLongUnweightedText ||
+          mixedMetricRow;
+
+      if (mustStack && component['component'] == 'Row') {
         component['component'] = 'Column';
         // Keep the surface-wide component graph in sync with the message map.
         componentsById[component['id'] as String] = component;
@@ -315,6 +387,9 @@ bool _hasHermesEventAction(Object? action) {
       name.length <= 80 &&
       _actionNamePattern.hasMatch(name);
 }
+
+bool _hasPositiveWeight(Map<String, dynamic> component) =>
+    component['weight'] is int && (component['weight'] as int) > 0;
 
 bool _hasSafeComponentGraph(Map<String, Map<String, dynamic>> components) {
   final visiting = <String>{};

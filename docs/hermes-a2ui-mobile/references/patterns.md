@@ -34,9 +34,20 @@ Notes: tab titles live inside the Tabs component; a refresh action returns the w
 {"version":"v0.9","updateComponents":{"surfaceId":"plan-comparison-01","components":[{"id":"root","component":"Card","child":"content"},{"id":"content","component":"Column","children":["title","row","note"]},{"id":"title","component":"Text","text":"Plan comparison","variant":"h4"},{"id":"row","component":"Row","children":["pro","basic"]},{"id":"pro","component":"MetricTile","label":"Pro","value":35,"unit":"CAD/mo","weight":1},{"id":"basic","component":"MetricTile","label":"Basic","value":12,"unit":"CAD/mo","weight":1},{"id":"note","component":"Text","text":"Entered by hand; no live pricing checked.","variant":"caption"}]}}
 ```
 
-Notes: `weight: 1` on the direct Row children keeps the tiles side by side; without weights Conduit stacks them.
+Notes: give every direct width-consuming Row child a positive integer weight. `weight: 1` on both direct MetricTile children keeps short comparable values side by side; use a Column when values/labels are long or controls would be cramped. Conduit repairs existing saved messages at render time, but new output should already follow this rule.
 
-## 5. Multi-select picker — choose several options
+## 5. Compact two-metric overview — synthetic values
+
+These are illustrative layout values only, not live measurements. Overview dashboards follow the same finite-width rule as comparison cards.
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"synthetic-overview-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"synthetic-overview-01","components":[{"id":"root","component":"Card","child":"content"},{"id":"content","component":"Column","children":["title","metrics","note"]},{"id":"title","component":"Text","text":"System overview","variant":"h4"},{"id":"metrics","component":"Row","children":["cpu","memory"]},{"id":"cpu","component":"MetricTile","label":"CPU use","value":38,"unit":"%","min":0,"max":100,"source":"Synthetic sample","weight":1},{"id":"memory","component":"MetricTile","label":"Memory used","value":6.4,"unit":"GiB","weight":1},{"id":"note","component":"Text","text":"Illustrative values only; not a live check.","variant":"caption"}]}}
+```
+
+Both direct MetricTile children have positive weights so the ranged CPU indicator receives finite width. Use a Column instead if actual labels or values are long.
+
+## 6. Multi-select picker — choose several options
 
 ```a2ui
 {"version":"v0.9","createSurface":{"surfaceId":"alert-topics-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}

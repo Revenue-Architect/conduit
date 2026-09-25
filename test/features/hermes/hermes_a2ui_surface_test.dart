@@ -1,14 +1,325 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:conduit/features/hermes/widgets/hermes_a2ui_surface.dart';
+import 'package:conduit/features/hermes/widgets/hermes_visual_catalog.dart';
 
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genui/genui.dart' show Surface;
+import 'package:genui/genui.dart'
+    show
+        Catalog,
+        CatalogItem,
+        CatalogItemContext,
+        DataContext,
+        DataPath,
+        InMemoryDataModel,
+        Surface;
+
+Widget _catalogItemInUnboundedRow({
+  required CatalogItem item,
+  required Catalog catalog,
+  required DataContext dataContext,
+  required Map<String, Object?> data,
+}) {
+  CatalogItem? getCatalogItem(String type) {
+    for (final candidate in catalog.items) {
+      if (candidate.name == type) return candidate;
+    }
+    return null;
+  }
+
+  return MaterialApp(
+    home: Scaffold(
+      body: Builder(
+        builder: (context) => Row(
+          children: [
+            item.widgetBuilder(
+              CatalogItemContext(
+                data: data,
+                id: 'unbounded-visual',
+                type: item.name,
+                buildChild: (id, [dataContext]) => const SizedBox.shrink(),
+                dispatchEvent: (_) {},
+                buildContext: context,
+                dataContext: dataContext,
+                getComponent: (_) => null,
+                getCatalogItem: getCatalogItem,
+                surfaceId: 'unbounded-test',
+                reportError: (_, _) {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 void main() {
+  testWidgets('renders a saved ranged metric row without infinite width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final payload = File(
+      'test/fixtures/hermes/a2ui/metric-row-ranged-unweighted.jsonl',
+    ).readAsStringSync();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HermesA2uiSurface(payload: payload),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Surface), findsOneWidget);
+    expect(find.text('CPU use'), findsOneWidget);
+    expect(find.text('65 %'), findsOneWidget);
+    expect(find.text('Synthetic test data'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets(
+    'visuals have readable fallbacks under unbounded row constraints',
+    (tester) async {
+      final catalog = createHermesVisualCatalog();
+      final dataModel = InMemoryDataModel();
+      addTearDown(dataModel.dispose);
+      final dataContext = DataContext(dataModel, DataPath.root);
+      CatalogItem item(String name) =>
+          catalog.items.singleWhere((candidate) => candidate.name == name);
+
+      await tester.pumpWidget(
+        _catalogItemInUnboundedRow(
+          item: item('MetricTile'),
+          catalog: catalog,
+          dataContext: dataContext,
+          data: {
+            'label': 'CPU use',
+            'value': 65,
+            'unit': '%',
+            'min': 0,
+            'max': 100,
+            'source': 'Synthetic source',
+          },
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('65 %'), findsOneWidget);
+      expect(find.text('0 – 100 %'), findsOneWidget);
+      expect(find.textContaining('Synthetic s'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      await tester.pumpWidget(
+        _catalogItemInUnboundedRow(
+          item: item('MiniChart'),
+          catalog: catalog,
+          dataContext: dataContext,
+          data: {
+            'label': 'Network traffic',
+            'kind': 'line',
+            'unit': 'MiB/s',
+            'points': [
+              {'label': '09:00', 'value': 18},
+              {'label': '10:00', 'value': 22},
+            ],
+            'source': 'Synthetic samples',
+          },
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Network traffic'), findsOneWidget);
+      expect(find.textContaining('2 samples'), findsOneWidget);
+      expect(find.textContaining('Source: Synthetic s'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('hermes-mini-chart')),
+        findsNothing,
+      );
+
+      await tester.pumpWidget(
+        _catalogItemInUnboundedRow(
+          item: item('StatusBadge'),
+          catalog: catalog,
+          dataContext: dataContext,
+          data: {
+            'label': 'Hermes',
+            'state': 'ok',
+            'detail': 'Synthetic connection state',
+          },
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Hermes'), findsOneWidget);
+      expect(find.text('OK'), findsOneWidget);
+      expect(find.textContaining('Synthetic connectio'), findsOneWidget);
+    },
+  );
+
+  for (final width in <double>[320, 360, 412]) {
+    for (final textScale in <double>[1, 2]) {
+      for (final themeMode in <ThemeMode>[ThemeMode.light, ThemeMode.dark]) {
+        testWidgets(
+          'renders synthetic 22-component dashboard at ${width.toInt()} px, ${textScale}x, ${themeMode.name}',
+          (tester) async {
+            await tester.binding.setSurfaceSize(Size(width, 900));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final payload = File(
+              'test/fixtures/hermes/a2ui/synthetic-22-component-dashboard.jsonl',
+            ).readAsStringSync();
+
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: ThemeData(useMaterial3: true),
+                darkTheme: ThemeData.dark(useMaterial3: true),
+                themeMode: themeMode,
+                home: Scaffold(
+                  body: MediaQuery(
+                    data: MediaQueryData(
+                      size: Size(width, 900),
+                      textScaler: TextScaler.linear(textScale),
+                    ),
+                    child: SingleChildScrollView(
+                      child: HermesA2uiSurface(payload: payload),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+
+            expect(tester.takeException(), isNull);
+            expect(find.byType(Surface), findsOneWidget);
+            expect(find.text('Synthetic system overview'), findsOneWidget);
+            expect(find.text('65 %'), findsOneWidget);
+            expect(find.text('Synthetic telemetry'), findsWidgets);
+            expect(find.byType(LinearProgressIndicator), findsNWidgets(3));
+            expect(find.text('Refresh'), findsOneWidget);
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets('repaired dashboard action routes one turn with its target', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final payload = File(
+      'test/fixtures/hermes/a2ui/synthetic-22-component-dashboard.jsonl',
+    ).readAsStringSync();
+    final interactions = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HermesA2uiSurface(
+              payload: payload,
+              onInteraction: interactions.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.text('Refresh'));
+    await tester.tap(find.text('Refresh'));
+    await tester.pump();
+
+    expect(interactions, hasLength(1));
+    expect(interactions.single, startsWith('[A2UI_INTERACTION]\n'));
+    final interaction = jsonDecode(
+      interactions.single.substring('[A2UI_INTERACTION]\n'.length),
+    ) as Map<String, dynamic>;
+    expect(
+      (interaction['action'] as Map<String, dynamic>)['name'],
+      'dashboard.refresh',
+    );
+  });
+
+  testWidgets('surface reconstructs after scrolling away and back', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final payload = File(
+      'test/fixtures/hermes/a2ui/metric-row-ranged-unweighted.jsonl',
+    ).readAsStringSync();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView.builder(
+            controller: scrollController,
+            itemCount: 36,
+            itemBuilder: (context, index) => index == 1
+                ? SizedBox(
+                    key: const ValueKey('saved-a2ui-surface'),
+                    height: 220,
+                    child: HermesA2uiSurface(payload: payload),
+                  )
+                : SizedBox(height: 160, child: Text('List item $index')),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('CPU use'), findsOneWidget);
+
+    scrollController.jumpTo(scrollController.position.maxScrollExtent);
+    await tester.pump();
+    scrollController.jumpTo(0);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Surface), findsOneWidget);
+    expect(find.text('CPU use'), findsOneWidget);
+    expect(find.text('65 %'), findsOneWidget);
+  });
+
+  testWidgets('surface reconstructs after background-style subtree resume', (
+    tester,
+  ) async {
+    final payload = File(
+      'test/fixtures/hermes/a2ui/metric-row-ranged-unweighted.jsonl',
+    ).readAsStringSync();
+    Widget surface() => MaterialApp(
+      home: Scaffold(body: HermesA2uiSurface(payload: payload)),
+    );
+
+    await tester.pumpWidget(surface());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(Surface), findsOneWidget);
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pump();
+    await tester.pumpWidget(surface());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Surface), findsOneWidget);
+    expect(find.text('65 %'), findsOneWidget);
+  });
+
   testWidgets('renders an A2UI v0.9 card through the GenUI surface', (
     tester,
   ) async {

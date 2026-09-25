@@ -19,7 +19,7 @@ Source of truth: `catalog-v0_9-basic.json` and `common-types-v0_9.json` in this 
 | Divider | — | axis: horizontal vertical | |
 | Card | child | | Single child id; wrap multiples in a Column |
 | Column | children | justify: start center end spaceBetween spaceAround spaceEvenly stretch; align | `weight` allowed on direct children only |
-| Row | children | justify; align | Phone: prefer stacking; never unweighted Text+Button |
+| Row | children | justify; align | Every direct width-consuming child needs a positive integer `weight`; use a Column for long text or cramped controls. |
 | List | children | direction: vertical horizontal; align | |
 | Tabs | tabs: [{"title","child"}] | | Each tab needs title + child id |
 | Modal | trigger, content | | Both are component ids; trigger is usually a Button |
