@@ -36,6 +36,7 @@ import '../../hermes/models/hermes_model.dart';
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_local_document_service.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../direct_connections/direct_connections.dart';
 import '../../direct_connections/providers/direct_mcp_providers.dart';
 import '../../direct_connections/services/direct_mcp_client.dart';
@@ -308,6 +309,7 @@ List<IosKeyboardAttachmentActionConfig> buildIosKeyboardAttachmentActions({
 class ModernChatInput extends ConsumerStatefulWidget {
   final Function(String) onSendMessage;
   final bool enabled;
+  final bool hermezStyle;
   final double? bottomPadding;
 
   /// Keeps the Android IME and attachment keyboard in one fixed bottom region.
@@ -348,6 +350,7 @@ class ModernChatInput extends ConsumerStatefulWidget {
     super.key,
     required this.onSendMessage,
     this.enabled = true,
+    this.hermezStyle = false,
     this.bottomPadding,
     this.managesSystemKeyboardInset = false,
     this.placeholder,
@@ -4324,6 +4327,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     bool hasUploadsInProgress, {
     bool dense = false,
   }) {
+    final hermezPalette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final prominentInk = widget.hermezStyle
+        ? hermezPalette.onAccent
+        : context.conduitTheme.buttonPrimaryText;
+    final prominentFill = widget.hermezStyle ? hermezPalette.accent : null;
     final double buttonSize = conduitScaledControlExtent(
       context,
       baseExtent: dense ? _composerControlSize : TouchTarget.minimum,
@@ -4360,12 +4370,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           semanticLabel: stopLabel,
           iosSymbolSize: primaryIconSize,
           isProminent: true,
+          color: prominentFill,
           iosSymbol: 'stop.fill',
-          iosSymbolColor: context.conduitTheme.buttonPrimaryText,
+          iosSymbolColor: prominentInk,
           child: ConduitSystemAdaptiveIcon(
             Platform.isIOS ? CupertinoIcons.stop_fill : Icons.stop,
             size: primaryIconSize,
-            color: context.conduitTheme.buttonPrimaryText,
+            color: prominentInk,
           ),
         ),
       );
@@ -4399,7 +4410,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                   : Icons.arrow_upward_rounded,
               size: primaryIconSize,
               color: enabled
-                  ? context.conduitTheme.buttonPrimaryText
+                  ? prominentInk
                   : context.conduitTheme.textPrimary.withValues(
                       alpha: Alpha.disabled,
                     ),
@@ -4418,9 +4429,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
               : AppLocalizations.of(context)!.send,
           iosSymbolSize: primaryIconSize,
           isProminent: true,
+          color: prominentFill,
           iosSymbol: hasUploadsInProgress ? null : 'arrow.up',
           iosSymbolColor: enabled
-              ? context.conduitTheme.buttonPrimaryText
+              ? prominentInk
               : context.conduitTheme.textPrimary.withValues(
                   alpha: Alpha.disabled,
                 ),
@@ -4448,9 +4460,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           semanticLabel: AppLocalizations.of(context)!.voiceCallTitle,
           iosSymbolSize: primaryIconSize,
           isProminent: true,
+          color: prominentFill,
           iosSymbol: 'waveform',
           iosSymbolColor: enabledVoiceCall
-              ? context.conduitTheme.buttonPrimaryText
+              ? prominentInk
               : context.conduitTheme.textPrimary.withValues(
                   alpha: Alpha.disabled,
                 ),
@@ -4458,7 +4471,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
             Platform.isIOS ? CupertinoIcons.waveform : Icons.graphic_eq,
             size: primaryIconSize,
             color: enabledVoiceCall
-                ? context.conduitTheme.buttonPrimaryText
+                ? prominentInk
                 : context.conduitTheme.textPrimary.withValues(
                     alpha: Alpha.disabled,
                   ),
@@ -4764,10 +4777,19 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     bool isRecording = false,
   }) {
     final theme = context.conduitTheme;
-    final recordingBorderColor = theme.buttonPrimary.withValues(alpha: 0.56);
+    final hermezPalette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final surface = widget.hermezStyle
+        ? hermezPalette.surface
+        : theme.surfaceContainerHighest;
+    final recordingBorderColor =
+        (widget.hermezStyle ? hermezPalette.accent : theme.buttonPrimary)
+            .withValues(alpha: 0.56);
     final recordingSurfaceColor = Color.alphaBlend(
-      theme.buttonPrimary.withValues(alpha: 0.045),
-      theme.surfaceContainerHighest,
+      (widget.hermezStyle ? hermezPalette.accent : theme.buttonPrimary)
+          .withValues(alpha: 0.045),
+      surface,
     );
 
     if (conduitSupportsNativeGlass() && _isRouteVisible) {
@@ -4807,9 +4829,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       duration: context.motionDuration(const Duration(milliseconds: 160)),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: isRecording
-            ? recordingSurfaceColor
-            : theme.surfaceContainerHighest,
+        color: isRecording ? recordingSurfaceColor : surface,
         borderRadius: borderRadius,
       ),
       // Paint the state border over the surface instead of letting
@@ -4819,7 +4839,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       foregroundDecoration: BoxDecoration(
         borderRadius: borderRadius,
         border: Border.all(
-          color: isRecording ? recordingBorderColor : theme.cardBorder,
+          color: isRecording
+              ? recordingBorderColor
+              : widget.hermezStyle
+              ? hermezPalette.border
+              : theme.cardBorder,
           width: isRecording ? BorderWidth.thin * 1.5 : BorderWidth.thin,
         ),
       ),

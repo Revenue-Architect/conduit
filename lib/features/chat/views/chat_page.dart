@@ -7,7 +7,8 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
 
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show kDebugMode, listEquals, visibleForTesting;
 import 'package:conduit/core/services/haptic_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
@@ -53,6 +54,8 @@ import '../../hermes/services/hermes_pending_decision_store.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
+import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../core/utils/message_tree_utils.dart' as message_tree;
 import '../../../core/utils/user_display_name.dart';
@@ -3665,6 +3668,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   // Inline editing handled by UserMessageBubble. Dialog flow removed.
 
+  bool get _useHermezChatVisuals {
+    final selected = ref.read(selectedModelProvider);
+    final conversation = ref.read(activeConversationProvider);
+    return shouldUseHermezChatVisuals(
+      debugBuild: kDebugMode,
+      android: Platform.isAndroid,
+      hermes:
+          ref.read(hermesOnlyModeProvider) ||
+          (selected != null && isHermesModel(selected)) ||
+          isNativeHermesConversation(conversation),
+    );
+  }
+
   Widget _buildEmptyState(ThemeData theme) {
     final l10n = AppLocalizations.of(context)!;
     final authUser = ref.watch(currentUserProvider2);
@@ -3811,11 +3827,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       opacity: _greetingReady ? 1 : 0,
                       child: Align(
                         alignment: Alignment.center,
-                        child: Text(
-                          _greetingReady ? greetingDisplay : '',
-                          style: greetingStyle,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: _useHermezChatVisuals
+                            ? HermezEmptyChatGreeting(
+                                greeting: _greetingReady ? greetingDisplay : '',
+                              )
+                            : Text(
+                                _greetingReady ? greetingDisplay : '',
+                                style: greetingStyle,
+                                textAlign: TextAlign.center,
+                              ),
                       ),
                     ),
                   ),
@@ -4001,6 +4021,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   }
                   return ModernChatInput(
                     onSendMessage: _handleMessageSend,
+                    hermezStyle: _useHermezChatVisuals,
+                    placeholder: _useHermezChatVisuals
+                        ? 'Message Hermez'
+                        : null,
                     enabled: debugCanSubmitChatMessageForTesting(
                       isLoadingConversation: isLoadingConversation,
                       isSavingTemporary: _isSavingTemporary,
@@ -4129,6 +4153,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
     final hermesBot = chatHermesBotPresentation(activeConversation);
+    final hermezVisuals = _useHermezChatVisuals;
+    final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);
     final formattedModelName = selectedModel != null
         ? _formatModelDisplayName(selectedModel.name)
         : null;
@@ -4192,106 +4218,119 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           modelLabel: modelLabel,
           hermesBot: hermesBot,
         ),
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: _dismissComposerFocus,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Consumer(
-                  builder: (context, listRef, _) {
-                    return RepaintBoundary(
-                      child: _buildMessagesList(theme, listRef),
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: ConduitChromeGradientFade.top(
-                  contentHeight:
-                      MediaQuery.viewPaddingOf(context).top +
-                      conduitAdaptiveToolbarHeightOf(context),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: ConduitChromeGradientFade.bottom(
-                  contentHeight: math.max(
-                    0,
-                    math.max(
-                      _inputHeight - Spacing.xl,
-                      MediaQuery.viewPaddingOf(context).bottom + Spacing.xxl,
-                    ),
+        body: ColoredBox(
+          color: hermezVisuals
+              ? hermezPalette.canvas
+              : theme.scaffoldBackgroundColor,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _dismissComposerFocus,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Consumer(
+                    builder: (context, listRef, _) {
+                      return RepaintBoundary(
+                        child: _buildMessagesList(theme, listRef),
+                      );
+                    },
                   ),
-                  fadeHeight: Spacing.md,
                 ),
-              ),
-              Positioned(
-                bottom: (_inputHeight > 0)
-                    ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
-                    : (Spacing.xxl + Spacing.xxxl),
-                left: 0,
-                right: 0,
-                child: AnimatedSwitcher(
-                  duration: context.motionDuration(
-                    AnimationDuration.microInteraction,
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: ConduitChromeGradientFade.top(
+                    contentHeight:
+                        MediaQuery.viewPaddingOf(context).top +
+                        conduitAdaptiveToolbarHeightOf(context),
+                    backgroundColor: hermezVisuals
+                        ? hermezPalette.canvas
+                        : null,
                   ),
-                  switchInCurve: AnimationCurves.microInteraction,
-                  switchOutCurve: AnimationCurves.microInteraction,
-                  transitionBuilder: (child, animation) {
-                    final slideAnimation = Tween<Offset>(
-                      begin: context.reduceMotion
-                          ? Offset.zero
-                          : const Offset(0, 0.15),
-                      end: Offset.zero,
-                    ).animate(animation);
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: slideAnimation,
-                        child: child,
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ConduitChromeGradientFade.bottom(
+                    contentHeight: math.max(
+                      0,
+                      math.max(
+                        _inputHeight - Spacing.xl,
+                        MediaQuery.viewPaddingOf(context).bottom + Spacing.xxl,
                       ),
-                    );
-                  },
-                  child: ThemedSheets.hideNativeChromeWhileCovered(
-                    child: Consumer(
-                      builder: (context, scrollButtonRef, _) {
-                        final hasMessages = scrollButtonRef.watch(
-                          hasChatMessagesProvider,
-                        );
-                        return debugShouldRenderScrollToLatestForTesting(
-                              requested: _showScrollToBottom,
-                              hasScrollableContent: canScroll,
-                              hasMessages: hasMessages,
-                            )
-                            ? Center(
-                                key: const ValueKey('scroll_to_bottom_visible'),
-                                child: AdaptiveTooltip(
-                                  message: l10n.scrollToBottom,
-                                  child: _buildScrollToBottomButton(context),
-                                ),
+                    ),
+                    fadeHeight: Spacing.md,
+                    backgroundColor: hermezVisuals
+                        ? hermezPalette.canvas
+                        : null,
+                  ),
+                ),
+                Positioned(
+                  bottom: (_inputHeight > 0)
+                      ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
+                      : (Spacing.xxl + Spacing.xxxl),
+                  left: 0,
+                  right: 0,
+                  child: AnimatedSwitcher(
+                    duration: context.motionDuration(
+                      AnimationDuration.microInteraction,
+                    ),
+                    switchInCurve: AnimationCurves.microInteraction,
+                    switchOutCurve: AnimationCurves.microInteraction,
+                    transitionBuilder: (child, animation) {
+                      final slideAnimation = Tween<Offset>(
+                        begin: context.reduceMotion
+                            ? Offset.zero
+                            : const Offset(0, 0.15),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: slideAnimation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: ThemedSheets.hideNativeChromeWhileCovered(
+                      child: Consumer(
+                        builder: (context, scrollButtonRef, _) {
+                          final hasMessages = scrollButtonRef.watch(
+                            hasChatMessagesProvider,
+                          );
+                          return debugShouldRenderScrollToLatestForTesting(
+                                requested: _showScrollToBottom,
+                                hasScrollableContent: canScroll,
+                                hasMessages: hasMessages,
                               )
-                            : const SizedBox.shrink(
-                                key: ValueKey('scroll_to_bottom_hidden'),
-                              );
-                      },
+                              ? Center(
+                                  key: const ValueKey(
+                                    'scroll_to_bottom_visible',
+                                  ),
+                                  child: AdaptiveTooltip(
+                                    message: l10n.scrollToBottom,
+                                    child: _buildScrollToBottomButton(context),
+                                  ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey('scroll_to_bottom_hidden'),
+                                );
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildComposerSection(context),
-              ),
-              ChatVoiceModeOverlay(bottomOffset: _inputHeight),
-            ],
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildComposerSection(context),
+                ),
+                ChatVoiceModeOverlay(bottomOffset: _inputHeight),
+              ],
+            ),
           ),
         ),
       ),
@@ -4385,6 +4424,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       showModelDropdown: showModelDropdown,
       hermesBot: hermesBot,
       hermesBotActive: hermesBot != null && ref.watch(isChatStreamingProvider),
+      hermezVisuals: _useHermezChatVisuals,
     );
     final actionDescriptors = _buildAdaptiveToolbarActions(
       context: context,
@@ -4436,6 +4476,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool showModelDropdown,
     required HermesBotChatPresentation? hermesBot,
     required bool hermesBotActive,
+    required bool hermezVisuals,
   }) {
     if (hermesBot != null) {
       return _HermesBotToolbarTitle(
@@ -4447,6 +4488,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ConduitAdaptiveAppBarModelSelector(
       label: modelLabel,
       maxWidth: maxModelWidth,
+      textStyle: hermezVisuals
+          ? AppTypography.bodyMediumStyle.copyWith(
+              color: HermezChatPalette.forBrightness(
+                Theme.of(context).brightness,
+              ).ink,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+            )
+          : null,
       isLoading: isLoadingConversation || _isOpeningModelSelector,
       showChevron: showModelDropdown,
       onPressed: () => _openModelSelector(context),

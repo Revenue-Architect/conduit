@@ -1,6 +1,8 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/core/services/haptic_service.dart';
 import 'package:conduit/l10n/app_localizations.dart';
@@ -17,6 +19,7 @@ import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/file_type_utils.dart';
 import '../../../shared/utils/locale_display_formatters.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../providers/chat_providers.dart';
 import '../utils/file_utils.dart';
@@ -781,6 +784,14 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
 
   Widget _buildUserMessage() {
     final theme = context.conduitTheme;
+    final hermezVisuals = shouldUseHermezChatVisuals(
+      debugBuild: kDebugMode,
+      android: Platform.isAndroid,
+      hermes: widget.isHermesConversation,
+    );
+    final hermezPalette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     final rawContent = widget.message.content as String;
     final interactionLabel = widget.isHermesConversation
         ? hermesA2uiInteractionLabel(rawContent)
@@ -799,9 +810,11 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
       MediaQuery.sizeOf(context).width * 0.78,
       640.0,
     );
-    final bubbleBorderColor = theme.chatBubbleUserText.withValues(
-      alpha: theme.isDark ? 0.16 : 0.08,
-    );
+    final bubbleBorderColor = hermezVisuals
+        ? hermezPalette.userBubble
+        : theme.chatBubbleUserText.withValues(
+            alpha: theme.isDark ? 0.16 : 0.08,
+          );
     const bubbleBorderRadius = BorderRadius.only(
       topLeft: Radius.circular(AppBorderRadius.chatBubble),
       topRight: Radius.circular(AppBorderRadius.chatBubble),
@@ -844,7 +857,9 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                         key: const Key('user-message-bubble-surface'),
                         padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
                         decoration: BoxDecoration(
-                          color: theme.chatBubbleUser,
+                          color: hermezVisuals
+                              ? hermezPalette.userBubble
+                              : theme.chatBubbleUser,
                           borderRadius: bubbleBorderRadius,
                           border: Border.all(
                             color: bubbleBorderColor,
@@ -894,7 +909,9 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                             : Text(
                                 visibleContent,
                                 style: AppTypography.chatMessageStyle.copyWith(
-                                  color: theme.chatBubbleUserText,
+                                  color: hermezVisuals
+                                      ? hermezPalette.onUserBubble
+                                      : theme.chatBubbleUserText,
                                 ),
                                 softWrap: true,
                                 textAlign: TextAlign.left,
