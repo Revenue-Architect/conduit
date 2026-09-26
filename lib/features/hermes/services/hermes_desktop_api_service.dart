@@ -283,6 +283,32 @@ final class HermesDesktopApiService
     }
   }
 
+  /// Kanban JSON uses the same native PKCE bearer and refresh path as Desktop
+  /// Gateway REST. The installed OAuth gate accepts valid native bearer tokens
+  /// on plugin routes; this method cannot reach a different API namespace.
+  Future<Object?> requestKanbanJson(
+    String method,
+    String path, {
+    String? board,
+    Map<String, Object?>? body,
+  }) {
+    if (_closed ||
+        config.desktopAuthKind != HermesDesktopAuthKind.nativePkce ||
+        !const {'GET', 'POST', 'PATCH'}.contains(method) ||
+        !path.startsWith('/api/plugins/kanban/') ||
+        path.contains('..') ||
+        (path != '/api/plugins/kanban/boards' &&
+            (board == null || board.trim().isEmpty))) {
+      throw StateError('Invalid native Kanban request.');
+    }
+    return _requestJson(
+      method,
+      path,
+      query: board == null ? null : {'board': board},
+      body: body,
+    );
+  }
+
   Stream<HermesDesktopTurnState> get turnStates => _turnStates.stream;
   Stream<HermesDesktopTurnState> turnStatesFor(String storedId) =>
       Stream<HermesDesktopTurnState>.multi((controller) {

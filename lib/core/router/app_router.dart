@@ -37,6 +37,7 @@ import '../../features/profile/views/app_customization_page.dart';
 import '../../features/profile/views/audio_settings_page.dart';
 import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
+import '../../features/hermes/kanban/hermes_kanban_page.dart';
 import '../../features/hermes/views/hermes_mcp_page.dart';
 import '../../features/profile/views/personalization_page.dart';
 import '../../features/profile/views/profile_page.dart';
@@ -71,6 +72,7 @@ bool _isAccountlessBackendLocation(String location) {
       isDirectConnectionsLocation(location) ||
       location == Routes.hermesSettings ||
       location == Routes.hermesJobs ||
+      location == Routes.hermesKanban ||
       location == Routes.about;
 }
 
@@ -687,6 +689,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       name: RouteNames.hermesJobs,
       pageBuilder: (context, state) =>
           _buildPlatformPage(state: state, child: const HermesJobsPage()),
+    ),
+    GoRoute(
+      path: Routes.hermesKanban,
+      name: RouteNames.hermesKanban,
+      pageBuilder: (context, state) =>
+          _buildPlatformPage(state: state, child: const HermesKanbanPage()),
     ),
     GoRoute(
       path: Routes.hermesMcp,

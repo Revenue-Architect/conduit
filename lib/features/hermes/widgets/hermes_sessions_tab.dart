@@ -1,8 +1,10 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/services/haptic_service.dart';
+import '../../../core/services/navigation_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
@@ -14,6 +16,7 @@ import '../../navigation/widgets/chats_drawer.dart'
     show sidebarSectionDisclosureIcon;
 import '../../navigation/widgets/drawer_section_notifiers.dart';
 import '../models/hermes_bot.dart';
+import '../models/hermes_config.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
 import 'hermes_bot_tile.dart';
@@ -66,6 +69,9 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
           child: SizedBox(height: sidebarTabContentTopPadding(context)),
         ),
         ..._botSlivers(context, ref.watch(hermesBotsProvider).asData?.value),
+        if (ref.watch(hermesConfigProvider).mode ==
+            HermesBackendMode.desktopGateway)
+          const SliverToBoxAdapter(child: _KanbanEntry()),
         if (showJobs) const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
         ..._sessionSlivers(context, sessionsAsync),
         SliverToBoxAdapter(
@@ -207,6 +213,38 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
             style: AppTypography.bodySmallStyle.copyWith(color: color),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _KanbanEntry extends StatelessWidget {
+  const _KanbanEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.conduitTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.xs,
+      ),
+      child: Material(
+        color: theme.surfaceBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppBorderRadius.card),
+          side: BorderSide(color: theme.cardBorder),
+        ),
+        child: ListTile(
+          key: const ValueKey<String>('hermes-kanban-entry'),
+          leading: const Icon(Icons.view_kanban_outlined),
+          title: const Text('Kanban'),
+          subtitle: const Text('Boards and tasks'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.pushNamed(RouteNames.hermesKanban),
+        ),
       ),
     );
   }

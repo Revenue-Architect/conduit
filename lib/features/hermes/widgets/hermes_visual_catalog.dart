@@ -7,6 +7,8 @@ import 'package:genui/genui.dart';
 // ignore: depend_on_referenced_packages
 import 'package:json_schema_builder/json_schema_builder.dart';
 
+import 'hermez_visual_theme.dart';
+
 /// Extends GenUI's safe, no-asset basic catalog with app-owned data widgets.
 /// No component in this catalog performs network or filesystem access.
 Catalog createHermesVisualCatalog() {
@@ -118,7 +120,7 @@ Widget _buildStatusBadge(CatalogItemContext context) {
   }
 
   final theme = Theme.of(context.buildContext);
-  final color = _stateColor(theme.colorScheme, state);
+  final color = _stateColor(theme, state);
   final stateLabel = state.label;
   final semanticLabel = [label, stateLabel, ?detail].join('. ');
 
@@ -215,7 +217,7 @@ Widget _buildMetricTile(CatalogItemContext context) {
   final theme = Theme.of(context.buildContext);
   final color = outsideRange
       ? theme.colorScheme.error
-      : _stateColor(theme.colorScheme, state ?? _VisualState.unknown);
+      : _stateColor(theme, state ?? _VisualState.unknown);
   final displayValue = _formatNumber(value);
   final valueText = '$displayValue${unit == null ? '' : ' $unit'}';
   final rangeText = outsideRange ? 'Outside expected range' : state?.label;
@@ -567,11 +569,15 @@ String _formatScientific(double value) => value
     .replaceFirst('.0e', 'e')
     .replaceFirst('e+', 'e');
 
-Color _stateColor(ColorScheme scheme, _VisualState state) => switch (state) {
-  _VisualState.ok => scheme.primary,
-  _VisualState.warning => scheme.tertiary,
-  _VisualState.error => scheme.error,
-  _VisualState.unknown => scheme.onSurfaceVariant,
+Color _stateColor(ThemeData theme, _VisualState state) => switch (state) {
+  _VisualState.ok =>
+    theme.extension<HermezStatusColors>()?.success ?? theme.colorScheme.primary,
+  _VisualState.warning =>
+    theme.extension<HermezStatusColors>()?.warning ??
+        theme.colorScheme.tertiary,
+  _VisualState.error =>
+    theme.extension<HermezStatusColors>()?.danger ?? theme.colorScheme.error,
+  _VisualState.unknown => theme.colorScheme.onSurfaceVariant,
 };
 
 enum _VisualState {

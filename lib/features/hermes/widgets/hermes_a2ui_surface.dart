@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 
 import '../services/hermes_a2ui_layout_normalizer.dart';
 import 'hermes_visual_catalog.dart';
+import 'hermez_chat_palette.dart';
+import 'hermez_visual_theme.dart';
 
 /// Renders the completed body of one Hermes `a2ui` fence as native widgets.
 /// Each response owns its own controller and surface lifecycle.
@@ -180,7 +184,7 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
       );
     }
 
-    return Padding(
+    final surface = Padding(
       padding: const EdgeInsets.only(top: 12),
       child: IgnorePointer(
         ignoring:
@@ -199,5 +203,12 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
         ),
       ),
     );
+    return shouldUseHermezChatVisuals(
+          debugBuild: kDebugMode,
+          android: Platform.isAndroid,
+          hermes: true,
+        )
+        ? Theme(data: hermezVisualTheme(Theme.of(context)), child: surface)
+        : surface;
   }
 }

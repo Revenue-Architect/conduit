@@ -183,6 +183,7 @@ class Routes {
       '/profile/direct-connections/mcp/:id';
   static const String hermesSettings = '/profile/hermes';
   static const String hermesJobs = '/profile/hermes/jobs';
+  static const String hermesKanban = '/profile/hermes/kanban';
   static const String hermesMcp = '/profile/hermes/mcp';
   static const String about = '/profile/about';
   static const String notes = '/notes';
@@ -222,6 +223,7 @@ class RouteNames {
   static const String directMcpServerEditor = 'direct-mcp-server-editor';
   static const String hermesSettings = 'hermes-settings';
   static const String hermesJobs = 'hermes-jobs';
+  static const String hermesKanban = 'hermes-kanban';
   static const String hermesMcp = 'hermes-mcp';
   static const String about = 'about';
   static const String notes = 'notes';
