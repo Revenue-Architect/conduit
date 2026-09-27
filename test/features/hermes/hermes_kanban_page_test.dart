@@ -2,14 +2,176 @@ import 'dart:convert';
 
 import 'package:conduit/features/hermes/kanban/hermes_kanban_client.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_page.dart';
+import 'package:conduit/features/hermes/views/hermes_artifacts_page.dart';
+import 'package:conduit/core/services/navigation_service.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
+  test('Kanban attachment identity requires a real server ID and filename', () {
+    final target = HermesKanbanArtifactTarget.fromAttachment(
+      board: 'default',
+      taskId: 't-one',
+      attachment: {'id': 19, 'filename': 'Plan.pdf'},
+    );
+    expect(target?.attachmentId, 19);
+    expect(target?.filename, 'Plan.pdf');
+    expect(
+      HermesKanbanArtifactTarget.fromAttachment(
+        board: 'default',
+        taskId: 't-one',
+        attachment: {'filename': 'Plan.pdf'},
+      ),
+      isNull,
+    );
+    expect(
+      HermesKanbanArtifactTarget.fromAttachment(
+        board: 'default',
+        taskId: 't-one',
+        attachment: {'id': 19, 'filename': '../secret'},
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets('task attachment opens its exact target in Artifacts', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(412, 950));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final client = HermesKanbanClient(
+      const HermesConfig(
+        enabled: true,
+        mode: HermesBackendMode.desktopGateway,
+        baseUrl: 'https://example.test/v1',
+        desktopAuthKind: HermesDesktopAuthKind.dashboardCookie,
+      ),
+      request: (_, uri, {body}) async {
+        if (uri.path.endsWith('/boards')) {
+          return (
+            status: 200,
+            body: '{"boards":[{"slug":"default","name":"Default"}]}',
+          );
+        }
+        if (uri.path.endsWith('/board')) {
+          return (
+            status: 200,
+            body: jsonEncode({
+              'columns': [
+                {
+                  'name': 'todo',
+                  'tasks': [
+                    {'id': 't-one', 'title': 'Linked task', 'status': 'todo'},
+                  ],
+                },
+              ],
+            }),
+          );
+        }
+        if (uri.path.endsWith('/tasks/t-parent')) {
+          return (
+            status: 200,
+            body: jsonEncode({
+              'task': {
+                'id': 't-parent',
+                'title': 'Parent task view',
+                'status': 'todo',
+              },
+              'comments': [],
+              'runs': [],
+              'events': [],
+              'links': {
+                'parents': [],
+                'children': ['t-one'],
+              },
+              'attachments': [],
+              'child_results': [],
+            }),
+          );
+        }
+        return (
+          status: 200,
+          body: jsonEncode({
+            'task': {'id': 't-one', 'title': 'Linked task', 'status': 'todo'},
+            'comments': [],
+            'runs': [],
+            'events': [],
+            'links': {
+              'parents': ['t-parent'],
+              'children': [],
+            },
+            'attachments': [
+              {
+                'id': 19,
+                'filename': 'Plan.pdf',
+                'stored_path': '/private/attachment/Plan.pdf',
+              },
+            ],
+            'child_results': [],
+          }),
+        );
+      },
+    );
+    HermesKanbanArtifactTarget? opened;
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => HermesKanbanPage(client: client),
+        ),
+        GoRoute(
+          path: Routes.hermesArtifacts,
+          name: RouteNames.hermesArtifacts,
+          builder: (_, state) {
+            opened = state.extra as HermesKanbanArtifactTarget?;
+            return const Scaffold(body: Text('Artifact destination'));
+          },
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Linked task'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.text('View linked items'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View linked items'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Plan.pdf'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plan.pdf'));
+    await tester.pumpAndSettle();
+    expect(find.text('Artifact destination'), findsOneWidget);
+    expect(opened?.board, 'default');
+    expect(opened?.taskId, 't-one');
+    expect(opened?.attachmentId, 19);
+    expect(opened?.filename, 'Plan.pdf');
+    router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Linked task'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.text('View linked items'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View linked items'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Parent task · t-parent'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parent task · t-parent'));
+    await tester.pumpAndSettle();
+    expect(find.text('Parent task view'), findsWidgets);
+  });
+
   const config = HermesConfig(
     enabled: true,
     mode: HermesBackendMode.desktopGateway,

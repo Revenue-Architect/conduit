@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_visual_theme.dart';
 
 /// Shared native chrome for Hermes-owned destinations. Content is always real
@@ -77,10 +78,12 @@ class HermesPanel extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
+    this.backgroundVariant,
   });
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
+  final HermezBackgroundVariant? backgroundVariant;
 
   @override
   Widget build(BuildContext context) {
@@ -94,15 +97,22 @@ class HermesPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(19),
         side: BorderSide(color: palette.border),
       ),
-      child: onTap == null
-          ? Padding(padding: padding, child: child)
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(19),
-              child: Padding(padding: padding, child: child),
+      child: backgroundVariant == null
+          ? _content()
+          : HermezTechnicalBackground(
+              variant: backgroundVariant!,
+              child: _content(),
             ),
     );
   }
+
+  Widget _content() => onTap == null
+      ? Padding(padding: padding, child: child)
+      : InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(19),
+          child: Padding(padding: padding, child: child),
+        );
 }
 
 class HermesSectionTitle extends StatelessWidget {

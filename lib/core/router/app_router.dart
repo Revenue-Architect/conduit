@@ -385,7 +385,9 @@ class RouterNotifier extends ChangeNotifier {
         if (_isAuthLocation(location) ||
             location == Routes.splash ||
             location == Routes.connectionIssue) {
-          return prefersHermes && hermesUsable ? Routes.hermesHome : Routes.chat;
+          return prefersHermes && hermesUsable
+              ? Routes.hermesHome
+              : Routes.chat;
         }
         return _workspaceRedirect(location);
     }
@@ -766,8 +768,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesArtifacts,
       name: RouteNames.hermesArtifacts,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesArtifactsPage()),
+      pageBuilder: (context, state) => _buildPlatformPage(
+        state: state,
+        child: HermesArtifactsPage(
+          selectedKanbanAttachment: state.extra is HermesKanbanArtifactTarget
+              ? state.extra! as HermesKanbanArtifactTarget
+              : null,
+        ),
+      ),
     ),
     GoRoute(
       path: Routes.hermesMcp,

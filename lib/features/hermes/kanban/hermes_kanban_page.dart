@@ -8,10 +8,26 @@ import 'package:intl/intl.dart';
 import '../../../core/services/navigation_service.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../services/hermes_identifier.dart';
 import '../views/hermes_dashboard_auth_page.dart';
+import '../views/hermes_artifacts_page.dart';
 import '../widgets/hermez_visual_theme.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_kanban_client.dart';
+
+sealed class _KanbanLinkedSelection {
+  const _KanbanLinkedSelection();
+}
+
+final class _KanbanLinkedTask extends _KanbanLinkedSelection {
+  const _KanbanLinkedTask(this.id);
+  final String id;
+}
+
+final class _KanbanLinkedAttachment extends _KanbanLinkedSelection {
+  const _KanbanLinkedAttachment(this.target);
+  final HermesKanbanArtifactTarget target;
+}
 
 /// The pop Future resolves before Material's dialog exit animation. Wait for
 /// the overlay to be removed before rebuilding Kanban or disposing its fields.
@@ -502,7 +518,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
   Future<void> _openTask(KanbanTask task) async {
     final board = _board;
     if (board == null) return;
-    await showModalBottomSheet<void>(
+    final selected = await showModalBottomSheet<_KanbanLinkedSelection>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -523,6 +539,27 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         ),
       ),
     );
+    if (!mounted || _board != board) return;
+    switch (selected) {
+      case _KanbanLinkedTask(:final id):
+        try {
+          final linked = await _api().task(board, id);
+          if (mounted && _board == board) await _openTask(linked.task);
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Linked task is unavailable.')),
+            );
+          }
+        }
+      case _KanbanLinkedAttachment(:final target):
+        await context.pushNamed<void>(
+          RouteNames.hermesArtifacts,
+          extra: target,
+        );
+      case null:
+        break;
+    }
   }
 
   @override
@@ -1572,25 +1609,84 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
               '${detail.links['parents'] is List ? (detail.links['parents'] as List).length : 0} parents · ${detail.attachments.length} attachments',
               Icons.attach_file_rounded,
               [
+                if (_filesExpanded && detail.links['parents'] is List)
+                  for (final parent in (detail.links['parents'] as List).take(
+                    20,
+                  ))
+                    Builder(
+                      builder: (context) {
+                        final id = validateHermesOpaqueIdentifier(parent);
+                        return ListTile(
+                          leading: const Icon(Icons.account_tree_outlined),
+                          title: Text('Parent task · ${id ?? 'Unavailable'}'),
+                          trailing: id == null
+                              ? null
+                              : const Icon(Icons.chevron_right_rounded),
+                          onTap: id == null
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  _KanbanLinkedTask(id),
+                                ),
+                        );
+                      },
+                    ),
                 if (_filesExpanded)
                   for (final attachment in detail.attachments.take(20))
-                    ListTile(
-                      leading: const Icon(Icons.attach_file),
-                      title: Text(
-                        attachment['filename']?.toString() ??
-                            attachment['name']?.toString() ??
-                            'Attachment',
-                      ),
-                      subtitle: const Text('Stored in Hermes'),
+                    Builder(
+                      builder: (context) {
+                        final target =
+                            HermesKanbanArtifactTarget.fromAttachment(
+                              board: widget.board,
+                              taskId: task.id,
+                              attachment: attachment,
+                            );
+                        return ListTile(
+                          leading: const Icon(Icons.attach_file),
+                          title: Text(
+                            attachment['filename']?.toString() ?? 'Attachment',
+                          ),
+                          subtitle: Text(
+                            target == null
+                                ? 'Attachment unavailable'
+                                : 'Open in Artifacts',
+                          ),
+                          trailing: target == null
+                              ? null
+                              : const Icon(Icons.chevron_right_rounded),
+                          onTap: target == null
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  _KanbanLinkedAttachment(target),
+                                ),
+                        );
+                      },
                     ),
                 if (_filesExpanded)
                   for (final child in detail.childResults.take(20))
-                    ListTile(
-                      leading: const Icon(Icons.subdirectory_arrow_right),
-                      title: Text(child['title']?.toString() ?? 'Child task'),
-                      subtitle: Text(
-                        child['status']?.toString() ?? 'Status unknown',
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final id = validateHermesOpaqueIdentifier(child['id']);
+                        return ListTile(
+                          leading: const Icon(Icons.subdirectory_arrow_right),
+                          title: Text(
+                            child['title']?.toString() ?? 'Child task',
+                          ),
+                          subtitle: Text(
+                            child['status']?.toString() ?? 'Status unknown',
+                          ),
+                          trailing: id == null
+                              ? null
+                              : const Icon(Icons.chevron_right_rounded),
+                          onTap: id == null
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  _KanbanLinkedTask(id),
+                                ),
+                        );
+                      },
                     ),
                 if (_filesExpanded)
                   for (final diagnostic in task.diagnostics.take(10))
@@ -1603,6 +1699,8 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                       ),
                     ),
                 if (detail.attachments.isNotEmpty ||
+                    (detail.links['parents'] is List &&
+                        (detail.links['parents'] as List).isNotEmpty) ||
                     detail.childResults.isNotEmpty ||
                     task.diagnostics.isNotEmpty)
                   TextButton(

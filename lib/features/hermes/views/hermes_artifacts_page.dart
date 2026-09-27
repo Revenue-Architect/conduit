@@ -11,10 +11,52 @@ import '../services/hermes_media_parser.dart';
 import '../widgets/hermes_artifact_view.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 import '../sheets/hermez_modal_sheet.dart';
 
 const _artifactRoot = '/opt/data/artifacts';
+
+/// A Kanban attachment is identified by the server's board-scoped id, not
+/// its stored_path (which may be outside the general artifact directory).
+final class HermesKanbanArtifactTarget {
+  const HermesKanbanArtifactTarget({
+    required this.board,
+    required this.taskId,
+    required this.attachmentId,
+    required this.filename,
+  });
+
+  final String board;
+  final String taskId;
+  final int attachmentId;
+  final String filename;
+
+  static HermesKanbanArtifactTarget? fromAttachment({
+    required String board,
+    required String taskId,
+    required Map<String, dynamic> attachment,
+  }) {
+    final rawId = attachment['id'];
+    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+    final filename = attachment['filename'];
+    if (id == null ||
+        id <= 0 ||
+        filename is! String ||
+        filename.isEmpty ||
+        filename.contains('/') ||
+        filename.contains('\\')) {
+      return null;
+    }
+    return HermesKanbanArtifactTarget(
+      board: board,
+      taskId: taskId,
+      attachmentId: id,
+      filename: filename,
+    );
+  }
+}
+
 final _artifactFilesProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(hermesArtifactClientProvider).listDirectory(_artifactRoot),
 );
@@ -51,7 +93,9 @@ HermesMediaArtifact _artifact(HermesRemoteFile file) {
 }
 
 class HermesArtifactsPage extends ConsumerStatefulWidget {
-  const HermesArtifactsPage({super.key});
+  const HermesArtifactsPage({super.key, this.selectedKanbanAttachment});
+
+  final HermesKanbanArtifactTarget? selectedKanbanAttachment;
 
   @override
   ConsumerState<HermesArtifactsPage> createState() =>
@@ -60,6 +104,65 @@ class HermesArtifactsPage extends ConsumerStatefulWidget {
 
 class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
   String _filter = 'All';
+
+  Widget _selectedAttachment() {
+    final target = widget.selectedKanbanAttachment!;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final artifact = _artifact(
+      HermesRemoteFile(
+        name: target.filename,
+        path: 'kanban:${target.board}:${target.attachmentId}',
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+      child: HermesPanel(
+        backgroundVariant: HermezBackgroundVariant.editorial,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'KANBAN / ATTACHMENT',
+              style: TextStyle(
+                color: palette.muted,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.8,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              target.filename,
+              style: TextStyle(
+                color: palette.ink,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.35,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${target.board}  /  ${target.taskId}',
+              style: TextStyle(color: palette.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            HermesArtifactView(
+              artifact: artifact,
+              maxImageHeight: 380,
+              download: () => ref
+                  .read(hermesArtifactClientProvider)
+                  .downloadKanbanAttachment(
+                    board: target.board,
+                    attachmentId: target.attachmentId,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,9 +194,17 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
           await ref.read(_artifactFilesProvider.future);
         },
         child: files.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => ListView(
+            children: [
+              if (widget.selectedKanbanAttachment != null)
+                _selectedAttachment(),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          ),
           error: (error, _) => ListView(
             children: [
+              if (widget.selectedKanbanAttachment != null)
+                _selectedAttachment(),
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: HermesPanel(
@@ -121,6 +232,8 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
                 .toList(growable: false);
             return CustomScrollView(
               slivers: [
+                if (widget.selectedKanbanAttachment != null)
+                  SliverToBoxAdapter(child: _selectedAttachment()),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 9),
                   sliver: SliverToBoxAdapter(
@@ -192,8 +305,9 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
                           HermesSessionSummary? related;
                           if (provenance != null) {
                             for (final session in sessions) {
-                              if (session.id == provenance.sessionId)
+                              if (session.id == provenance.sessionId) {
                                 related = session;
+                              }
                             }
                             related ??= HermesSessionSummary(
                               id: provenance.sessionId,

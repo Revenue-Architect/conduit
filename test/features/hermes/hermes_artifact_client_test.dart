@@ -10,6 +10,74 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('HermesArtifactClient', () {
     test(
+      'Kanban attachment uses its board-scoped ID and Dashboard cookies',
+      () async {
+        final adapter = _RecordingAdapter(
+          (_) => ResponseBody.fromBytes(Uint8List.fromList([1, 2, 3]), 200),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        final client = HermesArtifactClient(
+          config: _config(),
+          dio: dio,
+          cookieReader: (_) async => const {'session': 'cookie-value'},
+        );
+        final bytes = await client.downloadKanbanAttachment(
+          board: 'project-1',
+          attachmentId: 42,
+        );
+        expect(bytes.bytes, [1, 2, 3]);
+        final request = adapter.requests.single;
+        expect(request.uri.path, '/api/plugins/kanban/attachments/42');
+        expect(request.uri.queryParameters, {'board': 'project-1'});
+        expect(request.headers['Cookie'], 'session=cookie-value');
+        expect(request.followRedirects, isFalse);
+        await expectLater(
+          client.downloadKanbanAttachment(board: '../other', attachmentId: 42),
+          throwsA(isA<HermesArtifactException>()),
+        );
+        await expectLater(
+          client.downloadKanbanAttachment(board: 'project-1', attachmentId: 0),
+          throwsA(isA<HermesArtifactException>()),
+        );
+        expect(adapter.requests, hasLength(1));
+        dio.close(force: true);
+      },
+    );
+
+    test(
+      'Kanban attachment uses native bearer auth and maps missing files',
+      () async {
+        final adapter = _RecordingAdapter(
+          (_) => ResponseBody.fromBytes(Uint8List(0), 404),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        final client = HermesArtifactClient(
+          config: _config(authKind: HermesDesktopAuthKind.nativePkce),
+          dio: dio,
+          nativeAuthorizationReader: () async => const {
+            'Authorization': 'Bearer test-token',
+          },
+        );
+        await expectLater(
+          client.downloadKanbanAttachment(board: 'default', attachmentId: 7),
+          throwsA(
+            isA<HermesArtifactException>().having(
+              (error) => error.kind,
+              'kind',
+              HermesArtifactFailureKind.missing,
+            ),
+          ),
+        );
+        expect(
+          adapter.requests.single.headers['Authorization'],
+          'Bearer test-token',
+        );
+        expect(adapter.requests.single.followRedirects, isFalse);
+        dio.close(force: true);
+      },
+    );
+
+    test(
       'lists only validated artifact files with existing Dashboard auth',
       () async {
         final adapter = _RecordingAdapter(

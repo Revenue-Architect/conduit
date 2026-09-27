@@ -178,6 +178,37 @@ final class HermesArtifactClient {
       );
     }
     final uri = _downloadUri(artifact.path, sessionId: validatedSessionId);
+    return _downloadBytes(uri);
+  }
+
+  /// Kanban attachments are not necessarily under /opt/data/artifacts.
+  /// Hermes authorizes these by board + attachment id and validates their
+  /// stored path server-side; never substitute the returned stored_path into
+  /// the general filesystem download route.
+  Future<HermesArtifactBytes> downloadKanbanAttachment({
+    required String board,
+    required int attachmentId,
+  }) async {
+    if (!supportsHermesArtifactDownloads(config) ||
+        !RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$').hasMatch(board) ||
+        attachmentId <= 0) {
+      throw const HermesArtifactException(
+        HermesArtifactFailureKind.unavailable,
+      );
+    }
+    final root = _apiRoot();
+    final uri = root
+        .resolve('api/plugins/kanban/attachments/$attachmentId')
+        .replace(queryParameters: {'board': board});
+    if (uri.origin != root.origin || uri.scheme.toLowerCase() != 'https') {
+      throw const HermesArtifactException(
+        HermesArtifactFailureKind.unavailable,
+      );
+    }
+    return _downloadBytes(uri);
+  }
+
+  Future<HermesArtifactBytes> _downloadBytes(Uri uri) async {
     final requestHeaders = <String, String>{};
     if (config.desktopAuthKind == HermesDesktopAuthKind.nativePkce) {
       final authorizationHeaders = await _readNativeAuthorizationHeaders();
@@ -264,6 +295,24 @@ final class HermesArtifactClient {
   }
 
   Uri _downloadUri(String path, {String? sessionId}) {
+    final root = _apiRoot();
+    final queryParameters = <String, String>{
+      'path': path,
+      'profile': config.desktopProfile,
+    };
+    if (sessionId != null) queryParameters['session_id'] = sessionId;
+    final uri = root
+        .resolve('api/fs/download')
+        .replace(queryParameters: queryParameters);
+    if (uri.scheme.toLowerCase() != 'https' || uri.origin != root.origin) {
+      throw const HermesArtifactException(
+        HermesArtifactFailureKind.unavailable,
+      );
+    }
+    return uri;
+  }
+
+  Uri _apiRoot() {
     final endpoint = HermesConfig.connectionEndpoint(config.baseUrl);
     final root = endpoint == null ? null : Uri.tryParse(endpoint);
     if (root == null ||
@@ -278,21 +327,7 @@ final class HermesArtifactClient {
     }
 
     final rootPath = root.path.endsWith('/') ? root.path : '${root.path}/';
-    final base = root.replace(path: rootPath);
-    final queryParameters = <String, String>{
-      'path': path,
-      'profile': config.desktopProfile,
-    };
-    if (sessionId != null) queryParameters['session_id'] = sessionId;
-    final uri = base
-        .resolve('api/fs/download')
-        .replace(queryParameters: queryParameters);
-    if (uri.scheme.toLowerCase() != 'https' || uri.origin != root.origin) {
-      throw const HermesArtifactException(
-        HermesArtifactFailureKind.unavailable,
-      );
-    }
-    return uri;
+    return root.replace(path: rootPath);
   }
 
   static String? _headerValue(Map<String, String> headers, String name) {

@@ -18,11 +18,16 @@ class HermesArtifactView extends ConsumerStatefulWidget {
     required this.artifact,
     this.sessionId,
     this.maxImageHeight = 340,
+    this.download,
   });
 
   final HermesMediaArtifact artifact;
   final String? sessionId;
   final double maxImageHeight;
+
+  /// Overrides the filesystem route for server-owned artifacts such as
+  /// Kanban attachments, which are downloaded by board and attachment id.
+  final Future<HermesArtifactBytes> Function()? download;
 
   @override
   ConsumerState<HermesArtifactView> createState() => _HermesArtifactViewState();
@@ -53,9 +58,11 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
     }
   }
 
-  Future<HermesArtifactBytes> _download() => ref
-      .read(hermesArtifactClientProvider)
-      .download(widget.artifact, sessionId: widget.sessionId);
+  Future<HermesArtifactBytes> _download() =>
+      widget.download?.call() ??
+      ref
+          .read(hermesArtifactClientProvider)
+          .download(widget.artifact, sessionId: widget.sessionId);
 
   @override
   Widget build(BuildContext context) =>
