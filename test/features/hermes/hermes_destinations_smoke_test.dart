@@ -20,6 +20,59 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('Home Scheduled agents opens the full list when jobs exist', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: Routes.hermesHome,
+      routes: [
+        GoRoute(
+          path: Routes.hermesHome,
+          builder: (context, state) => const HermesHomePage(),
+        ),
+        GoRoute(
+          path: Routes.hermesJobs,
+          name: RouteNames.hermesJobs,
+          builder: (context, state) =>
+              const Scaffold(body: Center(child: Text('All scheduled agents'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    NavigationService.attachRouter(router);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesApiServiceProvider.overrideWithValue(null),
+          hermesBotsProvider.overrideWith((ref) async => []),
+          hermesHomeProfileJobsProvider.overrideWith(
+            (ref) async => [
+              (
+                'kai',
+                HermesJob(
+                  id: 'job-1',
+                  name: 'Daily research digest',
+                  prompt: 'Summarize research',
+                  schedule: '0 9 * * *',
+                  enabled: true,
+                ),
+              ),
+            ],
+          ),
+          hermesSessionsProvider.overrideWith(_EmptySessionsController.new),
+          hermesKanbanSummaryProvider.overrideWith((ref) async => null),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Scheduled agents'));
+    await tester.tap(find.text('Scheduled agents'));
+    await tester.pumpAndSettle();
+    expect(find.text('All scheduled agents'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Home recent row opens its exact conversation', (tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     PreferencesStore.debugOverride(await SharedPreferences.getInstance());

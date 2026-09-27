@@ -19,7 +19,7 @@ import '../widgets/hermez_relative_time.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
-final _homeProfileJobsProvider =
+final hermesHomeProfileJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
       final service = ref.watch(hermesApiServiceProvider);
       if (service is! HermesDesktopApiService) return const [];
@@ -124,7 +124,7 @@ class HermesHomePage extends ConsumerWidget {
       Theme.of(context).brightness,
     );
     final bots = ref.watch(hermesBotsProvider).asData?.value;
-    final jobs = ref.watch(_homeProfileJobsProvider).asData?.value;
+    final jobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
     final sessions = sessionsAsync.asData?.value;
     final kanban = ref.watch(hermesKanbanSummaryProvider).asData?.value;
@@ -162,7 +162,7 @@ class HermesHomePage extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(hermesBotsProvider);
           ref.invalidate(hermesJobsProvider);
-          ref.invalidate(_homeProfileJobsProvider);
+          ref.invalidate(hermesHomeProfileJobsProvider);
           ref.invalidate(hermesSessionsProvider);
           ref.invalidate(hermesKanbanSummaryProvider);
           await ref.read(hermesBotsProvider.future);
@@ -170,8 +170,12 @@ class HermesHomePage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 36),
           children: [
-            Text('BOTS', style: HermezType.technical(palette.muted)),
-            const SizedBox(height: 10),
+            HermezSectionBar(
+              label: 'BOTS  ${bots?.length ?? '—'}',
+              actionLabel: 'All chats',
+              onAction: () => context.pushNamed(RouteNames.hermesConversations),
+            ),
+            const SizedBox(height: 8),
             if (bots == null)
               const LinearProgressIndicator()
             else if (bots.isEmpty)
@@ -180,24 +184,29 @@ class HermesHomePage extends ConsumerWidget {
                 style: HermezType.meta(palette),
               )
             else
-              SizedBox(
-                height: 64 + 36 * MediaQuery.textScalerOf(context).scale(1),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: bots.length > 6 ? 6 : bots.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) =>
-                      _BotCard(bot: bots[index], index: index),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = MediaQuery.textScalerOf(context).scale(1);
+                  final columns = constraints.maxWidth >= 300 && scale <= 1.35
+                      ? 2
+                      : 1;
+                  const gap = 10.0;
+                  final width =
+                      (constraints.maxWidth - gap * (columns - 1)) / columns;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final bot in bots.take(6))
+                        SizedBox(
+                          width: width,
+                          child: _BotCard(bot: bot),
+                        ),
+                    ],
+                  );
+                },
               ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () =>
-                    context.pushNamed(RouteNames.hermesConversations),
-                child: Text('See all ${bots?.length ?? ''}'.trim()),
-              ),
-            ),
+            const SizedBox(height: 22),
             Text('TODAY', style: HermezType.technical(palette.muted)),
             const SizedBox(height: 8),
             HermezSurface(
@@ -272,14 +281,7 @@ class HermesHomePage extends ConsumerWidget {
                   child: HermezSurface(
                     kind: HermezSurfaceKind.utility,
                     motif: HermezMotif.slash,
-                    onTap: activeJobs.isEmpty
-                        ? () => context.pushNamed(RouteNames.hermesJobs)
-                        : () => _openJob(
-                            context,
-                            ref,
-                            activeJobs.first.$2,
-                            activeJobs.first.$1,
-                          ),
+                    onTap: () => context.pushNamed(RouteNames.hermesJobs),
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,9 +563,8 @@ class _TodayRow extends StatelessWidget {
 }
 
 class _BotCard extends ConsumerWidget {
-  const _BotCard({required this.bot, required this.index});
+  const _BotCard({required this.bot});
   final HermesBot bot;
-  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -579,47 +580,82 @@ class _BotCard extends ConsumerWidget {
     final status = running
         ? 'Running'
         : bot.lastActive == null
-        ? 'Available'
-        : hermezWhen(bot.lastActive, prefix: 'Active');
-    return SizedBox(
-      width: 210,
+        ? 'No recent activity'
+        : 'Used ${hermezRelativeLabel(bot.lastActive!).split(',').first.toLowerCase()}';
+    final description = bot.description?.trim();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: palette.border.withValues(alpha: 0.8)),
+      ),
       child: HermezSurface(
         kind: HermezSurfaceKind.utility,
-        motif: index.isEven ? HermezMotif.slash : HermezMotif.arc,
         onTap: () => context.pushNamed(
           RouteNames.hermesBotDetail,
           pathParameters: {'profile': bot.name},
         ),
-        padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
-        child: Row(
-          children: [
-            HermezBotMark(
-              identity: hermezIdentityForBot(bot),
-              size: 48,
-              label: bot.title,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 116),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    bot.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: HermezType.section(palette).copyWith(fontSize: 15),
+                  HermezBotMark(
+                    identity: hermezIdentityForBot(bot),
+                    size: 46,
+                    label: bot.title,
                   ),
-                  Text(
-                    status,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: HermezType.meta(palette),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      bot.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: HermezType.section(palette).copyWith(fontSize: 15),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: palette.ink,
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                description == null || description.isEmpty
+                    ? 'Hermes profile'
+                    : description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: HermezType.meta(palette),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: running ? palette.accent : palette.muted,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: HermezType.meta(palette),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

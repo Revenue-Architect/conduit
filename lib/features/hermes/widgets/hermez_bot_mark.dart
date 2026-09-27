@@ -58,119 +58,117 @@ class _BotMarkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final body = Paint()..color = palette.surface;
-    final ink = Paint()..color = const Color(0xFF17181C);
-    final accent = Paint()..color = palette.accent;
-    final line = Paint()
-      ..color = palette.accent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.2, size.width * 0.035)
-      ..strokeCap = StrokeCap.round;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.42;
-
-    if (identity == HermezBotIdentity.fast) {
-      final streak = Paint()
-        ..color = palette.accent.withValues(alpha: 0.55)
-        ..strokeWidth = size.width * 0.045
-        ..strokeCap = StrokeCap.round;
-      for (var i = 0; i < 3; i++) {
-        final y = size.height * (0.32 + i * 0.16);
-        canvas.drawLine(
-          Offset(size.width * 0.02, y),
-          Offset(size.width * 0.28, y),
-          streak,
-        );
-      }
-    }
-
-    canvas.drawCircle(center, radius, body);
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = palette.ink.withValues(alpha: 0.12)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+    final unit = size.width;
+    final center = Offset(unit * 0.5, unit * 0.53);
+    final shellRect = Rect.fromLTWH(
+      unit * 0.11,
+      unit * 0.15,
+      unit * 0.78,
+      unit * 0.74,
     );
-    canvas.drawCircle(center, radius * 0.62, ink);
-
+    final shell = RRect.fromRectAndRadius(
+      shellRect,
+      Radius.circular(unit * 0.31),
+    );
+    final shadow = RRect.fromRectAndRadius(
+      shellRect.shift(Offset(0, unit * 0.035)),
+      Radius.circular(unit * 0.31),
+    );
+    canvas.drawRRect(shadow, Paint()..color = const Color(0xFFAFB3B8));
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFFFF), Color(0xFFE8EAEC), Color(0xFFC9CDD0)],
+        ).createShader(shellRect),
+    );
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..color = const Color(0xFFB4B8BC)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.8, unit * 0.017),
+    );
+    final faceRect = Rect.fromLTWH(
+      unit * 0.24,
+      unit * 0.32,
+      unit * 0.52,
+      unit * 0.35,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(faceRect, Radius.circular(unit * 0.115)),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF090B0E), Color(0xFF25282D)],
+        ).createShader(faceRect),
+    );
     final eye = Paint()..color = palette.accent;
-    for (final dx in [-0.16, 0.16]) {
+    for (final dx in [-0.105, 0.105]) {
       canvas.drawCircle(
-        center.translate(size.width * dx, -size.height * 0.01),
-        size.width * 0.055,
+        center.translate(unit * dx, -unit * 0.03),
+        unit * 0.041,
         eye,
       );
     }
-
+    final seam = Paint()
+      ..color = const Color(0xFF9DA2A7)
+      ..strokeWidth = math.max(0.75, unit * 0.016)
+      ..strokeCap = StrokeCap.round;
+    final signal = Paint()
+      ..color = palette.accent
+      ..strokeWidth = math.max(1.25, unit * 0.035)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(unit * 0.38, unit * 0.77),
+      Offset(unit * 0.62, unit * 0.77),
+      seam,
+    );
     switch (identity) {
       case HermezBotIdentity.neutral:
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius * 1.08),
-          -math.pi * 0.95,
-          math.pi * 0.45,
-          false,
-          line,
+        canvas.drawLine(
+          Offset(unit * 0.39, unit * 0.21),
+          Offset(unit * 0.61, unit * 0.21),
+          signal,
         );
       case HermezBotIdentity.kai:
-        final crest = Path()
-          ..moveTo(center.dx, center.dy - radius * 1.28)
-          ..lineTo(center.dx + radius * 0.28, center.dy - radius * 0.72)
-          ..lineTo(center.dx, center.dy - radius * 0.9)
-          ..lineTo(center.dx - radius * 0.28, center.dy - radius * 0.72)
-          ..close();
-        canvas.drawPath(crest, accent);
+        canvas.drawLine(
+          Offset(unit * 0.5, unit * 0.08),
+          Offset(unit * 0.5, unit * 0.19),
+          signal,
+        );
+        canvas.drawCircle(Offset(unit * 0.5, unit * 0.065), unit * 0.045, eye);
       case HermezBotIdentity.local:
-        final vent = Paint()
-          ..color = palette.ink.withValues(alpha: 0.45)
-          ..strokeWidth = size.width * 0.035
-          ..strokeCap = StrokeCap.round;
         for (var i = 0; i < 3; i++) {
-          final y = center.dy - radius * 0.28 + i * size.height * 0.09;
-          canvas.drawLine(
-            Offset(center.dx - radius * 0.95, y),
-            Offset(center.dx - radius * 0.7, y),
-            vent,
-          );
+          final y = unit * (0.36 + i * 0.09);
+          canvas.drawLine(Offset(unit * 0.14, y), Offset(unit * 0.20, y), seam);
         }
       case HermezBotIdentity.autopilot:
         final bolt = Path()
-          ..moveTo(center.dx + radius * 0.15, center.dy - radius * 1.2)
-          ..lineTo(center.dx - radius * 0.05, center.dy - radius * 0.72)
-          ..lineTo(center.dx + radius * 0.22, center.dy - radius * 0.72)
-          ..lineTo(center.dx - radius * 0.12, center.dy - radius * 0.2)
-          ..lineTo(center.dx + radius * 0.08, center.dy - radius * 0.55)
-          ..lineTo(center.dx - radius * 0.16, center.dy - radius * 0.55)
-          ..close();
-        canvas.drawPath(bolt, accent);
+          ..moveTo(unit * 0.52, unit * 0.08)
+          ..lineTo(unit * 0.44, unit * 0.20)
+          ..lineTo(unit * 0.53, unit * 0.20)
+          ..lineTo(unit * 0.48, unit * 0.29);
+        canvas.drawPath(bolt, signal..style = PaintingStyle.stroke);
       case HermezBotIdentity.fast:
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius * 1.05),
-          -0.4,
-          1.1,
-          false,
-          line,
-        );
+        for (var i = 0; i < 3; i++) {
+          final y = unit * (0.37 + i * 0.11);
+          canvas.drawLine(
+            Offset(unit * 0.03, y),
+            Offset(unit * 0.17, y),
+            signal,
+          );
+        }
       case HermezBotIdentity.strong:
-        final armor = Paint()
-          ..color = palette.accent
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(1.4, size.width * 0.04);
         canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius * 0.86),
-          -2.4,
-          1.2,
+          Rect.fromLTWH(unit * 0.07, unit * 0.20, unit * 0.86, unit * 0.66),
+          math.pi * 0.12,
+          math.pi * 0.75,
           false,
-          armor,
-        );
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius * 0.86),
-          0.5,
-          1.1,
-          false,
-          armor,
+          signal..style = PaintingStyle.stroke,
         );
     }
   }
