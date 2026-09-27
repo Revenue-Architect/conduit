@@ -11,9 +11,12 @@ import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
-import '../widgets/hermes_bot_avatar.dart';
+import '../utils/hermes_schedule_format.dart';
 import '../widgets/hermes_session_tile.dart';
+import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_relative_time.dart';
+import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
 final class _BotData {
@@ -95,8 +98,9 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
     setState(() => _opening = true);
     try {
       final id = await service.createBotConversation(bot);
-      if (!mounted || !identical(ref.read(hermesApiServiceProvider), service))
+      if (!mounted || !identical(ref.read(hermesApiServiceProvider), service)) {
         return;
+      }
       ref.invalidate(hermesBotSessionsProvider(bot.name));
       ref.invalidate(hermesSessionsProvider);
       ref.invalidate(hermesSessionTotalsProvider);
@@ -114,10 +118,11 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
             : null,
       );
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open this bot chat.')),
         );
+      }
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -140,7 +145,6 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
         .watch(hermesSessionTotalsProvider)
         .asData
         ?.value[profile];
-    final avatar = ref.watch(hermesBotAvatarProvider(profile)).asData?.value;
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
@@ -155,70 +159,85 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
           children: [
-            HermesPanel(
+            HermezSurface(
+              kind: HermezSurfaceKind.hero,
+              motif: HermezMotif.crop,
+              indexLabel: '01',
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      HermesBotAvatar(
+                      HermezBotMark(
+                        identity: hermezIdentityForName(bot?.name ?? profile),
                         size: 72,
                         label: bot?.title ?? profile,
-                        shape: bot?.avatarShape ?? 'squircle',
-                        color: bot?.avatarColor ?? '#8b5cf6',
-                        imageKind: bot?.avatarImageKind,
-                        imageUrl: avatar,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
+                              'BOT',
+                              style: HermezType.technical(palette.muted),
+                            ),
+                            Text(
                               bot?.title ?? profile,
-                              style: const TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              style: HermezType.display(palette)
+                                  .copyWith(fontSize: 28),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              bot?.description ?? 'Hermes bot',
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
                               bot?.lastActive == null
-                                  ? 'Profile available'
-                                  : 'Last active ${bot!.lastActive!.toLocal()}',
-                              style: TextStyle(
-                                color: palette.muted,
-                                fontSize: 12,
-                              ),
+                                  ? 'Available'
+                                  : hermezWhen(
+                                      bot!.lastActive,
+                                      prefix: 'Active',
+                                    ),
+                              style: HermezType.meta(palette),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Text(
+                    bot?.description ?? 'Hermes profile',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: HermezType.body(palette),
+                  ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: bot == null || _opening
-                          ? null
-                          : () => _openChat(bot!),
-                      icon: const Icon(Icons.chat_bubble_outline_rounded),
-                      label: Text(
-                        _opening
-                            ? 'Opening…'
-                            : 'Chat with ${bot?.title ?? profile}',
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: palette.ink,
-                        foregroundColor: palette.surface,
-                        minimumSize: const Size(0, 50),
-                      ),
+                  HermezSurface(
+                    kind: HermezSurfaceKind.technical,
+                    onTap: bot == null || _opening
+                        ? null
+                        : () => _openChat(bot!),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          color: Color(0xFFF6F5F2),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _opening
+                                ? 'Opening…'
+                                : 'Chat with ${bot?.title ?? profile}',
+                            style: const TextStyle(
+                              color: Color(0xFFF6F5F2),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -235,113 +254,160 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
               error: (_, _) => const HermesPanel(
                 child: Text('Bot details unavailable. Pull to retry.'),
               ),
-              data: (detail) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  HermesPanel(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Expanded(
-                          child: _metric(
-                            '${totalConversations ?? detail.sessions.length}',
-                            'Conversations',
+              data: (detail) {
+                final curated = _curateCapabilities(
+                  skills: detail.skills,
+                  tools: detail.tools,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    HermezSurface(
+                      kind: HermezSurfaceKind.utility,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _metric(
+                              '${totalConversations ?? detail.sessions.length}',
+                              'Chats',
+                              palette,
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: _metric('${detail.skills.length}', 'Skills'),
-                        ),
-                        Expanded(
-                          child: _metric('${detail.jobs.length}', 'Schedules'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const HermesSectionTitle('Capabilities'),
-                  const SizedBox(height: 9),
-                  HermesPanel(
-                    child: detail.skills.isEmpty && detail.tools.isEmpty
-                        ? const Text('No profile capabilities reported.')
-                        : Wrap(
-                            spacing: 7,
-                            runSpacing: 7,
-                            children: [
-                              for (final name in {
-                                ...detail.skills,
-                                ...detail.tools,
-                              }.take(24))
-                                Chip(label: Text(name.replaceAll('_', ' '))),
-                            ],
+                          Expanded(
+                            child: _metric(
+                              '${detail.skills.length}',
+                              'Skills',
+                              palette,
+                            ),
                           ),
-                  ),
-                  const SizedBox(height: 18),
-                  HermesSectionTitle(
-                    'Recent conversations',
-                    trailing: TextButton(
-                      onPressed: () =>
-                          context.pushNamed(RouteNames.hermesConversations),
-                      child: const Text('See all →'),
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  HermesPanel(
-                    child: detail.sessions.isEmpty
-                        ? const Text('No conversations for this profile yet.')
-                        : Column(
-                            children: [
-                              for (final session in detail.sessions.take(3))
-                                HermesSessionTile(session: session),
-                            ],
+                          Expanded(
+                            child: _metric(
+                              '${detail.jobs.length}',
+                              'Schedules',
+                              palette,
+                            ),
                           ),
-                  ),
-                  const SizedBox(height: 18),
-                  HermesSectionTitle(
-                    'Scheduled agents',
-                    trailing: TextButton(
-                      onPressed: () => context.pushNamed(RouteNames.hermesJobs),
-                      child: const Text('See all →'),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 9),
-                  HermesPanel(
-                    child: detail.jobs.isEmpty
-                        ? const Text('No schedules for this profile.')
-                        : Column(
-                            children: [
-                              for (final job in detail.jobs.take(3))
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(
-                                    Icons.event_repeat_rounded,
+                    const SizedBox(height: 22),
+                    Text(
+                      'CAPABILITIES',
+                      style: HermezType.technical(palette.muted),
+                    ),
+                    const SizedBox(height: 8),
+                    if (curated.featured.isEmpty)
+                      Text(
+                        'No profile capabilities reported.',
+                        style: HermezType.meta(palette),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final name in curated.featured)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.surface,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                name.replaceAll('_', ' '),
+                                style: HermezType.meta(palette)
+                                    .copyWith(color: palette.ink),
+                              ),
+                            ),
+                        ],
+                      ),
+                    if (curated.rest.isNotEmpty)
+                      Theme(
+                        data: Theme.of(context)
+                            .copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: Text(
+                            'All skills and tools',
+                            style: HermezType.section(palette)
+                                .copyWith(fontSize: 14),
+                          ),
+                          children: [
+                            for (final name in curated.rest)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    name.replaceAll('_', ' '),
+                                    style: HermezType.meta(palette),
                                   ),
-                                  title: Text(job.displayName),
-                                  subtitle: Text(
-                                    job.nextRun == null
-                                        ? job.schedule
-                                        : 'Next: ${job.nextRun!.toLocal()}',
-                                  ),
-                                  onTap: () async {
-                                    final run =
-                                        await showHermesScheduledAgentSheet(
-                                          context,
-                                          job: job,
-                                          profile: profile,
-                                        );
-                                    if (run != null && context.mounted) {
-                                      await openHermesSession(
-                                        context,
-                                        ref,
-                                        run,
-                                      );
-                                    }
-                                  },
                                 ),
-                            ],
-                          ),
-                  ),
-                ],
-              ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    HermezSectionBar(
+                      label: 'CONVERSATIONS',
+                      onAction: () =>
+                          context.pushNamed(RouteNames.hermesConversations),
+                    ),
+                    if (detail.sessions.isEmpty)
+                      Text(
+                        'No conversations for this profile yet.',
+                        style: HermezType.meta(palette),
+                      )
+                    else
+                      Column(
+                        children: [
+                          for (final session in detail.sessions.take(3))
+                            HermesSessionTile(session: session, compact: true),
+                        ],
+                      ),
+                    const SizedBox(height: 12),
+                    HermezSectionBar(
+                      label: 'SCHEDULED',
+                      onAction: () => context.pushNamed(RouteNames.hermesJobs),
+                    ),
+                    if (detail.jobs.isEmpty)
+                      Text(
+                        'No schedules for this profile.',
+                        style: HermezType.meta(palette),
+                      )
+                    else
+                      Column(
+                        children: [
+                          for (final job in detail.jobs.take(3))
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(job.displayName),
+                              subtitle: Text(
+                                job.nextRun == null
+                                    ? describeHermesCronSchedule(job.schedule)
+                                    : hermezWhen(job.nextRun, prefix: 'Next'),
+                              ),
+                              onTap: () async {
+                                final run = await showHermesScheduledAgentSheet(
+                                  context,
+                                  job: job,
+                                  profile: profile,
+                                );
+                                if (run != null && context.mounted) {
+                                  await openHermesSession(context, ref, run);
+                                }
+                              },
+                            ),
+                        ],
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -349,19 +415,51 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
     );
   }
 
-  Widget _metric(String value, String label) => Column(
-    children: [
-      Text(
-        value,
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-      ),
-      Text(
-        label,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 11),
-      ),
-    ],
-  );
+  Widget _metric(String value, String label, HermezChatPalette palette) =>
+      Column(
+        children: [
+          Text(
+            value,
+            style: HermezType.numeric(palette.ink).copyWith(fontSize: 22),
+          ),
+          Text(label, style: HermezType.meta(palette)),
+        ],
+      );
+}
+
+class _CuratedCapabilities {
+  const _CuratedCapabilities(this.featured, this.rest);
+  final List<String> featured;
+  final List<String> rest;
+}
+
+_CuratedCapabilities _curateCapabilities({
+  required List<String> skills,
+  required List<String> tools,
+}) {
+  final all = <String>{...skills, ...tools}.toList(growable: false);
+  bool technical(String name) {
+    final value = name.toLowerCase();
+    const markers = [
+      'api',
+      'server',
+      'engine',
+      'mcp',
+      'cron',
+      'context',
+      'gateway',
+      'sdk',
+      'plugin',
+    ];
+    return markers.any(value.contains);
+  }
+
+  final human = all.where((name) => !technical(name)).toList(growable: false);
+  final machine = all.where(technical).toList(growable: false);
+  final featured = <String>[
+    ...human.take(8),
+    if (human.length < 6) ...machine.take(6 - human.length),
+  ];
+  final rest = all.where((name) => !featured.contains(name)).toList();
+  return _CuratedCapabilities(featured, rest);
 }

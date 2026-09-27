@@ -1,19 +1,75 @@
 import 'package:conduit/features/hermes/kanban/hermes_kanban_summary_provider.dart';
+import 'package:conduit/core/persistence/preferences_store.dart';
+import 'package:conduit/core/services/navigation_service.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/models/hermes_job.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/services/hermes_desktop_api_service.dart';
+import 'package:conduit/features/hermes/services/hermes_api_service.dart';
 import 'package:conduit/features/hermes/views/hermes_attention_page.dart';
 import 'package:conduit/features/hermes/views/hermes_bot_detail_page.dart';
 import 'package:conduit/features/hermes/views/hermes_home_page.dart';
 import 'package:conduit/features/hermes/views/hermes_live_run_page.dart';
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('Home recent row opens its exact conversation', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+    addTearDown(PreferencesStore.debugReset);
+    final service = _RecentSessionService();
+    final router = GoRouter(
+      initialLocation: Routes.hermesHome,
+      routes: [
+        GoRoute(
+          path: Routes.hermesHome,
+          builder: (context, state) => const HermesHomePage(),
+        ),
+        GoRoute(
+          path: Routes.chat,
+          builder: (context, state) => const Scaffold(body: Text('Chat route')),
+        ),
+        GoRoute(
+          path: Routes.hermesConversations,
+          builder: (context, state) =>
+              const Scaffold(body: Text('Conversations route')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    NavigationService.attachRouter(router);
+    final container = ProviderContainer(
+      overrides: [
+        hermesApiServiceProvider.overrideWithValue(service),
+        hermesBotsProvider.overrideWith((ref) async => const []),
+        hermesSessionsProvider.overrideWith(_LoadedSessionsController.new),
+        hermesKanbanSummaryProvider.overrideWith((ref) async => null),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Roadmap ideas'));
+    await tester.tap(find.text('Roadmap ideas'));
+    await tester.pumpAndSettle();
+    expect(service.openedIds, ['session-1']);
+    expect(container.read(hermesActiveSessionProvider), 'session-1');
+    expect(find.text('Chat route'), findsOneWidget);
+    expect(find.text('Conversations route'), findsNothing);
+  });
+
   testWidgets(
     'Home renders real bot/job/session shapes at 320 px and 200% text',
     (tester) async {
@@ -55,10 +111,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      expect(find.text('Kai'), findsOneWidget);
+      expect(find.text('LIVE WORK'), findsNothing);
+      await tester.drag(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ListView && widget.scrollDirection == Axis.vertical,
+        ),
+        const Offset(0, -300),
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Kai'), findsOneWidget);
     },
   );
 
@@ -146,6 +209,30 @@ void main() {
         },
       );
     }
+  }
+}
+
+class _RecentSessionService extends HermesApiService {
+  _RecentSessionService()
+    : super(
+        config: const HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          apiKey: 'test-key',
+        ),
+      );
+
+  final openedIds = <String>[];
+
+  @override
+  Future<List<Map<String, dynamic>>> getSessionMessages(
+    String id, {
+    CancelToken? cancelToken,
+  }) async {
+    openedIds.add(id);
+    return [
+      {'role': 'assistant', 'content': 'Saved response'},
+    ];
   }
 }
 

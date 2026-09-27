@@ -12,9 +12,11 @@ import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
-import '../widgets/hermes_bot_avatar.dart';
 import '../widgets/hermes_session_tile.dart';
+import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_relative_time.dart';
+import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
 final _homeProfileJobsProvider =
@@ -90,8 +92,9 @@ class HermesHomePage extends ConsumerWidget {
     try {
       final id = await service.createBotConversation(bot);
       if (!context.mounted ||
-          !identical(ref.read(hermesApiServiceProvider), service))
+          !identical(ref.read(hermesApiServiceProvider), service)) {
         return;
+      }
       ref.invalidate(hermesBotSessionsProvider(bot.name));
       ref.invalidate(hermesSessionsProvider);
       ref.invalidate(hermesSessionTotalsProvider);
@@ -122,7 +125,8 @@ class HermesHomePage extends ConsumerWidget {
     );
     final bots = ref.watch(hermesBotsProvider).asData?.value;
     final jobs = ref.watch(_homeProfileJobsProvider).asData?.value;
-    final sessions = ref.watch(hermesSessionsProvider).asData?.value;
+    final sessionsAsync = ref.watch(hermesSessionsProvider);
+    final sessions = sessionsAsync.asData?.value;
     final kanban = ref.watch(hermesKanbanSummaryProvider).asData?.value;
     final now = DateTime.now();
     final todayJobs = (jobs ?? const <(String, HermesJob)>[])
@@ -166,139 +170,93 @@ class HermesHomePage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 36),
           children: [
-            Text(
-              'An intelligent personal agent to help you think clearer, make progress, and build a more intentional life.',
-              style: TextStyle(color: palette.muted, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 22),
-            HermesSectionTitle(
-              'Bots',
-              trailing: TextButton(
-                onPressed: () =>
-                    context.pushNamed(RouteNames.hermesConversations),
-                child: Text('${bots?.length ?? '—'}  See all →'),
-              ),
-            ),
-            const SizedBox(height: 8),
+            Text('BOTS', style: HermezType.technical(palette.muted)),
+            const SizedBox(height: 10),
             if (bots == null)
-              const HermesPanel(child: LinearProgressIndicator())
+              const LinearProgressIndicator()
             else if (bots.isEmpty)
-              const HermesPanel(
-                child: Text('No Hermes bot profiles available.'),
+              Text(
+                'No Hermes bot profiles available.',
+                style: HermezType.meta(palette),
               )
             else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final tileWidth = (constraints.maxWidth - 8) / 2;
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final bot in bots.take(6))
-                        SizedBox(
-                          width: tileWidth,
-                          child: _BotCard(bot: bot),
-                        ),
-                    ],
-                  );
-                },
+              SizedBox(
+                height: 64 + 36 * MediaQuery.textScalerOf(context).scale(1),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: bots.length > 6 ? 6 : bots.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) =>
+                      _BotCard(bot: bots[index], index: index),
+                ),
               ),
-            const SizedBox(height: 18),
-            HermesSectionTitle(
-              'Today',
-              trailing: Text(
-                '${now.day}/${now.month}',
-                style: TextStyle(color: palette.muted, fontSize: 11),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () =>
+                    context.pushNamed(RouteNames.hermesConversations),
+                child: Text('See all ${bots?.length ?? ''}'.trim()),
               ),
             ),
+            Text('TODAY', style: HermezType.technical(palette.muted)),
             const SizedBox(height: 8),
-            HermesPanel(
-              child: Column(
+            HermezSurface(
+              kind: HermezSurfaceKind.hero,
+              motif: HermezMotif.crop,
+              indexLabel: '02',
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Make progress on what matters.',
-                          style: TextStyle(color: palette.muted, fontSize: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'What is actually on today',
+                          style: HermezType.section(palette),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: palette.accent, width: 4),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '${todayJobs.length + running.length}',
-                              style: const TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w900,
-                                height: 1,
-                              ),
-                            ),
-                            const Text(
-                              'ITEMS',
-                              style: TextStyle(
-                                fontSize: 7,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        if (todayJobs.isEmpty && running.isEmpty)
+                          Text(
+                            'No scheduled runs or running Kanban work today.',
+                            style: HermezType.meta(palette),
+                          ),
+                        for (final (profile, job) in todayJobs.take(4))
+                          _TodayRow(
+                            title: job.displayName,
+                            detail:
+                                'Scheduled · ${hermezRelativeLabel(job.nextRun!)}',
+                            onTap: () => _openJob(context, ref, job, profile),
+                          ),
+                        for (final task in running.take(3))
+                          _TodayRow(
+                            title: task.title,
+                            detail:
+                                'Running${task.assignee == null ? '' : ' · ${task.assignee}'}',
+                            onTap: () =>
+                                context.pushNamed(RouteNames.hermesKanban),
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  if (todayJobs.isEmpty && running.isEmpty)
-                    const Text(
-                      'No scheduled runs or running Kanban work today.',
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 72,
+                    child: Column(
+                      children: [
+                        Text(
+                          '${todayJobs.length + running.length}',
+                          style: HermezType.numeric(palette.ink),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ITEMS',
+                          style: HermezType.technical(palette.accent),
+                        ),
+                      ],
                     ),
-                  for (final (profile, job) in todayJobs.take(4))
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      leading: Icon(
-                        Icons.circle,
-                        color: palette.accent,
-                        size: 12,
-                      ),
-                      title: Text(
-                        job.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        '${job.nextRun!.toLocal().hour.toString().padLeft(2, '0')}:${job.nextRun!.toLocal().minute.toString().padLeft(2, '0')} · Scheduled agent',
-                      ),
-                      onTap: () => _openJob(context, ref, job, profile),
-                    ),
-                  for (final task in running.take(3))
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      leading: const Icon(
-                        Icons.radio_button_checked,
-                        color: Color(0xFF2776D2),
-                        size: 17,
-                      ),
-                      title: Text(
-                        task.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        'Running${task.assignee == null ? '' : ' · ${task.assignee}'}',
-                      ),
-                      onTap: () => context.pushNamed(RouteNames.hermesKanban),
-                    ),
+                  ),
                 ],
               ),
             ),
@@ -308,9 +266,12 @@ class HermesHomePage extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: HermesPanel(
+                  child: HermezSurface(
+                    kind: HermezSurfaceKind.utility,
+                    motif: HermezMotif.slash,
                     onTap: activeJobs.isEmpty
                         ? () => context.pushNamed(RouteNames.hermesJobs)
                         : () => _openJob(
@@ -319,20 +280,25 @@ class HermesHomePage extends ConsumerWidget {
                             activeJobs.first.$2,
                             activeJobs.first.$1,
                           ),
+                    padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.event_repeat_rounded, color: palette.accent),
-                        const SizedBox(height: 9),
-                        const Text(
-                          'Scheduled agents',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        Text(
+                          'SCHEDULE',
+                          style: HermezType.technical(palette.accent),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Scheduled agents',
+                          style: HermezType.section(palette),
+                        ),
+                        const SizedBox(height: 4),
                         Text(
                           jobs == null
                               ? 'Loading…'
                               : '${activeJobs.length} active · ${jobs.length} total',
-                          style: TextStyle(color: palette.muted, fontSize: 11),
+                          style: HermezType.meta(palette),
                         ),
                         if (activeJobs.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -340,6 +306,7 @@ class HermesHomePage extends ConsumerWidget {
                             activeJobs.first.$2.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: HermezType.body(palette),
                           ),
                         ],
                       ],
@@ -348,30 +315,34 @@ class HermesHomePage extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: HermesPanel(
+                  child: HermezSurface(
+                    kind: HermezSurfaceKind.utility,
+                    motif: HermezMotif.arc,
                     onTap: () => context.pushNamed(RouteNames.hermesKanban),
+                    padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.view_kanban_outlined, color: palette.accent),
-                        const SizedBox(height: 9),
-                        const Text(
-                          'Kanban',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        Text(
+                          'BOARD',
+                          style: HermezType.technical(palette.muted),
                         ),
+                        const SizedBox(height: 8),
+                        Text('Kanban', style: HermezType.section(palette)),
+                        const SizedBox(height: 4),
                         Text(
                           kanban == null
                               ? 'Unavailable'
                               : '${kanban.total} tasks · ${kanban.board.name}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: palette.muted, fontSize: 11),
+                          style: HermezType.meta(palette),
                         ),
                         if (kanban != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            '${kanban.count('todo')} Todo  ·  ${kanban.count('running')} Running  ·  ${kanban.count('done')} Done',
-                            style: const TextStyle(fontSize: 10),
+                            '${kanban.count('todo')} todo · ${kanban.count('running')} running · ${kanban.count('done')} done',
+                            style: HermezType.meta(palette),
                           ),
                         ],
                       ],
@@ -380,70 +351,61 @@ class HermesHomePage extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            HermesSectionTitle(
-              'Recent conversations',
-              trailing: TextButton(
-                onPressed: () =>
-                    context.pushNamed(RouteNames.hermesConversations),
-                child: const Text('See all →'),
-              ),
+            const SizedBox(height: 22),
+            HermezSectionBar(
+              label: 'RECENT',
+              onAction: () => context.pushNamed(RouteNames.hermesConversations),
             ),
-            const SizedBox(height: 8),
-            HermesPanel(
+            HermezSurface(
+              kind: HermezSurfaceKind.list,
+              padding: EdgeInsets.zero,
               child: sessions == null
-                  ? const LinearProgressIndicator()
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: sessionsAsync.hasError
+                          ? Text(
+                              'Recent conversations are unavailable right now.',
+                              style: HermezType.meta(palette),
+                            )
+                          : const LinearProgressIndicator(),
+                    )
                   : sessions.isEmpty
-                  ? const Text('No recent conversations.')
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'No recent conversations.',
+                        style: HermezType.meta(palette),
+                      ),
+                    )
                   : Column(
                       children: [
-                        for (final session in sessions.take(3))
-                          HermesSessionTile(session: session),
+                        for (var i = 0; i < sessions.take(4).length; i++) ...[
+                          if (i > 0)
+                            Divider(
+                              height: 1,
+                              color: palette.border.withValues(alpha: 0.7),
+                            ),
+                          HermesSessionTile(
+                            session: sessions[i],
+                            compact: true,
+                          ),
+                        ],
                       ],
                     ),
-            ),
-            const SizedBox(height: 14),
-            HermesPanel(
-              onTap: sessions?.isNotEmpty == true
-                  ? () => context.pushNamed(
-                      RouteNames.hermesLiveRun,
-                      pathParameters: {'sessionId': sessions!.first.id},
-                    )
-                  : null,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.radio_button_checked_rounded,
-                    color: palette.accent,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      sessions?.isNotEmpty == true
-                          ? 'Live activity · ${sessions!.first.title}'
-                          : 'Live activity · No conversations yet',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
             ),
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: TextButton.icon(
                     onPressed: () =>
                         context.pushNamed(RouteNames.hermesAttention),
                     icon: const Icon(Icons.notifications_none_rounded),
                     label: const Text('Attention'),
                   ),
                 ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: TextButton.icon(
                     onPressed: () =>
                         context.pushNamed(RouteNames.hermesArtifacts),
                     icon: const Icon(Icons.folder_outlined),
@@ -496,18 +458,19 @@ class _ActiveWorkCard extends ConsumerWidget {
         );
         return Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: HermesPanel(
-            onTap: () => context.pushNamed(
-              RouteNames.hermesLiveRun,
-              pathParameters: {'sessionId': active!.id},
-            ),
+          child: HermezSurface(
+            kind: HermezSurfaceKind.technical,
+            motif: HermezMotif.arc,
+            // Live work belongs to the conversation's inline activity panel.
+            onTap: () => openHermesSession(context, ref, active!),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 SizedBox(
-                  width: 28,
-                  height: 28,
+                  width: 22,
+                  height: 22,
                   child: CircularProgressIndicator(
-                    strokeWidth: 3,
+                    strokeWidth: 2.4,
                     color: palette.accent,
                   ),
                 ),
@@ -516,23 +479,26 @@ class _ActiveWorkCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'LIVE WORK',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                        ),
+                        style: HermezType.technical(const Color(0xFFFF5A26)),
                       ),
                       Text(
                         active.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFF6F5F2),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFF6F5F2),
+                ),
               ],
             ),
           ),
@@ -542,83 +508,119 @@ class _ActiveWorkCard extends ConsumerWidget {
   }
 }
 
+class _TodayRow extends StatelessWidget {
+  const _TodayRow({
+    required this.title,
+    required this.detail,
+    required this.onTap,
+  });
+
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: palette.accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HermezType.body(palette),
+                  ),
+                  Text(detail, style: HermezType.meta(palette)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BotCard extends ConsumerWidget {
-  const _BotCard({required this.bot});
+  const _BotCard({required this.bot, required this.index});
   final HermesBot bot;
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final avatar = ref.watch(hermesBotAvatarProvider(bot.name)).asData?.value;
     final service = ref.watch(hermesApiServiceProvider);
     final state =
         service is HermesDesktopApiService && bot.chatSessionId != null
         ? service.turnStateFor(bot.chatSessionId!)
         : HermesDesktopTurnState.idle;
     final running = state == HermesDesktopTurnState.running;
-    return HermesPanel(
-      onTap: () => context.pushNamed(
-        RouteNames.hermesBotDetail,
-        pathParameters: {'profile': bot.name},
-      ),
-      padding: const EdgeInsets.all(11),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              HermesBotAvatar(
-                size: 42,
-                label: bot.title,
-                shape: bot.avatarShape,
-                color: bot.avatarColor,
-                imageKind: bot.avatarImageKind,
-                imageUrl: avatar,
+    final status = running
+        ? 'Running'
+        : bot.lastActive == null
+        ? 'Available'
+        : hermezWhen(bot.lastActive, prefix: 'Active');
+    return SizedBox(
+      width: 210,
+      child: HermezSurface(
+        kind: HermezSurfaceKind.utility,
+        motif: index.isEven ? HermezMotif.slash : HermezMotif.arc,
+        onTap: () => context.pushNamed(
+          RouteNames.hermesBotDetail,
+          pathParameters: {'profile': bot.name},
+        ),
+        padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+        child: Row(
+          children: [
+            HermezBotMark(
+              identity: hermezIdentityForBot(bot),
+              size: 48,
+              label: bot.title,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    bot.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HermezType.section(palette).copyWith(fontSize: 15),
+                  ),
+                  Text(
+                    status,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HermezType.meta(palette),
+                  ),
+                ],
               ),
-              const Spacer(),
-              const Icon(Icons.chevron_right_rounded, size: 18),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            bot.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          Text(
-            bot.description ?? 'Hermes profile',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: palette.muted),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 3,
-                backgroundColor: running
-                    ? const Color(0xFF17A46A)
-                    : const Color(0xFF2776D2),
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  running
-                      ? 'Running'
-                      : bot.lastActive == null
-                      ? 'Available'
-                      : 'Last active ${bot.lastActive!.toLocal().hour}:${bot.lastActive!.toLocal().minute.toString().padLeft(2, '0')}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10, color: palette.muted),
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

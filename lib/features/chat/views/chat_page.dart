@@ -2143,14 +2143,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ? (voice.isCollapsed ? 72.0 : 180.0)
         : 0.0;
     final activeHermes = ref.read(activeConversationProvider);
-    final hasLiveActivity =
-        isNativeHermesConversation(activeHermes) &&
-        ref.read(hermesActiveSessionProvider) != null &&
-        ref.read(hermesApiServiceProvider) is HermesDesktopApiService;
+    final storedId = ref.read(hermesActiveSessionProvider);
+    final turn = ref.read(hermesDesktopTurnStateProvider).asData?.value;
+    final hasLiveActivity = shouldShowHermesLiveActivity(
+      nativeConversation: isNativeHermesConversation(activeHermes),
+      conversationSessionId: activeHermes?.metadata['hermesSessionId']
+          ?.toString(),
+      activeSessionId: storedId,
+      desktopService:
+          ref.read(hermesApiServiceProvider) is HermesDesktopApiService,
+      turnState: turn,
+    );
     final activityHeight = hasLiveActivity
-        ? (_liveActivityExpanded
-                  ? HermesLiveActivityDisclosure.expandedHeight
-                  : HermesLiveActivityDisclosure.collapsedHeight) +
+        ? HermesLiveActivityDisclosure.heightFor(
+                context,
+                expanded: _liveActivityExpanded,
+              ) +
               16
         : 0.0;
     return Spacing.lg + _inputHeight + voiceOverlayHeight + activityHeight;
@@ -3696,6 +3704,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _buildEmptyState(ThemeData theme) {
     final l10n = AppLocalizations.of(context)!;
+    final hermesBot = chatHermesBotPresentation(
+      ref.watch(activeConversationProvider),
+    );
     final authUser = ref.watch(currentUserProvider2);
     final asyncUser = ref.watch(currentUserProvider);
     final user = asyncUser.maybeWhen(
@@ -3843,6 +3854,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         child: _useHermezChatVisuals
                             ? HermezEmptyChatGreeting(
                                 greeting: _greetingReady ? greetingDisplay : '',
+                                contextLabel: hermesBot == null
+                                    ? null
+                                    : 'With ${hermesBot.title}',
+                                starters: [
+                                  if (hermesBot != null)
+                                    'What should ${hermesBot.title} look at first?',
+                                  'What is waiting on me?',
+                                  'Help me plan the next step.',
+                                ],
+                                onStarter: (prompt) {
+                                  ref
+                                      .read(
+                                        composerTextInsertionProvider.notifier,
+                                      )
+                                      .insert(
+                                        targetId:
+                                            chatComposerTextInsertionTargetId,
+                                        text: prompt,
+                                      );
+                                },
                               )
                             : Text(
                                 _greetingReady ? greetingDisplay : '',
@@ -4167,10 +4198,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final activeConversation = ref.watch(activeConversationProvider);
     final activeHermesSessionId = ref.watch(hermesActiveSessionProvider);
     final desktopService = ref.watch(hermesApiServiceProvider);
-    final showHermesActivity =
-        isNativeHermesConversation(activeConversation) &&
-        activeHermesSessionId != null &&
-        desktopService is HermesDesktopApiService;
+    final activeHermesTurn = ref
+        .watch(hermesDesktopTurnStateProvider)
+        .asData
+        ?.value;
+    final showHermesActivity = shouldShowHermesLiveActivity(
+      nativeConversation: isNativeHermesConversation(activeConversation),
+      conversationSessionId: activeConversation?.metadata['hermesSessionId']
+          ?.toString(),
+      activeSessionId: activeHermesSessionId,
+      desktopService: desktopService is HermesDesktopApiService,
+      turnState: activeHermesTurn,
+    );
     final hermesBot = chatHermesBotPresentation(activeConversation);
     final hermezVisuals = _useHermezChatVisuals;
     final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);
@@ -4292,11 +4331,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
                           : (Spacing.xxl + Spacing.xxxl)) +
                       (showHermesActivity
-                          ? (_liveActivityExpanded
-                                    ? HermesLiveActivityDisclosure
-                                          .expandedHeight
-                                    : HermesLiveActivityDisclosure
-                                          .collapsedHeight) +
+                          ? HermesLiveActivityDisclosure.heightFor(
+                                  context,
+                                  expanded: _liveActivityExpanded,
+                                ) +
                                 16
                           : 0),
                   left: 0,
@@ -4350,7 +4388,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
                 ),
-                if (showHermesActivity)
+                if (showHermesActivity &&
+                    desktopService is HermesDesktopApiService &&
+                    activeHermesSessionId != null)
                   Positioned(
                     left: 12,
                     right: 12,

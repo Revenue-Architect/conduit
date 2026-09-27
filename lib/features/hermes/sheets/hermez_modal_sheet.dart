@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_surfaces.dart';
 import '../widgets/hermez_visual_theme.dart';
+
+/// Shared detail sheet. Existing callers keep [showHermezSheet].
+typedef HermezDetailSheet = HermezModalSheet;
 
 /// A single visual shell for Hermes-owned details. Dismissing it never implies
 /// a backend action; callers must resolve requests explicitly.
@@ -52,7 +56,6 @@ class HermezModalSheet extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            side: BorderSide(color: palette.border),
           ),
           child: Column(
             children: [
@@ -61,7 +64,7 @@ class HermezModalSheet extends StatelessWidget {
                 width: 42,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: palette.border,
+                  color: palette.ink.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(5),
                 ),
               ),
@@ -76,25 +79,23 @@ class HermezModalSheet extends StatelessWidget {
                           if (eyebrow != null)
                             Text(
                               eyebrow!.toUpperCase(),
-                              style: TextStyle(
-                                color: palette.accent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.8,
-                              ),
+                              style: HermezType.technical(palette.accent),
                             ),
                           Text(
                             title,
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: palette.ink,
-                              fontSize: 27,
-                              fontWeight: FontWeight.w900,
-                              height: 1.08,
+                            style: HermezType.display(palette).copyWith(
+                              fontSize: 28,
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    IgnorePointer(
+                      child: CustomPaint(
+                        size: const Size(28, 36),
+                        painter: _SheetSlashPainter(palette.accent),
                       ),
                     ),
                     IconButton(
@@ -125,4 +126,25 @@ class HermezModalSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SheetSlashPainter extends CustomPainter {
+  const _SheetSlashPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawLine(
+      Offset(size.width * 0.15, size.height * 0.85),
+      Offset(size.width * 0.85, size.height * 0.1),
+      Paint()
+        ..color = color
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SheetSlashPainter oldDelegate) => color != oldDelegate.color;
 }

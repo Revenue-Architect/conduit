@@ -23,6 +23,7 @@ import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import 'hermes_bot_tile.dart';
 import 'hermes_bot_avatar.dart';
+import 'hermez_bot_mark.dart';
 import 'hermes_session_tile.dart';
 
 /// Sidebar tab listing the user's Hermes server-side conversations, with one
@@ -118,7 +119,11 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         }
         ref.invalidate(hermesKanbanSummaryProvider);
         ref.invalidate(hermesSessionTotalsProvider);
-        await ref.read(hermesSessionsProvider.future);
+        try {
+          await ref.read(hermesSessionsProvider.future);
+        } catch (_) {
+          // Keep the list on screen. A failed refresh is not a new error page.
+        }
       },
       child: scroll,
     );
@@ -154,11 +159,12 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         ),
         sliver: SliverToBoxAdapter(
           child: Container(
-            decoration: BoxDecoration(
-              color: context.conduitTheme.surfaceBackground,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: context.conduitTheme.cardBorder),
-            ),
+            decoration: widget.standalone
+                ? null
+                : BoxDecoration(
+                    color: context.conduitTheme.surfaceBackground,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
             child: Column(
               children: [
                 _SectionHeader(
@@ -221,48 +227,44 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             child: Row(
               children: [
-                HermesBotAvatar(
-                  size: 38,
-                  imageUrl: avatar,
-                  label: bot.title,
-                  shape: bot.avatarShape,
-                  color: bot.avatarColor,
-                  imageKind: bot.avatarImageKind,
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Text(
-                    bot.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyMediumStyle.copyWith(
-                      color: theme.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (conversationCount > 0) ...[
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
+                bot.avatarImageKind == 'photo' && avatar != null
+                    ? HermesBotAvatar(
+                        size: 36,
+                        imageUrl: avatar,
+                        label: bot.title,
+                        shape: bot.avatarShape,
+                        color: bot.avatarColor,
+                        imageKind: bot.avatarImageKind,
+                      )
+                    : HermezBotMark(
+                        identity: hermezIdentityForBot(bot),
+                        size: 36,
+                        label: bot.title,
                       ),
-                      child: Text(
-                        '$conversationCount',
-                        style: AppTypography.bodySmallStyle.copyWith(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bot.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodyMediumStyle.copyWith(
                           color: theme.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
+                      if (conversationCount > 0)
+                        Text(
+                          '$conversationCount chats',
+                          style: AppTypography.bodySmallStyle.copyWith(
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(width: 9),
-                ],
+                ),
                 Icon(
                   sidebarSectionDisclosureIcon(expanded),
                   color: theme.iconSecondary,
@@ -288,11 +290,11 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                       padding: EdgeInsets.all(12),
                       child: LinearProgressIndicator(),
                     ),
-                  if (scoped?.hasError == true)
+                  if (scoped?.hasError == true && owned.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
-                        'Could not load all conversations. Pull to retry.',
+                        'Could not refresh chats for this bot. Pull to retry.',
                       ),
                     ),
                   for (final session in owned.take(visibleCount))
@@ -362,14 +364,20 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                   Spacing.sm,
                   Spacing.xs,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.surfaceBackground,
-                    borderRadius: BorderRadius.circular(AppBorderRadius.card),
-                    border: Border.all(color: theme.cardBorder),
-                  ),
-                  child: HermesSessionTile(session: sessions[index]),
-                ),
+                child: widget.standalone
+                    ? HermesSessionTile(
+                        session: sessions[index],
+                        compact: true,
+                      )
+                    : DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.surfaceBackground,
+                          borderRadius: BorderRadius.circular(
+                            AppBorderRadius.card,
+                          ),
+                        ),
+                        child: HermesSessionTile(session: sessions[index]),
+                      ),
               ),
             ),
           ),
@@ -387,9 +395,9 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         SliverToBoxAdapter(
           child: _message(
             theme,
-            Icons.error_outline,
-            l10n.hermesConversationsLoadError,
-            theme.error,
+            Icons.chat_bubble_outline,
+            'Recent conversations are unavailable right now.',
+            theme.textSecondary,
           ),
         ),
       ],
@@ -435,8 +443,7 @@ class _HermesHomeEntry extends StatelessWidget {
       child: Material(
         color: theme.surfaceBackground,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: theme.cardBorder),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: ListTile(
           key: const ValueKey('hermes-home-entry'),
@@ -472,7 +479,6 @@ class _KanbanEntry extends ConsumerWidget {
         color: theme.surfaceBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppBorderRadius.card),
-          side: BorderSide(color: theme.cardBorder),
         ),
         child: ListTile(
           key: const ValueKey<String>('hermes-kanban-entry'),
@@ -565,7 +571,6 @@ class _ScheduledAgentsTile extends ConsumerWidget {
           decoration: BoxDecoration(
             color: theme.surfaceBackground,
             borderRadius: BorderRadius.circular(AppBorderRadius.card),
-            border: Border.all(color: theme.cardBorder),
           ),
           child: Row(
             children: [

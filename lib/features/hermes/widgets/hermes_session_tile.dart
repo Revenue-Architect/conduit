@@ -32,6 +32,28 @@ import '../services/hermes_local_document_trust_store.dart';
 import '../services/hermes_message_mapper.dart';
 import '../services/hermes_pending_decision_store.dart';
 import '../services/hermes_session_provenance.dart';
+import 'hermez_bot_mark.dart';
+import 'hermez_chat_palette.dart';
+import 'hermez_relative_time.dart';
+import 'hermez_surfaces.dart';
+
+/// True when [value] is a failed-run dump rather than a conversation title.
+bool hermezTextLooksLikeErrorDump(String value) {
+  final text = value.trim();
+  if (text.isEmpty) return false;
+  final lower = text.toLowerCase();
+  if (lower.startsWith('traceback')) return true;
+  if (lower.startsWith('exception:') || lower.startsWith('exception ')) {
+    return true;
+  }
+  final longErrorLead =
+      (lower.startsWith('error:') || lower.startsWith('error ')) &&
+      (text.length > 180 || text.contains('\n'));
+  if (longErrorLead) return true;
+  if (text.contains('At line:') || text.contains('.dart:')) return true;
+  if (text.startsWith('{') && lower.contains('"error"')) return true;
+  return false;
+}
 
 /// A single Hermes session row, styled to match the chat conversation tiles —
 /// single-line title, selected highlight, and an in-progress spinner while a
@@ -40,11 +62,13 @@ class HermesSessionTile extends ConsumerWidget {
   const HermesSessionTile({
     required this.session,
     this.nested = false,
+    this.compact = false,
     super.key,
   });
 
   final HermesSessionSummary session;
   final bool nested;
+  final bool compact;
 
   String get _localConversationId => 'local:hermes_${session.id}';
 
@@ -57,6 +81,69 @@ class HermesSessionTile extends ConsumerWidget {
     final isGenerating =
         ref.watch(hermesActiveSessionProvider) == session.id &&
         ref.watch(isChatStreamingProvider);
+
+    if (compact) {
+      final palette = HermezChatPalette.forBrightness(
+        Theme.of(context).brightness,
+      );
+      final when = session.updatedAt == null
+          ? null
+          : hermezRelativeLabel(session.updatedAt!);
+      return ConduitContextMenu(
+        actions: _contextMenuActions(context, ref),
+        previewBuilder: buildConversationTileContextPreview,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () => openHermesSession(context, ref, session),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  HermezBotMark(
+                    identity: hermezIdentityForName(session.profile),
+                    size: 32,
+                    label: session.profile,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _displayTitle(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: HermezType.section(palette)
+                              .copyWith(fontSize: 15),
+                        ),
+                        Text(
+                          [
+                            ?session.profile,
+                            ?when,
+                            if (session.messageCount != null)
+                              '${session.messageCount} messages',
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: HermezType.meta(palette),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isGenerating)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return ConduitContextMenu(
       actions: _contextMenuActions(context, ref),
@@ -126,15 +213,26 @@ class HermesSessionTile extends ConsumerWidget {
 
   /// Single-line label: the title, falling back to the transcript preview when
   /// the server left it untitled (e.g. cron/telegram sessions).
+  ///
+  /// Error dumps from a failed run are not titles. They stay out of the list.
   String _displayTitle(BuildContext context) {
     final title = session.title.trim();
-    if (title.isNotEmpty && title != 'Untitled session') return title;
+    if (title.isNotEmpty &&
+        title != 'Untitled session' &&
+        !hermezTextLooksLikeErrorDump(title)) {
+      return title;
+    }
     final preview = session.preview?.trim();
-    if (preview != null && preview.isNotEmpty) return preview;
-    return title.isEmpty
-        ? (AppLocalizations.of(context) ?? AppLocalizationsEn())
-              .hermesSessionUntitled
-        : title;
+    if (preview != null &&
+        preview.isNotEmpty &&
+        !hermezTextLooksLikeErrorDump(preview)) {
+      return preview;
+    }
+    if (session.profile != null && session.profile!.isNotEmpty) {
+      return session.profile!;
+    }
+    return (AppLocalizations.of(context) ?? AppLocalizationsEn())
+        .hermesSessionUntitled;
   }
 
   List<ConduitContextMenuAction> _contextMenuActions(

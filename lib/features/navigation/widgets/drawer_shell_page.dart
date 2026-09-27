@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
@@ -39,6 +40,38 @@ class DrawerShellPage extends ConsumerStatefulWidget {
 
 class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
   final _drawerKey = GlobalKey<ResponsiveDrawerLayoutState>();
+  GoRouter? _observedRouter;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.of(context);
+    if (identical(router, _observedRouter)) return;
+    _observedRouter?.routeInformationProvider.removeListener(_onRouteChanged);
+    _observedRouter = router;
+    router.routeInformationProvider.addListener(_onRouteChanged);
+    _onRouteChanged();
+  }
+
+  void _onRouteChanged() {
+    if (_observedRouter?.routeInformationProvider.value.uri.path !=
+        Routes.chat) {
+      return;
+    }
+    // A session selected on Hermes Home can bind before this shell is visible.
+    // Close the retained mobile drawer when Chat becomes the destination.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !usesPersistentTabletSidebar(context)) {
+        _drawerKey.currentState?.close();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _observedRouter?.routeInformationProvider.removeListener(_onRouteChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

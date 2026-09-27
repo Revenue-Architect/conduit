@@ -1,71 +1,116 @@
 import 'package:flutter/material.dart';
 
+import 'hermez_bot_mark.dart';
 import 'hermez_chat_palette.dart';
+import 'hermez_surfaces.dart';
+import 'hermez_technical_background.dart';
 
-/// A typographic restyle of ChatPage's existing empty state, not a new screen.
+/// Empty Hermes chat. Decorative once messages exist; this only fills the void.
 class HermezEmptyChatGreeting extends StatelessWidget {
-  const HermezEmptyChatGreeting({super.key, required this.greeting});
+  const HermezEmptyChatGreeting({
+    super.key,
+    required this.greeting,
+    this.contextLabel,
+    this.starters = const [],
+    this.onStarter,
+  });
 
   final String greeting;
+  final String? contextLabel;
+  final List<String> starters;
+  final ValueChanged<String>? onStarter;
 
   @override
   Widget build(BuildContext context) {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final headline = Theme.of(context).textTheme.displaySmall;
+    final visibleStarters = onStarter == null
+        ? const <String>[]
+        : starters.take(3).toList(growable: false);
 
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+          child: HermezTechnicalBackground(
+            variant: HermezBackgroundVariant.editorial,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('HERMEZ', style: HermezType.technical(palette.muted)),
+                      const Spacer(),
+                      Text('01', style: HermezType.technical(palette.muted)),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          greeting,
+                          style: HermezType.display(palette).copyWith(
+                            fontSize: 36,
+                          ),
+                        ),
+                      ),
+                      const HermezBotMark(
+                        identity: HermezBotIdentity.neutral,
+                        size: 64,
+                      ),
+                    ],
+                  ),
+                  if (contextLabel != null && contextLabel!.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        contextLabel!,
+                        style: HermezType.meta(palette),
+                      ),
+                    ),
+                  const SizedBox(height: 18),
                   Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      shape: BoxShape.circle,
-                    ),
+                    width: 42,
+                    height: 3,
+                    color: palette.accent,
                   ),
-                  const SizedBox(width: 9),
-                  Text(
-                    'HERMEZ',
-                    style: TextStyle(
-                      color: palette.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2.4,
+                  if (visibleStarters.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final starter in visibleStarters)
+                          ActionChip(
+                            label: Text(starter),
+                            labelStyle: HermezType.meta(palette).copyWith(
+                              color: palette.ink,
+                            ),
+                            backgroundColor: palette.surface,
+                            side: BorderSide.none,
+                            onPressed: () => onStarter!(starter),
+                          ),
+                      ],
                     ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 18),
-              Text(
-                greeting,
-                style: headline?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.1,
-                ),
-                textAlign: TextAlign.start,
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 46,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.accent,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

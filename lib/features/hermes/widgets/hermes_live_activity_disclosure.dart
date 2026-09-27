@@ -5,6 +5,23 @@ import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_live_activity.dart';
 import 'hermez_chat_palette.dart';
 
+/// Show the disclosure only for the selected Desktop session while a turn is
+/// active or being recovered. Historical activity remains in the transcript.
+bool shouldShowHermesLiveActivity({
+  required bool nativeConversation,
+  required String? conversationSessionId,
+  required String? activeSessionId,
+  required bool desktopService,
+  required HermesDesktopTurnState? turnState,
+}) =>
+    nativeConversation &&
+    conversationSessionId != null &&
+    conversationSessionId == activeSessionId &&
+    desktopService &&
+    (turnState == HermesDesktopTurnState.running ||
+        turnState == HermesDesktopTurnState.synchronizing ||
+        turnState == HermesDesktopTurnState.reconnecting);
+
 /// A compact, session-scoped live timeline that stays inside the conversation.
 /// It shares the existing Desktop event subscription; opening it never starts
 /// another gateway connection or invents a progress percentage.
@@ -19,6 +36,14 @@ class HermesLiveActivityDisclosure extends StatefulWidget {
 
   static const collapsedHeight = 72.0;
   static const expandedHeight = 292.0;
+
+  static double heightFor(BuildContext context, {required bool expanded}) {
+    final textGrowth = (MediaQuery.textScalerOf(context).scale(88) - 88).clamp(
+      0.0,
+      264.0,
+    );
+    return (expanded ? expandedHeight : collapsedHeight) + textGrowth;
+  }
 
   final HermesDesktopApiService service;
   final String sessionId;
@@ -60,6 +85,10 @@ class _HermesLiveActivityDisclosureState
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
+    final headerHeight = HermesLiveActivityDisclosure.heightFor(
+      context,
+      expanded: false,
+    );
     return StreamBuilder<HermesDesktopTurnState>(
       stream: _turns,
       initialData: widget.service.turnStateFor(widget.sessionId),
@@ -69,13 +98,17 @@ class _HermesLiveActivityDisclosureState
         builder: (context, activity) {
           final events = activity.data ?? const <HermesLiveActivityEvent>[];
           final running = turn.data == HermesDesktopTurnState.running;
+          final reconnecting = turn.data == HermesDesktopTurnState.reconnecting;
+          final synchronizing =
+              turn.data == HermesDesktopTurnState.synchronizing;
           final latest = events.isEmpty ? null : events.last;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
-            height: widget.expanded
-                ? HermesLiveActivityDisclosure.expandedHeight
-                : HermesLiveActivityDisclosure.collapsedHeight,
+            height: HermesLiveActivityDisclosure.heightFor(
+              context,
+              expanded: widget.expanded,
+            ),
             decoration: BoxDecoration(
               color: palette.surface,
               borderRadius: BorderRadius.circular(20),
@@ -89,7 +122,7 @@ class _HermesLiveActivityDisclosureState
                   child: InkWell(
                     onTap: widget.onToggle,
                     child: SizedBox(
-                      height: HermesLiveActivityDisclosure.collapsedHeight - 2,
+                      height: headerHeight - 2,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -107,7 +140,7 @@ class _HermesLiveActivityDisclosureState
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    running ? 'Live activity' : 'Run activity',
+                                    'Live activity',
                                     style: TextStyle(
                                       color: palette.ink,
                                       fontWeight: FontWeight.w800,
@@ -115,9 +148,11 @@ class _HermesLiveActivityDisclosureState
                                   ),
                                   Text(
                                     latest?.title ??
-                                        (running
-                                            ? 'Hermes is working'
-                                            : 'No active run'),
+                                        (reconnecting
+                                            ? 'Reconnecting to Hermes'
+                                            : synchronizing
+                                            ? 'Synchronizing run'
+                                            : 'Hermes is working'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -157,37 +192,58 @@ class _HermesLiveActivityDisclosureState
                               style: TextStyle(color: palette.muted),
                             ),
                           )
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                            itemCount: events.length.clamp(0, 20),
-                            itemBuilder: (context, index) {
-                              final event = events[events.length - 1 - index];
-                              final time = TimeOfDay.fromDateTime(
-                                event.timestamp.toLocal(),
-                              ).format(context);
-                              return ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: Icon(
-                                  Icons.circle,
-                                  size: 8,
-                                  color: index == 0 && running
-                                      ? palette.accent
-                                      : palette.muted,
-                                ),
-                                title: Text(event.title, maxLines: 2),
-                                trailing: Text(
-                                  time,
-                                  style: TextStyle(
-                                    color: palette.muted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              );
-                            },
+                        : HermesLiveActivityTimeline(
+                            events: events,
+                            running: running,
                           ),
                   ),
               ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A Material-backed timeline because ListTile requires an ancestor even when
+/// the chat itself is composed with non-Material adaptive surfaces.
+class HermesLiveActivityTimeline extends StatelessWidget {
+  const HermesLiveActivityTimeline({
+    super.key,
+    required this.events,
+    required this.running,
+  });
+
+  final List<HermesLiveActivityEvent> events;
+  final bool running;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Material(
+      type: MaterialType.transparency,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        itemCount: events.length.clamp(0, 20),
+        itemBuilder: (context, index) {
+          final event = events[events.length - 1 - index];
+          final time = TimeOfDay.fromDateTime(event.timestamp.toLocal())
+              .format(context);
+          return ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.circle,
+              size: 8,
+              color: index == 0 && running ? palette.accent : palette.muted,
+            ),
+            title: Text(event.title, maxLines: 2),
+            trailing: Text(
+              time,
+              style: TextStyle(color: palette.muted, fontSize: 11),
             ),
           );
         },
