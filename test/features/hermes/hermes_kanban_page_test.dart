@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_client.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_page.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
+import 'package:conduit/features/hermes/models/hermes_bot.dart';
+import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -114,6 +116,13 @@ void main() {
           scrollable: find.byType(Scrollable).last,
         );
         expect(find.text('No private data.'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('Live activity'),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.tap(find.text('Live activity'));
+        await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
           find.text('Check the route'),
           250,
@@ -284,6 +293,18 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(writes, ['create', 'patch', 'comment']);
+    await tester.scrollUntilVisible(
+      find.text('Live activity'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Live activity'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Reviewed in QA'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('Reviewed in QA'), findsOneWidget);
 
     await tester.scrollUntilVisible(
@@ -339,6 +360,54 @@ void main() {
     await tester.tap(find.text('Assignee'));
     await tester.pumpAndSettle();
     expect(find.text('autopilot'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('task form uses the Bot Mode roster and neutral sheet surface', (
+    tester,
+  ) async {
+    var pluginRosterCalled = false;
+    final client = HermesKanbanClient(
+      config,
+      request: (_, uri, {body}) async {
+        if (uri.path.endsWith('/boards')) {
+          return (status: 200, body: '{"boards":[{"slug":"qa","name":"QA"}]}');
+        }
+        if (uri.path.endsWith('/profiles')) {
+          pluginRosterCalled = true;
+          return (status: 200, body: '{"profiles":[]}');
+        }
+        return (status: 200, body: '{"columns":[]}');
+      },
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesBotsProvider.overrideWith(
+            (ref) async => const [
+              HermesBot(name: 'kai', title: 'Kai', description: 'Research'),
+              HermesBot(name: 'strong', title: 'Strong'),
+            ],
+          ),
+        ],
+        child: MaterialApp(home: HermesKanbanPage(client: client)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('New task'));
+    await tester.pumpAndSettle();
+    expect(
+      Theme.of(tester.element(find.text('New task').last))
+          .dialogTheme
+          .backgroundColor,
+      const Color(0xFFFFFFFF),
+    );
+    await tester.tap(find.text('Assign a Hermes bot (optional)'));
+    await tester.pumpAndSettle();
+    expect(find.text('kai'), findsOneWidget);
+    expect(find.text('strong'), findsOneWidget);
+    expect(pluginRosterCalled, isFalse);
     expect(tester.takeException(), isNull);
   });
 

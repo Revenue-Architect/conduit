@@ -54,6 +54,7 @@ import '../../hermes/services/hermes_pending_decision_store.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
+import '../../hermes/widgets/hermes_live_activity_disclosure.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -494,6 +495,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _isDeactivated = false;
   double _inputHeight = 0;
   bool _didStartupFocus = false; // one-time auto-focus on startup
+  bool _liveActivityExpanded = false;
   String? _lastConversationId;
   int _conversationOwnerGeneration = 0;
   int? _timelineHistoryIndexDesyncLogGeneration;
@@ -2140,7 +2142,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final voiceOverlayHeight = voice.isActive
         ? (voice.isCollapsed ? 72.0 : 180.0)
         : 0.0;
-    return Spacing.lg + _inputHeight + voiceOverlayHeight;
+    final activeHermes = ref.read(activeConversationProvider);
+    final hasLiveActivity =
+        isNativeHermesConversation(activeHermes) &&
+        ref.read(hermesActiveSessionProvider) != null &&
+        ref.read(hermesApiServiceProvider) is HermesDesktopApiService;
+    final activityHeight = hasLiveActivity
+        ? (_liveActivityExpanded
+                  ? HermesLiveActivityDisclosure.expandedHeight
+                  : HermesLiveActivityDisclosure.collapsedHeight) +
+              16
+        : 0.0;
+    return Spacing.lg + _inputHeight + voiceOverlayHeight + activityHeight;
   }
 
   /// User-initiated scroll to bottom (e.g. button tap).
@@ -4152,6 +4165,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
+    final activeHermesSessionId = ref.watch(hermesActiveSessionProvider);
+    final desktopService = ref.watch(hermesApiServiceProvider);
+    final showHermesActivity =
+        isNativeHermesConversation(activeConversation) &&
+        activeHermesSessionId != null &&
+        desktopService is HermesDesktopApiService;
     final hermesBot = chatHermesBotPresentation(activeConversation);
     final hermezVisuals = _useHermezChatVisuals;
     final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);
@@ -4268,9 +4287,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ),
                 ),
                 Positioned(
-                  bottom: (_inputHeight > 0)
-                      ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
-                      : (Spacing.xxl + Spacing.xxxl),
+                  bottom:
+                      ((_inputHeight > 0)
+                          ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
+                          : (Spacing.xxl + Spacing.xxxl)) +
+                      (showHermesActivity
+                          ? (_liveActivityExpanded
+                                    ? HermesLiveActivityDisclosure
+                                          .expandedHeight
+                                    : HermesLiveActivityDisclosure
+                                          .collapsedHeight) +
+                                16
+                          : 0),
                   left: 0,
                   right: 0,
                   child: AnimatedSwitcher(
@@ -4322,6 +4350,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
                 ),
+                if (showHermesActivity)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: _inputHeight + 8,
+                    child: HermesLiveActivityDisclosure(
+                      service: desktopService,
+                      sessionId: activeHermesSessionId,
+                      expanded: _liveActivityExpanded,
+                      onToggle: () => setState(
+                        () => _liveActivityExpanded = !_liveActivityExpanded,
+                      ),
+                    ),
+                  ),
                 Positioned(
                   left: 0,
                   right: 0,

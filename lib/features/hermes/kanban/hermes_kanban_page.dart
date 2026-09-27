@@ -19,7 +19,18 @@ Future<T?> _settledDialog<T>(
   BuildContext context,
   WidgetBuilder builder,
 ) async {
-  final route = DialogRoute<T>(context: context, builder: builder);
+  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+  final theme = hermezVisualTheme(Theme.of(context)).copyWith(
+    dialogTheme: DialogThemeData(
+      backgroundColor: palette.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+  );
+  final route = DialogRoute<T>(
+    context: context,
+    builder: (dialogContext) =>
+        Theme(data: theme, child: builder(dialogContext)),
+  );
   final result = await Navigator.of(context).push<T>(route);
   await route.completed;
   return result;
@@ -75,7 +86,23 @@ Future<String?> _pickKanbanProfile(
   HermesKanbanClient client, {
   String? current,
 }) {
-  final profiles = client.profiles();
+  final profiles = () async {
+    try {
+      final bots = await ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(hermesBotsProvider.future);
+      if (bots.isNotEmpty) {
+        return bots
+            .map((bot) => KanbanProfile(bot.name, bot.description))
+            .toList(growable: false);
+      }
+    } catch (_) {
+      // Older gateways may not advertise Bot Mode; the Kanban plugin remains
+      // a compatible fallback for their profile roster.
+    }
+    return client.profiles();
+  }();
   return _settledDialog<String>(
     context,
     (dialogContext) => AlertDialog(
@@ -439,15 +466,17 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                             assignee: assignee,
                             priority: priority,
                           );
-                          if (dialogContext.mounted)
+                          if (dialogContext.mounted) {
                             Navigator.pop(dialogContext, true);
+                          }
                         } catch (error) {
                           if (dialogContext.mounted) {
                             setModalState(() => errorText = _message(error));
                           }
                         } finally {
-                          if (dialogContext.mounted)
+                          if (dialogContext.mounted) {
                             setModalState(() => saving = false);
+                          }
                         }
                       },
                 child: saving
@@ -1110,47 +1139,61 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
     String title,
     String subtitle,
     IconData icon,
-    List<Widget> children,
-  ) => Card(
+    List<Widget> children, {
+    VoidCallback? onTap,
+    bool expanded = true,
+  }) => Card(
     margin: const EdgeInsets.only(bottom: 12),
     child: Padding(
       padding: const EdgeInsets.all(17),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerLow,
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).colorScheme.onSurface,
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerLow,
+                  child: Icon(
+                    icon,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                if (onTap != null)
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ...children,
+          if (onTap == null || expanded) ...[
+            const SizedBox(height: 12),
+            ...children,
+          ],
         ],
       ),
     ),
@@ -1426,8 +1469,8 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
           ),
           if (detail != null) ...[
             _section(
-              'Activity',
-              '${detail.runs.length} runs · ${detail.events.length} events · ${detail.comments.length} comments',
+              'Live activity',
+              '${detail.runs.length} runs · ${detail.events.length} events · ${detail.comments.length} comments · refreshes while open',
               Icons.schedule_rounded,
               [
                 if (detail.runs.isEmpty &&
@@ -1465,10 +1508,11 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                         run['summary']?.toString() ??
                             run['outcome']?.toString() ??
                             'No summary available',
-                        maxLines: _activityExpanded ? null : 2,
-                        overflow: _activityExpanded
-                            ? null
-                            : TextOverflow.ellipsis,
+                        // Run summaries can contain the entire assistant
+                        // answer. Keep the timeline scannable; the full
+                        // result remains in the task's Details section.
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                 if (_activityExpanded ||
@@ -1519,6 +1563,9 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                     ),
                   ),
               ],
+              onTap: () =>
+                  setState(() => _activityExpanded = !_activityExpanded),
+              expanded: _activityExpanded,
             ),
             _section(
               'Dependencies & files',

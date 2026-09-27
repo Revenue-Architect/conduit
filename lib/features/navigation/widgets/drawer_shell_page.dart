@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -27,13 +28,28 @@ import 'sidebar_tab_registry.dart';
 /// This shell intentionally does not own an `AdaptiveRouteShell` because the
 /// child routes still need route-specific app bars, native tab bars, and
 /// fullscreen overlays.
-class DrawerShellPage extends ConsumerWidget {
+class DrawerShellPage extends ConsumerStatefulWidget {
   final Widget child;
 
   const DrawerShellPage({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DrawerShellPage> createState() => _DrawerShellPageState();
+}
+
+class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
+  final _drawerKey = GlobalKey<ResponsiveDrawerLayoutState>();
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(activeConversationProvider, (previous, next) {
+      if (next == null || previous?.id == next.id) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !usesPersistentTabletSidebar(context)) {
+          _drawerKey.currentState?.close();
+        }
+      });
+    });
     final isTablet = usesPersistentTabletSidebar(context);
     final tabletWidth = ref.watch(sidebarTabletWidthProvider);
     final localizations = AppLocalizations.of(context)!;
@@ -42,6 +58,7 @@ class DrawerShellPage extends ConsumerWidget {
         : context.colorTokens.scrimStrong;
 
     return ResponsiveDrawerLayout(
+      key: _drawerKey,
       maxFraction: isTablet ? 0.42 : 1.0,
       edgeFraction: isTablet ? 0.36 : 1.0,
       settleFraction: 0.06,
@@ -72,7 +89,7 @@ class DrawerShellPage extends ConsumerWidget {
       },
       drawer: const SidebarPage(),
       layoutBuilder: (layout) => MacDesktopShortcuts(child: layout),
-      child: child,
+      child: widget.child,
     );
   }
 }
