@@ -162,6 +162,8 @@ void main() {
         Routes.directConnections,
         Routes.directConnectionEditorPath('new'),
         Routes.hermesSettings,
+        Routes.hermesMcp,
+        Routes.hermesHome,
         Routes.hermesJobs,
         Routes.about,
       ]) {
@@ -312,7 +314,7 @@ void main() {
         container.read(hermesSecretsLoadingProvider.notifier).set(false);
 
         check(notifier.redirect(_MockBuildContext(), state))
-            .equals(Routes.chat);
+            .equals(Routes.hermesHome);
       },
     );
 
@@ -530,10 +532,12 @@ void main() {
       final state = _MockGoRouterState();
       final notifier = container.read(routerNotifierProvider);
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
-      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state))
+          .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
-      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state))
+          .equals(Routes.hermesHome);
     });
 
     test('authenticated Hermes escapes auth when OWUI errors', () async {
@@ -564,10 +568,12 @@ void main() {
       final state = _MockGoRouterState();
       final notifier = container.read(routerNotifierProvider);
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
-      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state))
+          .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
-      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state))
+          .equals(Routes.hermesHome);
     });
   });
 

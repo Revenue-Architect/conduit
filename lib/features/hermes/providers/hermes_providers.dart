@@ -1738,6 +1738,20 @@ final hermesSessionsProvider =
       HermesSessionsController.new,
     );
 
+/// Lazily load the expanded bot's own sessions. The unified recent list is
+/// paginated across profiles, so it cannot back a complete bot disclosure.
+final hermesBotSessionsProvider = FutureProvider.autoDispose
+    .family<List<HermesSessionSummary>, String>((ref, profile) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return const [];
+      final rows = await service.listSessionsForProfile(profile);
+      return rows
+          .map(HermesSessionSummary.fromJson)
+          .whereType<HermesSessionSummary>()
+          .where((session) => session.profile == profile)
+          .toList(growable: false);
+    });
+
 /// Bot Mode roster, newest activity first. Empty on gateways without Bot Mode
 /// and on the Responses backend, which hides the sidebar section entirely.
 final hermesBotsProvider = FutureProvider<List<HermesBot>>((ref) async {
@@ -1759,9 +1773,8 @@ final hermesBotsProvider = FutureProvider<List<HermesBot>>((ref) async {
 @visibleForTesting
 List<HermesBot> sortHermesBotsByRecency(List<HermesBot> bots) {
   final epoch = DateTime.fromMillisecondsSinceEpoch(0);
-  return [...bots]..sort(
-    (a, b) => (b.lastActive ?? epoch).compareTo(a.lastActive ?? epoch),
-  );
+  return [...bots]
+    ..sort((a, b) => (b.lastActive ?? epoch).compareTo(a.lastActive ?? epoch));
 }
 
 /// A bot's avatar data URL, or null when it has none.

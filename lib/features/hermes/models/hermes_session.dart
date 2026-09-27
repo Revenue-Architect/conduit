@@ -1,5 +1,6 @@
 import '../utils/hermes_time_parsing.dart';
 import '../services/hermes_identifier.dart';
+import 'hermes_config.dart';
 
 const int kMaxHermesSessionTitleCharacters = 512;
 const int kMaxHermesSessionPreviewCharacters = 4096;
@@ -13,6 +14,8 @@ class HermesSessionSummary {
     this.preview,
     this.source,
     this.updatedAt,
+    this.profile,
+    this.messageCount,
   });
 
   final String id;
@@ -27,6 +30,10 @@ class HermesSessionSummary {
   final String? source;
 
   final DateTime? updatedAt;
+
+  /// Owning Hermes profile on the unified Desktop session endpoint.
+  final String? profile;
+  final int? messageCount;
 
   /// Parses one session object from `GET /api/sessions`, or null when it has no
   /// usable id. Tolerant of the field-name variations across Hermes versions.
@@ -64,6 +71,15 @@ class HermesSessionSummary {
             json['updatedAt'] ??
             json['started_at'],
       ),
+      profile: switch (json['profile'] ?? json['profile_name']) {
+        final String value when HermesConfig.isValidDesktopProfile(value) =>
+          value,
+        _ => null,
+      },
+      messageCount: switch (json['message_count']) {
+        final int value when value >= 0 => value,
+        _ => null,
+      },
     );
   }
 }

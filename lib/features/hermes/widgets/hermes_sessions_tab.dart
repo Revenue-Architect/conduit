@@ -15,20 +15,27 @@ import '../../navigation/models/sidebar_navigation_model.dart';
 import '../../navigation/widgets/chats_drawer.dart'
     show sidebarSectionDisclosureIcon;
 import '../../navigation/widgets/drawer_section_notifiers.dart';
+import '../kanban/hermes_kanban_summary_provider.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
+import '../providers/hermes_session_totals_provider.dart';
 import 'hermes_bot_tile.dart';
-import 'hermes_jobs_sheet.dart';
+import 'hermes_bot_avatar.dart';
 import 'hermes_session_tile.dart';
 
 /// Sidebar tab listing the user's Hermes server-side conversations, with one
 /// compact entry point for scheduled agents when the server exposes jobs.
 class HermesSessionsTab extends ConsumerStatefulWidget {
-  const HermesSessionsTab({super.key, this.showBottomNavigationBar = true});
+  const HermesSessionsTab({
+    super.key,
+    this.showBottomNavigationBar = true,
+    this.standalone = false,
+  });
 
   final bool showBottomNavigationBar;
+  final bool standalone;
 
   @override
   ConsumerState<HermesSessionsTab> createState() => _HermesSessionsTabState();
@@ -37,9 +44,14 @@ class HermesSessionsTab extends ConsumerStatefulWidget {
 class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
     with SidebarTabScrollRegistration<HermesSessionsTab> {
   final ScrollController _scrollController = ScrollController();
+  final Set<String> _expandedBots = <String>{};
+  final Map<String, int> _visibleBotSessions = <String, int>{};
 
   @override
   SidebarTabId get sidebarTabId => SidebarTabId.hermes;
+
+  @override
+  bool get registerSidebarScrollController => !widget.standalone;
 
   @override
   ScrollController get sidebarScrollController => _scrollController;
@@ -55,6 +67,7 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
     final caps = ref.watch(hermesCapabilitiesProvider).asData?.value;
     final showJobs = caps?.jobs ?? true;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
+    final profileTotals = ref.watch(hermesSessionTotalsProvider).asData?.value;
 
     // The sidebar tab host has no Material ancestor; provide a transparent one
     // so InkWell / IconButton / CustomizationTile work inside this tab.
@@ -66,9 +79,19 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
       physics: platformAlwaysScrollablePhysics(context),
       slivers: [
         SliverToBoxAdapter(
-          child: SizedBox(height: sidebarTabContentTopPadding(context)),
+          child: SizedBox(
+            height: widget.standalone
+                ? 0
+                : sidebarTabContentTopPadding(context),
+          ),
         ),
-        ..._botSlivers(context, ref.watch(hermesBotsProvider).asData?.value),
+        const SliverToBoxAdapter(child: _HermesHomeEntry()),
+        ..._botSlivers(
+          context,
+          ref.watch(hermesBotsProvider).asData?.value,
+          sessionsAsync.asData?.value ?? const [],
+          profileTotals,
+        ),
         if (ref.watch(hermesConfigProvider).mode ==
             HermesBackendMode.desktopGateway)
           const SliverToBoxAdapter(child: _KanbanEntry()),
@@ -90,6 +113,11 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         if (showJobs) ref.invalidate(hermesJobsProvider);
         ref.invalidate(hermesBotsProvider);
         ref.invalidate(hermesSessionsProvider);
+        for (final profile in _expandedBots) {
+          ref.invalidate(hermesBotSessionsProvider(profile));
+        }
+        ref.invalidate(hermesKanbanSummaryProvider);
+        ref.invalidate(hermesSessionTotalsProvider);
         await ref.read(hermesSessionsProvider.future);
       },
       child: scroll,
@@ -108,30 +136,189 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
 
   /// The Bot Mode roster, above everything else. Absent entirely on gateways
   /// without Bot Mode, which report no bots.
-  List<Widget> _botSlivers(BuildContext context, List<HermesBot>? bots) {
+  List<Widget> _botSlivers(
+    BuildContext context,
+    List<HermesBot>? bots,
+    List<HermesSessionSummary> sessions,
+    Map<String, int>? profileTotals,
+  ) {
     if (bots == null || bots.isEmpty) return const [];
     final expanded = ref.watch(hermesShowBotsProvider);
     return [
-      SliverToBoxAdapter(
-        child: _SectionHeader(
-          title: AppLocalizations.of(context)!.hermesBotsTitle,
-          count: bots.length,
-          expanded: expanded,
-          onToggle: () {
-            ConduitHaptics.selectionClick();
-            ref.read(hermesShowBotsProvider.notifier).toggle();
-          },
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+          Spacing.sm,
+          Spacing.xs,
+          Spacing.sm,
+          Spacing.sm,
         ),
-      ),
-      if (expanded)
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-          sliver: SliverList.builder(
-            itemCount: bots.length,
-            itemBuilder: (context, index) => HermesBotTile(bot: bots[index]),
+        sliver: SliverToBoxAdapter(
+          child: Container(
+            decoration: BoxDecoration(
+              color: context.conduitTheme.surfaceBackground,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.conduitTheme.cardBorder),
+            ),
+            child: Column(
+              children: [
+                _SectionHeader(
+                  title: AppLocalizations.of(context)!.hermesBotsTitle,
+                  count: bots.length,
+                  expanded: expanded,
+                  onToggle: () {
+                    ConduitHaptics.selectionClick();
+                    ref.read(hermesShowBotsProvider.notifier).toggle();
+                  },
+                ),
+                if (expanded)
+                  for (var index = 0; index < bots.length; index++) ...[
+                    if (index > 0)
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                    _botGroup(bots[index], sessions, profileTotals),
+                  ],
+              ],
+            ),
           ),
         ),
+      ),
     ];
+  }
+
+  Widget _botGroup(
+    HermesBot bot,
+    List<HermesSessionSummary> sessions,
+    Map<String, int>? profileTotals,
+  ) {
+    final theme = context.conduitTheme;
+    final expanded = _expandedBots.contains(bot.name);
+    final recentOwned = sessions
+        .where((session) => session.profile == bot.name)
+        .toList(growable: false);
+    final scoped = expanded
+        ? ref.watch(hermesBotSessionsProvider(bot.name))
+        : null;
+    final scopedOwned = scoped?.asData?.value;
+    final owned = scopedOwned == null ||
+            (scopedOwned.isEmpty && recentOwned.isNotEmpty)
+        ? recentOwned
+        : scopedOwned;
+    final conversationCount = profileTotals?[bot.name] ?? owned.length;
+    final visibleCount = _visibleBotSessions[bot.name] ?? 8;
+    final avatar = bot.hasAvatar
+        ? ref.watch(hermesBotAvatarProvider(bot.name)).asData?.value
+        : null;
+    return Column(
+      children: [
+        InkWell(
+          key: ValueKey('hermes-bot-disclosure-${bot.name}'),
+          onTap: () {
+            ConduitHaptics.selectionClick();
+            setState(() {
+              if (!_expandedBots.add(bot.name)) _expandedBots.remove(bot.name);
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            child: Row(
+              children: [
+                HermesBotAvatar(
+                  size: 38,
+                  imageUrl: avatar,
+                  label: bot.title,
+                  shape: bot.avatarShape,
+                  color: bot.avatarColor,
+                  imageKind: bot.avatarImageKind,
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Text(
+                    bot.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyMediumStyle.copyWith(
+                      color: theme.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (conversationCount > 0) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      child: Text(
+                        '$conversationCount',
+                        style: AppTypography.bodySmallStyle.copyWith(
+                          color: theme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                ],
+                Icon(
+                  sidebarSectionDisclosureIcon(expanded),
+                  color: theme.iconSecondary,
+                  size: IconSize.listItem,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(48, 0, 12, 10),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: theme.cardBorder)),
+              ),
+              child: Column(
+                children: [
+                  // This action always starts a new profile-bound session.
+                  HermesBotTile(bot: bot, nested: true),
+                  if (scoped?.isLoading == true)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: LinearProgressIndicator(),
+                    ),
+                  if (scoped?.hasError == true)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'Could not load all conversations. Pull to retry.',
+                      ),
+                    ),
+                  for (final session in owned.take(visibleCount))
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8, top: 3),
+                      child: HermesSessionTile(session: session, nested: true),
+                    ),
+                  if (owned.length > visibleCount)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        key: ValueKey('hermes-bot-more-${bot.name}'),
+                        onPressed: () => setState(() {
+                          _visibleBotSessions[bot.name] = visibleCount + 12;
+                        }),
+                        child: Text(
+                          'Show more conversations (${owned.length - visibleCount} left)',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   List<Widget> _sessionSlivers(
@@ -168,8 +355,22 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
             padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
             sliver: SliverList.builder(
               itemCount: sessions.length,
-              itemBuilder: (context, index) =>
-                  HermesSessionTile(session: sessions[index]),
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Spacing.sm,
+                  0,
+                  Spacing.sm,
+                  Spacing.xs,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.surfaceBackground,
+                    borderRadius: BorderRadius.circular(AppBorderRadius.card),
+                    border: Border.all(color: theme.cardBorder),
+                  ),
+                  child: HermesSessionTile(session: sessions[index]),
+                ),
+              ),
             ),
           ),
         ];
@@ -218,12 +419,48 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
   }
 }
 
-class _KanbanEntry extends StatelessWidget {
-  const _KanbanEntry();
+class _HermesHomeEntry extends StatelessWidget {
+  const _HermesHomeEntry();
 
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.sm,
+        Spacing.xs,
+        Spacing.sm,
+        Spacing.xs,
+      ),
+      child: Material(
+        color: theme.surfaceBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: theme.cardBorder),
+        ),
+        child: ListTile(
+          key: const ValueKey('hermes-home-entry'),
+          leading: Icon(Icons.home_outlined, color: theme.buttonPrimary),
+          title: const Text(
+            'Hermes Home',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: const Text('Bots, work, and what needs you'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.pushNamed(RouteNames.hermesHome),
+        ),
+      ),
+    );
+  }
+}
+
+class _KanbanEntry extends ConsumerWidget {
+  const _KanbanEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = context.conduitTheme;
+    final count = ref.watch(hermesKanbanSummaryProvider).asData?.value?.total;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.sm,
@@ -239,10 +476,47 @@ class _KanbanEntry extends StatelessWidget {
         ),
         child: ListTile(
           key: const ValueKey<String>('hermes-kanban-entry'),
-          leading: const Icon(Icons.view_kanban_outlined),
-          title: const Text('Kanban'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 9,
+          ),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: theme.buttonPrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppBorderRadius.button),
+            ),
+            child: Icon(
+              Icons.view_kanban_outlined,
+              color: theme.buttonPrimary,
+              size: 27,
+            ),
+          ),
+          title: Text(
+            'Kanban',
+            style: AppTypography.bodyMediumStyle.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: theme.textPrimary,
+            ),
+          ),
           subtitle: const Text('Boards and tasks'),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (count != null) ...[
+                Text(
+                  '$count',
+                  style: AppTypography.bodySmallStyle.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 7),
+              ],
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
           onTap: () => context.pushNamed(RouteNames.hermesKanban),
         ),
       ),
@@ -281,12 +555,12 @@ class _ScheduledAgentsTile extends ConsumerWidget {
       ),
       child: InkWell(
         key: const ValueKey<String>('hermes-scheduled-agents-tile'),
-        onTap: () => showHermesJobsSheet(context),
+        onTap: () => context.pushNamed(RouteNames.hermesJobs),
         borderRadius: BorderRadius.circular(AppBorderRadius.card),
         child: Container(
           padding: const EdgeInsets.symmetric(
             horizontal: Spacing.md,
-            vertical: Spacing.sm,
+            vertical: 16,
           ),
           decoration: BoxDecoration(
             color: theme.surfaceBackground,
@@ -296,8 +570,8 @@ class _ScheduledAgentsTile extends ConsumerWidget {
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: theme.buttonPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppBorderRadius.button),
@@ -317,7 +591,8 @@ class _ScheduledAgentsTile extends ConsumerWidget {
                       l10n.hermesScheduledAgentsTitle,
                       style: AppTypography.bodyMediumStyle.copyWith(
                         color: theme.textPrimary,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: Spacing.xxs),
@@ -386,7 +661,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
     final titleStyle = AppTypography.labelStyle.copyWith(
-      color: theme.textSecondary,
+      color: theme.textPrimary,
+      fontSize: 18,
       fontWeight: FontWeight.w700,
     );
 
@@ -413,11 +689,21 @@ class _SectionHeader extends StatelessWidget {
                 Text(title, style: titleStyle),
                 if (count != null) ...[
                   const SizedBox(width: Spacing.sm),
-                  Text(
-                    '$count',
-                    style: AppTypography.labelMediumStyle.copyWith(
-                      color: theme.textSecondary,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(AppBorderRadius.pill),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: AppTypography.labelMediumStyle.copyWith(
+                        color: theme.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],

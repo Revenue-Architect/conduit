@@ -9,6 +9,9 @@ void main() {
       final base = ThemeData(brightness: brightness);
       final themed = hermezVisualTheme(base);
       final palette = HermezChatPalette.forBrightness(brightness);
+      if (brightness == Brightness.light) {
+        expect(palette.canvas, const Color(0xFFF7F7F7));
+      }
       expect(themed.colorScheme.primary, palette.accent);
       expect(themed.colorScheme.surface, palette.surface);
       expect(themed.colorScheme.onSurface, palette.ink);

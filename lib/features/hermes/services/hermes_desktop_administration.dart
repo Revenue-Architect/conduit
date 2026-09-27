@@ -53,6 +53,37 @@ final class _HermesDesktopAdministration {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> listSkillsForProfile(
+    String profile,
+  ) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    await _owner._ensureConnected();
+    final result = _owner._object(
+      await _owner._rpc.request<Object?>(
+        'skills.manage',
+        params: {'action': 'list', 'profile': profile},
+      ),
+    );
+    final rows = result['skills'];
+    if (rows is! List) return const [];
+    return rows
+        .take(256)
+        .map<Map<String, dynamic>>((row) {
+          final map = row is Map ? Map<String, dynamic>.from(row) : null;
+          return {
+            'name': (map?['name'] ?? row).toString().replaceFirst(
+              RegExp(r'^/'),
+              '',
+            ),
+            'description': map?['description']?.toString() ?? '',
+          };
+        })
+        .where((row) => (row['name'] as String).isNotEmpty)
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> listCommands() async {
     await _owner._ensureConnected();
     final result = _owner._object(
@@ -88,6 +119,22 @@ final class _HermesDesktopAdministration {
     await _owner._ensureConnected();
     final result = _owner._object(
       await _owner._rpc.request<Object?>('tools.list'),
+    );
+    return _owner._objects(result['sections'] ?? result['toolsets']);
+  }
+
+  Future<List<Map<String, dynamic>>> listToolsetsForProfile(
+    String profile,
+  ) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    await _owner._ensureConnected();
+    final result = _owner._object(
+      await _owner._rpc.request<Object?>(
+        'tools.list',
+        params: {'profile': profile},
+      ),
     );
     return _owner._objects(result['sections'] ?? result['toolsets']);
   }
@@ -320,7 +367,11 @@ final class _HermesDesktopAdministration {
       await _owner._rpc.request<Object?>(
         'reload.mcp',
         // Bound sessions can include bot chats, which live in another profile.
-        params: {'confirm': true, 'session_id': id, ..._owner._runtimeScope(id)},
+        params: {
+          'confirm': true,
+          'session_id': id,
+          ..._owner._runtimeScope(id),
+        },
       );
     }
   }
@@ -371,6 +422,19 @@ final class _HermesDesktopAdministration {
   Future<List<Map<String, dynamic>>> listJobs() async =>
       _owner._objects(await _owner._requestJson('GET', '/api/cron/jobs'));
 
+  Future<List<Map<String, dynamic>>> listJobsForProfile(String profile) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    return _owner._objects(
+      await _owner._requestJson(
+        'GET',
+        '/api/cron/jobs',
+        query: {'profile': profile},
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> createJob({
     required String name,
     required String prompt,
@@ -390,6 +454,7 @@ final class _HermesDesktopAdministration {
 
   Future<void> updateJob(
     String id, {
+    String? profile,
     String? name,
     String? prompt,
     String? schedule,
@@ -398,6 +463,7 @@ final class _HermesDesktopAdministration {
     await _owner._requestJson(
       'PUT',
       '/api/cron/jobs/${Uri.encodeComponent(id)}',
+      query: {if (profile != null) 'profile': profile},
       body: {
         'updates': {
           'name': ?name,
@@ -409,10 +475,16 @@ final class _HermesDesktopAdministration {
     );
   }
 
-  Future<void> mutateJob(String id, String method, String suffix) async {
+  Future<void> mutateJob(
+    String id,
+    String method,
+    String suffix, {
+    String? profile,
+  }) async {
     await _owner._requestJson(
       method,
       '/api/cron/jobs/${Uri.encodeComponent(id)}$suffix',
+      query: {if (profile != null) 'profile': profile},
     );
   }
 
@@ -425,6 +497,23 @@ final class _HermesDesktopAdministration {
         ),
         'runs',
       );
+  Future<List<Map<String, dynamic>>> listJobRunsForProfile(
+    String profile,
+    String id,
+  ) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    return _owner._objects(
+      await _owner._requestJson(
+        'GET',
+        '/api/cron/jobs/${Uri.encodeComponent(id)}/runs',
+        query: {'profile': profile, 'limit': 20},
+      ),
+      'runs',
+    );
+  }
+
   Future<void> respondToMcpSetup({
     required String runtimeId,
     required String requestId,

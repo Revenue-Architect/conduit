@@ -45,7 +45,7 @@ class HermezChatPalette {
           border: Color(0xFF434449),
         )
       : const HermezChatPalette(
-          canvas: Color(0xFFF6F5F2),
+          canvas: Color(0xFFF7F7F7),
           surface: Color(0xFFFFFFFF),
           ink: Color(0xFF17181C),
           muted: Color(0xFF666765),
@@ -53,6 +53,6 @@ class HermezChatPalette {
           onAccent: Color(0xFF17181C),
           userBubble: Color(0xFF202126),
           onUserBubble: Color(0xFFFFFFFF),
-          border: Color(0xFFDAD9D5),
+          border: Color(0xFFDADADA),
         );
 }

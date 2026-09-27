@@ -13,6 +13,35 @@ void main() {
 
   tearDown(PreferencesStore.debugReset);
 
+  test('inbox reads only the current origin and requested profile', () async {
+    for (final (origin, profile, request) in [
+      ('https://hermes.example:443', 'kai', 'kai-request'),
+      ('https://hermes.example:443', 'default', 'default-request'),
+      ('https://other.example:443', 'kai', 'other-request'),
+    ]) {
+      await HermesPendingDecisionStore.upsert(
+        origin: origin,
+        profile: profile,
+        storedSessionId: request,
+        runtimeId: request,
+        requestId: request,
+        kind: HermesPendingDesktopDecisionKind.approval,
+      );
+    }
+    final all = await HermesPendingDecisionStore.forOrigin(
+      origin: 'https://hermes.example:443',
+    );
+    expect(all.map((item) => item.requestId).toSet(), {
+      'kai-request',
+      'default-request',
+    });
+    final kai = await HermesPendingDecisionStore.forOrigin(
+      origin: 'https://hermes.example:443',
+      profile: 'kai',
+    );
+    expect(kai.map((item) => item.requestId), ['kai-request']);
+  });
+
   test('persists only bounded redacted prompt presentation', () async {
     await HermesPendingDecisionStore.upsert(
       origin: 'https://hermes.example:443',

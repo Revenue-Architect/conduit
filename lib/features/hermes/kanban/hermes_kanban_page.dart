@@ -1,17 +1,16 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../views/hermes_dashboard_auth_page.dart';
-import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_visual_theme.dart';
+import '../widgets/hermez_chat_palette.dart';
 import 'hermes_kanban_client.dart';
 
 /// The pop Future resolves before Material's dialog exit animation. Wait for
@@ -71,6 +70,78 @@ Future<String?> _kanbanTextDialog(
   }
 }
 
+Future<String?> _pickKanbanProfile(
+  BuildContext context,
+  HermesKanbanClient client, {
+  String? current,
+}) {
+  final profiles = client.profiles();
+  return _settledDialog<String>(
+    context,
+    (dialogContext) => AlertDialog(
+      title: const Text('Assign Hermes profile'),
+      content: SizedBox(
+        width: 320,
+        height: MediaQuery.sizeOf(dialogContext).height * 0.5,
+        child: FutureBuilder<List<KanbanProfile>>(
+          future: profiles,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData && !snapshot.hasError) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(
+                child: Text(
+                  'Could not load Hermes profiles. Retry the assignment.',
+                ),
+              );
+            }
+            final roster = snapshot.data!;
+            if (roster.isEmpty) {
+              return const Center(child: Text('No Hermes profiles available.'));
+            }
+            return ListView(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text('Ready tasks start automatically once assigned.'),
+                ),
+                for (final profile in roster)
+                  ListTile(
+                    title: Text(profile.name),
+                    subtitle: profile.description == null
+                        ? null
+                        : Text(
+                            profile.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                    trailing: profile.name == current
+                        ? const Icon(Icons.check_rounded)
+                        : null,
+                    onTap: () => Navigator.pop(dialogContext, profile.name),
+                  ),
+                if (current != null)
+                  ListTile(
+                    title: const Text('Unassign'),
+                    subtitle: const Text('This pauses new agent work.'),
+                    onTap: () => Navigator.pop(dialogContext, ''),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
+}
+
 class HermesKanbanPage extends ConsumerStatefulWidget {
   const HermesKanbanPage({super.key, this.client});
 
@@ -87,10 +158,15 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
   List<KanbanBoardRef> _boards = const [];
   KanbanSnapshot? _snapshot;
   String? _board;
-  String _lane = 'todo';
+  bool _showSearch = false;
+  bool _showEmptyLanes = false;
+  String _searchQuery = '';
   String? _error;
   bool _loading = true;
-  bool _busy = false;
+  final bool _busy = false;
+  bool _foreground = true;
+  bool _pollInFlight = false;
+  Timer? _refreshTimer;
   int _generation = 0;
 
   @override
@@ -98,16 +174,32 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future<void>.microtask(_loadBoards);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!_foreground ||
+          !mounted ||
+          _board == null ||
+          _loading ||
+          _busy ||
+          _pollInFlight) {
+        return;
+      }
+      _pollInFlight = true;
+      unawaited(
+        _refresh(quiet: true).whenComplete(() => _pollInFlight = false),
+      );
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) unawaited(_refresh());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
     final client = _client;
     if (client != null) unawaited(client.close());
     super.dispose();
@@ -151,17 +243,19 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     }
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({bool quiet = false}) async {
     final board = _board;
     if (board == null) {
       if (mounted) setState(() => _loading = false);
       return;
     }
     final generation = ++_generation;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!quiet || _error != null) {
+      setState(() {
+        if (!quiet) _loading = true;
+        _error = null;
+      });
+    }
     try {
       final snapshot = await _api().board(board);
       if (!mounted || generation != _generation || _board != board) return;
@@ -184,7 +278,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     setState(() {
       _board = slug;
       _snapshot = null;
-      _lane = 'todo';
+      _searchQuery = '';
     });
     unawaited(_refresh());
   }
@@ -204,35 +298,176 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     if (mounted) await _loadBoards();
   }
 
-  Future<void> _create() async {
+  Future<void> _create({bool triage = true}) async {
     final board = _board;
     if (board == null || _busy) return;
-    final title = await _askText('New task', 'Task title');
-    if (title == null || title.trim().isEmpty || !mounted) return;
-    final triage = _lane == 'triage';
-    setState(() => _busy = true);
+    final title = TextEditingController();
+    final body = TextEditingController();
+    var selectedTriage = triage;
+    var priority = 0;
+    String? assignee;
+    var saving = false;
+    String? errorText;
     try {
-      await _api().create(board, title.trim(), triage: triage);
-      if (mounted && _board == board) {
-        // The installed Hermes API creates ordinary tasks in Ready.
-        // Keep the new card in view instead of leaving the user on Todo.
-        setState(() => _lane = triage ? 'triage' : 'ready');
+      final created = await _settledDialog<bool>(
+        context,
+        (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setModalState) => AlertDialog(
+            title: const Text('New task'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: title,
+                      autofocus: true,
+                      maxLength: 240,
+                      decoration: const InputDecoration(labelText: 'Title *'),
+                    ),
+                    TextField(
+                      controller: body,
+                      minLines: 3,
+                      maxLines: 7,
+                      decoration: const InputDecoration(
+                        labelText: 'Details / instructions',
+                        hintText: 'Describe the outcome and useful context',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: true, label: Text('Triage')),
+                        ButtonSegment(value: false, label: Text('Ready')),
+                      ],
+                      selected: {selectedTriage},
+                      onSelectionChanged: saving
+                          ? null
+                          : (value) => setModalState(
+                              () => selectedTriage = value.first,
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final picked = await _pickKanbanProfile(
+                                dialogContext,
+                                _api(),
+                                current: assignee,
+                              );
+                              if (dialogContext.mounted && picked != null) {
+                                setModalState(() => assignee = picked);
+                              }
+                            },
+                      icon: const Icon(Icons.person_outline_rounded),
+                      label: Text(
+                        assignee == null || assignee!.isEmpty
+                            ? 'Assign a Hermes bot (optional)'
+                            : 'Assigned to $assignee',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      initialValue: priority,
+                      decoration: const InputDecoration(labelText: 'Priority'),
+                      items: [
+                        for (var value = 0; value <= 3; value++)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Text('Priority $value'),
+                          ),
+                      ],
+                      onChanged: saving
+                          ? null
+                          : (value) =>
+                                setModalState(() => priority = value ?? 0),
+                    ),
+                    if (!selectedTriage &&
+                        assignee != null &&
+                        assignee!.isNotEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Ready tasks assigned to a bot may start agent work immediately.',
+                        ),
+                      ),
+                    if (errorText != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          errorText!,
+                          style: TextStyle(
+                            color: Theme.of(dialogContext).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (title.text.trim().isEmpty) {
+                          setModalState(
+                            () => errorText = 'Enter a task title.',
+                          );
+                          return;
+                        }
+                        setModalState(() {
+                          saving = true;
+                          errorText = null;
+                        });
+                        try {
+                          await _api().create(
+                            board,
+                            title.text.trim(),
+                            body: body.text,
+                            triage: selectedTriage,
+                            assignee: assignee,
+                            priority: priority,
+                          );
+                          if (dialogContext.mounted)
+                            Navigator.pop(dialogContext, true);
+                        } catch (error) {
+                          if (dialogContext.mounted) {
+                            setModalState(() => errorText = _message(error));
+                          }
+                        } finally {
+                          if (dialogContext.mounted)
+                            setModalState(() => saving = false);
+                        }
+                      },
+                child: saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Create task'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (created == true && mounted && _board == board) {
         await _refresh();
       }
-    } catch (error) {
-      _showError(error);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      title.dispose();
+      body.dispose();
     }
-  }
-
-  Future<String?> _askText(String title, String hint, {String? initial}) =>
-      _kanbanTextDialog(context, title, hint: hint, initial: initial);
-
-  void _showError(Object error) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(_message(error))));
   }
 
   Future<void> _openTask(KanbanTask task) async {
@@ -242,6 +477,11 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      clipBehavior: Clip.antiAlias,
       builder: (context) => FractionallySizedBox(
         heightFactor: 0.86,
         child: _KanbanTaskSheet(
@@ -258,20 +498,35 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
 
   @override
   Widget build(BuildContext context) {
-    final useHermez = shouldUseHermezChatVisuals(
-      debugBuild: kDebugMode,
-      android: Platform.isAndroid,
-      hermes: true,
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
     );
-    final theme = useHermez
-        ? hermezVisualTheme(Theme.of(context))
-        : Theme.of(context);
     return Theme(
-      data: theme,
+      data: hermezVisualTheme(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Kanban'),
+          title: Row(
+            children: [
+              Text(
+                'H',
+                style: Theme.of(context).textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -3),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 3, top: 13),
+                child: CircleAvatar(
+                  radius: 4,
+                  backgroundColor: Color(0xFFFF5A26),
+                ),
+              ),
+            ],
+          ),
           actions: [
+            IconButton(
+              tooltip: 'Search tasks',
+              onPressed: () => setState(() => _showSearch = !_showSearch),
+              icon: const Icon(Icons.search_rounded),
+            ),
             IconButton(
               tooltip: 'Refresh board',
               onPressed: _loading ? null : _refresh,
@@ -282,54 +537,80 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         floatingActionButton: _board == null
             ? null
             : FloatingActionButton.extended(
-                onPressed: _busy ? null : _create,
+                onPressed: _busy ? null : () => _create(),
                 icon: const Icon(Icons.add),
                 label: const Text('New task'),
               ),
         body: Column(
           children: [
-            if (_boards.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey(_board),
-                  initialValue: _board,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Board'),
-                  items: [
-                    for (final board in _boards)
-                      DropdownMenuItem(
-                        value: board.slug,
-                        child: Text(
-                          board.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kanban',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.8,
                       ),
+                    ),
+                    Text(
+                      'TURN IDEAS INTO ACTION',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        letterSpacing: 3.0,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) _selectBoard(value);
-                  },
                 ),
               ),
-            if (_snapshot != null && _snapshot!.boardSlug == _board)
+            ),
+            if (_boards.isNotEmpty)
               SizedBox(
                 height: 58,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    for (final lane in kanbanLanes)
+                    for (final board in _boards)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(
-                            '${_label(lane)} ${_snapshot!.lanes[lane]?.length ?? 0}',
+                          label: Text(board.name),
+                          selected: board.slug == _board,
+                          selectedColor: palette.ink,
+                          backgroundColor: palette.surface,
+                          labelStyle: TextStyle(
+                            color: board.slug == _board
+                                ? palette.surface
+                                : palette.ink,
+                            fontWeight: FontWeight.w700,
                           ),
-                          selected: lane == _lane,
-                          onSelected: (_) => setState(() => _lane = lane),
+                          side: BorderSide(
+                            color: board.slug == _board
+                                ? palette.ink
+                                : palette.border,
+                          ),
+                          onSelected: (_) => _selectBoard(board.slug),
                         ),
                       ),
                   ],
+                ),
+              ),
+            if (_showSearch)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: TextField(
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    hintText: 'Search this board',
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
                 ),
               ),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
@@ -385,24 +666,150 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
       if (_error != null) return const SizedBox.shrink();
       return const Center(child: Text('No Kanban boards available.'));
     }
-    final tasks = snapshot.lanes[_lane] ?? const <KanbanTask>[];
+    final query = _searchQuery.trim().toLowerCase();
+    final visibleByLane = <String, List<KanbanTask>>{
+      for (final lane in kanbanLanes)
+        lane: query.isEmpty
+            ? snapshot.lanes[lane] ?? const []
+            : (snapshot.lanes[lane] ?? const <KanbanTask>[])
+                  .where(
+                    (task) =>
+                        task.title.toLowerCase().contains(query) ||
+                        (task.body?.toLowerCase().contains(query) ?? false) ||
+                        (task.assignee?.toLowerCase().contains(query) ?? false),
+                  )
+                  .toList(growable: false),
+    };
+    final occupied = kanbanLanes
+        .where((lane) => visibleByLane[lane]!.isNotEmpty)
+        .toList(growable: false);
+    final empty = kanbanLanes
+        .where((lane) => visibleByLane[lane]!.isEmpty)
+        .toList(growable: false);
+    final entryLanes = empty
+        .where((lane) => lane == 'triage' || lane == 'ready')
+        .toList(growable: false);
+    final otherEmpty = empty
+        .where((lane) => lane != 'triage' && lane != 'ready')
+        .toList(growable: false);
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: tasks.isEmpty
-          ? ListView(
-              children: [
-                const SizedBox(height: 100),
-                Center(child: Text('No tasks in ${_label(_lane)}.')),
-              ],
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-              itemCount: tasks.length,
-              itemBuilder: (context, index) => _KanbanTaskCard(
-                task: tasks[index],
-                onTap: () => _openTask(tasks[index]),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+        children: [
+          if (occupied.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Text(
+                query.isEmpty
+                    ? 'No tasks yet. Create one to start the board.'
+                    : 'No tasks match this search.',
+                textAlign: TextAlign.center,
               ),
             ),
+          for (final lane in occupied) _laneSection(lane, visibleByLane[lane]!),
+          if (query.isEmpty)
+            for (final lane in entryLanes) _laneSection(lane, const []),
+          if (query.isEmpty && otherEmpty.isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () =>
+                    setState(() => _showEmptyLanes = !_showEmptyLanes),
+                icon: Icon(
+                  _showEmptyLanes
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                ),
+                label: Text(
+                  _showEmptyLanes
+                      ? 'Hide empty stages'
+                      : 'Show ${otherEmpty.length} empty stages',
+                ),
+              ),
+            ),
+            if (_showEmptyLanes)
+              for (final lane in otherEmpty) _laneSection(lane, const []),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _laneSection(String lane, List<KanbanTask> tasks) {
+    final visible = tasks;
+    final color = switch (lane) {
+      'ready' || 'triage' => Theme.of(context).colorScheme.primary,
+      'running' => const Color(0xFF2776D2),
+      'done' => const Color(0xFF18704B),
+      _ => Theme.of(context).colorScheme.onSurfaceVariant,
+    };
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        key: PageStorageKey<String>('hermes-lane-$lane'),
+        initiallyExpanded:
+            visible.isNotEmpty || lane == 'triage' || lane == 'ready',
+        dense: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.only(bottom: 2),
+        expansionAnimationStyle: const AnimationStyle(
+          duration: Duration(milliseconds: 170),
+          reverseDuration: Duration(milliseconds: 130),
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeOutCubic,
+        ),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: CircleAvatar(radius: 5, backgroundColor: color),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                _label(lane),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                '${visible.length}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        trailing: lane == 'triage' || lane == 'ready'
+            ? IconButton(
+                tooltip: 'New ${_label(lane)} task',
+                onPressed: _busy
+                    ? null
+                    : () => _create(triage: lane == 'triage'),
+                icon: const Icon(Icons.add_rounded),
+              )
+            : null,
+        children: [
+          if (visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Text('No tasks in ${_label(lane)}.'),
+            ),
+          for (var index = 0; index < visible.length; index++) ...[
+            _KanbanTaskCard(
+              task: visible[index],
+              onTap: () => _openTask(visible[index]),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -410,47 +817,147 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
 String _label(String value) =>
     value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 
+String _kanbanTime(Object? raw) {
+  final seconds = raw is num
+      ? raw.toInt()
+      : int.tryParse(raw?.toString() ?? '');
+  if (seconds == null || seconds <= 0) return 'Time unavailable';
+  final millis = seconds > 100000000000 ? seconds : seconds * 1000;
+  try {
+    return DateFormat.yMMMd().add_jm().format(
+      DateTime.fromMillisecondsSinceEpoch(millis),
+    );
+  } catch (_) {
+    return 'Time unavailable';
+  }
+}
+
 class _KanbanTaskCard extends StatelessWidget {
   const _KanbanTaskCard({required this.task, required this.onTap});
   final KanbanTask task;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 10),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(task.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              _label(task.status),
-              style: Theme.of(context).textTheme.labelMedium,
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            task.status == 'done'
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            size: 20,
+            color: task.status == 'done'
+                ? const Color(0xFF17A46A)
+                : Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 4,
+                      backgroundColor: task.status == 'done'
+                          ? const Color(0xFF18704B)
+                          : const Color(0xFFFF5A26),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+                if (task.body != null || task.summary != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    task.summary ?? task.body!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
+                  children: [
+                    if (task.assignee != null)
+                      _TaskMeta(Icons.person_outline_rounded, task.assignee!),
+                    if (task.priority != null)
+                      _TaskMeta(Icons.flag_outlined, '${task.priority}'),
+                    if (task.commentCount != null && task.commentCount! > 0)
+                      _TaskMeta(
+                        Icons.mode_comment_outlined,
+                        '${task.commentCount}',
+                      ),
+                  ],
+                ),
+                if (task.status == 'ready' && task.assignee == null)
+                  const Text('Assign a Hermes profile to start agent work.'),
+                if (task.childTotal != null && task.childTotal! > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: ((task.childDone ?? 0) / task.childTotal!)
+                              .clamp(0.0, 1.0),
+                          minHeight: 5,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${task.childDone ?? 0}/${task.childTotal}',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
-            if (task.summary != null) ...[
-              const SizedBox(height: 8),
-              Text(task.summary!, maxLines: 3, overflow: TextOverflow.ellipsis),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              [
-                if (task.assignee != null) task.assignee!,
-                if (task.priority != null) 'Priority ${task.priority}',
-                if (task.commentCount != null) '${task.commentCount} comments',
-                if (task.childTotal != null)
-                  '${task.childDone ?? 0}/${task.childTotal} children done',
-              ].join(' · '),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, size: 20),
+        ],
       ),
     ),
+  );
+}
+
+class _TaskMeta extends StatelessWidget {
+  const _TaskMeta(this.icon, this.label);
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(
+        icon,
+        size: 14,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      const SizedBox(width: 3),
+      Text(label, style: Theme.of(context).textTheme.labelSmall),
+    ],
   );
 }
 
@@ -470,28 +977,56 @@ class _KanbanTaskSheet extends StatefulWidget {
   State<_KanbanTaskSheet> createState() => _KanbanTaskSheetState();
 }
 
-class _KanbanTaskSheetState extends State<_KanbanTaskSheet> {
+class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
+    with WidgetsBindingObserver {
   KanbanTaskDetail? _detail;
   String? _error;
   bool _busy = false;
+  bool _activityExpanded = false;
+  bool _filesExpanded = false;
+  bool _descriptionExpanded = false;
+  bool _foreground = true;
+  bool _pollInFlight = false;
+  Timer? _refreshTimer;
+  int _generation = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future<void>.microtask(_load);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted || !_foreground || _busy || _pollInFlight) return;
+      _pollInFlight = true;
+      unawaited(_load().whenComplete(() => _pollInFlight = false));
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
+    final generation = ++_generation;
     try {
       final detail = await widget.client.task(widget.board, widget.task.id);
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _detail = detail;
           _error = null;
         });
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(
           () => _error = error is KanbanApiException
               ? error.message
@@ -571,19 +1106,135 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet> {
     }
   }
 
+  Widget _section(
+    String title,
+    String subtitle,
+    IconData icon,
+    List<Widget> children,
+  ) => Card(
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerLow,
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
     final task = detail?.task ?? widget.task;
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
         children: [
-          Text(task.title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            '${_label(task.status)} · ${task.assignee ?? 'Unassigned'} · Priority ${task.priority?.toString() ?? 'unknown'}',
+          Center(
+            child: Container(
+              width: 40,
+              height: 5,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outline,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  task.id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Close task details',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          Text(
+            task.title,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1.12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(
+                avatar: const CircleAvatar(
+                  radius: 5,
+                  backgroundColor: Color(0xFF666765),
+                ),
+                label: Text(_label(task.status)),
+              ),
+              Chip(
+                avatar: const Icon(Icons.person_outline, size: 17),
+                label: Text(task.assignee ?? 'Unassigned'),
+              ),
+              Chip(
+                avatar: const Icon(Icons.flag_outlined, size: 17),
+                label: Text('Priority ${task.priority?.toString() ?? '—'}'),
+              ),
+            ],
+          ),
+          if (task.childTotal != null && task.childTotal! > 0) ...[
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: ((task.childDone ?? 0) / task.childTotal!)
+                  .clamp(0.0, 1.0)
+                  .toDouble(),
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            const SizedBox(height: 4),
+            Text('${task.childDone ?? 0}/${task.childTotal} children done'),
+          ],
           if (_busy) const LinearProgressIndicator(),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -594,167 +1245,336 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet> {
             TextButton(onPressed: _load, child: const Text('Retry')),
           ],
           const SizedBox(height: 16),
-          if (task.body != null) Text(task.body!),
-          if (task.summary != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Latest summary',
-              style: Theme.of(context).textTheme.titleSmall,
+          if (task.status == 'ready' && task.assignee == null)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'This task needs a Hermes profile before an agent can start.',
+              ),
             ),
-            Text(task.summary!),
-          ],
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final value = await _input(
-                          'Edit title',
-                          initial: task.title,
-                        );
-                        if (!mounted) return;
-                        if (value != null && value.isNotEmpty) {
-                          await _write(
-                            () => widget.client.patchTask(
-                              widget.board,
-                              task.id,
-                              {'title': value},
-                            ),
-                          );
-                        }
-                      },
-                child: const Text('Edit title'),
-              ),
-              OutlinedButton(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final value = await _input(
-                          'Assign to',
-                          initial: task.assignee,
-                        );
-                        if (!mounted) return;
-                        if (value != null) {
-                          await _write(
-                            () => widget.client.patchTask(
-                              widget.board,
-                              task.id,
-                              {'assignee': value},
-                            ),
-                          );
-                        }
-                      },
-                child: const Text('Assignee'),
-              ),
-              OutlinedButton(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final value = await _input(
-                          'Priority',
-                          initial: task.priority?.toString(),
-                        );
-                        if (!mounted) return;
-                        final priority = int.tryParse(value ?? '');
-                        if (priority != null) {
-                          await _write(
-                            () => widget.client.patchTask(
-                              widget.board,
-                              task.id,
-                              {'priority': priority},
-                            ),
-                          );
-                        }
-                      },
-                child: const Text('Priority'),
+          _section(
+            'Actions',
+            'Edit key details for this task.',
+            Icons.edit_outlined,
+            [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = MediaQuery.textScalerOf(context).scale(1);
+                  final columns = scale > 1.5
+                      ? 1
+                      : scale > 1.1 || constraints.maxWidth < 315
+                      ? 2
+                      : 3;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 8) / columns;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(
+                        width: width,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            minimumSize: const Size(0, 46),
+                          ),
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  final value = await _input(
+                                    'Edit title',
+                                    initial: task.title,
+                                  );
+                                  if (!mounted) return;
+                                  if (value != null && value.isNotEmpty) {
+                                    await _write(
+                                      () => widget.client.patchTask(
+                                        widget.board,
+                                        task.id,
+                                        {'title': value},
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.edit_outlined, size: 17),
+                          label: const Text('Edit title'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            minimumSize: const Size(0, 46),
+                          ),
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  final value = await _pickKanbanProfile(
+                                    context,
+                                    widget.client,
+                                    current: task.assignee,
+                                  );
+                                  if (!mounted) return;
+                                  if (value != null) {
+                                    await _write(
+                                      () => widget.client.patchTask(
+                                        widget.board,
+                                        task.id,
+                                        {'assignee': value},
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.person_outline, size: 17),
+                          label: const Text('Assignee'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            minimumSize: const Size(0, 46),
+                          ),
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  final value = await _input(
+                                    'Priority',
+                                    initial: task.priority?.toString(),
+                                  );
+                                  if (!mounted) return;
+                                  final priority = int.tryParse(value ?? '');
+                                  if (priority != null) {
+                                    await _write(
+                                      () => widget.client.patchTask(
+                                        widget.board,
+                                        task.id,
+                                        {'priority': priority},
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.flag_outlined, size: 17),
+                          label: const Text('Priority'),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text('Move task', style: Theme.of(context).textTheme.titleSmall),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final lane in kanbanLanes)
-                if (lane != 'running' && lane != task.status)
-                  ActionChip(
-                    label: Text(_label(lane)),
-                    onPressed: _busy ? null : () => _changeStatus(lane),
-                  ),
-              if (task.status != 'archived')
-                ActionChip(
-                  label: const Text('Archive'),
-                  onPressed: _busy ? null : () => _changeStatus('archived'),
-                ),
+          _section(
+            'Move task',
+            'Change the status of this task.',
+            Icons.swap_horiz_rounded,
+            [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = MediaQuery.textScalerOf(context).scale(1);
+                  final columns = scale > 1.5
+                      ? 1
+                      : scale > 1.1 || constraints.maxWidth < 315
+                      ? 2
+                      : 3;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 8) / columns;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final lane in kanbanLanes)
+                        if (lane != 'running' && lane != task.status)
+                          SizedBox(
+                            width: width,
+                            child: ActionChip(
+                              label: SizedBox(
+                                width: double.infinity,
+                                child: Text(
+                                  _label(lane),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              onPressed: _busy
+                                  ? null
+                                  : () => _changeStatus(lane),
+                            ),
+                          ),
+                      if (task.status != 'archived')
+                        SizedBox(
+                          width: width,
+                          child: ActionChip(
+                            label: const SizedBox(
+                              width: double.infinity,
+                              child: Text(
+                                'Archive',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            onPressed: _busy
+                                ? null
+                                : () => _changeStatus('archived'),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
           if (detail != null) ...[
-            const SizedBox(height: 16),
-            Text('Activity', style: Theme.of(context).textTheme.titleMedium),
-            Text(
+            _section(
+              'Activity',
               '${detail.runs.length} runs · ${detail.events.length} events · ${detail.comments.length} comments',
+              Icons.schedule_rounded,
+              [
+                if (detail.runs.isEmpty &&
+                    detail.events.isEmpty &&
+                    detail.comments.isEmpty)
+                  const Text(
+                    'No agent runs yet. Ready, assigned tasks start automatically.',
+                  ),
+                if (!_activityExpanded &&
+                    detail.runs.length +
+                            detail.events.length +
+                            detail.comments.length >
+                        3)
+                  Text(
+                    detail.events.isNotEmpty
+                        ? 'Latest: ${(detail.events.last['kind']?.toString() ?? 'Task event').replaceAll('_', ' ')} · ${_kanbanTime(detail.events.last['created_at'])}'
+                        : detail.runs.isNotEmpty
+                        ? 'Latest agent run: ${detail.runs.last['status'] ?? 'unknown'}'
+                        : 'Latest comment: ${detail.comments.last['author'] ?? 'Unknown author'}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (_activityExpanded ||
+                    detail.runs.length +
+                            detail.events.length +
+                            detail.comments.length <=
+                        3)
+                  for (final run in detail.runs.reversed.take(10))
+                    ListTile(
+                      leading: const Icon(Icons.play_circle_outline),
+                      title: Text(
+                        run['status']?.toString() ?? 'Run state unknown',
+                      ),
+                      subtitle: Text(
+                        run['summary']?.toString() ??
+                            run['outcome']?.toString() ??
+                            'No summary available',
+                        maxLines: _activityExpanded ? null : 2,
+                        overflow: _activityExpanded
+                            ? null
+                            : TextOverflow.ellipsis,
+                      ),
+                    ),
+                if (_activityExpanded ||
+                    detail.runs.length +
+                            detail.events.length +
+                            detail.comments.length <=
+                        3)
+                  for (final event in detail.events.reversed.take(10))
+                    ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(
+                        (event['kind']?.toString() ?? 'Task event').replaceAll(
+                          '_',
+                          ' ',
+                        ),
+                      ),
+                      subtitle: Text(_kanbanTime(event['created_at'])),
+                    ),
+                if (_activityExpanded ||
+                    detail.runs.length +
+                            detail.events.length +
+                            detail.comments.length <=
+                        3)
+                  for (final comment in detail.comments.reversed.take(20))
+                    ListTile(
+                      title: Text(
+                        comment['body']?.toString() ?? '',
+                        maxLines: _activityExpanded ? null : 2,
+                        overflow: _activityExpanded
+                            ? null
+                            : TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        comment['author']?.toString() ?? 'Unknown author',
+                      ),
+                    ),
+                if (detail.runs.length +
+                        detail.events.length +
+                        detail.comments.length >
+                    3)
+                  TextButton(
+                    onPressed: () =>
+                        setState(() => _activityExpanded = !_activityExpanded),
+                    child: Text(
+                      _activityExpanded
+                          ? 'Show less activity'
+                          : 'View full activity',
+                    ),
+                  ),
+              ],
             ),
-            for (final run in detail.runs.reversed.take(10))
-              ListTile(
-                leading: const Icon(Icons.play_circle_outline),
-                title: Text(run['status']?.toString() ?? 'Run state unknown'),
-                subtitle: Text(
-                  run['summary']?.toString() ??
-                      run['outcome']?.toString() ??
-                      'No summary available',
-                ),
-              ),
-            for (final event in detail.events.reversed.take(10))
-              ListTile(
-                leading: const Icon(Icons.history),
-                title: Text(event['kind']?.toString() ?? 'Task event'),
-                subtitle: Text(
-                  event['created_at']?.toString() ?? 'Time unavailable',
-                ),
-              ),
-            for (final comment in detail.comments.reversed.take(20))
-              ListTile(
-                title: Text(comment['body']?.toString() ?? ''),
-                subtitle: Text(
-                  comment['author']?.toString() ?? 'Unknown author',
-                ),
-              ),
-            Text(
-              'Dependencies: ${detail.links['parents'] is List ? (detail.links['parents'] as List).length : 'unknown'} parents',
+            _section(
+              'Dependencies & files',
+              '${detail.links['parents'] is List ? (detail.links['parents'] as List).length : 0} parents · ${detail.attachments.length} attachments',
+              Icons.attach_file_rounded,
+              [
+                if (_filesExpanded)
+                  for (final attachment in detail.attachments.take(20))
+                    ListTile(
+                      leading: const Icon(Icons.attach_file),
+                      title: Text(
+                        attachment['filename']?.toString() ??
+                            attachment['name']?.toString() ??
+                            'Attachment',
+                      ),
+                      subtitle: const Text('Stored in Hermes'),
+                    ),
+                if (_filesExpanded)
+                  for (final child in detail.childResults.take(20))
+                    ListTile(
+                      leading: const Icon(Icons.subdirectory_arrow_right),
+                      title: Text(child['title']?.toString() ?? 'Child task'),
+                      subtitle: Text(
+                        child['status']?.toString() ?? 'Status unknown',
+                      ),
+                    ),
+                if (_filesExpanded)
+                  for (final diagnostic in task.diagnostics.take(10))
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(
+                        diagnostic['message']?.toString() ??
+                            diagnostic['kind']?.toString() ??
+                            'Diagnostic',
+                      ),
+                    ),
+                if (detail.attachments.isNotEmpty ||
+                    detail.childResults.isNotEmpty ||
+                    task.diagnostics.isNotEmpty)
+                  TextButton(
+                    onPressed: () =>
+                        setState(() => _filesExpanded = !_filesExpanded),
+                    child: Text(
+                      _filesExpanded ? 'Show less' : 'View linked items',
+                    ),
+                  ),
+              ],
             ),
-            Text('Attachments: ${detail.attachments.length}'),
-            for (final attachment in detail.attachments.take(20))
-              ListTile(
-                leading: const Icon(Icons.attach_file),
-                title: Text(
-                  attachment['filename']?.toString() ??
-                      attachment['name']?.toString() ??
-                      'Attachment',
-                ),
-                subtitle: const Text('Stored in Hermes'),
-              ),
-            for (final child in detail.childResults.take(20))
-              ListTile(
-                leading: const Icon(Icons.subdirectory_arrow_right),
-                title: Text(child['title']?.toString() ?? 'Child task'),
-                subtitle: Text(child['status']?.toString() ?? 'Status unknown'),
-              ),
-            for (final diagnostic in task.diagnostics.take(10))
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(
-                  diagnostic['message']?.toString() ??
-                      diagnostic['kind']?.toString() ??
-                      'Diagnostic',
-                ),
-              ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              ),
               onPressed: _busy
                   ? null
                   : () async {
@@ -772,6 +1592,51 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet> {
                     },
               icon: const Icon(Icons.comment_outlined),
               label: const Text('Add comment'),
+            ),
+          ],
+          if (task.body != null || task.summary != null) ...[
+            const SizedBox(height: 16),
+            _section(
+              'Details',
+              'Task description and latest agent summary',
+              Icons.notes_rounded,
+              [
+                if (task.body != null) ...[
+                  Text(
+                    'Description',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    task.body!,
+                    maxLines: _descriptionExpanded ? null : 2,
+                    overflow: _descriptionExpanded
+                        ? null
+                        : TextOverflow.ellipsis,
+                  ),
+                ],
+                if (task.summary != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Latest summary',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    task.summary!,
+                    maxLines: _descriptionExpanded ? null : 2,
+                    overflow: _descriptionExpanded
+                        ? null
+                        : TextOverflow.ellipsis,
+                  ),
+                ],
+                TextButton(
+                  onPressed: () => setState(
+                    () => _descriptionExpanded = !_descriptionExpanded,
+                  ),
+                  child: Text(
+                    _descriptionExpanded ? 'Show less' : 'Read full details',
+                  ),
+                ),
+              ],
             ),
           ],
         ],

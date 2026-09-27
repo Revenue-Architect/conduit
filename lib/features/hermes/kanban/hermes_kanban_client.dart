@@ -55,6 +55,21 @@ final class KanbanBoardRef {
   }
 }
 
+final class KanbanProfile {
+  const KanbanProfile(this.name, this.description);
+  final String name;
+  final String? description;
+
+  static KanbanProfile? fromJson(Object? value) {
+    final data = _map(value);
+    final name = _text(data['name']);
+    if (name == null || !HermesConfig.isValidDesktopProfile(name)) {
+      return null;
+    }
+    return KanbanProfile(name, _text(data['description']));
+  }
+}
+
 final class KanbanTask {
   const KanbanTask({
     required this.id,
@@ -310,6 +325,13 @@ final class HermesKanbanClient {
           .map(KanbanBoardRef.fromJson)
           .toList(growable: false);
 
+  Future<List<KanbanProfile>> profiles() async =>
+      _list(_map(await _json('GET', '/profiles'))['profiles'])
+          .take(256)
+          .map(KanbanProfile.fromJson)
+          .whereType<KanbanProfile>()
+          .toList(growable: false);
+
   Future<KanbanSnapshot> board(String slug) async =>
       KanbanSnapshot.fromJson(slug, await _json('GET', '/board', board: slug));
 
@@ -318,12 +340,25 @@ final class HermesKanbanClient {
         await _json('GET', '/tasks/${Uri.encodeComponent(id)}', board: board),
       );
 
-  Future<void> create(String board, String title, {bool triage = false}) async {
+  Future<void> create(
+    String board,
+    String title, {
+    bool triage = false,
+    String? assignee,
+    String? body,
+    int priority = 0,
+  }) async {
     await _json(
       'POST',
       '/tasks',
       board: board,
-      body: {'title': title, 'triage': triage},
+      body: {
+        'title': title,
+        'triage': triage,
+        'priority': priority,
+        if (assignee != null && assignee.isNotEmpty) 'assignee': assignee,
+        if (body != null && body.trim().isNotEmpty) 'body': body.trim(),
+      },
     );
   }
 

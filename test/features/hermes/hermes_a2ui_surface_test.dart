@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:conduit/features/hermes/widgets/hermes_a2ui_surface.dart';
 import 'package:conduit/features/hermes/widgets/hermes_visual_catalog.dart';
+import 'package:conduit/features/hermes/widgets/hermez_chat_palette.dart';
+import 'package:conduit/features/hermes/widgets/hermez_visual_theme.dart';
 
 import 'dart:convert';
 
@@ -59,6 +61,42 @@ Widget _catalogItemInUnboundedRow({
 }
 
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets('stock A2UI Card and Button use Hermez $brightness', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 760));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final payload = File('test/fixtures/hermes/a2ui/meal-plan-form.jsonl')
+          .readAsStringSync();
+      final palette = HermezChatPalette.forBrightness(brightness);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Theme(
+            data: hermezVisualTheme(ThemeData(brightness: brightness)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: HermesA2uiSurface(payload: payload),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final card = tester.widget<Card>(find.byType(Card).first);
+      expect((card.child! as Padding).padding, const EdgeInsets.all(16));
+      final button = tester.widget<ElevatedButton>(
+        find.byType(ElevatedButton).first,
+      );
+      expect(button.style?.backgroundColor?.resolve({}), palette.accent);
+      expect(button.style?.foregroundColor?.resolve({}), palette.onAccent);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('renders a saved ranged metric row without infinite width', (
     tester,
   ) async {

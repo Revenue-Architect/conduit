@@ -26,6 +26,7 @@ import 'hermes_desktop_transport.dart';
 import 'hermes_identifier.dart';
 import 'hermes_json_guard.dart';
 import 'hermes_pending_decision_store.dart';
+import 'hermes_live_activity.dart';
 
 part 'hermes_desktop_administration.dart';
 part 'hermes_desktop_auth_rest.dart';
@@ -310,6 +311,27 @@ final class HermesDesktopApiService
   }
 
   Stream<HermesDesktopTurnState> get turnStates => _turnStates.stream;
+  final Map<String, List<HermesLiveActivityEvent>> _activityHistory = {};
+  final StreamController<String> _activityChanges =
+      StreamController<String>.broadcast();
+
+  List<HermesLiveActivityEvent> activitySnapshotFor(String storedId) =>
+      List.unmodifiable(_activityHistory[storedId] ?? const []);
+
+  Stream<List<HermesLiveActivityEvent>> activityFor(String storedId) =>
+      Stream<List<HermesLiveActivityEvent>>.multi((controller) {
+        final subscription = _activityChanges.stream.listen(
+          (changedId) {
+            if (changedId == storedId)
+              controller.add(activitySnapshotFor(storedId));
+          },
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        controller
+          ..add(activitySnapshotFor(storedId))
+          ..onCancel = subscription.cancel;
+      });
   Stream<HermesDesktopTurnState> turnStatesFor(String storedId) =>
       Stream<HermesDesktopTurnState>.multi((controller) {
         final subscription = _sessionTurnStateChanges.stream.listen(
@@ -406,6 +428,59 @@ final class HermesDesktopApiService
   );
   @override
   Future<List<Map<String, dynamic>>> listSessions() => _runtimeListSessions();
+
+  /// A profile-specific read for Bot Detail. Never silently relabel another
+  /// profile's sessions as this bot's conversations.
+  Future<List<Map<String, dynamic>>> listSessionsForProfile(
+    String profile,
+  ) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    return _objects(
+      await _requestJson(
+        'GET',
+        '/api/profiles/sessions',
+        query: {
+          'profile': profile,
+          'limit': 200,
+          'offset': 0,
+          'order': 'recent',
+        },
+      ),
+      'sessions',
+    );
+  }
+
+  /// Associates a server-advertised session with its profile before resume or
+  /// transcript reads. A fresh process has no in-memory bot bindings yet.
+  void bindSessionProfile(String storedId, String profile) {
+    final id = validateHermesOpaqueIdentifier(storedId);
+    if (id == null || !HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError('Invalid Hermes session profile binding.');
+    }
+    _sessionProfiles[id] = profile;
+  }
+
+  /// Authoritative profile counts, independent of the paged recent-session list.
+  Future<Map<String, int>> sessionTotalsByProfile() async {
+    final response = await _requestJson(
+      'GET',
+      '/api/profiles/sessions',
+      query: {'limit': 1, 'offset': 0, 'order': 'recent'},
+    );
+    final raw = response is Map ? response['profile_totals'] : null;
+    if (raw is! Map) return const {};
+    return {
+      for (final entry in raw.entries)
+        if (entry.key is String &&
+            HermesConfig.isValidDesktopProfile(entry.key as String) &&
+            entry.value is int &&
+            (entry.value as int) >= 0)
+          entry.key as String: entry.value as int,
+    };
+  }
+
   @override
   Future<List<Map<String, dynamic>>> getSessionMessages(
     String id, {
@@ -435,12 +510,28 @@ final class HermesDesktopApiService
   /// stored session id. Later calls for that session stay scoped to the bot.
   Future<String> openBotChat(HermesBot bot) => _openBotChat(bot);
 
+  /// Starts a visible, independent conversation bound to this bot's profile.
+  /// The canonical Bot Chat remains available in conversation history.
+  Future<String> createBotConversation(HermesBot bot) async {
+    if (!HermesConfig.isValidDesktopProfile(bot.name)) {
+      throw ArgumentError.value(bot.name, 'profile');
+    }
+    final id = await _runtimeCreateDesktopSession(
+      options: const HermesDesktopSessionOptions(),
+      profile: bot.name,
+    );
+    _sessionProfiles[id] = bot.name;
+    return id;
+  }
+
   Future<List<HermesDesktopModelOption>> configuredModels() =>
       _administration.configuredModels();
 
   @override
   Future<List<Map<String, dynamic>>> listSkills() =>
       _administration.listSkills();
+  Future<List<Map<String, dynamic>>> listSkillsForProfile(String profile) =>
+      _administration.listSkillsForProfile(profile);
   Future<List<Map<String, dynamic>>> listCommands() =>
       _administration.listCommands();
 
@@ -449,6 +540,8 @@ final class HermesDesktopApiService
   @override
   Future<List<Map<String, dynamic>>> listToolsets() =>
       _administration.listToolsets();
+  Future<List<Map<String, dynamic>>> listToolsetsForProfile(String profile) =>
+      _administration.listToolsetsForProfile(profile);
 
   Future<void> configureTools(List<String> names, {required bool enabled}) =>
       _administration.configureTools(names, enabled: enabled);
@@ -501,6 +594,8 @@ final class HermesDesktopApiService
 
   @override
   Future<List<Map<String, dynamic>>> listJobs() => _administration.listJobs();
+  Future<List<Map<String, dynamic>>> listJobsForProfile(String profile) =>
+      _administration.listJobsForProfile(profile);
 
   @override
   Future<Map<String, dynamic>> createJob({
@@ -531,15 +626,44 @@ final class HermesDesktopApiService
   @override
   Future<void> pauseJob(String id) =>
       _administration.mutateJob(id, "POST", "/pause");
+  Future<void> pauseJobForProfile(String profile, String id) =>
+      _administration.mutateJob(id, 'POST', '/pause', profile: profile);
   @override
   Future<void> resumeJob(String id) =>
       _administration.mutateJob(id, "POST", "/resume");
+  Future<void> resumeJobForProfile(String profile, String id) =>
+      _administration.mutateJob(id, 'POST', '/resume', profile: profile);
   @override
   Future<void> runJob(String id) =>
       _administration.mutateJob(id, "POST", "/trigger");
+  Future<void> runJobForProfile(String profile, String id) =>
+      _administration.mutateJob(id, 'POST', '/trigger', profile: profile);
+  Future<void> updateJobForProfile(
+    String profile,
+    String id, {
+    String? name,
+    String? prompt,
+    String? schedule,
+    bool? enabled,
+  }) => _administration.updateJob(
+    id,
+    profile: profile,
+    name: name,
+    prompt: prompt,
+    schedule: schedule,
+    enabled: enabled,
+  );
 
   Future<List<Map<String, dynamic>>> listJobRuns(String id) =>
       _administration.listJobRuns(id);
+  Future<List<Map<String, dynamic>>> listJobRunsForProfile(
+    String profile,
+    String id,
+  ) => _administration.listJobRunsForProfile(profile, id);
+
+  Future<List<HermesPendingDesktopDecision>> pendingDecisions({
+    String? profile,
+  }) => HermesPendingDecisionStore.forOrigin(origin: _origin, profile: profile);
 
   @override
   Future<HermesResponseStream> streamDesktopResponse(
@@ -623,6 +747,7 @@ final class HermesDesktopApiService
     unawaited(_rpc.close());
     unawaited(_turnStates.close());
     unawaited(_sessionTurnStateChanges.close());
+    unawaited(_activityChanges.close());
     unawaited(_transcriptChanges.close());
     unawaited(_desktopContractChanges.close());
     _eventBuffer.clear();
@@ -632,6 +757,7 @@ final class HermesDesktopApiService
     _lastTranscripts.clear();
     _appliedSessionOptions.clear();
     _sessionTurnStates.clear();
+    _activityHistory.clear();
   }
 
   void _emitTurnState(HermesDesktopTurnState state) {

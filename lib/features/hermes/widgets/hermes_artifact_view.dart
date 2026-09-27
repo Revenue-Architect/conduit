@@ -13,10 +13,16 @@ import '../services/hermes_artifact_client.dart';
 import '../services/hermes_media_parser.dart';
 
 class HermesArtifactView extends ConsumerStatefulWidget {
-  const HermesArtifactView({super.key, required this.artifact, this.sessionId});
+  const HermesArtifactView({
+    super.key,
+    required this.artifact,
+    this.sessionId,
+    this.maxImageHeight = 340,
+  });
 
   final HermesMediaArtifact artifact;
   final String? sessionId;
+  final double maxImageHeight;
 
   @override
   ConsumerState<HermesArtifactView> createState() => _HermesArtifactViewState();
@@ -73,7 +79,7 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
           ? SvgPicture.memory(
               bytes,
               width: double.infinity,
-              height: 340,
+              height: widget.maxImageHeight,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => _imageErrorPreview(
                 context,
@@ -85,7 +91,7 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
           : Image.memory(
               bytes,
               width: double.infinity,
-              height: 340,
+              height: widget.maxImageHeight,
               fit: BoxFit.contain,
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
                 if (wasSynchronouslyLoaded || frame != null) return child;
@@ -98,13 +104,44 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
                 ),
               ),
             );
-      return _imageFrame(context, image);
+      return Column(
+        children: [
+          _imageFrame(
+            context,
+            InteractiveViewer(minScale: 1, maxScale: 5, child: image),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: _isActionInProgress
+                    ? null
+                    : () => _runAction(open: true),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Open'),
+              ),
+              TextButton.icon(
+                onPressed: _isActionInProgress
+                    ? null
+                    : () => _runAction(open: false),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('Share'),
+              ),
+            ],
+          ),
+          if (_actionError != null)
+            Text(
+              _actionError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+        ],
+      );
     },
   );
 
   Widget _imageFrame(BuildContext context, Widget child) => Container(
     width: double.infinity,
-    constraints: const BoxConstraints(maxHeight: 360),
+    constraints: BoxConstraints(maxHeight: widget.maxImageHeight + 20),
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(16),

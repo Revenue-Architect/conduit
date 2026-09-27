@@ -296,6 +296,24 @@ final class HermesPendingDecisionStore {
     );
   }
 
+  static Future<List<HermesPendingDesktopDecision>> forOrigin({
+    required String origin,
+    String? profile,
+  }) async {
+    var records = const <HermesPendingDesktopDecision>[];
+    await _serialize(() async {
+      records = _read();
+      await _write(records);
+    });
+    return List.unmodifiable(
+      records.where(
+        (record) =>
+            record.origin == origin &&
+            (profile == null || record.profile == profile),
+      ),
+    );
+  }
+
   static Future<void> _remove(
     bool Function(HermesPendingDesktopDecision record) predicate,
   ) => _serialize(() async {

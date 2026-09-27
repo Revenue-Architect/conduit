@@ -10,7 +10,10 @@ import 'package:conduit/features/navigation/widgets/sidebar_page.dart';
 import 'package:conduit/features/navigation/widgets/sidebar_tab_registry.dart';
 import 'package:conduit/features/navigation/widgets/sidebar_user_pill.dart';
 import 'package:conduit/features/hermes/models/hermes_job.dart';
+import 'package:conduit/features/hermes/models/hermes_bot.dart';
+import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/hermes/widgets/hermes_sessions_tab.dart';
+import 'package:conduit/features/hermes/widgets/hermes_session_tile.dart';
 import 'package:conduit/features/terminal/models/terminal_models.dart';
 import 'package:conduit/features/terminal/providers/terminal_providers.dart';
 import 'package:conduit/features/terminal/widgets/terminal_tab.dart';
@@ -729,6 +732,133 @@ void main() {
     expect(find.text('1 active · 1 schedule'), findsOneWidget);
     expect(find.text('Daily summary'), findsNothing);
     expect(find.text('0 9 * * *'), findsNothing);
+  });
+
+  testWidgets('Hermes bots collapse their own real conversations', (
+    tester,
+  ) async {
+    final controllers = SidebarTestSidebarHarnessControllers();
+    await tester.pumpWidget(
+      sidebarTestBuildHarness(
+        controllers: controllers,
+        hermesOnly: true,
+        hermesEnabled: true,
+        hermesBots: const [
+          HermesBot(name: 'default', title: 'default'),
+          HermesBot(name: 'kai', title: 'kai'),
+        ],
+        hermesSessions: const [
+          HermesSessionSummary(
+            id: 'one',
+            title: 'Draft idea',
+            profile: 'default',
+            messageCount: 4,
+          ),
+          HermesSessionSummary(
+            id: 'two',
+            title: 'Research plan',
+            profile: 'kai',
+            messageCount: 8,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    final defaultBot = find.byKey(
+      const ValueKey('hermes-bot-disclosure-default'),
+    );
+    final kaiBot = find.byKey(const ValueKey('hermes-bot-disclosure-kai'));
+    expect(defaultBot, findsOneWidget);
+    expect(kaiBot, findsOneWidget);
+    await tester.tap(defaultBot);
+    await tester.pumpAndSettle();
+    expect(find.text('4 messages'), findsOneWidget);
+    expect(find.text('8 messages'), findsNothing);
+    await tester.tap(kaiBot);
+    await tester.pumpAndSettle();
+    expect(find.text('8 messages'), findsOneWidget);
+    await tester.tap(defaultBot);
+    await tester.pumpAndSettle();
+    expect(find.text('4 messages'), findsNothing);
+    expect(find.text('8 messages'), findsOneWidget);
+  });
+
+  testWidgets('large bot histories reveal conversations progressively', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final sessions = List.generate(
+      30,
+      (index) => HermesSessionSummary(
+        id: 'session-$index',
+        title: 'Conversation $index',
+        profile: 'default',
+        messageCount: 1,
+      ),
+    );
+    await tester.pumpWidget(
+      sidebarTestBuildHarness(
+        controllers: SidebarTestSidebarHarnessControllers(),
+        hermesOnly: true,
+        hermesEnabled: true,
+        hermesBots: const [HermesBot(name: 'default', title: 'default')],
+        hermesSessions: sessions,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('hermes-bot-disclosure-default')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is HermesSessionTile && widget.nested,
+        skipOffstage: false,
+      ),
+      findsNWidgets(8),
+    );
+    final more = find.byKey(const ValueKey('hermes-bot-more-default'));
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is HermesSessionTile && widget.nested,
+        skipOffstage: false,
+      ),
+      findsNWidgets(20),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Scheduled agents tile opens the jobs screen', (tester) async {
+    final controllers = SidebarTestSidebarHarnessControllers();
+    await tester.pumpWidget(
+      sidebarTestBuildHarness(
+        controllers: controllers,
+        hermesOnly: true,
+        hermesEnabled: true,
+        hermesJobs: const [
+          HermesJob(
+            id: 'daily-summary',
+            name: 'Daily summary',
+            prompt: 'Summarize updates',
+            schedule: '0 9 * * *',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('hermes-scheduled-agents-tile')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Scheduled agents destination'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('hides terminal tab when no terminal servers are available', (

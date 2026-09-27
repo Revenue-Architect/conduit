@@ -57,6 +57,9 @@ mixin SidebarTabScrollRegistration<T extends ConsumerStatefulWidget>
     on ConsumerState<T> {
   SidebarTabId get sidebarTabId;
 
+  /// Full-screen reuse of a tab must not replace the live sidebar controller.
+  bool get registerSidebarScrollController => true;
+
   /// May choose between controllers, as the terminal tab does for its panels.
   ScrollController? get sidebarScrollController;
 
@@ -66,16 +69,20 @@ mixin SidebarTabScrollRegistration<T extends ConsumerStatefulWidget>
   void initState() {
     super.initState();
     _sidebarScrollRegistry = ref.read(sidebarTabScrollRegistryProvider);
-    _sidebarScrollRegistry.registerController(
-      sidebarTabId,
-      owner: this,
-      resolve: () => sidebarScrollController,
-    );
+    if (registerSidebarScrollController) {
+      _sidebarScrollRegistry.registerController(
+        sidebarTabId,
+        owner: this,
+        resolve: () => sidebarScrollController,
+      );
+    }
   }
 
   @override
   void dispose() {
-    _sidebarScrollRegistry.unregister(sidebarTabId, owner: this);
+    if (registerSidebarScrollController) {
+      _sidebarScrollRegistry.unregister(sidebarTabId, owner: this);
+    }
     super.dispose();
   }
 }

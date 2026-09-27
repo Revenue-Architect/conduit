@@ -113,77 +113,77 @@ Color mix(Color a, Color b, double amount) {
 
 class TweakcnThemes {
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
-    background: const Color(0xFFFFFFFF), // background
-    foreground: const Color(0xFF000000), // onBackground
-    card: const Color(0xFFF4F4F4), // surface
-    cardForeground: const Color(0xFF000000), // onSurface
-    popover: const Color(0xFFFFFFFF), // background
-    popoverForeground: const Color(0xFF000000), // onSurface
-    primary: const Color(0xFF000000), // primary
-    primaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    secondary: const Color(0xFFF4F4F4), // secondary
-    secondaryForeground: const Color(0xFF000000), // onSecondary
-    muted: const Color(0xFFF4F4F4), // surface
-    mutedForeground: const Color(0xFF6E6E80), // onSurfaceVariant
-    accent: const Color(0xFFECECEC), // surfaceVariant
-    accentForeground: const Color(0xFF000000), // onSurface
-    destructive: const Color(0xFFEF4444), // error
+    background: const Color(0xFFF7F7F7), // neutral light-grey canvas
+    foreground: const Color(0xFF17181C), // graphite ink
+    card: const Color(0xFFFFFFFF),
+    cardForeground: const Color(0xFF17181C),
+    popover: const Color(0xFFFFFFFF),
+    popoverForeground: const Color(0xFF17181C),
+    primary: const Color(0xFFFF5A26), // signal orange
+    primaryForeground: const Color(0xFF17181C),
+    secondary: const Color(0xFF202126),
+    secondaryForeground: const Color(0xFFFFFFFF),
+    muted: const Color(0xFFEDEDED),
+    mutedForeground: const Color(0xFF666765),
+    accent: const Color(0xFFEDEDED),
+    accentForeground: const Color(0xFF17181C),
+    destructive: const Color(0xFFB43432),
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFFE5E5E5), // outlineVariant
-    input: const Color(0xFFE5E5E5), // outlineVariant
-    ring: const Color(0xFF8E8EA0), // outline
-    sidebarBackground: const Color(0xFFF4F4F4), // surface
-    sidebarForeground: const Color(0xFF000000), // onSurface
-    sidebarPrimary: const Color(0xFF000000), // primary
-    sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    sidebarAccent: const Color(0xFFECECEC), // surfaceVariant
-    sidebarAccentForeground: const Color(0xFF000000), // onSurface
-    sidebarBorder: const Color(0xFFE5E5E5), // outlineVariant
-    sidebarRing: const Color(0xFF8E8EA0), // outline
-    success: const Color(0xFF10A37F), // success / tertiary
-    successForeground: const Color(0xFFFFFFFF), // onTertiary
-    warning: const Color(0xFFF59E0B), // warning
-    warningForeground: const Color(0xFF000000), // onBackground
-    info: const Color(0xFF10A37F), // tertiary (reuse as info)
-    infoForeground: const Color(0xFFFFFFFF), // onTertiary
-    radius: 10,
+    border: const Color(0xFFDADADA),
+    input: const Color(0xFFDADADA),
+    ring: const Color(0xFFFF5A26),
+    sidebarBackground: const Color(0xFFF7F7F7),
+    sidebarForeground: const Color(0xFF17181C),
+    sidebarPrimary: const Color(0xFFFF5A26),
+    sidebarPrimaryForeground: const Color(0xFF17181C),
+    sidebarAccent: const Color(0xFFEDEDED),
+    sidebarAccentForeground: const Color(0xFF17181C),
+    sidebarBorder: const Color(0xFFDADADA),
+    sidebarRing: const Color(0xFFFF5A26),
+    success: const Color(0xFF18704B),
+    successForeground: const Color(0xFFFFFFFF),
+    warning: const Color(0xFF925600),
+    warningForeground: const Color(0xFFFFFFFF),
+    info: const Color(0xFF2663A6),
+    infoForeground: const Color(0xFFFFFFFF),
+    radius: 16,
   );
 
   static final TweakcnThemeVariant _conduitDark = TweakcnThemeVariant(
-    background: const Color(0xFF000000), // background
-    foreground: const Color(0xFFECECEC), // onBackground
-    card: const Color(0xFF141414), // surface
-    cardForeground: const Color(0xFFECECEC), // onSurface
-    popover: const Color(0xFF1A1A1A), // surfaceVariant
-    popoverForeground: const Color(0xFFECECEC), // onSurface
-    primary: const Color(0xFFECECEC), // primary
-    primaryForeground: const Color(0xFF000000), // onPrimary
-    secondary: const Color(0xFF1A1A1A), // secondary
-    secondaryForeground: const Color(0xFFECECEC), // onSecondary
-    muted: const Color(0xFF1A1A1A), // surfaceVariant
-    mutedForeground: const Color(0xFF8E8EA0), // onSurfaceVariant
-    accent: const Color(0xFF232323), // secondaryContainer
-    accentForeground: const Color(0xFFECECEC), // onSecondaryContainer
-    destructive: const Color(0xFFEF4444), // error
-    destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFF1E1E1E), // outlineVariant
-    input: const Color(0xFF1E1E1E), // outlineVariant
-    ring: const Color(0xFF6E6E80), // outline
-    sidebarBackground: const Color(0xFF000000), // background
-    sidebarForeground: const Color(0xFFECECEC), // onSurface
-    sidebarPrimary: const Color(0xFFECECEC), // primary
-    sidebarPrimaryForeground: const Color(0xFF000000), // onPrimary
-    sidebarAccent: const Color(0xFF1A1A1A), // surfaceVariant
-    sidebarAccentForeground: const Color(0xFFECECEC), // onSurface
-    sidebarBorder: const Color(0xFF1E1E1E), // outlineVariant
-    sidebarRing: const Color(0xFF6E6E80), // outline
-    success: const Color(0xFF10A37F), // success / tertiary
-    successForeground: const Color(0xFFFFFFFF), // onTertiary
-    warning: const Color(0xFFF59E0B), // warning
-    warningForeground: const Color(0xFFECECEC), // onBackground
-    info: const Color(0xFF10A37F), // tertiary (reuse as info)
-    infoForeground: const Color(0xFFECECEC), // onBackground
-    radius: 10,
+    background: const Color(0xFF111215),
+    foreground: const Color(0xFFF6F5F2),
+    card: const Color(0xFF24252A),
+    cardForeground: const Color(0xFFF6F5F2),
+    popover: const Color(0xFF24252A),
+    popoverForeground: const Color(0xFFF6F5F2),
+    primary: const Color(0xFFFF6A36),
+    primaryForeground: const Color(0xFF17181C),
+    secondary: const Color(0xFFEAE8E3),
+    secondaryForeground: const Color(0xFF17181C),
+    muted: const Color(0xFF24252A),
+    mutedForeground: const Color(0xFFB6B7B4),
+    accent: const Color(0xFF4B3029),
+    accentForeground: const Color(0xFFF6F5F2),
+    destructive: const Color(0xFFFF8F8F),
+    destructiveForeground: const Color(0xFF17181C),
+    border: const Color(0xFF434449),
+    input: const Color(0xFF434449),
+    ring: const Color(0xFFFF6A36),
+    sidebarBackground: const Color(0xFF111215),
+    sidebarForeground: const Color(0xFFF6F5F2),
+    sidebarPrimary: const Color(0xFFFF6A36),
+    sidebarPrimaryForeground: const Color(0xFF17181C),
+    sidebarAccent: const Color(0xFF4B3029),
+    sidebarAccentForeground: const Color(0xFFF6F5F2),
+    sidebarBorder: const Color(0xFF434449),
+    sidebarRing: const Color(0xFFFF6A36),
+    success: const Color(0xFF74D3A1),
+    successForeground: const Color(0xFF17181C),
+    warning: const Color(0xFFFFC477),
+    warningForeground: const Color(0xFF17181C),
+    info: const Color(0xFF8DBCF5),
+    infoForeground: const Color(0xFF17181C),
+    radius: 16,
   );
 
   static final TweakcnThemeVariant _t3ChatLight = TweakcnThemeVariant(
@@ -512,14 +512,14 @@ class TweakcnThemes {
 
   static final TweakcnThemeDefinition conduit = TweakcnThemeDefinition(
     id: 'conduit',
-    labelBuilder: (l10n) => l10n.themePaletteConduitLabel,
-    descriptionBuilder: (l10n) => l10n.themePaletteConduitDescription,
+    labelBuilder: (_) => 'Hermez',
+    descriptionBuilder: (_) => 'White, graphite and signal orange',
     light: _conduitLight,
     dark: _conduitDark,
     preview: const <Color>[
-      Color(0xFF000000), // primary
-      Color(0xFF10A37F), // tertiary / accent
-      Color(0xFFF4F4F4), // surface
+      Color(0xFFFF5A26),
+      Color(0xFF202126),
+      Color(0xFFF7F7F7),
     ],
   );
 

@@ -44,6 +44,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     }
     _stateSubscription ??= _rpc.events.listen((event) {
       final startedBuffering = _eventBuffer.add(event);
+      _recordLiveActivity(event);
       if (event.type == 'session.info') {
         // Update BOTH keys. `session.create` can omit `running`, which parks
         // the stored id at unsupportedGateway; a runtime-only update never
@@ -80,6 +81,70 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       }
     });
     _emitTurnState(HermesDesktopTurnState.idle);
+  }
+
+  void _recordLiveActivity(HermesDesktopEvent event) {
+    if (_closed || _activityChanges.isClosed) return;
+    final storedId =
+        _storedIdForRuntime(event.sessionId) ??
+        validateHermesOpaqueIdentifier(event.sessionId);
+    if (storedId == null) return;
+    final kind = switch (event.type) {
+      'tool.start' => HermesLiveActivityKind.toolStarted,
+      'tool.generating' ||
+      'tool.progress' => HermesLiveActivityKind.toolProgress,
+      'tool.complete' => HermesLiveActivityKind.toolCompleted,
+      'subagent.start' ||
+      'subagent.spawn_requested' => HermesLiveActivityKind.subagentStarted,
+      'subagent.thinking' ||
+      'subagent.tool' ||
+      'subagent.progress' => HermesLiveActivityKind.subagentProgress,
+      'subagent.complete' => HermesLiveActivityKind.subagentCompleted,
+      'review.summary' => HermesLiveActivityKind.review,
+      'approval.request' ||
+      'clarify.request' ||
+      'sudo.request' ||
+      'secret.request' ||
+      'mcp.setup.request' => HermesLiveActivityKind.waitingForInput,
+      'message.complete' => HermesLiveActivityKind.completed,
+      'message.error' || 'session.error' => HermesLiveActivityKind.failed,
+      _ => null,
+    };
+    if (kind == null) return;
+    final name = validateHermesBoundedString(
+      event.payload['name'],
+      maxCharacters: 80,
+    );
+    final safeName =
+        name != null &&
+            !config.sensitiveValues.any(
+              (secret) => secret.isNotEmpty && name.contains(secret),
+            )
+        ? name
+        : null;
+    final title = switch (kind) {
+      HermesLiveActivityKind.toolStarted => 'Started ${safeName ?? 'tool'}',
+      HermesLiveActivityKind.toolProgress => 'Running ${safeName ?? 'tool'}',
+      HermesLiveActivityKind.toolCompleted => 'Completed ${safeName ?? 'tool'}',
+      HermesLiveActivityKind.subagentStarted => 'Subagent started',
+      HermesLiveActivityKind.subagentProgress => 'Subagent working',
+      HermesLiveActivityKind.subagentCompleted => 'Subagent completed',
+      HermesLiveActivityKind.review => 'Review ready',
+      HermesLiveActivityKind.waitingForInput => 'Waiting for your input',
+      HermesLiveActivityKind.completed => 'Response completed',
+      HermesLiveActivityKind.failed => 'Run failed',
+    };
+    final history = _activityHistory.putIfAbsent(storedId, () => []);
+    history.add(
+      HermesLiveActivityEvent(
+        sessionId: storedId,
+        kind: kind,
+        title: title,
+        timestamp: DateTime.now().toUtc(),
+      ),
+    );
+    if (history.length > 100) history.removeRange(0, history.length - 100);
+    _activityChanges.add(storedId);
   }
 
   Future<void> _resolvePendingDecisionEvent(HermesDesktopEvent event) async {
@@ -377,14 +442,52 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     return stored;
   }
 
-  Future<List<Map<String, dynamic>>> _runtimeListSessions() async => _objects(
-    await _requestJson(
-      'GET',
-      '/api/sessions',
-      query: {'limit': 100, 'offset': 0, 'order': 'recent'},
-    ),
-    'sessions',
-  );
+  Future<List<Map<String, dynamic>>> _runtimeListSessions() async {
+    List<Map<String, dynamic>> rows;
+    try {
+      rows = _objects(
+        await _requestJson(
+          'GET',
+          '/api/profiles/sessions',
+          query: {
+            'limit': 200,
+            'offset': 0,
+            'order': 'recent',
+            'profile': 'all',
+          },
+        ),
+        'sessions',
+      );
+    } catch (error) {
+      final missing =
+          error is DioException && error.response?.statusCode == 404 ||
+          error is StateError &&
+              error.message == 'Hermes dashboard request failed (404).';
+      if (!missing) rethrow;
+      // Older Desktop gateways lack the cross-profile list; keep their
+      // active-profile sidebar functional without masking auth/server errors.
+      rows = _objects(
+        await _requestJson(
+          'GET',
+          '/api/sessions',
+          query: {'limit': 100, 'offset': 0, 'order': 'recent'},
+        ),
+        'sessions',
+      );
+    }
+    for (final row in rows) {
+      final id = validateHermesOpaqueIdentifier(row['id'] ?? row['session_id']);
+      final profile = row['profile'];
+      if (id != null &&
+          profile is String &&
+          HermesConfig.isValidDesktopProfile(profile) &&
+          profile != config.desktopProfile) {
+        // Cross-profile transcript/history/send operations need the owner.
+        _sessionProfiles[id] = profile;
+      }
+    }
+    return rows;
+  }
 
   Future<List<Map<String, dynamic>>> _runtimeGetSessionMessages(
     String id, {

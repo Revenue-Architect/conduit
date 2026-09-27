@@ -151,7 +151,45 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                   for (final toolset in toolsets)
                     UtilityRow(
                       title: toolset.label,
-                      subtitle: l10n.hermesToolCount(toolset.tools.length),
+                      subtitle: [
+                        if (toolset.description?.isNotEmpty == true)
+                          toolset.description!,
+                        l10n.hermesToolCount(toolset.tools.length),
+                        if (toolset.tools.isNotEmpty)
+                          toolset.tools.take(3).join(' · '),
+                      ].join('\n'),
+                      subtitleMaxLines: 5,
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: Text(toolset.label),
+                          content: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (toolset.description?.isNotEmpty == true)
+                                  Text(toolset.description!),
+                                const SizedBox(height: 12),
+                                Text(
+                                  l10n.hermesToolCount(toolset.tools.length),
+                                ),
+                                for (final name in toolset.tools)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 5),
+                                    child: Text('• $name'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      ),
                       trailing: desktop
                           ? AdaptiveSwitch(
                               value: toolset.enabled,

@@ -28,6 +28,8 @@ import 'package:conduit/features/navigation/widgets/drawer_section_notifiers.dar
 import 'package:conduit/features/navigation/widgets/sidebar_page.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/models/hermes_job.dart';
+import 'package:conduit/features/hermes/models/hermes_bot.dart';
+import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/notes/widgets/notes_list_tab.dart';
 import 'package:conduit/features/notes/providers/notes_providers.dart';
 import 'package:conduit/features/terminal/models/terminal_models.dart';
@@ -131,6 +133,8 @@ Widget sidebarTestBuildHarness({
   bool hermesOnly = false,
   bool hermesEnabled = false,
   List<HermesJob> hermesJobs = const [],
+  List<HermesBot> hermesBots = const [],
+  List<HermesSessionSummary> hermesSessions = const [],
   Map<String, Conversation> loadedConversations = const {},
   Map<String, Future<Conversation>> pendingLoadedConversations = const {},
   bool isAuthenticated = true,
@@ -152,6 +156,12 @@ Widget sidebarTestBuildHarness({
         path: '/chat',
         name: RouteNames.chat,
         builder: (context, state) => const Scaffold(body: SidebarPage()),
+      ),
+      GoRoute(
+        path: Routes.hermesJobs,
+        name: RouteNames.hermesJobs,
+        builder: (context, state) =>
+            const Scaffold(body: Text('Scheduled agents destination')),
       ),
       GoRoute(
         path: '/folder/:id',
@@ -271,6 +281,10 @@ Widget sidebarTestBuildHarness({
       terminalServiceProvider.overrideWithValue(null),
       hermesJobsProvider.overrideWith(
         () => SidebarTestTestHermesJobsController(hermesJobs),
+      ),
+      hermesBotsProvider.overrideWith((ref) async => hermesBots),
+      hermesSessionsProvider.overrideWith(
+        () => SidebarTestHermesSessionsController(hermesSessions),
       ),
       // ignore: scoped_providers_should_specify_dependencies
       notesFeatureEnabledProvider.overrideWith(() => controllers.notesNotifier),
@@ -424,6 +438,15 @@ class SidebarTestTestHermesJobsController extends HermesJobsController {
 
   @override
   Future<List<HermesJob>> build() async => jobs;
+}
+
+class SidebarTestHermesSessionsController extends HermesSessionsController {
+  SidebarTestHermesSessionsController(this.sessions);
+
+  final List<HermesSessionSummary> sessions;
+
+  @override
+  Future<List<HermesSessionSummary>> build() async => sessions;
 }
 
 class SidebarTestSidebarHarnessControllers {

@@ -316,7 +316,10 @@ class AppThemePalette extends _$AppThemePalette {
 class AppLightTheme extends _$AppLightTheme {
   @override
   ThemeData build() {
-    final palette = ref.watch(appThemePaletteProvider);
+    final savedPalette = ref.watch(appThemePaletteProvider);
+    final palette = ref.watch(hermesOnlyModeProvider)
+        ? TweakcnThemes.conduit
+        : savedPalette;
     return AppTheme.light(palette);
   }
 }
@@ -325,7 +328,10 @@ class AppLightTheme extends _$AppLightTheme {
 class AppDarkTheme extends _$AppDarkTheme {
   @override
   ThemeData build() {
-    final palette = ref.watch(appThemePaletteProvider);
+    final savedPalette = ref.watch(appThemePaletteProvider);
+    final palette = ref.watch(hermesOnlyModeProvider)
+        ? TweakcnThemes.conduit
+        : savedPalette;
     return AppTheme.dark(palette);
   }
 }
@@ -334,7 +340,10 @@ class AppDarkTheme extends _$AppDarkTheme {
 class AppCupertinoLightTheme extends _$AppCupertinoLightTheme {
   @override
   CupertinoThemeData build() {
-    final palette = ref.watch(appThemePaletteProvider);
+    final savedPalette = ref.watch(appThemePaletteProvider);
+    final palette = ref.watch(hermesOnlyModeProvider)
+        ? TweakcnThemes.conduit
+        : savedPalette;
     return AppTheme.cupertinoLight(palette);
   }
 }
@@ -343,7 +352,10 @@ class AppCupertinoLightTheme extends _$AppCupertinoLightTheme {
 class AppCupertinoDarkTheme extends _$AppCupertinoDarkTheme {
   @override
   CupertinoThemeData build() {
-    final palette = ref.watch(appThemePaletteProvider);
+    final savedPalette = ref.watch(appThemePaletteProvider);
+    final palette = ref.watch(hermesOnlyModeProvider)
+        ? TweakcnThemes.conduit
+        : savedPalette;
     return AppTheme.cupertinoDark(palette);
   }
 }

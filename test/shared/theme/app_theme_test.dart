@@ -2,12 +2,77 @@ import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/color_tokens.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
+import 'package:conduit/core/providers/app_providers.dart';
+import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:checks/checks.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class _SavedWarmPalette extends AppThemePalette {
+  @override
+  TweakcnThemeDefinition build() => TweakcnThemes.tangerine;
+}
 
 void main() {
+  test('Hermes-only chrome stays neutral despite a saved warm palette', () {
+    final hermes = ProviderContainer(
+      overrides: [
+        appThemePaletteProvider.overrideWith(_SavedWarmPalette.new),
+        hermesOnlyModeProvider.overrideWithValue(true),
+      ],
+    );
+    final mixed = ProviderContainer(
+      overrides: [
+        appThemePaletteProvider.overrideWith(_SavedWarmPalette.new),
+        hermesOnlyModeProvider.overrideWithValue(false),
+      ],
+    );
+    addTearDown(hermes.dispose);
+    addTearDown(mixed.dispose);
+    expect(
+      hermes.read(appLightThemeProvider).scaffoldBackgroundColor,
+      const Color(0xFFF7F7F7),
+    );
+    expect(
+      mixed.read(appLightThemeProvider).scaffoldBackgroundColor,
+      TweakcnThemes.tangerine.variantFor(Brightness.light).background,
+    );
+  });
+  test('default app palette uses the Hermez identity in light and dark', () {
+    final palette = TweakcnThemes.byId(null);
+    expect(
+      palette.variantFor(Brightness.light).background,
+      const Color(0xFFF7F7F7),
+    );
+    expect(
+      palette.variantFor(Brightness.light).primary,
+      const Color(0xFFFF5A26),
+    );
+    expect(
+      palette.variantFor(Brightness.dark).background,
+      const Color(0xFF111215),
+    );
+    expect(
+      palette.variantFor(Brightness.dark).primary,
+      const Color(0xFFFF6A36),
+    );
+    expect(TweakcnThemes.byId('conduit').id, palette.id);
+    final light = AppTheme.light(palette);
+    final dark = AppTheme.dark(palette);
+    expect(light.scaffoldBackgroundColor, const Color(0xFFF7F7F7));
+    expect(
+      palette.variantFor(Brightness.light).accent,
+      const Color(0xFFEDEDED),
+    );
+    expect(light.colorScheme.primary, const Color(0xFFFF5A26));
+    expect(light.cardTheme.color, const Color(0xFFFFFFFF));
+    expect(dark.scaffoldBackgroundColor, const Color(0xFF111215));
+    expect(dark.colorScheme.primary, const Color(0xFFFF6A36));
+    expect(dark.cardTheme.color, const Color(0xFF24252A));
+  });
+
   test('iOS text selection uses the themed Android accent colors', () {
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
 

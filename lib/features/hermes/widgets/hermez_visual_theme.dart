@@ -82,6 +82,9 @@ ThemeData hermezVisualTheme(ThemeData base) {
       backgroundColor: palette.canvas,
       foregroundColor: palette.ink,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: palette.accent,

@@ -29,6 +29,12 @@ final class HermesArtifactBytes {
   final String? contentType;
 }
 
+final class HermesRemoteFile {
+  const HermesRemoteFile({required this.name, required this.path});
+  final String name;
+  final String path;
+}
+
 typedef HermesArtifactCookieReader = Future<Map<String, String>> Function(
   String url,
 );
@@ -75,6 +81,83 @@ final class HermesArtifactClient {
   final bool _ownsDio;
   final HermesArtifactCookieReader _cookieReader;
   final HermesArtifactNativeAuthorizationReader? _nativeAuthorizationReader;
+
+  /// Lists only the app's known artifact directory. The server still enforces
+  /// its authenticated filesystem policy; this is not a generic file browser.
+  Future<List<HermesRemoteFile>> listDirectory(String path) async {
+    if (path != '/opt/data/artifacts' ||
+        !supportsHermesArtifactDownloads(config)) {
+      throw const HermesArtifactException(
+        HermesArtifactFailureKind.unavailable,
+      );
+    }
+    final downloadUri = _downloadUri(path);
+    final uri = downloadUri.replace(
+      path: downloadUri.path.replaceFirst(RegExp(r'/download$'), '/list'),
+    );
+    final headers = <String, String>{};
+    if (config.desktopAuthKind == HermesDesktopAuthKind.nativePkce) {
+      headers.addAll(await _readNativeAuthorizationHeaders() ?? const {});
+    } else {
+      final cookies = await _cookieReader(uri.replace(query: '').toString());
+      final cookieHeader = WebViewCookieHelper.formatCookieHeader(cookies);
+      final configured = _headerValue(config.accessHeaders, 'cookie');
+      final combined = [
+        configured,
+        cookieHeader,
+      ].where((value) => value != null && value.trim().isNotEmpty).join('; ');
+      if (combined.isNotEmpty) headers['Cookie'] = combined;
+    }
+    try {
+      final response = await _dio.get<Object?>(
+        uri.toString(),
+        options: Options(
+          responseType: ResponseType.json,
+          headers: headers,
+          followRedirects: false,
+          validateStatus: (status) => status != null,
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status == 401 || status == 403) {
+        throw const HermesArtifactException(
+          HermesArtifactFailureKind.authExpired,
+        );
+      }
+      if (status == 404) {
+        throw const HermesArtifactException(HermesArtifactFailureKind.missing);
+      }
+      if (status < 200 || status >= 300 || response.data is! Map) {
+        throw const HermesArtifactException(
+          HermesArtifactFailureKind.unavailable,
+        );
+      }
+      final entries = (response.data as Map)['entries'];
+      if (entries is! List) return const [];
+      return List.unmodifiable(
+        entries.take(1000).whereType<Map>().map((row) {
+          final name = row['name'];
+          final filePath = row['path'];
+          if (row['isDirectory'] == true ||
+              name is! String ||
+              filePath is! String ||
+              name.isEmpty ||
+              name.contains('/') ||
+              name.contains('\\') ||
+              filePath != '$path/$name') {
+            return null;
+          }
+          return HermesRemoteFile(name: name, path: filePath);
+        }).whereType<HermesRemoteFile>(),
+      );
+    } on HermesArtifactException {
+      rethrow;
+    } catch (_) {
+      throw const HermesArtifactException(
+        HermesArtifactFailureKind.unavailable,
+      );
+    }
+  }
 
   Future<HermesArtifactBytes> download(
     HermesMediaArtifact artifact, {

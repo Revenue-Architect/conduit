@@ -94,7 +94,7 @@ void main() {
   test('auth and dependency conflicts are explicit', () async {
     final auth = HermesKanbanClient(
       config,
-      request: (_, __, {body}) async => (status: 401, body: ''),
+      request: (_, _, {body}) async => (status: 401, body: ''),
     );
     await expectLater(
       auth.boards(),
@@ -102,7 +102,7 @@ void main() {
     );
     final conflict = HermesKanbanClient(
       config,
-      request: (_, __, {body}) async =>
+      request: (_, _, {body}) async =>
           (status: 409, body: '{"detail":"Parent task unfinished"}'),
     );
     await expectLater(
@@ -116,6 +116,31 @@ void main() {
       ),
     );
   });
+
+  test(
+    'profiles are scoped to Hermes and task creation carries the assignee',
+    () async {
+      final calls = <({String method, Uri uri, String? body})>[];
+      final client = HermesKanbanClient(
+        config,
+        request: (method, uri, {body}) async {
+          calls.add((method: method, uri: uri, body: body));
+          if (uri.path.endsWith('/profiles')) {
+            return (
+              status: 200,
+              body: '{"profiles":[{"name":"kai","description":"General"},{"name":"invalid name"}]}',
+            );
+          }
+          return (status: 200, body: '{}');
+        },
+      );
+      expect((await client.profiles()).map((p) => p.name), ['kai']);
+      await client.create('project-x', 'Write a summary', assignee: 'kai');
+      expect(calls.first.uri.path, '/hermes/api/plugins/kanban/profiles');
+      expect(calls.last.uri.queryParameters['board'], 'project-x');
+      expect(jsonDecode(calls.last.body!)['assignee'], 'kai');
+    },
+  );
 
   test(
     'native PKCE uses existing bearer-capable request path, never cookies',
@@ -137,6 +162,13 @@ void main() {
               ],
             };
           }
+          if (path.endsWith('/profiles')) {
+            return {
+              'profiles': [
+                {'name': 'kai', 'description': 'Native profile'},
+              ],
+            };
+          }
           return {
             'columns': [
               {'name': 'todo', 'tasks': []},
@@ -146,8 +178,10 @@ void main() {
       );
       expect((await native.boards()).single.name, 'Native board');
       expect((await native.board('native')).lanes['todo'], isEmpty);
-      expect(calls.last.path, '/api/plugins/kanban/board');
-      expect(calls.last.board, 'native');
+      expect((await native.profiles()).single.name, 'kai');
+      expect(calls[1].path, '/api/plugins/kanban/board');
+      expect(calls[1].board, 'native');
+      expect(calls.last.path, '/api/plugins/kanban/profiles');
       await native.close();
     },
   );

@@ -473,6 +473,94 @@ void main() {
         .isEmpty();
   });
 
+  test('new bot conversation creates a visible profile-scoped session', () async {
+    SharedPreferences.setMockInitialValues({});
+    PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+    final harness = _GatewayHarness();
+    final rpc = HermesDesktopRpcClient(
+      channelFactory: (_, _, {httpClient}) => harness.channel,
+    );
+    final service = HermesDesktopApiService(
+      config: HermesConfig(
+        enabled: true,
+        baseUrl: 'https://hermes.example',
+        mode: HermesBackendMode.desktopGateway,
+        desktopProfile: 'default',
+        desktopCredentials: HermesDesktopCredentials(
+          legacyToken: 'session-token',
+        ),
+      ),
+      dio: _statusDio(_StubAdapter()),
+      rpc: rpc,
+    );
+    addTearDown(() async {
+      service.close();
+      await harness.dispose();
+    });
+    harness.responder = (method) => switch (method) {
+      'session.create' => {
+        'session_id': 'runtime-strong',
+        'stored_session_id': 'stored-strong',
+        'info': const {},
+      },
+      _ => const {},
+    };
+
+    final id = await service.createBotConversation(
+      const HermesBot(name: 'strong', title: 'Strong'),
+    );
+    check(id).equals('stored-strong');
+    final create = harness.sent.firstWhere(
+      (frame) => frame['method'] == 'session.create',
+    );
+    final params = create['params'] as Map;
+    check(params['profile']).equals('strong');
+    check(params['hidden']).isNull();
+    check(params['title']).isNull();
+    check(harness.sent.where((frame) => frame['method'] == 'session.resume'))
+        .isEmpty();
+  });
+
+  test('an existing bot session binds its profile before resume', () async {
+    SharedPreferences.setMockInitialValues({});
+    PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+    final harness = _GatewayHarness();
+    final service = HermesDesktopApiService(
+      config: HermesConfig(
+        enabled: true,
+        baseUrl: 'https://hermes.example',
+        mode: HermesBackendMode.desktopGateway,
+        desktopProfile: 'default',
+        desktopCredentials: HermesDesktopCredentials(
+          legacyToken: 'session-token',
+        ),
+      ),
+      dio: _statusDio(_StubAdapter()),
+      rpc: HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      ),
+    );
+    addTearDown(() async {
+      service.close();
+      await harness.dispose();
+    });
+    harness.responder = (method) => switch (method) {
+      'session.resume' => {
+        'session_id': 'runtime-strong',
+        'stored_session_id': 'stored-strong',
+        'info': const {'running': false},
+      },
+      'session.history' => {'messages': const []},
+      _ => const {},
+    };
+    service.bindSessionProfile('stored-strong', 'strong');
+    await service.getSessionMessages('stored-strong');
+    final resume = harness.sent.firstWhere(
+      (frame) => frame['method'] == 'session.resume',
+    );
+    check((resume['params'] as Map)['profile']).equals('strong');
+  });
+
   test(
     'bot chat transcripts use gateway history instead of dashboard REST',
     () async {

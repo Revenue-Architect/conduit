@@ -10,6 +10,68 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('HermesArtifactClient', () {
     test(
+      'lists only validated artifact files with existing Dashboard auth',
+      () async {
+        final adapter = _RecordingAdapter(
+          (_) => ResponseBody.fromString(
+            jsonEncode({
+              'entries': [
+                {
+                  'name': 'My Report.pdf',
+                  'path': '/opt/data/artifacts/My Report.pdf',
+                  'isDirectory': false,
+                },
+                {
+                  'name': 'folder',
+                  'path': '/opt/data/artifacts/folder',
+                  'isDirectory': true,
+                },
+                {
+                  'name': '../secret',
+                  'path': '/opt/data/artifacts/../secret',
+                  'isDirectory': false,
+                },
+                {
+                  'name': 'other.png',
+                  'path': '/tmp/other.png',
+                  'isDirectory': false,
+                },
+              ],
+            }),
+            200,
+            headers: {
+              Headers.contentTypeHeader: ['application/json'],
+            },
+          ),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        final client = HermesArtifactClient(
+          config: _config(),
+          dio: dio,
+          cookieReader: (_) async => const {'session': 'cookie-value'},
+        );
+        final files = await client.listDirectory('/opt/data/artifacts');
+        expect(files.map((file) => file.name), ['My Report.pdf']);
+        expect(adapter.requests.single.uri.path, '/api/fs/list');
+        expect(
+          adapter.requests.single.uri.queryParameters['path'],
+          '/opt/data/artifacts',
+        );
+        expect(
+          adapter.requests.single.headers['Cookie'],
+          'session=cookie-value',
+        );
+        expect(adapter.requests.single.followRedirects, isFalse);
+        await expectLater(
+          client.listDirectory('/opt/data'),
+          throwsA(isA<HermesArtifactException>()),
+        );
+        expect(adapter.requests, hasLength(1));
+        dio.close(force: true);
+      },
+    );
+
+    test(
       'artifact download support matches the authenticated HTTPS endpoint',
       () {
         expect(supportsHermesArtifactDownloads(_config()), isTrue);
@@ -169,53 +231,62 @@ void main() {
       },
     );
 
-    test('allows an unauthenticated HTTPS Gateway in native PKCE mode', () async {
-      final adapter = _RecordingAdapter(
-        (_) => ResponseBody.fromBytes(Uint8List.fromList([7, 8, 9]), 200),
-      );
-      final dio = Dio()..httpClientAdapter = adapter;
-      var cookieReads = 0;
-      final client = HermesArtifactClient(
-        config: _config(authKind: HermesDesktopAuthKind.nativePkce),
-        dio: dio,
-        cookieReader: (_) async {
-          cookieReads++;
-          return const {};
-        },
-        nativeAuthorizationReader: () async => null,
-      );
+    test(
+      'allows an unauthenticated HTTPS Gateway in native PKCE mode',
+      () async {
+        final adapter = _RecordingAdapter(
+          (_) => ResponseBody.fromBytes(Uint8List.fromList([7, 8, 9]), 200),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        var cookieReads = 0;
+        final client = HermesArtifactClient(
+          config: _config(authKind: HermesDesktopAuthKind.nativePkce),
+          dio: dio,
+          cookieReader: (_) async {
+            cookieReads++;
+            return const {};
+          },
+          nativeAuthorizationReader: () async => null,
+        );
 
-      final result = await client.download(_artifact('/opt/data/file.png'));
+        final result = await client.download(_artifact('/opt/data/file.png'));
 
-      expect(result.bytes, [7, 8, 9]);
-      expect(adapter.requests.single.headers.containsKey('Authorization'), isFalse);
-      expect(cookieReads, 0);
-      dio.close(force: true);
-    });
+        expect(result.bytes, [7, 8, 9]);
+        expect(
+          adapter.requests.single.headers.containsKey('Authorization'),
+          isFalse,
+        );
+        expect(cookieReads, 0);
+        dio.close(force: true);
+      },
+    );
 
-    test('maps missing native PKCE credentials to authExpired on 401', () async {
-      final adapter = _RecordingAdapter(
-        (_) => ResponseBody.fromBytes(Uint8List(0), 401),
-      );
-      final dio = Dio()..httpClientAdapter = adapter;
-      final client = HermesArtifactClient(
-        config: _config(authKind: HermesDesktopAuthKind.nativePkce),
-        dio: dio,
-        nativeAuthorizationReader: () async => null,
-      );
+    test(
+      'maps missing native PKCE credentials to authExpired on 401',
+      () async {
+        final adapter = _RecordingAdapter(
+          (_) => ResponseBody.fromBytes(Uint8List(0), 401),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        final client = HermesArtifactClient(
+          config: _config(authKind: HermesDesktopAuthKind.nativePkce),
+          dio: dio,
+          nativeAuthorizationReader: () async => null,
+        );
 
-      await expectLater(
-        client.download(_artifact('/opt/data/file.png')),
-        throwsA(
-          isA<HermesArtifactException>().having(
-            (error) => error.kind,
-            'kind',
-            HermesArtifactFailureKind.authExpired,
+        await expectLater(
+          client.download(_artifact('/opt/data/file.png')),
+          throwsA(
+            isA<HermesArtifactException>().having(
+              (error) => error.kind,
+              'kind',
+              HermesArtifactFailureKind.authExpired,
+            ),
           ),
-        ),
-      );
-      dio.close(force: true);
-    });
+        );
+        dio.close(force: true);
+      },
+    );
 
     test(
       'forwards the configured profile and validated session context',

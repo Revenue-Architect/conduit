@@ -274,6 +274,13 @@ void main() {
   });
 
   group('HermesSessionSummary.fromJson', () {
+    test('accepts profile_name from Hermes session variants', () {
+      final session = HermesSessionSummary.fromJson({
+        'id': 'profile-1',
+        'profile_name': 'kai',
+      });
+      expect(session?.profile, 'kai');
+    });
     test('parses id/title and skips entries without an id', () {
       check(HermesSessionSummary.fromJson({'name': 'no id'})).isNull();
       final s = HermesSessionSummary.fromJson({
@@ -289,6 +296,24 @@ void main() {
     test('falls back to a placeholder title', () {
       final s = HermesSessionSummary.fromJson({'id': 's1'});
       check(s!.title).equals('Untitled session');
+    });
+
+    test('keeps validated profile and real message count for bot grouping', () {
+      final session = HermesSessionSummary.fromJson({
+        'id': 's1',
+        'title': 'Project ideas',
+        'profile': 'kai',
+        'message_count': 12,
+      });
+      check(session!.profile).equals('kai');
+      check(session.messageCount).equals(12);
+      final unsafe = HermesSessionSummary.fromJson({
+        'id': 's2',
+        'profile': '../other',
+        'message_count': -1,
+      });
+      check(unsafe!.profile).isNull();
+      check(unsafe.messageCount).isNull();
     });
   });
 

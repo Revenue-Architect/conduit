@@ -107,7 +107,18 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(tester.takeException(), isNull);
+        expect(find.text('Actions'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('No private data.'),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
         expect(find.text('No private data.'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('Check the route'),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
         expect(find.text('Check the route'), findsOneWidget);
       });
     }
@@ -137,7 +148,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('New task'));
     await tester.pumpAndSettle();
-    expect(find.text('Task title'), findsOneWidget);
+    expect(find.text('Title *'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox.shrink());
@@ -164,8 +175,19 @@ void main() {
             body: '{"boards":[{"slug":"qa","name":"QA board"}]}',
           );
         }
+        if (path.endsWith('/profiles')) {
+          return (
+            status: 200,
+            body: '{"profiles":[{"name":"kai","description":"General agent"}]}',
+          );
+        }
         if (method == 'POST' && path.endsWith('/tasks')) {
-          title = (jsonDecode(body!) as Map)['title'] as String;
+          final payload = jsonDecode(body!) as Map;
+          title = payload['title'] as String;
+          expect(payload['assignee'], 'kai');
+          expect(payload['body'], 'Research the route');
+          expect(payload['priority'], 0);
+          status = payload['triage'] == true ? 'triage' : 'ready';
           writes.add('create');
           return (status: 200, body: '{}');
         }
@@ -229,8 +251,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('New task'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'QA sprint');
-    await tester.tap(find.text('Save'));
+    await tester.enterText(find.byType(TextField).first, 'QA sprint');
+    await tester.enterText(find.byType(TextField).last, 'Research the route');
+    await tester.tap(find.text('Ready').last);
+    await tester.tap(find.text('Assign a Hermes bot (optional)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('kai'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create task'));
     await tester.pumpAndSettle();
     expect(writes, ['create']);
     expect(find.text('QA sprint'), findsOneWidget);
@@ -245,7 +273,11 @@ void main() {
     expect(writes, ['create', 'patch']);
     expect(find.text('Updated QA sprint'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Add comment'));
+    await tester.scrollUntilVisible(
+      find.text('Add comment'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Add comment'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'Reviewed in QA');
@@ -254,8 +286,12 @@ void main() {
     expect(writes, ['create', 'patch', 'comment']);
     expect(find.text('Reviewed in QA'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Todo'));
-    await tester.tap(find.text('Todo'));
+    await tester.scrollUntilVisible(
+      find.widgetWithText(ActionChip, 'Todo'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.widgetWithText(ActionChip, 'Todo'));
     await tester.pumpAndSettle();
     expect(find.text('Move to Todo?'), findsOneWidget);
     expect(writes.length, 3);
@@ -263,6 +299,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(writes, ['create', 'patch', 'comment', 'patch']);
     expect(status, 'todo');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('assignee offers installed Hermes profiles', (tester) async {
+    final client = HermesKanbanClient(
+      config,
+      request: (method, uri, {body}) async {
+        if (uri.path.endsWith('/profiles')) {
+          return (
+            status: 200,
+            body: '{"profiles":[{"name":"kai","description":"General"},{"name":"autopilot","description":"Background work"}]}',
+          );
+        }
+        if (uri.path.endsWith('/boards')) {
+          return (status: 200, body: '{"boards":[{"slug":"qa","name":"QA"}]}');
+        }
+        if (uri.path.endsWith('/board')) {
+          return (
+            status: 200,
+            body: '{"columns":[{"name":"ready","tasks":[{"id":"t-1","title":"A task","status":"ready"}]}]}',
+          );
+        }
+        return (
+          status: 200,
+          body: '{"task":{"id":"t-1","title":"A task","status":"ready"},"comments":[],"runs":[],"events":[],"links":{},"attachments":[],"child_results":[]}',
+        );
+      },
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(home: HermesKanbanPage(client: client)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('A task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assignee'));
+    await tester.pumpAndSettle();
+    expect(find.text('autopilot'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('board refreshes agent status while visible', (tester) async {
+    var status = 'ready';
+    final client = HermesKanbanClient(
+      config,
+      request: (method, uri, {body}) async {
+        if (uri.path.endsWith('/boards')) {
+          return (status: 200, body: '{"boards":[{"slug":"qa","name":"QA"}]}');
+        }
+        return (
+          status: 200,
+          body: jsonEncode({
+            'columns': [
+              {
+                'name': status,
+                'tasks': [
+                  {'id': 't-1', 'title': 'Agent work', 'status': status},
+                ],
+              },
+            ],
+          }),
+        );
+      },
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(home: HermesKanbanPage(client: client)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('1'), findsWidgets);
+    status = 'running';
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pump();
+    expect(find.text('Running'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

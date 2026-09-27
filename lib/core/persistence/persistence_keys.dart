@@ -88,6 +88,8 @@ final class PreferenceKeys {
       'hermes_mixed_session_binding_trust_v1';
   static const String hermesPendingDesktopDecisions =
       'hermes_pending_desktop_decisions_v1';
+  static const String hermesArtifactProvenance =
+      'hermes_artifact_provenance_v1';
   static const String hermesDashboardCookieIdentities =
       'hermes_dashboard_cookie_identities_v1';
 

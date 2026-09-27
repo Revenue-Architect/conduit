@@ -38,6 +38,13 @@ import '../../features/profile/views/audio_settings_page.dart';
 import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
 import '../../features/hermes/kanban/hermes_kanban_page.dart';
+import '../../features/hermes/views/hermes_home_page.dart';
+import '../../features/hermes/views/hermes_bot_detail_page.dart';
+import '../../features/hermes/views/hermes_attention_page.dart';
+import '../../features/hermes/views/hermes_artifacts_page.dart';
+import '../../features/hermes/views/hermes_live_run_page.dart';
+import '../../features/hermes/views/hermes_conversations_page.dart';
+import '../../features/hermes/services/hermes_identifier.dart';
 import '../../features/hermes/views/hermes_mcp_page.dart';
 import '../../features/profile/views/personalization_page.dart';
 import '../../features/profile/views/profile_page.dart';
@@ -71,8 +78,15 @@ bool _isAccountlessBackendLocation(String location) {
       location == Routes.personalization ||
       isDirectConnectionsLocation(location) ||
       location == Routes.hermesSettings ||
+      location == Routes.hermesMcp ||
       location == Routes.hermesJobs ||
       location == Routes.hermesKanban ||
+      location == Routes.hermesHome ||
+      location == Routes.hermesConversations ||
+      location == Routes.hermesAttention ||
+      location == Routes.hermesArtifacts ||
+      location.startsWith('/profile/hermes/bots/') ||
+      location.startsWith('/profile/hermes/live/') ||
       location == Routes.about;
 }
 
@@ -191,7 +205,7 @@ class RouterNotifier extends ChangeNotifier {
     if (authState == AuthNavigationState.authenticated &&
         _isAuthLocation(location) &&
         location != Routes.connectionIssue) {
-      return Routes.chat;
+      return prefersHermes && hermesUsable ? Routes.hermesHome : Routes.chat;
     }
 
     // Onboarding and local backend setup screens always render.
@@ -286,6 +300,9 @@ class RouterNotifier extends ChangeNotifier {
     // session. Auth routes remain reachable so users can add or repair an
     // optional Open WebUI connection. Once that session is authenticated, its
     // server-backed surfaces remain available too.
+    if (prefersHermes && hermesUsable && location == Routes.splash) {
+      return Routes.hermesHome;
+    }
     if (usesAccountlessPrimaryBackend &&
         (!hasActiveServer || authState != AuthNavigationState.authenticated)) {
       return _accountlessOrAuthRedirect(location);
@@ -368,7 +385,7 @@ class RouterNotifier extends ChangeNotifier {
         if (_isAuthLocation(location) ||
             location == Routes.splash ||
             location == Routes.connectionIssue) {
-          return Routes.chat;
+          return prefersHermes && hermesUsable ? Routes.hermesHome : Routes.chat;
         }
         return _workspaceRedirect(location);
     }
@@ -413,7 +430,8 @@ class RouterNotifier extends ChangeNotifier {
     final isAllowed = prefersDirect
         ? isDirectOnlyAppLocation(location)
         : isHermesOnlyAppLocation(location);
-    return isAllowed ? null : Routes.chat;
+    if (isAllowed) return null;
+    return prefersDirect ? Routes.chat : Routes.hermesHome;
   }
 
   @override
@@ -695,6 +713,61 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       name: RouteNames.hermesKanban,
       pageBuilder: (context, state) =>
           _buildPlatformPage(state: state, child: const HermesKanbanPage()),
+    ),
+    GoRoute(
+      path: Routes.hermesHome,
+      name: RouteNames.hermesHome,
+      pageBuilder: (context, state) =>
+          _buildPlatformPage(state: state, child: const HermesHomePage()),
+    ),
+    GoRoute(
+      path: Routes.hermesConversations,
+      name: RouteNames.hermesConversations,
+      pageBuilder: (context, state) => _buildPlatformPage(
+        state: state,
+        child: const HermesConversationsPage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesBotDetail,
+      name: RouteNames.hermesBotDetail,
+      pageBuilder: (context, state) => _buildPlatformPage(
+        state: state,
+        child: HermesBotDetailPage(
+          profile:
+              HermesConfig.isValidDesktopProfile(
+                state.pathParameters['profile'] ?? '',
+              )
+              ? state.pathParameters['profile']!
+              : '',
+        ),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesLiveRun,
+      name: RouteNames.hermesLiveRun,
+      pageBuilder: (context, state) => _buildPlatformPage(
+        state: state,
+        child: HermesLiveRunPage(
+          sessionId:
+              validateHermesOpaqueIdentifier(
+                state.pathParameters['sessionId'],
+              ) ??
+              '',
+        ),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesAttention,
+      name: RouteNames.hermesAttention,
+      pageBuilder: (context, state) =>
+          _buildPlatformPage(state: state, child: const HermesAttentionPage()),
+    ),
+    GoRoute(
+      path: Routes.hermesArtifacts,
+      name: RouteNames.hermesArtifacts,
+      pageBuilder: (context, state) =>
+          _buildPlatformPage(state: state, child: const HermesArtifactsPage()),
     ),
     GoRoute(
       path: Routes.hermesMcp,

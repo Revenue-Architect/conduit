@@ -184,6 +184,12 @@ class Routes {
   static const String hermesSettings = '/profile/hermes';
   static const String hermesJobs = '/profile/hermes/jobs';
   static const String hermesKanban = '/profile/hermes/kanban';
+  static const String hermesHome = '/profile/hermes/home';
+  static const String hermesConversations = '/profile/hermes/conversations';
+  static const String hermesBotDetail = '/profile/hermes/bots/:profile';
+  static const String hermesLiveRun = '/profile/hermes/live/:sessionId';
+  static const String hermesAttention = '/profile/hermes/attention';
+  static const String hermesArtifacts = '/profile/hermes/artifacts';
   static const String hermesMcp = '/profile/hermes/mcp';
   static const String about = '/profile/about';
   static const String notes = '/notes';
@@ -224,6 +230,12 @@ class RouteNames {
   static const String hermesSettings = 'hermes-settings';
   static const String hermesJobs = 'hermes-jobs';
   static const String hermesKanban = 'hermes-kanban';
+  static const String hermesHome = 'hermes-home';
+  static const String hermesConversations = 'hermes-conversations';
+  static const String hermesBotDetail = 'hermes-bot-detail';
+  static const String hermesLiveRun = 'hermes-live-run';
+  static const String hermesAttention = 'hermes-attention';
+  static const String hermesArtifacts = 'hermes-artifacts';
   static const String hermesMcp = 'hermes-mcp';
   static const String about = 'about';
   static const String notes = 'notes';

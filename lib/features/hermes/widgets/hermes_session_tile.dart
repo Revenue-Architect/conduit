@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:dio/dio.dart' show DioException;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart';
@@ -9,6 +10,7 @@ import '../../../core/services/navigation_service.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/app_localizations_en.dart';
+import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
@@ -35,14 +37,20 @@ import '../services/hermes_session_provenance.dart';
 /// single-line title, selected highlight, and an in-progress spinner while a
 /// run is streaming. Shared by the Hermes sidebar tab and settings page.
 class HermesSessionTile extends ConsumerWidget {
-  const HermesSessionTile({required this.session, super.key});
+  const HermesSessionTile({
+    required this.session,
+    this.nested = false,
+    super.key,
+  });
 
   final HermesSessionSummary session;
+  final bool nested;
 
   String get _localConversationId => 'local:hermes_${session.id}';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = context.conduitTheme;
     final selected =
         ref.watch(activeConversationProvider)?.id == _localConversationId;
     // The session is "in progress" when its run is the one currently streaming.
@@ -53,14 +61,66 @@ class HermesSessionTile extends ConsumerWidget {
     return ConduitContextMenu(
       actions: _contextMenuActions(context, ref),
       previewBuilder: buildConversationTileContextPreview,
-      child: ConversationTile(
-        title: _displayTitle(context),
-        pinned: false,
-        selected: selected,
-        isLoading: false,
-        isGenerating: isGenerating,
-        onTap: () => openHermesSession(context, ref, session),
-      ),
+      child: nested
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.surfaceBackground,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.cardBorder.withValues(alpha: 0.65),
+                ),
+              ),
+              child: ChatStyleSidebarTile(
+                selected: selected,
+                onTap: () => openHermesSession(context, ref, session),
+                child: SidebarListTileContent(
+                  title: _displayTitle(context),
+                  selected: selected,
+                  emphasizeTitle: true,
+                  titleFontWeight: FontWeight.w600,
+                  leading: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: theme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 17,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  subtitle: [
+                    if (session.updatedAt != null)
+                      DateFormat.MMMd().add_jm().format(
+                        session.updatedAt!.toLocal(),
+                      ),
+                    if (session.messageCount != null)
+                      '${session.messageCount} messages',
+                  ].join(' · '),
+                  trailing: isGenerating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: theme.iconSecondary,
+                        ),
+                ),
+              ),
+            )
+          : ConversationTile(
+              title: _displayTitle(context),
+              pinned: false,
+              selected: selected,
+              isLoading: false,
+              isGenerating: isGenerating,
+              onTap: () => openHermesSession(context, ref, session),
+            ),
     );
   }
 
@@ -314,6 +374,9 @@ Future<void> openHermesSession(
   if (admission == null) return;
   final service = ref.read(hermesApiServiceProvider);
   if (service == null) return;
+  if (service is HermesDesktopApiService && session.profile != null) {
+    service.bindSessionProfile(session.id, session.profile!);
+  }
   final trustPrincipalId = configController.documentTrustPrincipalId();
 
   List<Map<String, dynamic>> raw;

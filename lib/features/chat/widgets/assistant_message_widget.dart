@@ -47,6 +47,8 @@ import 'code_execution_display.dart';
 import 'follow_up_suggestions.dart';
 import 'usage_stats_modal.dart';
 import '../../hermes/providers/hermes_providers.dart' show hermesConfigProvider;
+import '../../hermes/models/hermes_config.dart';
+import '../../hermes/services/hermes_artifact_provenance_store.dart';
 import '../../hermes/services/hermes_artifact_client.dart'
     show supportsHermesArtifactDownloads;
 import '../../hermes/services/hermes_identifier.dart'
@@ -175,6 +177,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   bool _hasAnimated = false;
   bool _isAppForeground = true;
   bool _isRouteVisible = true;
+  final Set<String> _recordedProvenanceKeys = <String>{};
   String? _visibleFollowUpScopeId;
   List<String> _visibleFollowUps = const <String>[];
   late final void Function(String url, String title) _markdownLinkTapCallback;
@@ -708,6 +711,29 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         }
         if (media != null) {
           for (final artifact in media.artifacts) {
+            if (sessionId != null && !widget.readOnly) {
+              final key = '$sessionId\u0000${artifact.path}';
+              if (_recordedProvenanceKeys.add(key)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  final config = ref.read(hermesConfigProvider);
+                  final endpoint = HermesConfig.connectionEndpoint(
+                    config.baseUrl,
+                  );
+                  if (endpoint == null) return;
+                  final principal = ref
+                      .read(hermesConfigProvider.notifier)
+                      .documentTrustPrincipalId();
+                  unawaited(
+                    HermesArtifactProvenanceStore.record(
+                      connectionIdentity: '$endpoint|$principal',
+                      path: artifact.path,
+                      sessionId: sessionId,
+                    ).catchError((_) {}),
+                  );
+                });
+              }
+            }
             children.add(
               Padding(
                 key: ValueKey(

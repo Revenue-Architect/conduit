@@ -13,9 +13,86 @@ import 'hermez_visual_theme.dart';
 /// No component in this catalog performs network or filesystem access.
 Catalog createHermesVisualCatalog() {
   return BasicCatalogItems.asNoAssetCatalog().copyWith(
-    newItems: [_statusBadge, _metricTile, _miniChart],
+    newItems: [
+      _hermezCard,
+      _hermezButton,
+      _statusBadge,
+      _metricTile,
+      _miniChart,
+    ],
   );
 }
+
+/// Keep the v0.9 basic catalog schema while rendering its common containers
+/// with the same spacing as the rest of Hermez.
+final _hermezCard = CatalogItem(
+  name: 'Card',
+  dataSchema: BasicCatalogItems.card.dataSchema,
+  widgetBuilder: (itemContext) {
+    final data = itemContext.data;
+    final child = data is Map ? data['child'] : null;
+    if (child is! String) {
+      return BasicCatalogItems.card.widgetBuilder(itemContext);
+    }
+    final scheme = Theme.of(itemContext.buildContext).colorScheme;
+    return Card(
+      color: scheme.surface,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: itemContext.buildChild(child),
+      ),
+    );
+  },
+  exampleData: BasicCatalogItems.card.exampleData,
+);
+
+/// GenUI's default Button explicitly paints itself surface-colored, bypassing
+/// the app's button theme. Reuse its action and validation implementation with
+/// a local color scheme for the default variant; primary/borderless keep their
+/// documented behavior. No agent-provided color or executable UI is accepted.
+final _hermezButton = CatalogItem(
+  name: 'Button',
+  dataSchema: BasicCatalogItems.button.dataSchema,
+  widgetBuilder: (itemContext) {
+    final data = itemContext.data;
+    if (data is Map && data['variant'] != null) {
+      return BasicCatalogItems.button.widgetBuilder(itemContext);
+    }
+    return Builder(
+      builder: (context) {
+        final base = Theme.of(context);
+        final scheme = base.colorScheme;
+        return Theme(
+          data: base.copyWith(
+            colorScheme: scheme.copyWith(
+              surface: scheme.primary,
+              onSurface: scheme.onPrimary,
+            ),
+          ),
+          child: Builder(
+            builder: (innerContext) => BasicCatalogItems.button.widgetBuilder(
+              CatalogItemContext(
+                data: itemContext.data,
+                id: itemContext.id,
+                type: itemContext.type,
+                buildChild: itemContext.buildChild,
+                dispatchEvent: itemContext.dispatchEvent,
+                buildContext: innerContext,
+                dataContext: itemContext.dataContext,
+                getComponent: itemContext.getComponent,
+                getCatalogItem: itemContext.getCatalogItem,
+                surfaceId: itemContext.surfaceId,
+                reportError: itemContext.reportError,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  },
+  exampleData: BasicCatalogItems.button.exampleData,
+);
 
 final _statusBadge = CatalogItem(
   name: 'StatusBadge',

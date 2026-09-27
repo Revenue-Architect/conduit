@@ -119,9 +119,7 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
               child: Text(
                 l10n.hermesJobLoadFailed,
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmallStyle.copyWith(
-                  color: theme.error,
-                ),
+                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
               ),
             ),
           ),
@@ -317,7 +315,9 @@ class _JobCardState extends ConsumerState<_JobCard> {
             if (job.lastDeliveryError?.isNotEmpty == true)
               Text(
                 'Delivery: ${job.lastDeliveryError}',
-                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: theme.error,
+                ),
               ),
             const SizedBox(height: Spacing.xs),
             Align(
