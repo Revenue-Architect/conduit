@@ -1,47 +1,60 @@
 # Hermez motion system
 
-Hermez motion is spatial continuity. A control the user touches should be the same object on the next screen. This is not a visual redesign and it is not the generic Conduit animation service.
+Hermez motion is spatial continuity. The object the user touches stays the same object on the next screen. **Nothing in Hermez animates opacity.** Objects compress, travel, grow, recede, unroll, and roll away on springs. The one intentional exception is the dim behind a sheet or dialog, which darkens with the sheet's position.
 
-Conduit durations and curves stay in `lib/core/services/animation_service.dart`. Hermez springs, shared elements, and route shells stay in `lib/features/hermes/motion/`. Product screens import `hermez_motion.dart`. They do not import `nib_motion` directly.
+Conduit's generic durations stay in `lib/core/services/animation_service.dart`. Hermez motion lives in `lib/features/hermes/motion/`. Screens import `hermez_motion.dart`; they do not import `nib_motion` directly. `nib_motion` is pinned at exactly `0.3.1`.
 
-`nib_motion` is pinned at `0.3.1`.
+## Weights and springs
 
-## Weights
+Screens pick a `HermezMotionWeight`, never raw spring values.
 
-Screens choose `HermezMotionWeight`, not raw stiffness.
+| Weight | Use | Press scale | Spring (mass / stiffness / damping) | Settles in |
+| --- | --- | --- | --- | --- |
+| light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.28 s |
+| medium | cards, sheets, sibling pages | 0.978 | 0.9 / 340 / 30 | ~0.41 s |
+| heavy | a page growing out of a card | 0.99 | 1.1 / 260 / 28 | ~0.54 s |
 
-| Weight | Use | Press scale | Spring |
-| --- | --- | --- | --- |
-| light | icons, chips, small controls | 0.96 | mass 0.65, stiffness 420, damping 32 |
-| medium | cards, bot tiles, sheets | 0.98 | mass 0.9, stiffness 340, damping 30 |
-| heavy | large panel expansion | 0.99 | mass 1.1, stiffness 260, damping 28 |
-
-Larger objects move less.
+`HermezSpringCurve` turns a spring into a `Curve` sampled over its own settle time, so route controllers, `AnimatedSize`, Hero flights, and dialogs move with the same physics as NibMotion. Its output is clamped to [0, 1] (Hero and `Interval` assert that range). Reverse motion always uses `curve.flipped`, so Back starts moving immediately.
 
 ## Primitives
 
-- `HermezMotionSurface` — press spring, then the tap. Reduced motion keeps the tap and skips the scale.
-- `HermezMorph` — Flutter `Hero`. Reduced motion, or a null id, renders the child with no flight.
-- `HermezPresence` — enter/exit for something that really mounts and unmounts. Stable keys. Do not replay this on every Riverpod rebuild.
-- `HermezMotionGroup` — FLIP for a small keyed set. Do not wrap a long scrolling list.
-- `buildHermezMotionPage` — Hermes route shell. `standard` is a short fade and a few pixels of rise. `morph` keeps the page still so the shared element is the motion. While a route covers another Hermes page, the source scales to `0.988` and fades to `0.94`.
+- `HermezMotionSurface`: physical press. Compresses on pointer-down (before the gesture arena decides), springs back on lift or when the finger starts to scroll (12 px slop), fires on a real tap only, and is a semantic button. `onOpen` passes a `HermezMorphOrigin` so the destination can grow out of it. `HermezSurface` uses it for every tappable card.
+- `HermezMorph` / `HermezMorphText` / `HermezMorphSurface`: Flutter `Hero` wrappers. Every part of an object is its own morph (`bot:kai#mark`, `#kind`, `#name`, `#about`, `#dot`, `#status`, `#motif`) so parts never nest and each keeps its geometry. Flights: `scale` (the detailed rendering scaled into the flight box), text (size, weight, colour, and line wrapping interpolate; `inherit` is normalised first), `stretch` (decorative marks resize with their container), `surface` (decoration lerp). Reduced motion or a null id renders the child with no flight.
+- `HermezMorphOrigin`: the tapped object's rectangle in its route's coordinate space, plus radius, fill, and border. It holds the source render box so Back contracts into where the card is now. It travels only as navigation `extra`; it is never global state.
+- Routes (`hermez_motion_route.dart`):
+  - `HermezRouteMotion.expand`: the destination grows out of the origin through a rounded aperture. The page is laid out once at its final size and revealed; the aperture's radius, fill, shadow, and the source's border interpolate. Expanding pages are non-opaque so the source stays painted and Back contracts on its first frame.
+  - `HermezRouteMotion.standard`: sibling push, slides in from the trailing edge; the page underneath shifts back 14 %. A leading-edge shadow is painted only while moving.
+  - `pushHermezSheet` / `pushHermezSheetRoute`: a sheet that grows out of the tapped row or card (or rises from the bottom edge), drag-down to close, tap-outside or Back to close, lifts above the keyboard. The route page stays full screen at the navigator origin and the sheet is placed inside it; Hero flights measure against the page, so this matters. The returned future completes after the sheet has contracted home, so follow-up navigation never starts under a sheet in flight.
+  - The screen under an expanding route recedes to scale 0.988; under a sibling push it shifts back.
+  - `HermezPushPageTransitionsBuilder` replaces Android's fading Zoom transition for every Material route in the app.
+- `HermezEntrance(order:)`: secondary content of an expanding destination unrolls from its top edge and rises the last few pixels after the shared object starts to arrive; on Back it rolls away first.
+- `HermezPresence` / `HermezReveal` / `HermezUnroll`: real mount and unmount unroll from the top edge and roll away; children keep full width.
+- `HermezSize`: `AnimatedSize` on a Hermez spring.
+- `HermezMotionGroup`: short keyed column. Moved children travel (FLIP through NibMotion controllers), new ones unroll, removed ones roll away. Positions are recorded after each frame's layout and never read during a build.
+- `HermezIconSwap`: an icon that changes meaning turns and scales in place.
+- `HermezRouteCanvas`: the page canvas starts as the source card's colour and settles to the canvas colour (a colour change, not opacity).
+- `ConduitDialogRoute` / `showConduitDialog` (`lib/shared/widgets/conduit_dialog_route.dart`): dialogs unfold from their centre line on a spring instead of fading. `ThemedDialogs`, `AdaptiveDialog`, Hermes, MCP, settings, and Kanban dialogs use it.
 
-## Shared-element ids
+## Reference interactions
 
-```text
-bot:<profile>
-```
+| Interaction | What travels | What unrolls |
+| --- | --- | --- |
+| Home bot card → Bot Detail | mark, BOT, name, description, status dot, status text, etched motif | chat CTA, metrics, capabilities, conversations, schedules |
+| Home Schedule card → Jobs | "Scheduled agents" title, card motif → header marks | subtitle, New job, job list |
+| Home Board card → Kanban | "Kanban" title, card motif → header marks | board |
+| Today row / Bot Detail schedule row → Scheduled Agent sheet | job title | sheet body |
+| Kanban task card → task sheet | task title | sheet body |
+| Artifact tile → artifact sheet | thumbnail image, file name | preview actions, related conversation |
+| Inline run surface → attention sheet | the surface grows into the sheet | decision UI |
+| Inline browser aperture → full-screen Steel | aperture grows; the WebView is created only after the route settles | caption |
 
-`hermezBotMorphId` returns null unless the profile matches Hermes' profile pattern, so two invalid names cannot collide.
+Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: spherical white shell, side disc, dark visor turned right, glowing eyes, and profile parts (Kai crest and gem, Strong armour and lit slot, Fast fins and streaks, Local vents and lens, Autopilot antenna).
 
-The first reference interaction is Home bot card → Bot Detail. The mark and name are the shared object. Back uses the same route transition in reverse. The card still opens `RouteNames.hermesBotDetail` for that profile.
+## Rules
 
-## Reduced motion
-
-`context.reduceMotion` is authoritative. `HermesPageChrome` passes it into `NibMotionConfig`. Reduced motion uses a short fade instead of a flight. Navigation still completes.
-
-## Not in this pass
-
-Schedule → Jobs, Kanban task flights, artifact preview flights, and Steel fullscreen expansion are later, after the bot transition is tuned on the S25 Ultra. The inline live-activity surface already grows in place with `AnimatedSize`. Do not replace that control tree to add motion.
-
-Do not use `NibBounce`, `NibRubberBand`, or `NibFloat`. Do not animate streaming chat tokens.
+- No opacity animation anywhere in Hermez, including chat (streaming content, activity dot, greeting, scroll button, composer icons, loading states, image previews). Message entrance is instant; streaming tokens never animate.
+- Measure positions only after layout. Reading `localToGlobal` during a build can throw when an ancestor is mid-layout and leaves the element tree half-updated (seen on device as `_dependents.isEmpty`).
+- Platform views (Steel WebView) never sit inside an animated clip or transform. The inline browser block is deliberately plain.
+- Morph ids come from model ids (`bot:<profile>`, `job:<profile>:<id>`, `kanban:<board>:<task>`, `artifact:<path>`, `session:<id>:browser`), never list positions.
+- Reduced motion (`context.reduceMotion`): no flights, instant routes, no press scale, instant presence.
+- Do not use `NibBounce`, `NibRubberBand`, `NibFloat`, `NibGlass`, or `NibScaffold`.

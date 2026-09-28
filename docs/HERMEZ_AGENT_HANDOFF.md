@@ -1,32 +1,31 @@
 # Hermez / Conduit: agent handoff
 
-Updated 2026-09-28, after the physical-motion foundation. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
+Updated 2026-09-28 (evening), after the physical-motion rewrite. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
 
 ## Start here
 
-1. Read this file, then `docs/HERMEZ_MOTION_SYSTEM.md`, `docs/HERMEZ_VISUAL_SYSTEM.md`, and `docs/HERMEZ_INLINE_LIVE_STEEL_RUNBOOK.md`.
-2. Run `git status --short` and `git log -8 --oneline` from `work/conduit`. Do not `git restore`, reset, or sync upstream. Uncommitted files listed below are live product work.
-3. Phone package is `app.cogwheel.conduit.debug` (application id `app.cogwheel.conduit` plus the debug suffix). Wireless ADB serial that worked on 2026-09-28: `adb-R5CY13VFPEP-JAeGpv._adb-tls-connect._tcp` (Samsung SM-S938W). `adb install -r` keeps the Hermes account. Toolchain: `../toolchain/flutter`, `../toolchain/android-sdk`, `../toolchain/jdk-17.0.20.1+1`.
-4. A pre-motion snapshot of the dirty tree is outside the git repo at `work/backups/pre-hermez-motion-20260928` (`HEAD.txt`, `uncommitted.patch`, and `tree/`). Use it only to recover a file. Do not apply the patch over newer edits.
-5. After the motion commit, these files may still be uncommitted local polish on top of `6f07e83b`. Do not discard them: `hermes_kanban_page.dart`, `hermes_steel_viewer.dart`, `hermes_attention_page.dart`, `hermes_jobs_page.dart`, `hermes_inline_run_surface.dart`, `hermes_sessions_tab.dart`, `hermez_empty_chat_greeting.dart`, `hermez_surfaces.dart`, `hermez_technical_background.dart`, `hermes_inline_run_surface_test.dart`, `hermez_chat_visuals_test.dart`. `hermes_home_page.dart`, `hermes_bot_detail_page.dart`, and `hermes_page_chrome.dart` also contain that polish plus the motion hooks, and those three are part of the motion commit.
+1. Read this file, then `docs/HERMEZ_MOTION_SYSTEM.md` (required before touching any Hermez motion), `docs/HERMEZ_VISUAL_SYSTEM.md`, and `docs/HERMEZ_INLINE_LIVE_STEEL_RUNBOOK.md`.
+2. Run `git status --short` and `git log -8 --oneline` from `work/conduit`. Do not `git restore`, reset, or sync upstream. `origin/main` has one newer README-only commit (`105db9f6`) that this branch has not merged.
+3. Phone package is `app.cogwheel.conduit.debug`. Wireless ADB (Samsung SM-S938W): serial `adb-R5CY13VFPEP-JAeGpv._adb-tls-connect._tcp`; if `adb devices` is empty after an adb restart, run `adb mdns services` and the phone reappears. `adb install -r` keeps the Hermes account. Toolchain: `../toolchain/flutter`, `../toolchain/android-sdk`, `../toolchain/jdk-17.0.20.1+1`.
+4. Backups outside git: `work/backups/pre-motion-v2-20260928` (HEAD bundle, the pre-session uncommitted patch, copies of dirty files). Device frame captures and test logs: `work/diagnostics/hermez-motion-v2-20260928`.
 
-Hermez uses a deliberate physical motion system. Do not introduce arbitrary `AnimatedContainer`, `AnimatedSwitcher`, or page-route animations when an existing Hermez motion primitive applies. Use `lib/features/hermes/motion/`. `nib_motion` 0.3.1 is pinned in `pubspec.yaml` and wrapped by those primitives. Cross-route shared elements use `HermezMorph`, which is Flutter `Hero`. Conduit's generic durations stay in `lib/core/services/animation_service.dart` and are not the Hermez motion system.
+**No fades.** The user's hard rule: nothing in Hermez animates opacity. Use the primitives in `lib/features/hermes/motion/` (`HermezMotionSurface`, `HermezMorph*`, `HermezRoute`/`pushHermezSheet`, `HermezEntrance`, `HermezPresence`, `HermezSize`, `HermezMotionGroup`, `HermezIconSwap`) and `showConduitDialog` for dialogs. Do not add `FadeTransition`, `AnimatedOpacity`, `AnimatedSwitcher` default transitions, `.fadeIn()`, or plain `showDialog`. `nib_motion` 0.3.1 is pinned and wrapped.
 
-## What the 2026-09-28 motion pass changed
+## What the 2026-09-28 motion rewrite changed
 
-This pass stopped at the spec's first quality gate. It did not convert Jobs, Kanban, artifacts, or Steel into shared-element flights.
+The earlier motion commit (`b5ac15c0`) faded routes and squeezed the detail header into the card mid-flight. It was replaced:
 
-- New: `lib/features/hermes/motion/` (`hermez_motion.dart` barrel, tokens, `HermezMotionSurface`, `HermezMorph`, `HermezPresence`, `HermezMotionGroup`, `buildHermezMotionPage`). Tests: `test/features/hermes/hermez_motion_test.dart`. Notes: `docs/HERMEZ_MOTION_SYSTEM.md`.
-- `nib_motion: 0.3.1` is an exact pin. Do not widen it to `^0.3.1` and do not call `NibBounce`, `NibRubberBand`, `NibFloat`, `NibGlass`, or `NibScaffold`.
-- Home bot cards (`hermes_home_page.dart`) use `HermezMotionSurface` for press and `HermezMorph` with id `bot:<profile>` around the mark and name. The tap still calls `context.pushNamed(RouteNames.hermesBotDetail)` with that profile. `hermezBotMorphId` returns null unless `HermesConfig.isValidDesktopProfile` accepts the name.
-- Bot Detail (`hermes_bot_detail_page.dart`) uses the same morph id on the header row. Chat-with-bot behavior is unchanged.
-- Hermes routes in `app_router.dart` use `_buildHermezPage` / `buildHermezMotionPage`. Bot Detail is `HermezRouteMotion.morph`. Other Hermes routes are `standard` (short fade, slight rise, source recedes to scale `0.988`). Chat, folders, notes, and the rest of Conduit stay on their existing `NoTransitionPage` or platform page. `usesNoTransitionForNativeSheet` is still honored.
-- `HermesPageChrome` wraps content in `NibMotionConfig(reducedMotion: context.reduceMotion, entranceWarmup: Duration.zero)`. `context.reduceMotion` remains the accessibility source. Reduced motion skips the Hero flight and uses a short fade.
-- `HermezMotionSurface` listens with a pointer slop of 18 px because NibMotion's own tap recognizer swallows a child `GestureDetector`. A scroll that moves farther than that must not open Bot Detail.
+- Spring-derived curves (`HermezSpringCurve`) for routes, Hero, sizes, and dialogs; reverse uses the flipped spring.
+- Expanding routes: Home bot card → Bot Detail, Schedule card → Jobs, Board card → Kanban grow out of the card through an aperture; each part (mark, BOT, name, description, status dot/text, motif) is its own Hero; secondary sections unroll. Expanding pages are non-opaque so Back starts on the first frame.
+- Sheets (`pushHermezSheet`): Scheduled Agent (from Today and Bot Detail rows), Kanban task (from the task card), Artifact (from the tile, thumbnail travels), Attention (from the inline run surface), Run Complete. Drag down, tap outside, or Back closes. The sheet page stays full screen at the navigator origin (Hero measures against it); the future resolves after the sheet has contracted.
+- Fade-free everywhere: Android `PageTransitionsTheme` uses `HermezPushPageTransitionsBuilder`; `ThemedDialogs`, adaptive dialogs, Hermes/MCP/settings/Kanban dialogs use `ConduitDialogRoute`; chat streaming content, message entrance, activity dot, greeting, scroll-to-bottom, composer icon swap, streaming status, image error/preview, loading states, drawer refresh no longer fade.
+- UI: bot marks redrawn from the reference renders (Kai crest/gem, Strong armour, Fast fins, Local vents, Autopilot antenna); Bot Detail header mirrors the card; Scheduled Agent, Attention, Run Complete, and Artifact sheets rebuilt in the mockup grammar with real data only; Jobs page restyled (it keeps a `material_ui` Scaffold so its snackbars still show).
+- Sidebar: chat rows press-scale on a spring (pressed tint stays instant); section disclosure chevrons rotate.
+- Fixes found on device: Kanban task crash (FLIP measured positions during a build; now recorded after layout), TextStyle `inherit` mismatch in title flights, sheet title flying outside the sheet, collapse pause, inline Steel browser block restored exactly (no animated clip around the WebView).
 
-Verified: `flutter test test/features/hermes/hermez_motion_test.dart` passed (6). `flutter test test/features/hermes/hermes_destinations_smoke_test.dart` passed, including Home at 200% text. `flutter build apk --debug --target-platform android-arm64` succeeded. `adb install -r` succeeded on the S25 Ultra and the app was relaunched. `dumpsys` reported `versionName=4.1.7`, `versionCode=148`, `lastUpdateTime=2026-09-28 10:42:58`. A Home screenshot after install showed the six-bot roster and Today items with no Flutter error banner. SHA-256 of `build/app/outputs/flutter-apk/app-debug.apk` at that build: `9de551142f5dd2a061d940351cad3d742cc3f3162e6151db80f1ab5608d28a23`.
+Verified: `flutter test test/features/hermes/` all pass (plus `hermes_kanban_app_root_test.dart` under the real `material_ui` root). Across `test/features/{hermes,navigation,chat}` and `test/shared`, the only failures are 8 that fail identically on the pre-session baseline (clipboard symlink ×3, auth-epoch preflight, workspace tabs note rows, server-version card ×3). ARM64 debug build installed on the S25 (SHA-256 `bea9144a62f93ea3e29fa09ddbdef623cc9e6ad46ab4bfcbecebbb46bc0e1bb2`). Frame-by-frame device captures (8× slowed via `ext.flutter.timeDilation`) checked: bot open/Back, Schedule → Jobs and Back, Kanban open, task open/close, Today row → sheet.
 
-Not verified on the phone: the actual Hero flight, Back reversing it, rapid tap-then-back, or spring feel. Do not mark those passed from widget tests. Do not start Schedule → Jobs, Kanban task flights, artifact preview flights, or Steel fullscreen expansion until that bot flight has been watched on the device. The inline run surface already grows with `AnimatedSize`; leave that control tree alone.
+Not verified on device: an active Hermes run (inline surface states, Steel inline and full-screen expand), artifact tile → preview with a real image, dialogs, sidebar feel. Watch those first.
 
 ## Product and boundaries
 
@@ -89,9 +88,10 @@ The 2026-09-28 inline-run/Steel pass: focused Hermes/decision/chat ownership sui
 
 ## Known limitations / next investigation
 
-- The phone currently has the 2026-09-28 motion debug APK (`lastUpdateTime=2026-09-28 10:42:58`, SHA-256 `9de551142f5dd2a061d940351cad3d742cc3f3162e6151db80f1ab5608d28a23`). Home rendered. The bot-card flight and Back were not exercised on device.
+- The phone has the motion-rewrite debug APK (SHA-256 `bea9144a62f93ea3e29fa09ddbdef623cc9e6ad46ab4bfcbecebbb46bc0e1bb2`).
 - Device acceptance for an active-to-completed Hermes turn and the embedded Steel WebView is still outstanding; leave the phone unlocked, face-up, and awake for that run. Use a disposable task, verify exact-session decisions/Steer/Stop, browser watch/expand, profile switching, and no scroll jump/Flutter error.
-- Next motion work, in order: watch Home bot → Bot Detail → Back on the S25, then Schedule summary → Jobs, Kanban task → detail, artifact → preview, then Steel inline → fullscreen. Do not mass-replace `InkWell`. Do not destroy and recreate the Steel WebView to animate it.
+- Next motion work: watch a real Hermes run (inline surface collapse/expand, attention, Stop → Stopping, Steel inline → full screen), artifact → preview with a real image, then Kanban lane reflow when a task changes status. Sidebar section content still appears/disappears without a size animation (slivers); only the chevron turns.
+- Hermes screens import Flutter's `material` while the app root is `material_ui`; the compatibility bridge supplies theme and localizations but not a Flutter `ScaffoldMessenger`, so existing `ScaffoldMessenger.of` error paths in Hermes screens likely throw. New code uses `maybeOf`; a follow-up task was suggested.
 - Human browser takeover/resume is explicitly deferred pending an authoritative Hermes browser-control handoff acknowledgement; a queued steer is not one. The viewer must stay watch-only until then.
 - Recent visual polish has not been exhaustively compared on every screen at the phone's largest text scale. Keep accessibility and dark-mode checks in new UI work.
 - Hermes contract versions can change; inspect the connected Desktop contract before changing blocking-decision handling. Do not silently assume newer upstream Hermes behavior matches the installed Umbrel version.
