@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:nib_motion/nib_motion.dart';
 
+import '../../../shared/theme/theme_extensions.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_visual_theme.dart';
@@ -25,7 +27,10 @@ class HermesPageChrome extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return Theme(
+    return NibMotionConfig(
+      reducedMotion: context.reduceMotion,
+      entranceWarmup: Duration.zero,
+      child: Theme(
       data: hermezVisualTheme(Theme.of(context)),
       child: Scaffold(
         backgroundColor: palette.canvas,
@@ -40,33 +45,37 @@ class HermesPageChrome extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: palette.ink,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1.5,
-                        height: 1.05,
+              HermezTechnicalBackground(
+                variant: HermezBackgroundVariant.editorial,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.5,
+                          height: 1.05,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(color: palette.muted, fontSize: 13),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: palette.muted, fontSize: 13),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Expanded(child: child),
             ],
           ),
         ),
+      ),
       ),
     );
   }

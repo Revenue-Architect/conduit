@@ -44,7 +44,9 @@ import '../../features/hermes/views/hermes_attention_page.dart';
 import '../../features/hermes/views/hermes_artifacts_page.dart';
 import '../../features/hermes/views/hermes_live_run_page.dart';
 import '../../features/hermes/views/hermes_conversations_page.dart';
+import '../../features/hermes/motion/hermez_motion.dart';
 import '../../features/hermes/services/hermes_identifier.dart';
+import '../../shared/theme/theme_extensions.dart';
 import '../../features/hermes/views/hermes_mcp_page.dart';
 import '../../features/profile/views/personalization_page.dart';
 import '../../features/profile/views/profile_page.dart';
@@ -699,7 +701,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesSettings,
       name: RouteNames.hermesSettings,
-      pageBuilder: (context, state) => _buildPlatformPage(
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
         state: state,
         child: HermesSettingsPage(isOnboarding: state.extra == true),
       ),
@@ -707,25 +710,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesJobs,
       name: RouteNames.hermesJobs,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesJobsPage()),
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesJobsPage(),
+      ),
     ),
     GoRoute(
       path: Routes.hermesKanban,
       name: RouteNames.hermesKanban,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesKanbanPage()),
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesKanbanPage(),
+      ),
     ),
     GoRoute(
       path: Routes.hermesHome,
       name: RouteNames.hermesHome,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesHomePage()),
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesHomePage(),
+      ),
     ),
     GoRoute(
       path: Routes.hermesConversations,
       name: RouteNames.hermesConversations,
-      pageBuilder: (context, state) => _buildPlatformPage(
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
         state: state,
         child: const HermesConversationsPage(),
       ),
@@ -733,8 +746,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesBotDetail,
       name: RouteNames.hermesBotDetail,
-      pageBuilder: (context, state) => _buildPlatformPage(
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
         state: state,
+        motion: HermezRouteMotion.morph,
         child: HermesBotDetailPage(
           profile:
               HermesConfig.isValidDesktopProfile(
@@ -748,7 +763,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesLiveRun,
       name: RouteNames.hermesLiveRun,
-      pageBuilder: (context, state) => _buildPlatformPage(
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
         state: state,
         child: HermesLiveRunPage(
           sessionId:
@@ -762,13 +778,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesAttention,
       name: RouteNames.hermesAttention,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesAttentionPage()),
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesAttentionPage(),
+      ),
     ),
     GoRoute(
       path: Routes.hermesArtifacts,
       name: RouteNames.hermesArtifacts,
-      pageBuilder: (context, state) => _buildPlatformPage(
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
         state: state,
         child: HermesArtifactsPage(
           selectedKanbanAttachment: state.extra is HermesKanbanArtifactTarget
@@ -780,8 +800,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesMcp,
       name: RouteNames.hermesMcp,
-      pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const HermesMcpPage()),
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesMcpPage(),
+      ),
     ),
     GoRoute(
       path: Routes.about,
@@ -913,6 +936,24 @@ class NavigationLoggingObserver extends NavigatorObserver {
       data: {'route': current ?? 'unknown', 'previous': previous ?? 'unknown'},
     );
   }
+}
+
+Page<void> _buildHermezPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+  HermezRouteMotion motion = HermezRouteMotion.standard,
+}) {
+  if (usesNoTransitionForNativeSheet(state.extra)) {
+    return _buildNoTransitionPage(state: state, child: child);
+  }
+  return buildHermezMotionPage(
+    pageKey: state.pageKey,
+    name: state.name,
+    child: child,
+    motion: motion,
+    reducedMotion: context.reduceMotion,
+  );
 }
 
 Page<void> _buildNoTransitionPage({

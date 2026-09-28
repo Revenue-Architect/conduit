@@ -1,6 +1,32 @@
 # Hermez / Conduit: agent handoff
 
-Updated 2026-09-28. This is the shortest safe entry point for a new coding session. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
+Updated 2026-09-28, after the physical-motion foundation. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
+
+## Start here
+
+1. Read this file, then `docs/HERMEZ_MOTION_SYSTEM.md`, `docs/HERMEZ_VISUAL_SYSTEM.md`, and `docs/HERMEZ_INLINE_LIVE_STEEL_RUNBOOK.md`.
+2. Run `git status --short` and `git log -8 --oneline` from `work/conduit`. Do not `git restore`, reset, or sync upstream. Uncommitted files listed below are live product work.
+3. Phone package is `app.cogwheel.conduit.debug` (application id `app.cogwheel.conduit` plus the debug suffix). Wireless ADB serial that worked on 2026-09-28: `adb-R5CY13VFPEP-JAeGpv._adb-tls-connect._tcp` (Samsung SM-S938W). `adb install -r` keeps the Hermes account. Toolchain: `../toolchain/flutter`, `../toolchain/android-sdk`, `../toolchain/jdk-17.0.20.1+1`.
+4. A pre-motion snapshot of the dirty tree is outside the git repo at `work/backups/pre-hermez-motion-20260928` (`HEAD.txt`, `uncommitted.patch`, and `tree/`). Use it only to recover a file. Do not apply the patch over newer edits.
+5. After the motion commit, these files may still be uncommitted local polish on top of `6f07e83b`. Do not discard them: `hermes_kanban_page.dart`, `hermes_steel_viewer.dart`, `hermes_attention_page.dart`, `hermes_jobs_page.dart`, `hermes_inline_run_surface.dart`, `hermes_sessions_tab.dart`, `hermez_empty_chat_greeting.dart`, `hermez_surfaces.dart`, `hermez_technical_background.dart`, `hermes_inline_run_surface_test.dart`, `hermez_chat_visuals_test.dart`. `hermes_home_page.dart`, `hermes_bot_detail_page.dart`, and `hermes_page_chrome.dart` also contain that polish plus the motion hooks, and those three are part of the motion commit.
+
+Hermez uses a deliberate physical motion system. Do not introduce arbitrary `AnimatedContainer`, `AnimatedSwitcher`, or page-route animations when an existing Hermez motion primitive applies. Use `lib/features/hermes/motion/`. `nib_motion` 0.3.1 is pinned in `pubspec.yaml` and wrapped by those primitives. Cross-route shared elements use `HermezMorph`, which is Flutter `Hero`. Conduit's generic durations stay in `lib/core/services/animation_service.dart` and are not the Hermez motion system.
+
+## What the 2026-09-28 motion pass changed
+
+This pass stopped at the spec's first quality gate. It did not convert Jobs, Kanban, artifacts, or Steel into shared-element flights.
+
+- New: `lib/features/hermes/motion/` (`hermez_motion.dart` barrel, tokens, `HermezMotionSurface`, `HermezMorph`, `HermezPresence`, `HermezMotionGroup`, `buildHermezMotionPage`). Tests: `test/features/hermes/hermez_motion_test.dart`. Notes: `docs/HERMEZ_MOTION_SYSTEM.md`.
+- `nib_motion: 0.3.1` is an exact pin. Do not widen it to `^0.3.1` and do not call `NibBounce`, `NibRubberBand`, `NibFloat`, `NibGlass`, or `NibScaffold`.
+- Home bot cards (`hermes_home_page.dart`) use `HermezMotionSurface` for press and `HermezMorph` with id `bot:<profile>` around the mark and name. The tap still calls `context.pushNamed(RouteNames.hermesBotDetail)` with that profile. `hermezBotMorphId` returns null unless `HermesConfig.isValidDesktopProfile` accepts the name.
+- Bot Detail (`hermes_bot_detail_page.dart`) uses the same morph id on the header row. Chat-with-bot behavior is unchanged.
+- Hermes routes in `app_router.dart` use `_buildHermezPage` / `buildHermezMotionPage`. Bot Detail is `HermezRouteMotion.morph`. Other Hermes routes are `standard` (short fade, slight rise, source recedes to scale `0.988`). Chat, folders, notes, and the rest of Conduit stay on their existing `NoTransitionPage` or platform page. `usesNoTransitionForNativeSheet` is still honored.
+- `HermesPageChrome` wraps content in `NibMotionConfig(reducedMotion: context.reduceMotion, entranceWarmup: Duration.zero)`. `context.reduceMotion` remains the accessibility source. Reduced motion skips the Hero flight and uses a short fade.
+- `HermezMotionSurface` listens with a pointer slop of 18 px because NibMotion's own tap recognizer swallows a child `GestureDetector`. A scroll that moves farther than that must not open Bot Detail.
+
+Verified: `flutter test test/features/hermes/hermez_motion_test.dart` passed (6). `flutter test test/features/hermes/hermes_destinations_smoke_test.dart` passed, including Home at 200% text. `flutter build apk --debug --target-platform android-arm64` succeeded. `adb install -r` succeeded on the S25 Ultra and the app was relaunched. `dumpsys` reported `versionName=4.1.7`, `versionCode=148`, `lastUpdateTime=2026-09-28 10:42:58`. A Home screenshot after install showed the six-bot roster and Today items with no Flutter error banner. SHA-256 of `build/app/outputs/flutter-apk/app-debug.apk` at that build: `9de551142f5dd2a061d940351cad3d742cc3f3162e6151db80f1ab5608d28a23`.
+
+Not verified on the phone: the actual Hero flight, Back reversing it, rapid tap-then-back, or spring feel. Do not mark those passed from widget tests. Do not start Schedule → Jobs, Kanban task flights, artifact preview flights, or Steel fullscreen expansion until that bot flight has been watched on the device. The inline run surface already grows with `AnimatedSize`; leave that control tree alone.
 
 ## Product and boundaries
 
@@ -27,6 +53,7 @@ Recent Git milestones on `main` (verify `git log` before work): `90c63b2c` intro
 | Steel watch viewer | `hermes_steel_viewer.dart` (URL validation/preference), `hermes_steel_live_view.dart` (lazy WebView/full screen), Hermes Settings |
 | Pending decisions | `hermes_pending_decision_store.dart` → `hermes_live_run_providers.dart` (exact-session local read/change stream); existing resolution sheet and transcript cards |
 | Visual system | `hermez_chat_palette.dart`, `hermez_visual_theme.dart`, `hermez_surfaces.dart`, `hermez_technical_background.dart`, `hermez_bot_mark.dart` |
+| Physical motion | `lib/features/hermes/motion/`, `docs/HERMEZ_MOTION_SYSTEM.md`. `nib_motion` 0.3.1 is pinned and wrapped. Cross-route continuity uses `HermezMorph` (Flutter Hero). Do not add ad-hoc `AnimatedContainer`, `AnimatedSwitcher`, or page-route animations when a Hermez primitive applies. |
 
 The `HermesHomePage` bot data comes from `hermesBotsProvider`; job aggregation is `hermesHomeProfileJobsProvider`, with each result tagged by the queried profile. The Home schedule summary **always** goes to the full Jobs route. Individual timed rows in Today may open one job sheet. A bot card goes to Bot Detail; the Bot Detail chat action creates a new profile-scoped conversation. Recent Home rows call `openHermesSession` on the exact stored session. Avoid replacing these with a generic sidebar transition or canonical Bot Chat.
 
@@ -62,7 +89,9 @@ The 2026-09-28 inline-run/Steel pass: focused Hermes/decision/chat ownership sui
 
 ## Known limitations / next investigation
 
-- Device acceptance for an active-to-completed Hermes turn and the embedded Steel WebView is still outstanding; leave the phone unlocked, face-up, and awake for that run. Use a disposable task, verify exact-session decisions/Steer/Stop, browser watch/expand, profile switching, and no scroll jump/Flutter error. The current debug APK is already installed and in Downloads.
+- The phone currently has the 2026-09-28 motion debug APK (`lastUpdateTime=2026-09-28 10:42:58`, SHA-256 `9de551142f5dd2a061d940351cad3d742cc3f3162e6151db80f1ab5608d28a23`). Home rendered. The bot-card flight and Back were not exercised on device.
+- Device acceptance for an active-to-completed Hermes turn and the embedded Steel WebView is still outstanding; leave the phone unlocked, face-up, and awake for that run. Use a disposable task, verify exact-session decisions/Steer/Stop, browser watch/expand, profile switching, and no scroll jump/Flutter error.
+- Next motion work, in order: watch Home bot → Bot Detail → Back on the S25, then Schedule summary → Jobs, Kanban task → detail, artifact → preview, then Steel inline → fullscreen. Do not mass-replace `InkWell`. Do not destroy and recreate the Steel WebView to animate it.
 - Human browser takeover/resume is explicitly deferred pending an authoritative Hermes browser-control handoff acknowledgement; a queued steer is not one. The viewer must stay watch-only until then.
 - Recent visual polish has not been exhaustively compared on every screen at the phone's largest text scale. Keep accessibility and dark-mode checks in new UI work.
 - Hermes contract versions can change; inspect the connected Desktop contract before changing blocking-decision handling. Do not silently assume newer upstream Hermes behavior matches the installed Umbrel version.

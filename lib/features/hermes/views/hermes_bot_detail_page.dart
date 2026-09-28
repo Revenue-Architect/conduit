@@ -16,6 +16,7 @@ import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_relative_time.dart';
+import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
@@ -166,41 +167,44 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      HermezBotMark(
-                        identity: hermezIdentityForName(bot?.name ?? profile),
-                        size: 72,
-                        label: bot?.title ?? profile,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'BOT',
-                              style: HermezType.technical(palette.muted),
-                            ),
-                            Text(
-                              bot?.title ?? profile,
-                              style: HermezType.display(palette)
-                                  .copyWith(fontSize: 28),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              bot?.lastActive == null
-                                  ? 'Available'
-                                  : hermezWhen(
-                                      bot!.lastActive,
-                                      prefix: 'Active',
-                                    ),
-                              style: HermezType.meta(palette),
-                            ),
-                          ],
+                  HermezMorph(
+                    id: hermezBotMorphId(bot?.name ?? profile),
+                    child: Row(
+                      children: [
+                        HermezBotMark(
+                          identity: hermezIdentityForName(bot?.name ?? profile),
+                          size: 72,
+                          label: bot?.title ?? profile,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'BOT',
+                                style: HermezType.technical(palette.muted),
+                              ),
+                              Text(
+                                bot?.title ?? profile,
+                                style: HermezType.display(palette)
+                                    .copyWith(fontSize: 28),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                bot?.lastActive == null
+                                    ? 'Available'
+                                    : hermezWhen(
+                                        bot!.lastActive,
+                                        prefix: 'Active',
+                                      ),
+                                style: HermezType.meta(palette),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(

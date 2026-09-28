@@ -6,7 +6,11 @@ import '../../shared/theme/theme_extensions.dart';
 
 part 'animation_service.g.dart';
 
-/// Service for managing animations with performance optimization and accessibility
+/// Generic Conduit motion: short durations and simple curves for the wider app.
+///
+/// Hermez physical motion does not use this service. It lives in
+/// `lib/features/hermes/motion/` and keeps its own springs, shared elements,
+/// and route transitions.
 class AnimationService {
   /// Get optimized animation duration based on context and settings
   static Duration getOptimizedDuration(

@@ -16,6 +16,7 @@ import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_relative_time.dart';
+import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
@@ -583,17 +584,21 @@ class _BotCard extends ConsumerWidget {
         ? 'No recent activity'
         : 'Used ${hermezRelativeLabel(bot.lastActive!).split(',').first.toLowerCase()}';
     final description = bot.description?.trim();
-    return DecoratedBox(
+    return HermezMotionSurface(
+      weight: HermezMotionWeight.medium,
+      semanticLabel: bot.title,
+      onTap: () => context.pushNamed(
+        RouteNames.hermesBotDetail,
+        pathParameters: {'profile': bot.name},
+      ),
+      child: DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(19),
         border: Border.all(color: palette.border.withValues(alpha: 0.8)),
       ),
       child: HermezSurface(
         kind: HermezSurfaceKind.utility,
-        onTap: () => context.pushNamed(
-          RouteNames.hermesBotDetail,
-          pathParameters: {'profile': bot.name},
-        ),
+        motif: HermezMotif.etched,
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 116),
@@ -602,18 +607,17 @@ class _BotCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  HermezBotMark(
-                    identity: hermezIdentityForBot(bot),
-                    size: 46,
-                    label: bot.title,
-                  ),
-                  const SizedBox(width: 7),
                   Expanded(
-                    child: Text(
-                      bot.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: HermezType.section(palette).copyWith(fontSize: 15),
+                    child: HermezMorph(
+                      id: hermezBotMorphId(bot.name),
+                      child: _BotIdentity(
+                        markSize: 46,
+                        title: bot.title,
+                        titleStyle: HermezType.section(palette).copyWith(
+                          fontSize: 15,
+                        ),
+                        identity: hermezIdentityForBot(bot),
+                      ),
                     ),
                   ),
                   Icon(
@@ -658,6 +662,39 @@ class _BotCard extends ConsumerWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+class _BotIdentity extends StatelessWidget {
+  const _BotIdentity({
+    required this.identity,
+    required this.title,
+    required this.titleStyle,
+    required this.markSize,
+  });
+
+  final HermezBotIdentity identity;
+  final String title;
+  final TextStyle titleStyle;
+  final double markSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        HermezBotMark(identity: identity, size: markSize, label: title),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: titleStyle,
+          ),
+        ),
+      ],
     );
   }
 }

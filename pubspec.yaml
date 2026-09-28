@@ -22,6 +22,8 @@ dependencies:
   
   # Navigation
   go_router: ^18.0.1
+  # Pinned. Hermez motion wrappers own this API; do not float the constraint.
+  nib_motion: 0.3.1
   
   # Network & API
   dio: ^5.9.0

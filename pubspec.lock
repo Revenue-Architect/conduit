@@ -1475,6 +1475,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.19.4"
+  nib_motion:
+    dependency: "direct main"
+    description:
+      name: nib_motion
+      sha256: b28e6fed34e6b89df2ec41820cf673a4d8f9a7595fe759b74064e185b0236ebe
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   nm:
     dependency: transitive
     description:
