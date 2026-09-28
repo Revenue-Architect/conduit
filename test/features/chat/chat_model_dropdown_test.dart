@@ -8,7 +8,7 @@ import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/services/hermes_session_provenance.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
-import 'package:conduit/shared/widgets/model_avatar.dart';
+import 'package:conduit/features/hermes/widgets/hermez_bot_mark.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -146,13 +146,14 @@ void main() {
     );
 
     check(find.text('Research').evaluate().length).equals(1);
-    final modelAvatar = tester.widget<ModelAvatar>(
+    // Hermez draws every bot with its own mark, not the synced image.
+    final mark = tester.widget<HermezBotMark>(
       find.descendant(
         of: find.byKey(const ValueKey('hermes-bot-toolbar-avatar')),
-        matching: find.byType(ModelAvatar),
+        matching: find.byType(HermezBotMark),
       ),
     );
-    check(modelAvatar.imageUrl).equals(avatar);
+    check(mark.label).equals('Research');
     check(
       find.byKey(const ValueKey('hermes-bot-activity-dot')).evaluate().length,
     ).equals(1);

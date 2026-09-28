@@ -266,7 +266,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a shared title flies between routes and Back returns it', (
+  testWidgets('an expanding page zooms out of its card as one object', (
     tester,
   ) async {
     final navigator = GlobalKey<NavigatorState>();
@@ -276,27 +276,31 @@ void main() {
         home: Scaffold(
           body: Builder(
             builder: (context) => Center(
-              child: HermezMotionSurface(
-                onOpen: (origin) => Navigator.of(context).push(
-                  HermezRoute<void>(
-                    motion: HermezRouteMotion.expand,
-                    origin: origin,
-                    builder: (_) => const Scaffold(
-                      body: Align(
-                        alignment: Alignment.topLeft,
-                        child: HermezMorphText(
-                          'Kai',
-                          id: 'bot:kai#name',
-                          style: TextStyle(fontSize: 34),
+              child: SizedBox(
+                width: 200,
+                height: 120,
+                child: HermezMotionSurface(
+                  onOpen: (origin) => Navigator.of(context).push(
+                    HermezRoute<void>(
+                      motion: HermezRouteMotion.expand,
+                      origin: origin,
+                      builder: (_) => const Scaffold(
+                        body: Align(
+                          alignment: Alignment.topLeft,
+                          child: HermezMorphText(
+                            'Kai page',
+                            id: 'bot:kai#name',
+                            style: TextStyle(fontSize: 34),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                child: const HermezMorphText(
-                  'Kai',
-                  id: 'bot:kai#name',
-                  style: TextStyle(fontSize: 15),
+                  child: const HermezMorphText(
+                    'Kai card',
+                    id: 'bot:kai#name',
+                    style: TextStyle(fontSize: 15),
+                  ),
                 ),
               ),
             ),
@@ -304,22 +308,27 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Kai'));
+    await tester.tap(find.text('Kai card'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 120));
-    // One travelling copy while the placeholders hold their slots.
-    expect(find.text('Kai'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 60));
+    // The whole page is scaled into the card: its title is smaller than at
+    // rest and sits inside the card, not on a separate flight path.
+    final early = tester.getRect(find.text('Kai page'));
     expect(tester.takeException(), isNull);
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(find.text('Kai')), Offset.zero);
+    final rest = tester.getRect(find.text('Kai page'));
+    expect(early.width, lessThan(rest.width));
+    expect(early.left, greaterThan(rest.left));
+    expect(rest.topLeft, Offset.zero);
 
     navigator.currentState!.pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 120));
-    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(tester.getRect(find.text('Kai page')).width, lessThan(rest.width));
     await tester.pumpAndSettle();
-    expect(find.text('Kai'), findsOneWidget);
-    expect(tester.getCenter(find.text('Kai')), const Offset(400, 300));
+    expect(find.text('Kai page'), findsNothing);
+    expect(find.text('Kai card'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a title flies between theme and Hermez text styles', (
@@ -362,7 +371,7 @@ void main() {
     expect(find.text('Kanban'), findsOneWidget);
   });
 
-  testWidgets('a sheet title flies between its card and the sheet header', (
+  testWidgets('a sheet grows out of its card and contracts back into it', (
     tester,
   ) async {
     // The sheet page stays at the navigator origin, so Hero flights land
@@ -387,7 +396,7 @@ void main() {
                       child: Align(
                         alignment: Alignment.topLeft,
                         child: HermezMorphText(
-                          'Task',
+                          'Task sheet',
                           id: 'kanban:b:t#title',
                           style: TextStyle(fontSize: 28),
                         ),
@@ -409,12 +418,12 @@ void main() {
     final start = tester.getTopLeft(find.text('Task')).dy;
     await tester.tap(find.text('Task'));
     await tester.pumpAndSettle();
-    final landed = tester.getTopLeft(find.text('Task')).dy;
+    final landed = tester.getTopLeft(find.text('Task sheet')).dy;
     navigator.currentState!.pop();
     await tester.pump();
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 60));
-      final y = tester.getTopLeft(find.text('Task').first).dy;
+      final y = tester.getTopLeft(find.text('Task sheet')).dy;
       expect(y, greaterThanOrEqualTo(math.min(start, landed) - 1));
       expect(y, lessThanOrEqualTo(math.max(start, landed) + 1));
     }

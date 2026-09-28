@@ -102,29 +102,34 @@ class HermezPageHeader extends StatelessWidget {
   final String? motifMorphId;
 
   @override
-  Widget build(BuildContext context) => HermezTechnicalBackground(
-    variant: HermezBackgroundVariant.editorial,
-    morphId: motifMorphId,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          HermezMorphText(
-            title,
-            id: titleMorphId,
-            maxLines: 2,
-            style: HermesPageChrome.titleStyle(palette),
-          ),
-          const SizedBox(height: 4),
-          HermezEntrance(
-            order: 0,
-            child: Text(
-              subtitle,
-              style: TextStyle(color: palette.muted, fontSize: 13),
+  // Full width: the construction marks run to the edge of the section, not
+  // to the end of the title.
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: HermezTechnicalBackground(
+      variant: HermezBackgroundVariant.editorial,
+      morphId: motifMorphId,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HermezMorphText(
+              title,
+              id: titleMorphId,
+              maxLines: 2,
+              style: HermesPageChrome.titleStyle(palette),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            HermezEntrance(
+              order: 0,
+              child: Text(
+                subtitle,
+                style: TextStyle(color: palette.muted, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

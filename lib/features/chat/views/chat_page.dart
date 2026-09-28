@@ -149,10 +149,12 @@ class _ScrollableCenteredEmptyState extends StatelessWidget {
   const _ScrollableCenteredEmptyState({
     required this.padding,
     required this.children,
+    this.alignTop = false,
   });
 
   final EdgeInsetsGeometry padding;
   final List<Widget> children;
+  final bool alignTop;
 
   @override
   Widget build(BuildContext context) {
@@ -170,10 +172,15 @@ class _ScrollableCenteredEmptyState extends StatelessWidget {
               ),
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: alignTop
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
-              children: children,
+              children: [
+                if (alignTop) SizedBox(height: constraints.maxHeight * 0.04),
+                ...children,
+              ],
             ),
           ),
         );
@@ -3835,6 +3842,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             width: double.infinity,
             height: constraints.maxHeight,
             child: _ScrollableCenteredEmptyState(
+              // Hermez greets near the top so the keyboard and composer never
+              // squeeze it against the toolbar.
+              alignTop: _useHermezChatVisuals && pendingFolder == null,
               padding: EdgeInsets.fromLTRB(
                 Spacing.lg,
                 topPadding,
@@ -3893,6 +3903,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         child: _useHermezChatVisuals
                             ? HermezEmptyChatGreeting(
                                 greeting: _greetingReady ? greetingDisplay : '',
+                                botName: hermesBot?.title,
                                 contextLabel: hermesBot == null
                                     ? null
                                     : 'With ${hermesBot.title}',

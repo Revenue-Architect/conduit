@@ -15,7 +15,6 @@ import '../utils/hermes_schedule_format.dart';
 import '../widgets/hermes_job_editor.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
-import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
 
@@ -129,17 +128,16 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     return [
       HermezEntrance(
         order: 0,
-        child: HermezTechnicalBackground(
-          variant: HermezBackgroundVariant.mechanical,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8, right: 12, bottom: 16),
-            child: ConduitButton(
-              text: l10n.hermesJobNew,
-              icon: Icons.add,
-              isFullWidth: true,
-              isLoading: _creating,
-              onPressed: writable && !_creating ? _createJob : null,
-            ),
+        // The page header already carries the technical marks; a second,
+        // padded background here read as a decoration cut off mid-screen.
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          child: ConduitButton(
+            text: l10n.hermesJobNew,
+            icon: Icons.add,
+            isFullWidth: true,
+            isLoading: _creating,
+            onPressed: writable && !_creating ? _createJob : null,
           ),
         ),
       ),

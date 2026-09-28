@@ -187,11 +187,17 @@ class HermezEntrance extends StatelessWidget {
   final int order;
   final Widget child;
 
+  /// Expanding routes now zoom the whole destination as one object, so
+  /// sections no longer move on their own timing. Kept as an explicit marker
+  /// for secondary content; set [staggered] to restore the unroll.
+  static const staggered = false;
+
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
     final animation = route?.animation;
-    if (animation == null ||
+    if (!staggered ||
+        animation == null ||
         route is! HermezRouteTransitions ||
         route.effectiveMotion != HermezRouteMotion.expand ||
         context.reduceMotion) {

@@ -220,7 +220,29 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
               ),
             ],
           ),
-          data: (all) {
+          data: (listed) {
+            // Files Hermes produced in conversations live wherever that run
+            // wrote them, not only in the artifacts folder. Everything a
+            // chat has shown on this connection is listed too, newest first.
+            final listedPaths = {for (final file in listed) file.path};
+            final seen = <String>{};
+            final fromChats = identity == null
+                ? const <HermesRemoteFile>[]
+                : ([...HermesArtifactProvenanceStore.allFor(identity)]
+                        ..sort((a, b) => b.observedAt.compareTo(a.observedAt)))
+                      .where(
+                        (record) =>
+                            !listedPaths.contains(record.path) &&
+                            seen.add(record.path),
+                      )
+                      .map(
+                        (record) => HermesRemoteFile(
+                          name: record.path.split('/').last,
+                          path: record.path,
+                        ),
+                      )
+                      .toList(growable: false);
+            final all = [...fromChats, ...listed];
             final visible = all
                 .where((file) {
                   final kind = _artifact(file).kind;

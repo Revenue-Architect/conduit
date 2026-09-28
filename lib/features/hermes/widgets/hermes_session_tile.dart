@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
+import '../motion/hermez_motion_route.dart' show HermezRouteExits;
 import '../../../core/utils/debug_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/app_localizations_en.dart';
@@ -600,6 +601,7 @@ Future<void> openHermesSession(
   ref.read(activeConversationProvider.notifier).set(conversation);
 
   if (context.mounted) {
+    HermezRouteExits.leaveForAnotherDestination();
     NavigationService.router.go(Routes.chat);
     closeSidebarDrawerIfOverlay(context);
   }

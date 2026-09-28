@@ -13,12 +13,16 @@ class HermezEmptyChatGreeting extends StatelessWidget {
     this.contextLabel,
     this.starters = const [],
     this.onStarter,
+    this.botName,
   });
 
   final String greeting;
   final String? contextLabel;
   final List<String> starters;
   final ValueChanged<String>? onStarter;
+
+  /// The chat's bot, so the greeting shows that bot's mark.
+  final String? botName;
 
   @override
   Widget build(BuildContext context) {
@@ -73,9 +77,10 @@ class HermezEmptyChatGreeting extends StatelessWidget {
                                 .copyWith(fontSize: 36),
                           ),
                         ),
-                        const HermezBotMark(
-                          identity: HermezBotIdentity.neutral,
+                        HermezBotMark(
+                          identity: hermezIdentityForName(botName),
                           size: 64,
+                          label: botName,
                         ),
                       ],
                     ),

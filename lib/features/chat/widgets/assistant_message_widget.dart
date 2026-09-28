@@ -58,6 +58,7 @@ import '../../hermes/services/hermes_rich_output_parser.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/widgets/hermes_a2ui_surface.dart';
 import '../../hermes/widgets/hermes_artifact_view.dart';
+import '../../hermes/widgets/hermez_bot_mark.dart';
 
 // Wrap only standalone base64 image lines so <details> attributes stay intact.
 final _standaloneBase64ImagePattern = RegExp(
@@ -936,7 +937,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     }
     final hasIcon = iconUrl != null && iconUrl.isNotEmpty;
 
-    final Widget leading = hasIcon
+    final Widget leading = _isHermesAssistantMessage
+        ? HermezBotMark(
+            identity: hermezIdentityForName(modelName),
+            size: 22,
+            label: modelName,
+          )
+        : hasIcon
         ? ModelAvatar(size: 20, imageUrl: iconUrl, label: modelName)
         : Container(
             width: 20,

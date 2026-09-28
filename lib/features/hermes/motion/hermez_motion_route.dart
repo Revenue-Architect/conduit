@@ -116,10 +116,15 @@ class HermezRoute<T> extends PageRoute<T> with HermezRouteTransitions<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    final page = Semantics(
-      scopesRoute: true,
-      explicitChildNodes: true,
-      child: builder(context),
+    final page = HeroMode(
+      // A destination that grows out of an object moves as that one object;
+      // its parts do not fly on their own paths.
+      enabled: effectiveMotion != HermezRouteMotion.expand,
+      child: Semantics(
+        scopesRoute: true,
+        explicitChildNodes: true,
+        child: builder(context),
+      ),
     );
     return shape == HermezExpandShape.sheet
         ? _HermezSheetPlacement(route: this, child: page)
@@ -202,10 +207,13 @@ class _HermezPageBasedRoute<T> extends PageRoute<T>
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) => Semantics(
-    scopesRoute: true,
-    explicitChildNodes: true,
-    child: _page.child,
+  ) => HeroMode(
+    enabled: effectiveMotion != HermezRouteMotion.expand,
+    child: Semantics(
+      scopesRoute: true,
+      explicitChildNodes: true,
+      child: _page.child,
+    ),
   );
 }
 
@@ -247,8 +255,23 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
       ? Duration.zero
       : HermezMotion.settleFor(_weight);
 
+  // Leaving is quicker than arriving: the object returns home decisively.
   @override
-  Duration get reverseTransitionDuration => transitionDuration;
+  Duration get reverseTransitionDuration =>
+      effectiveMotion == HermezRouteMotion.expand
+      ? HermezMotion.settleFor(HermezMotionWeight.medium)
+      : transitionDuration;
+
+  bool _slideOut = false;
+
+  @override
+  bool didPop(T? result) {
+    // Leaving for another destination (Chat) also removes the screen this
+    // object came from, so it slides away instead of contracting into a
+    // card that is no longer there.
+    if (HermezRouteExits.leavingElsewhere) _slideOut = true;
+    return super.didPop(result);
+  }
 
   // A page that grows out of an object keeps the source screen painted
   // underneath, so Back can contract into it on the first frame instead of
@@ -294,6 +317,16 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     Widget child,
   ) {
     final curve = HermezMotion.curveFor(_weight);
+    if (_slideOut) {
+      return HermezPushTransition(
+        animation: CurvedAnimation(
+          parent: animation,
+          curve: HermezMotion.curveMedium,
+          reverseCurve: HermezMotion.curveMedium.flipped,
+        ),
+        child: child,
+      );
+    }
     Widget result = switch (effectiveMotion) {
       HermezRouteMotion.none =>
         shape == HermezExpandShape.sheet
@@ -595,7 +628,13 @@ class _HermezSheetFrame<T> extends StatelessWidget {
                   child: ClipRRect(
                     clipper: _ApertureClipper(aperture),
                     clipBehavior: Clip.antiAlias,
-                    child: content,
+                    // One object: the whole destination scales out of the
+                    // source and back into it, so text, decoration, and
+                    // surfaces all move together on one spring.
+                    child: Transform(
+                      transform: _zoom(rect, end),
+                      child: content,
+                    ),
                   ),
                 ),
                 // The source's outline thins away as it grows, and returns as
@@ -622,6 +661,17 @@ class _HermezSheetFrame<T> extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Maps the destination's final rectangle onto the travelling aperture:
+  /// its top-left corner rides the aperture and it scales uniformly by width.
+  static Matrix4 _zoom(Rect rect, Rect end) {
+    if (end.width <= 0) return Matrix4.identity();
+    final scale = (rect.width / end.width).clamp(0.05, 1.5);
+    return Matrix4.identity()
+      ..translateByDouble(rect.left, rect.top, 0, 1)
+      ..scaleByDouble(scale, scale, 1, 1)
+      ..translateByDouble(-end.left, -end.top, 0, 1);
   }
 
   static Rect _sheetRect(Size size, MediaQueryData media, double factor) {
@@ -693,5 +743,22 @@ class HermezPushPageTransitionsBuilder extends PageTransitionsBuilder {
               child: child,
             ),
     );
+  }
+}
+
+/// Marks the next Hermez exits as leaving for another destination, such as
+/// opening a conversation from Home or Bot Detail. Routes removed in that
+/// moment slide away instead of contracting into their source card, because
+/// the source screen is being removed too.
+abstract final class HermezRouteExits {
+  static DateTime? _until;
+
+  static void leaveForAnotherDestination() {
+    _until = DateTime.now().add(const Duration(milliseconds: 400));
+  }
+
+  static bool get leavingElsewhere {
+    final until = _until;
+    return until != null && DateTime.now().isBefore(until);
   }
 }

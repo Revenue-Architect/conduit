@@ -39,10 +39,11 @@ abstract final class HermezMotion {
     stiffness: 340,
     damping: 30,
   );
+  // A growing page or sheet: critically damped, ~0.43 s to rest.
   static const springHeavy = NibSpringDescription(
-    mass: 1.1,
-    stiffness: 260,
-    damping: 28,
+    mass: 1,
+    stiffness: 300,
+    damping: 34,
   );
 
   static const staggerFast = Duration(milliseconds: 25);
