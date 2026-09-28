@@ -12,9 +12,9 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 | --- | --- | --- | --- | --- |
 | light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.28 s |
 | medium | cards, sheets, sibling pages | 0.978 | 0.9 / 340 / 30 | ~0.41 s |
-| heavy | a page growing out of a card | 0.99 | 1.1 / 260 / 28 | ~0.54 s |
+| heavy | a page or sheet growing out of a card | 0.99 | 1 / 300 / 34 | ~0.43 s |
 
-`HermezSpringCurve` turns a spring into a `Curve` sampled over its own settle time, so route controllers, `AnimatedSize`, Hero flights, and dialogs move with the same physics as NibMotion. Its output is clamped to [0, 1] (Hero and `Interval` assert that range). Reverse motion always uses `curve.flipped`, so Back starts moving immediately.
+`HermezSpringCurve` turns a spring into a `Curve` sampled over its own settle time, so route controllers, `AnimatedSize`, Hero flights, and dialogs move with the same physics as NibMotion. Its output is clamped to [0, 1] (Hero and `Interval` assert that range). Reverse motion always uses `curve.flipped`, so Back starts moving immediately. Exits are faster than entries: expanding routes reverse on the medium spring.
 
 ## Primitives
 
@@ -22,12 +22,13 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 - `HermezMorph` / `HermezMorphText` / `HermezMorphSurface`: Flutter `Hero` wrappers. Every part of an object is its own morph (`bot:kai#mark`, `#kind`, `#name`, `#about`, `#dot`, `#status`, `#motif`) so parts never nest and each keeps its geometry. Flights: `scale` (the detailed rendering scaled into the flight box), text (size, weight, colour, and line wrapping interpolate; `inherit` is normalised first), `stretch` (decorative marks resize with their container), `surface` (decoration lerp). Reduced motion or a null id renders the child with no flight.
 - `HermezMorphOrigin`: the tapped object's rectangle in its route's coordinate space, plus radius, fill, and border. It holds the source render box so Back contracts into where the card is now. It travels only as navigation `extra`; it is never global state.
 - Routes (`hermez_motion_route.dart`):
-  - `HermezRouteMotion.expand`: the destination grows out of the origin through a rounded aperture. The page is laid out once at its final size and revealed; the aperture's radius, fill, shadow, and the source's border interpolate. Expanding pages are non-opaque so the source stays painted and Back contracts on its first frame.
+  - `HermezRouteMotion.expand`: the destination grows out of the origin as **one object**. The page is laid out once at its final size and scaled (`_HermezSheetFrame._zoom`) so it exactly fills the aperture, whose rect, radius, fill, shadow, and the source's border interpolate. Text, motifs, and decorations ride inside the container; nothing flies on its own path or timing. `HeroMode` is disabled inside expand routes. Expanding pages are non-opaque so the source stays painted and Back contracts on its first frame.
+  - `HermezRouteExits.leaveForAnotherDestination()`: call before `router.go` to somewhere else (Bot Detail → new chat). The popping expand page then slides out instead of contracting into a card that is about to disappear.
   - `HermezRouteMotion.standard`: sibling push, slides in from the trailing edge; the page underneath shifts back 14 %. A leading-edge shadow is painted only while moving.
   - `pushHermezSheet` / `pushHermezSheetRoute`: a sheet that grows out of the tapped row or card (or rises from the bottom edge), drag-down to close, tap-outside or Back to close, lifts above the keyboard. The route page stays full screen at the navigator origin and the sheet is placed inside it; Hero flights measure against the page, so this matters. The returned future completes after the sheet has contracted home, so follow-up navigation never starts under a sheet in flight.
   - The screen under an expanding route recedes to scale 0.988; under a sibling push it shifts back.
   - `HermezPushPageTransitionsBuilder` replaces Android's fading Zoom transition for every Material route in the app.
-- `HermezEntrance(order:)`: secondary content of an expanding destination unrolls from its top edge and rises the last few pixels after the shared object starts to arrive; on Back it rolls away first.
+- `HermezEntrance(order:)`: currently a pass-through (`HermezEntrance.staggered = false`). Secondary content arrives with the container it belongs to; staggered parts read as separate objects.
 - `HermezPresence` / `HermezReveal` / `HermezUnroll`: real mount and unmount unroll from the top edge and roll away; children keep full width.
 - `HermezSize`: `AnimatedSize` on a Hermez spring.
 - `HermezMotionGroup`: short keyed column. Moved children travel (FLIP through NibMotion controllers), new ones unroll, removed ones roll away. Positions are recorded after each frame's layout and never read during a build.
@@ -36,6 +37,8 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 - `ConduitDialogRoute` / `showConduitDialog` (`lib/shared/widgets/conduit_dialog_route.dart`): dialogs unfold from their centre line on a spring instead of fading. `ThemedDialogs`, `AdaptiveDialog`, Hermes, MCP, settings, and Kanban dialogs use it.
 
 ## Reference interactions
+
+On expand routes and origin sheets the whole destination travels as one object. Part morphs (the "What travels" column) fly only when the same ids meet on a `standard` route.
 
 | Interaction | What travels | What unrolls |
 | --- | --- | --- |

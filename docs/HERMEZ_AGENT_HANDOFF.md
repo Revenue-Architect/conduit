@@ -1,6 +1,6 @@
 # Hermez / Conduit: agent handoff
 
-Updated 2026-09-28 (evening), after the physical-motion rewrite. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
+Updated 2026-09-28 (late), after the physical-motion rewrite and a second device feedback pass. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
 
 ## Start here
 
@@ -10,6 +10,28 @@ Updated 2026-09-28 (evening), after the physical-motion rewrite. This is the sho
 4. Backups outside git: `work/backups/pre-motion-v2-20260928` (HEAD bundle, the pre-session uncommitted patch, copies of dirty files). Device frame captures and test logs: `work/diagnostics/hermez-motion-v2-20260928`.
 
 **No fades.** The user's hard rule: nothing in Hermez animates opacity. Use the primitives in `lib/features/hermes/motion/` (`HermezMotionSurface`, `HermezMorph*`, `HermezRoute`/`pushHermezSheet`, `HermezEntrance`, `HermezPresence`, `HermezSize`, `HermezMotionGroup`, `HermezIconSwap`) and `showConduitDialog` for dialogs. Do not add `FadeTransition`, `AnimatedOpacity`, `AnimatedSwitcher` default transitions, `.fadeIn()`, or plain `showDialog`. `nib_motion` 0.3.1 is pinned and wrapped.
+
+## 2026-09-28 late pass (device feedback round 2)
+
+- **One object, not parts.** Expanding routes (Home Schedule → Jobs, Board → Kanban, bot card → Bot Detail) and origin sheets (Kanban task, Today row, Bot Detail schedule row, artifacts, attention) now scale the whole destination inside the aperture (`_HermezSheetFrame._zoom`). Text, motifs, and decorations move with the container; nothing flies on its own timing. `HeroMode` is off inside expand routes; per-part `HermezMorph` flights remain only on `standard` routes. `HermezEntrance` stagger is off (`HermezEntrance.staggered = false`).
+- **Exits faster than entries.** `springHeavy` is now 1 / 300 / 34 (~0.43 s). Expanding routes reverse on the medium spring.
+- **Leaving for another destination.** Opening a chat from Bot Detail (or anywhere that calls `HermezRouteExits.leaveForAnotherDestination()` before `router.go`) slides the page out instead of contracting it back into a card that is about to disappear.
+- **Headers span the full width.** `HermezPageHeader` backgrounds and technical marks reach the screen edge on every page, matching Kanban. The Jobs page no longer puts a second, clipped technical background behind New scheduled job.
+- **Chat artifacts appear in Artifacts.** The Artifacts page merges `HermesArtifactProvenanceStore.allFor(identity)` (files seen in chats) with the listed directory, newest first, deduplicated by path.
+- **Bot marks everywhere.** `HermesBotAvatar` (chat toolbar, drawer), the assistant message avatar, and the empty-chat greeting draw `HermezBotMark` for the conversation's bot instead of the synced backend image.
+- **Empty chat greeting sits high.** In Hermez chat it is top-aligned with a 4 % spacer, so the keyboard does not squeeze it.
+- **Steel browser preview.** The inline Watch browser block depends on a Steel viewer URL. Personal builds must pass `--dart-define=HERMES_STEEL_VIEWER_URL=<viewer url>`; the value lives only in `work/private-build-defines.txt` (outside git, never commit it). A blank saved preference now falls back to the build value. Hermes Settings can still override it.
+
+Build command (from `work/conduit`, bash):
+
+```
+V=$(grep '^HERMES_STEEL_VIEWER_URL=' ../private-build-defines.txt | sed 's/^HERMES_STEEL_VIEWER_URL=//; s/ .*//')
+flutter build apk --debug --target-platform android-arm64 --no-pub --dart-define=HERMES_STEEL_VIEWER_URL="$V"
+```
+
+Verified: focused suites (`test/features/{hermes,chat,navigation}`, `test/shared`) show only the 8 baseline failures. `test/features/hermes` all pass (713). Code commit `048e89aa`. ARM64 debug build with the Steel define installed on the S25 (SHA-256 `5e192531676fcaa9527e474077b9651bc32033d52084c35cbed39ba7f0a3cd09`). Device captures at 10x time dilation (`work/diagnostics/hermez-motion-v2-20260928/late*`): Today row → sheet and Back, Board card → Kanban, Kanban task → sheet (no exceptions), Bot Detail → new chat (slides in, greeting high above the keyboard, kai mark in toolbar and greeting), Jobs header full width.
+
+Not verified on device this pass: bot marks inside an existing chat's message list, the Artifacts page listing chat artifacts, and the Steel preview during a live run (the inline Watch browser button only appears while a run is active; the URL is compiled in).
 
 ## What the 2026-09-28 motion rewrite changed
 
@@ -70,7 +92,7 @@ Home → bot card → Bot Detail → new scoped chat. Home → recent conversati
 
 `ChatPage` no longer mounts a floating `Positioned` activity card or reserves its height above the composer. `ChatTimelineViewport.liveFooter` composes the original `StreamingTurnFooter` and one `HermesInlineRunSurface`, keyed to the active Hermes stored session ID. The inline surface shows bounded real activity, Steer, confirmed Stop, and exact-session pending requests; Review reuses `showHermesAttentionResolutionSheet`, and dismissing it does not deny anything. Pending reads use `pendingStoredDecisionsForSession()` against the existing local store (no Gateway resume merely to paint chat) and refresh via store mutation events, waiting-for-input, foreground resume, and successful resolution. `HermesLiveRunPage` remains optional larger details, not the only controls.
 
-Hermes Settings has an optional Steel viewer URL (blank by default; the user's private tailnet address is not tracked). During an active turn, expanded inline activity offers Watch browser and a session-scoped full-screen viewer. The embedded `flutter_inappwebview` is created only when opened, uses `interactive=false`, and leaves Steel in charge of its streaming implementation. The full-screen page hides the viewer if that exact run ceases to be active. The installed Steel endpoint answered HTTP 200 from the S25; embedded playback during an actual Steel run remains unverified because the phone locked during QA.
+Hermes Settings has an optional Steel viewer URL. Its default comes from the `HERMES_STEEL_VIEWER_URL` dart-define (blank when not passed; the private tailnet address is kept in `work/private-build-defines.txt`, never in git). During an active turn, expanded inline activity offers Watch browser and a session-scoped full-screen viewer. The embedded `flutter_inappwebview` is created only when opened, uses `interactive=false`, and leaves Steel in charge of its streaming implementation. The full-screen page hides the viewer if that exact run ceases to be active. The installed Steel endpoint answered HTTP 200 from the S25; embedded playback during an actual Steel run remains unverified because the phone locked during QA.
 
 **Takeover remains intentionally unavailable.** `service.steer()` returns true for a **queued** steer, not proof Hermes has paused browser clicks/typing. Hermes source indicates a steer may be appended after a tool result. There is no verified exact-browser handoff acknowledgement in this client contract. Do not switch the viewer to `interactive=true` merely on queued Steer; implement takeover/resume only after an authoritative control-transfer signal exists. See `docs/HERMEZ_INLINE_LIVE_STEEL_RUNBOOK.md` for evidence, acceptance checks, and next steps.
 
