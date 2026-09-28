@@ -141,6 +141,34 @@ live, approve sensitive steps before they run, and let scheduled agents run
 while you sleep. Conversations and schedules get their own tab, and Conduit only
 exposes the capabilities your server actually reports.
 
+### Hermes-only / Hermez mode
+
+This repository also contains the Hermes-first **Hermez** experience. In
+Hermes-only mode, the UI intentionally exposes only surfaces that currently have
+a Hermes-compatible data path. Features that still depend on an Open WebUI
+account remain in the codebase but do not appear just because their screens
+exist.
+
+Today that means:
+
+| Area | Hermes-only / Hermez availability |
+| --- | --- |
+| Hermes chat and conversations | Available |
+| Bots / profiles | Available |
+| Scheduled agents / Jobs | Available |
+| Live activity, approvals, steering, and stop controls | Available |
+| Kanban and Hermes artifacts | Available when the connected Hermes installation exposes them |
+| Files and multimodal chat | Available through the supported Hermes chat/file path |
+| Notes | Existing Conduit Notes UI is retained, including local/offline storage, but its current sync/ownership path is Open WebUI-backed and it is therefore hidden in Hermes-only mode |
+| Channels | Open WebUI-backed collaboration feature; hidden in Hermes-only mode |
+| Terminal | Open WebUI server capability; hidden in Hermes-only mode |
+| Open WebUI Workspace | Open WebUI-backed; not the same thing as Hermes tools, skills, MCP, Jobs, or Kanban |
+
+The Android/iOS home-screen quick-action widget is also inherited from upstream
+Conduit. Its actions remain functional in supported configurations, but custom
+Hermes/Hermez forks may need to restyle and rebrand the native widget resources
+separately from the Flutter UI.
+
 ## Screenshots
 
 | Chat | Connect | Chats | Voice |
@@ -169,25 +197,34 @@ Native Flutter surfaces, not a web view wrapped in a shell:
 
 ### A real Workspace
 
-Models, knowledge, prompts, tools, and skills as native screens with unified
-settings navigation. Sections you don't have permission for simply don't appear.
+For Open WebUI connections, models, knowledge, prompts, tools, and skills are
+available as native screens with unified settings navigation. Sections you
+don't have permission for simply don't appear.
+
+Hermes-only / Hermez mode has its own native Hermes administration surfaces
+(such as Bots, Jobs, MCP/tools, Kanban, and Artifacts where supported); it does
+not automatically expose Open WebUI Workspace resources.
 
 ### Everything else
 
-| Area | What's included |
-| --- | --- |
-| Files and media | Uploads, re-attaching previously uploaded server files, multimodal prompts, clipboard image paste, audio attachments |
-| Notes | Autosave, pinning, AI-generated titles, AI enhancement, audio recording, all available offline |
-| Channels | Threads and reactions, when your server enables them |
-| Voice | Voice input with on-device or server speech recognition, plus a full voice-call mode |
-| Home screen | Widgets on iOS and Android for new chat, mic, camera, photos, and clipboard; app quick actions; iOS App Intents and Shortcuts |
-| Sharing | Share-sheet ingestion from other apps straight into a prompt |
-| Terminal | Interactive sessions over WebSocket with a file browser, shown only when your server exposes it |
-| Personalization | Light, dark, and system themes; five accent palettes; adaptive Material and Cupertino UI; haptics |
-| Languages | 14 locales: English, German, Spanish, French, Italian, Japanese, Korean, Dutch, Russian, Simplified and Traditional Chinese, Czech, Slovak, Polish |
+Availability depends on the active backend. The table below describes the
+upstream capability and calls out the important Hermes-only differences.
 
-Server-dependent features (channels, notes, web search, image generation,
-toggle filters, terminal) appear only when your deployment exposes them.
+| Area | What's included | Backend notes |
+| --- | --- | --- |
+| Files and media | Uploads, re-attaching previously uploaded server files, multimodal prompts, clipboard image paste, audio attachments | Exact file capabilities depend on the selected backend |
+| Notes | Autosave, pinning, AI-generated titles, AI enhancement, audio recording, offline/local persistence | Current Notes sync and ownership are Open WebUI-backed; Notes are hidden in Hermes-only mode until a Hermes-compatible note backend is wired in |
+| Channels | Threads and reactions | Open WebUI-backed; hidden in Hermes-only mode |
+| Voice | Voice input with on-device or server speech recognition, plus a full voice-call mode | Availability depends on the selected model/backend |
+| Home screen | Widgets on iOS and Android for new chat, mic, camera, photos, and clipboard; app quick actions; iOS App Intents and Shortcuts | Native widget resources are separate from the Flutter UI and may retain upstream Conduit styling in custom forks until separately restyled |
+| Sharing | Share-sheet ingestion from other apps straight into a prompt | App-level feature; final dispatch depends on the selected backend |
+| Terminal | Interactive sessions over WebSocket with a file browser | Open WebUI server capability; hidden in Hermes-only mode |
+| Personalization | Light, dark, and system themes; five accent palettes; adaptive Material and Cupertino UI; haptics | App-level feature |
+| Languages | 14 locales: English, German, Spanish, French, Italian, Japanese, Korean, Dutch, Russian, Simplified and Traditional Chinese, Czech, Slovak, Polish | App-level feature |
+
+Server-dependent features appear only when the active backend exposes a
+compatible implementation. A screen being present in the source tree does not
+by itself mean that it is available for every backend.
 
 ## Built for self-hosted reality
 
