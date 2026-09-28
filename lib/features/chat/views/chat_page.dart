@@ -2142,26 +2142,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final voiceOverlayHeight = voice.isActive
         ? (voice.isCollapsed ? 72.0 : 180.0)
         : 0.0;
-    final activeHermes = ref.read(activeConversationProvider);
-    final storedId = ref.read(hermesActiveSessionProvider);
-    final turn = ref.read(hermesDesktopTurnStateProvider).asData?.value;
-    final hasLiveActivity = shouldShowHermesLiveActivity(
-      nativeConversation: isNativeHermesConversation(activeHermes),
-      conversationSessionId: activeHermes?.metadata['hermesSessionId']
-          ?.toString(),
-      activeSessionId: storedId,
-      desktopService:
-          ref.read(hermesApiServiceProvider) is HermesDesktopApiService,
-      turnState: turn,
-    );
-    final activityHeight = hasLiveActivity
-        ? HermesLiveActivityDisclosure.heightFor(
-                context,
-                expanded: _liveActivityExpanded,
-              ) +
-              16
-        : 0.0;
-    return Spacing.lg + _inputHeight + voiceOverlayHeight + activityHeight;
+    return Spacing.lg + _inputHeight + voiceOverlayHeight;
   }
 
   /// User-initiated scroll to bottom (e.g. button tap).
@@ -2945,6 +2926,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       apiService: apiService,
     );
     final timeline = _resolveTimelineRenderModel(messages);
+    final activeHermesConversation = watchRef.watch(activeConversationProvider);
+    final activeHermesSessionId = watchRef.watch(hermesActiveSessionProvider);
+    final desktopService = watchRef.watch(hermesApiServiceProvider);
+    final activeHermesTurn = watchRef
+        .watch(hermesDesktopTurnStateProvider)
+        .asData
+        ?.value;
+    final showHermesActivity = shouldShowHermesLiveActivity(
+      nativeConversation: isNativeHermesConversation(activeHermesConversation),
+      conversationSessionId: activeHermesConversation
+          ?.metadata['hermesSessionId']
+          ?.toString(),
+      activeSessionId: activeHermesSessionId,
+      desktopService: desktopService is HermesDesktopApiService,
+      turnState: activeHermesTurn,
+    );
     _scheduleMarkdownPrewarm(messages, layoutMetadata: layoutMetadata);
     _syncLayoutBottomAnchor();
 
@@ -3036,21 +3033,45 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       onRowExtentMeasured: rememberRowExtent,
       initialAnchor: _initialScrollAnchor,
       pinnedUserMessageId: _wantsPinToTop ? _pinnedUserMessageId : null,
-      liveFooter: timeline.runningFooterHost == null
+      liveFooter: timeline.runningFooterHost == null && !showHermesActivity
           ? null
-          : Consumer(
-              builder: (context, rowRef, _) {
-                final latestMessage = rowRef.watch(
-                  chatMessageByIdProvider(
-                    timeline.runningFooterHost!.messageId,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (timeline.runningFooterHost != null)
+                  Consumer(
+                    builder: (context, rowRef, _) {
+                      final latestMessage = rowRef.watch(
+                        chatMessageByIdProvider(
+                          timeline.runningFooterHost!.messageId,
+                        ),
+                      );
+                      if (latestMessage == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return StreamingTurnFooter(
+                        message: latestMessage,
+                        suppressStreamingHaptics:
+                            suppressAssistantStreamingHaptics,
+                      );
+                    },
                   ),
-                );
-                if (latestMessage == null) return const SizedBox.shrink();
-                return StreamingTurnFooter(
-                  message: latestMessage,
-                  suppressStreamingHaptics: suppressAssistantStreamingHaptics,
-                );
-              },
+                if (showHermesActivity &&
+                    desktopService is HermesDesktopApiService &&
+                    activeHermesSessionId != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: HermesLiveActivityDisclosure(
+                      key: ValueKey('hermes-live-$activeHermesSessionId'),
+                      service: desktopService,
+                      sessionId: activeHermesSessionId,
+                      expanded: _liveActivityExpanded,
+                      onToggle: () => setState(
+                        () => _liveActivityExpanded = !_liveActivityExpanded,
+                      ),
+                    ),
+                  ),
+              ],
             ),
       topContentInset: topPadding,
       bottomPadding: bottomPadding,
@@ -4196,20 +4217,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
-    final activeHermesSessionId = ref.watch(hermesActiveSessionProvider);
-    final desktopService = ref.watch(hermesApiServiceProvider);
-    final activeHermesTurn = ref
-        .watch(hermesDesktopTurnStateProvider)
-        .asData
-        ?.value;
-    final showHermesActivity = shouldShowHermesLiveActivity(
-      nativeConversation: isNativeHermesConversation(activeConversation),
-      conversationSessionId: activeConversation?.metadata['hermesSessionId']
-          ?.toString(),
-      activeSessionId: activeHermesSessionId,
-      desktopService: desktopService is HermesDesktopApiService,
-      turnState: activeHermesTurn,
-    );
     final hermesBot = chatHermesBotPresentation(activeConversation);
     final hermezVisuals = _useHermezChatVisuals;
     final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);
@@ -4326,17 +4333,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ),
                 ),
                 Positioned(
-                  bottom:
-                      ((_inputHeight > 0)
-                          ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
-                          : (Spacing.xxl + Spacing.xxxl)) +
-                      (showHermesActivity
-                          ? HermesLiveActivityDisclosure.heightFor(
-                                  context,
-                                  expanded: _liveActivityExpanded,
-                                ) +
-                                16
-                          : 0),
+                  bottom: (_inputHeight > 0)
+                      ? math.max(0, _inputHeight - Spacing.xl + Spacing.md)
+                      : (Spacing.xxl + Spacing.xxxl),
                   left: 0,
                   right: 0,
                   child: AnimatedSwitcher(
@@ -4388,22 +4387,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
                 ),
-                if (showHermesActivity &&
-                    desktopService is HermesDesktopApiService &&
-                    activeHermesSessionId != null)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: _inputHeight + 8,
-                    child: HermesLiveActivityDisclosure(
-                      service: desktopService,
-                      sessionId: activeHermesSessionId,
-                      expanded: _liveActivityExpanded,
-                      onToggle: () => setState(
-                        () => _liveActivityExpanded = !_liveActivityExpanded,
-                      ),
-                    ),
-                  ),
                 Positioned(
                   left: 0,
                   right: 0,
