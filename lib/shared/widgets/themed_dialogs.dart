@@ -9,6 +9,7 @@ import 'package:conduit/l10n/app_localizations.dart';
 import '../theme/conduit_input_styles.dart';
 import '../theme/theme_extensions.dart';
 import 'conduit_components.dart';
+import 'conduit_dialog_route.dart';
 
 /// Centralized helper for building themed dialogs consistently.
 ///
@@ -134,7 +135,7 @@ class ThemedDialogs {
     }
 
     // Android — fully themed Material dialog.
-    final result = await showDialog<bool>(
+    final result = await showConduitDialog<bool>(
       context: context,
       barrierDismissible: barrierDismissible,
       builder: (ctx) {
@@ -192,7 +193,7 @@ class ThemedDialogs {
     required WidgetBuilder builder,
     bool barrierDismissible = true,
   }) {
-    return showDialog<T>(
+    return showConduitDialog<T>(
       context: context,
       barrierDismissible: barrierDismissible,
       builder: builder,
@@ -285,7 +286,7 @@ class ThemedDialogs {
     // Android — fully themed Material dialog with TextField.
     // The controller is owned by _TextInputDialogContent so its lifecycle
     // is tied to the dialog widget tree (survives dismiss animation).
-    final result = await showDialog<String>(
+    final result = await showConduitDialog<String>(
       context: context,
       barrierDismissible: barrierDismissible,
       builder: (ctx) => _TextInputDialogContent(

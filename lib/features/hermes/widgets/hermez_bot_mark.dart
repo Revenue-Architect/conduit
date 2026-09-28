@@ -50,127 +50,493 @@ class HermezBotMark extends StatelessWidget {
   }
 }
 
+/// Draws the Hermez bot family from the reference renders: a white spherical
+/// shell with a side disc, a large dark face turned slightly to the right,
+/// glowing orange eyes, and a few profile-specific parts. Everything is in
+/// unit space so the mark stays crisp from 40 px chips to 88 px headers.
 class _BotMarkPainter extends CustomPainter {
   const _BotMarkPainter({required this.identity, required this.palette});
 
   final HermezBotIdentity identity;
   final HermezChatPalette palette;
 
+  static const _shellHi = Color(0xFFFFFFFF);
+  static const _shellMid = Color(0xFFEDEFF1);
+  static const _shellLow = Color(0xFFCDD1D5);
+  static const _shellEdge = Color(0xFFA3A8AE);
+  static const _seam = Color(0xFF8E949A);
+  static const _faceTop = Color(0xFF2B2E34);
+  static const _faceBottom = Color(0xFF07080A);
+  static const _glow = Color(0xFFFF8A1F);
+  static const _eyeCore = Color(0xFFFFB45C);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final unit = size.width;
-    final center = Offset(unit * 0.5, unit * 0.53);
-    final shellRect = Rect.fromLTWH(
-      unit * 0.11,
-      unit * 0.15,
-      unit * 0.78,
-      unit * 0.74,
-    );
-    final shell = RRect.fromRectAndRadius(
-      shellRect,
-      Radius.circular(unit * 0.31),
-    );
-    final shadow = RRect.fromRectAndRadius(
-      shellRect.shift(Offset(0, unit * 0.035)),
-      Radius.circular(unit * 0.31),
-    );
-    canvas.drawRRect(shadow, Paint()..color = const Color(0xFFAFB3B8));
-    canvas.drawRRect(
-      shell,
+    final u = size.width;
+    Offset p(double x, double y) => Offset(u * x, u * y);
+    final blur = math.max(0.6, u * 0.022);
+
+    // Ground shadow.
+    canvas.drawOval(
+      Rect.fromCenter(center: p(0.5, 0.925), width: u * 0.6, height: u * 0.07),
       Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFFE8EAEC), Color(0xFFC9CDD0)],
+        ..color = const Color(0x2E000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur * 1.4),
+    );
+
+    final center = p(0.5, 0.53);
+    final radius = u * 0.385;
+
+    if (identity == HermezBotIdentity.fast) _paintStreaks(canvas, u, p);
+
+    // Shell.
+    final shellRect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.42, -0.5),
+          radius: 1.05,
+          colors: [_shellHi, _shellMid, _shellLow, _shellEdge],
+          stops: [0, 0.42, 0.82, 1],
         ).createShader(shellRect),
     );
-    canvas.drawRRect(
-      shell,
+
+    if (identity == HermezBotIdentity.fast) _paintFins(canvas, u, p);
+
+    canvas.save();
+    canvas.clipPath(Path()..addOval(shellRect));
+    _paintShellDetail(canvas, u, p, blur);
+    canvas.restore();
+
+    canvas.drawCircle(
+      center,
+      radius,
       Paint()
-        ..color = const Color(0xFFB4B8BC)
+        ..color = _shellEdge.withValues(alpha: 0.55)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(0.8, unit * 0.017),
+        ..strokeWidth = math.max(0.6, u * 0.009),
     );
-    final faceRect = Rect.fromLTWH(
-      unit * 0.24,
-      unit * 0.32,
-      unit * 0.52,
-      unit * 0.35,
+
+    // Face: a dark visor turned slightly right, inside a seam.
+    final face = Rect.fromCenter(
+      center: p(0.575, 0.545),
+      width: u * 0.5,
+      height: u * 0.45,
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(faceRect, Radius.circular(unit * 0.115)),
+    canvas.drawOval(
+      face.inflate(u * 0.022),
+      Paint()..color = _shellEdge.withValues(alpha: 0.75),
+    );
+    canvas.drawOval(
+      face,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.35, -0.45),
+          radius: 0.95,
+          colors: [_faceTop, _faceBottom],
+        ).createShader(face),
+    );
+    // Glass highlight.
+    canvas.drawArc(
+      face.deflate(u * 0.035),
+      math.pi * 1.08,
+      math.pi * 0.42,
+      false,
+      Paint()
+        ..color = const Color(0x2EFFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.6, u * 0.018),
+    );
+
+    if (identity == HermezBotIdentity.neutral) {
+      final notch = Path()
+        ..moveTo(u * 0.535, u * 0.305)
+        ..lineTo(u * 0.625, u * 0.29)
+        ..lineTo(u * 0.575, u * 0.38)
+        ..close();
+      canvas.drawPath(notch, Paint()..color = _shellMid);
+    }
+
+    // Eyes.
+    for (final x in [0.5, 0.655]) {
+      final eye = p(x, 0.545);
+      canvas.drawCircle(
+        eye,
+        u * 0.07,
+        Paint()
+          ..color = _glow.withValues(alpha: 0.42)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur * 1.3),
+      );
+      canvas.drawCircle(
+        eye,
+        u * 0.047,
+        Paint()
+          ..shader = RadialGradient(colors: [_eyeCore, palette.accent])
+              .createShader(Rect.fromCircle(center: eye, radius: u * 0.047)),
+      );
+    }
+
+    if (identity == HermezBotIdentity.kai) _paintCrest(canvas, u, p, blur);
+    if (identity == HermezBotIdentity.autopilot) {
+      _paintAntenna(canvas, u, p, blur);
+    }
+  }
+
+  void _glowLine(
+    Canvas canvas,
+    Path path,
+    double u,
+    double blur, {
+    double width = 0.013,
+  }) {
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = _glow.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(1, u * width * 2.4)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = palette.accent
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.7, u * width),
+    );
+  }
+
+  Paint _seamPaint(double u) => Paint()
+    ..color = _seam.withValues(alpha: 0.7)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = math.max(0.5, u * 0.009);
+
+  /// Side disc, seams, and per-profile panel work, clipped to the shell.
+  void _paintShellDetail(
+    Canvas canvas,
+    double u,
+    Offset Function(double, double) p,
+    double blur,
+  ) {
+    // Side disc.
+    final disc = Rect.fromCenter(
+      center: p(0.215, 0.54),
+      width: u * 0.2,
+      height: u * 0.31,
+    );
+    canvas.drawOval(
+      disc,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF090B0E), Color(0xFF25282D)],
-        ).createShader(faceRect),
+          colors: [_shellHi, _shellLow],
+        ).createShader(disc),
     );
-    final eye = Paint()..color = palette.accent;
-    for (final dx in [-0.105, 0.105]) {
-      canvas.drawCircle(
-        center.translate(unit * dx, -unit * 0.03),
-        unit * 0.041,
-        eye,
-      );
-    }
-    final seam = Paint()
-      ..color = const Color(0xFF9DA2A7)
-      ..strokeWidth = math.max(0.75, unit * 0.016)
-      ..strokeCap = StrokeCap.round;
-    final signal = Paint()
-      ..color = palette.accent
-      ..strokeWidth = math.max(1.25, unit * 0.035)
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(unit * 0.38, unit * 0.77),
-      Offset(unit * 0.62, unit * 0.77),
-      seam,
-    );
+    canvas.drawOval(disc, _seamPaint(u));
+
     switch (identity) {
       case HermezBotIdentity.neutral:
-        canvas.drawLine(
-          Offset(unit * 0.39, unit * 0.21),
-          Offset(unit * 0.61, unit * 0.21),
-          signal,
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.47, u * 0.17)
+            ..quadraticBezierTo(u * 0.5, u * 0.26, u * 0.49, u * 0.3),
+          u,
+          blur,
+        );
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.33, u * 0.33)
+            ..quadraticBezierTo(u * 0.26, u * 0.6, u * 0.4, u * 0.82),
+          u,
+          blur,
         );
       case HermezBotIdentity.kai:
-        canvas.drawLine(
-          Offset(unit * 0.5, unit * 0.08),
-          Offset(unit * 0.5, unit * 0.19),
-          signal,
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.31, u * 0.36)
+            ..quadraticBezierTo(u * 0.25, u * 0.62, u * 0.4, u * 0.84),
+          u,
+          blur,
         );
-        canvas.drawCircle(Offset(unit * 0.5, unit * 0.065), unit * 0.045, eye);
-      case HermezBotIdentity.local:
-        for (var i = 0; i < 3; i++) {
-          final y = unit * (0.36 + i * 0.09);
-          canvas.drawLine(Offset(unit * 0.14, y), Offset(unit * 0.20, y), seam);
-        }
-      case HermezBotIdentity.autopilot:
-        final bolt = Path()
-          ..moveTo(unit * 0.52, unit * 0.08)
-          ..lineTo(unit * 0.44, unit * 0.20)
-          ..lineTo(unit * 0.53, unit * 0.20)
-          ..lineTo(unit * 0.48, unit * 0.29);
-        canvas.drawPath(bolt, signal..style = PaintingStyle.stroke);
-      case HermezBotIdentity.fast:
-        for (var i = 0; i < 3; i++) {
-          final y = unit * (0.37 + i * 0.11);
-          canvas.drawLine(
-            Offset(unit * 0.03, y),
-            Offset(unit * 0.17, y),
-            signal,
-          );
-        }
-      case HermezBotIdentity.strong:
         canvas.drawArc(
-          Rect.fromLTWH(unit * 0.07, unit * 0.20, unit * 0.86, unit * 0.66),
-          math.pi * 0.12,
-          math.pi * 0.75,
+          Rect.fromCenter(
+            center: p(0.215, 0.54),
+            width: u * 0.26,
+            height: u * 0.37,
+          ),
+          math.pi * 0.55,
+          math.pi * 0.9,
           false,
-          signal..style = PaintingStyle.stroke,
+          _seamPaint(u),
+        );
+      case HermezBotIdentity.strong:
+        final plate = _seamPaint(u)
+          ..color = const Color(0xFF3B3E43)
+          ..strokeWidth = math.max(0.8, u * 0.018);
+        canvas.drawArc(
+          Rect.fromCircle(center: p(0.5, 0.53), radius: u * 0.3),
+          math.pi * 1.05,
+          math.pi * 0.9,
+          false,
+          plate,
+        );
+        canvas.drawLine(p(0.5, 0.14), p(0.5, 0.23), plate);
+        canvas.drawLine(p(0.3, 0.8), p(0.38, 0.68), plate);
+        canvas.drawLine(p(0.72, 0.84), p(0.66, 0.72), plate);
+        // Lit slot along the crown and the disc ring.
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.5, u * 0.16)
+            ..lineTo(u * 0.5, u * 0.26),
+          u,
+          blur,
+          width: 0.028,
+        );
+        _glowLine(
+          canvas,
+          Path()..addOval(
+            Rect.fromCenter(
+              center: p(0.215, 0.54),
+              width: u * 0.25,
+              height: u * 0.37,
+            ),
+          ),
+          u,
+          blur,
+          width: 0.016,
+        );
+      case HermezBotIdentity.fast:
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.3, u * 0.24)
+            ..quadraticBezierTo(u * 0.4, u * 0.3, u * 0.37, u * 0.46),
+          u,
+          blur,
+        );
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.34, u * 0.7)
+            ..quadraticBezierTo(u * 0.44, u * 0.84, u * 0.56, u * 0.87),
+          u,
+          blur,
+        );
+      case HermezBotIdentity.local:
+        final vent = Paint()..color = const Color(0xFF2A2D32);
+        for (final rect in [
+          Rect.fromCenter(
+            center: p(0.38, 0.17),
+            width: u * 0.14,
+            height: u * 0.07,
+          ),
+          Rect.fromCenter(
+            center: p(0.64, 0.155),
+            width: u * 0.12,
+            height: u * 0.06,
+          ),
+          Rect.fromCenter(
+            center: p(0.46, 0.885),
+            width: u * 0.16,
+            height: u * 0.06,
+          ),
+        ]) {
+          final rrect = RRect.fromRectAndRadius(
+            rect,
+            Radius.circular(u * 0.02),
+          );
+          canvas.drawRRect(rrect, vent);
+          for (var i = 1; i < 4; i++) {
+            final y = rect.top + rect.height * i / 4;
+            canvas.drawLine(
+              Offset(rect.left + u * 0.012, y),
+              Offset(rect.right - u * 0.012, y),
+              Paint()
+                ..color = _glow.withValues(alpha: 0.85)
+                ..strokeWidth = math.max(0.4, u * 0.006),
+            );
+          }
+        }
+        // Lens port on the disc.
+        canvas.drawCircle(p(0.2, 0.53), u * 0.058, Paint()..color = _shellEdge);
+        canvas.drawCircle(
+          p(0.2, 0.53),
+          u * 0.036,
+          Paint()..color = const Color(0xFF3A3E44),
+        );
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.31, u * 0.4)
+            ..lineTo(u * 0.31, u * 0.47),
+          u,
+          blur,
+          width: 0.016,
+        );
+      case HermezBotIdentity.autopilot:
+        _glowLine(
+          canvas,
+          Path()
+            ..moveTo(u * 0.33, u * 0.33)
+            ..quadraticBezierTo(u * 0.27, u * 0.6, u * 0.4, u * 0.82),
+          u,
+          blur,
         );
     }
+  }
+
+  void _paintCrest(
+    Canvas canvas,
+    double u,
+    Offset Function(double, double) p,
+    double blur,
+  ) {
+    final crest = Path()
+      ..moveTo(u * 0.3, u * 0.25)
+      ..lineTo(u * 0.25, u * 0.1)
+      ..quadraticBezierTo(u * 0.36, u * 0.15, u * 0.43, u * 0.19)
+      ..lineTo(u * 0.53, u * 0.01)
+      ..lineTo(u * 0.61, u * 0.19)
+      ..quadraticBezierTo(u * 0.69, u * 0.14, u * 0.78, u * 0.1)
+      ..lineTo(u * 0.72, u * 0.27)
+      ..quadraticBezierTo(u * 0.6, u * 0.24, u * 0.56, u * 0.36)
+      ..quadraticBezierTo(u * 0.5, u * 0.24, u * 0.3, u * 0.25)
+      ..close();
+    canvas.drawPath(
+      crest,
+      Paint()
+        ..color = const Color(0x33000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur * 0.8),
+    );
+    canvas.drawPath(
+      crest,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_shellHi, _shellLow],
+        ).createShader(Rect.fromLTWH(u * 0.25, 0, u * 0.53, u * 0.36)),
+    );
+    _glowLine(
+      canvas,
+      Path()
+        ..moveTo(u * 0.25, u * 0.1)
+        ..quadraticBezierTo(u * 0.36, u * 0.15, u * 0.43, u * 0.19)
+        ..lineTo(u * 0.53, u * 0.01)
+        ..lineTo(u * 0.61, u * 0.19)
+        ..quadraticBezierTo(u * 0.69, u * 0.14, u * 0.78, u * 0.1),
+      u,
+      blur,
+      width: 0.011,
+    );
+    final gem = Path()
+      ..moveTo(u * 0.53, u * 0.12)
+      ..lineTo(u * 0.565, u * 0.18)
+      ..lineTo(u * 0.53, u * 0.24)
+      ..lineTo(u * 0.495, u * 0.18)
+      ..close();
+    canvas.drawPath(
+      gem,
+      Paint()
+        ..color = _glow.withValues(alpha: 0.6)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+    );
+    canvas.drawPath(gem, Paint()..color = palette.accent);
+  }
+
+  void _paintFins(Canvas canvas, double u, Offset Function(double, double) p) {
+    final fin = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.centerRight,
+        end: Alignment.centerLeft,
+        colors: [_shellHi, _shellLow],
+      ).createShader(Rect.fromLTWH(0, u * 0.1, u * 0.5, u * 0.7));
+    final edge = Paint()
+      ..color = _shellEdge
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.5, u * 0.008);
+    for (final points in const [
+      [0.36, 0.2, 0.2, 0.16, 0.3, 0.31],
+      [0.22, 0.36, 0.08, 0.37, 0.2, 0.5],
+      [0.2, 0.62, 0.07, 0.68, 0.25, 0.74],
+    ]) {
+      final path = Path()
+        ..moveTo(u * points[0], u * points[1])
+        ..quadraticBezierTo(
+          u * (points[2] + 0.06),
+          u * points[3],
+          u * points[2],
+          u * points[3],
+        )
+        ..lineTo(u * points[4], u * points[5])
+        ..close();
+      canvas.drawPath(path, fin);
+      canvas.drawPath(path, edge);
+    }
+  }
+
+  void _paintStreaks(
+    Canvas canvas,
+    double u,
+    Offset Function(double, double) p,
+  ) {
+    for (final (y, length) in const [
+      (0.34, 0.26),
+      (0.46, 0.34),
+      (0.58, 0.3),
+      (0.7, 0.22),
+    ]) {
+      final start = p(0.2, y);
+      final end = p(0.2 - length, y);
+      canvas.drawLine(
+        start,
+        end,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [_glow.withValues(alpha: 0.75), _glow.withValues(alpha: 0)],
+          ).createShader(Rect.fromPoints(start, end.translate(0, 1)))
+          ..strokeWidth = math.max(0.8, u * 0.022)
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  void _paintAntenna(
+    Canvas canvas,
+    double u,
+    Offset Function(double, double) p,
+    double blur,
+  ) {
+    canvas.drawLine(
+      p(0.56, 0.16),
+      p(0.62, 0.05),
+      Paint()
+        ..color = _shellEdge
+        ..strokeWidth = math.max(0.8, u * 0.018)
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(
+      p(0.625, 0.045),
+      u * 0.045,
+      Paint()
+        ..color = _glow.withValues(alpha: 0.5)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+    );
+    canvas.drawCircle(
+      p(0.625, 0.045),
+      u * 0.03,
+      Paint()..color = palette.accent,
+    );
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nib_motion/nib_motion.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
+import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_visual_theme.dart';
@@ -15,12 +16,29 @@ class HermesPageChrome extends StatelessWidget {
     required this.subtitle,
     required this.child,
     this.actions = const [],
+    this.showHeader = true,
+    this.titleMorphId,
   });
 
   final String title;
   final String subtitle;
   final Widget child;
   final List<Widget> actions;
+
+  /// False when the page draws its own header (for example a shared object
+  /// that arrives from the previous screen).
+  final bool showHeader;
+
+  /// Lets the page title arrive as the title of the object that opened it.
+  final String? titleMorphId;
+
+  static TextStyle titleStyle(HermezChatPalette palette) => TextStyle(
+    color: palette.ink,
+    fontSize: 34,
+    fontWeight: FontWeight.w900,
+    letterSpacing: -1.5,
+    height: 1.05,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -31,51 +49,128 @@ class HermesPageChrome extends StatelessWidget {
       reducedMotion: context.reduceMotion,
       entranceWarmup: Duration.zero,
       child: Theme(
-      data: hermezVisualTheme(Theme.of(context)),
-      child: Scaffold(
-        backgroundColor: palette.canvas,
-        appBar: AppBar(
-          backgroundColor: palette.canvas,
-          surfaceTintColor: Colors.transparent,
-          scrolledUnderElevation: 0,
-          actions: actions,
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              HermezTechnicalBackground(
-                variant: HermezBackgroundVariant.editorial,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: palette.ink,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -1.5,
-                          height: 1.05,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(color: palette.muted, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
+        data: hermezVisualTheme(Theme.of(context)),
+        child: HermezRouteCanvas(
+          color: palette.canvas,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              actions: actions,
+            ),
+            body: SafeArea(
+              top: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showHeader)
+                    HermezPageHeader(
+                      title: title,
+                      subtitle: subtitle,
+                      titleMorphId: titleMorphId,
+                      palette: palette,
+                    ),
+                  Expanded(child: child),
+                ],
               ),
-              Expanded(child: child),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The Hermez page title block. The title can arrive from the card that
+/// opened the page; the subtitle settles in behind it.
+class HermezPageHeader extends StatelessWidget {
+  const HermezPageHeader({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.palette,
+    this.titleMorphId,
+    this.motifMorphId,
+  });
+
+  final String title;
+  final String subtitle;
+  final HermezChatPalette palette;
+  final String? titleMorphId;
+  final String? motifMorphId;
+
+  @override
+  Widget build(BuildContext context) => HermezTechnicalBackground(
+    variant: HermezBackgroundVariant.editorial,
+    morphId: motifMorphId,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HermezMorphText(
+            title,
+            id: titleMorphId,
+            maxLines: 2,
+            style: HermesPageChrome.titleStyle(palette),
+          ),
+          const SizedBox(height: 4),
+          HermezEntrance(
+            order: 0,
+            child: Text(
+              subtitle,
+              style: TextStyle(color: palette.muted, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// The page canvas. While the page grows out of a card it starts as that
+/// card's surface color and settles to [color], so the growing aperture reads
+/// as the same object. A color change, not an opacity change.
+class HermezRouteCanvas extends StatelessWidget {
+  const HermezRouteCanvas({
+    super.key,
+    required this.color,
+    required this.child,
+  });
+
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final route = ModalRoute.of(context);
+    final animation = route?.animation;
+    final originColor = route is HermezRouteTransitions
+        ? route.origin?.color
+        : null;
+    if (animation == null ||
+        originColor == null ||
+        route is! HermezRouteTransitions ||
+        route.effectiveMotion != HermezRouteMotion.expand) {
+      return ColoredBox(color: color, child: child);
+    }
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) => ColoredBox(
+        color: Color.lerp(
+          originColor,
+          color,
+          // Match the route: on Back the colour moves with the flipped spring,
+          // so it starts changing immediately instead of lingering.
+          (animation.status == AnimationStatus.reverse
+                  ? HermezMotion.curveHeavy.flipped
+                  : HermezMotion.curveHeavy)
+              .transform(animation.value.clamp(0.0, 1.0)),
+        )!,
+        child: child,
       ),
     );
   }

@@ -273,7 +273,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
-      value: shouldAnimateOnMount ? 0.0 : 1.0,
+      value: 1.0,
     );
     _streamingContentFadeController = AnimationController(
       duration: const Duration(milliseconds: 260),
@@ -325,7 +325,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       _clearVisibleFollowUps();
       _resetTtsPlainTextState();
       _hasAnimated = !_shouldAnimateOnMount;
-      _fadeController.value = _shouldAnimateOnMount ? 0.0 : 1.0;
+      _fadeController.value = 1.0;
       _streamingContentFadeController.value = 1.0;
     }
 
@@ -498,12 +498,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         _displayedContent.trim().isEmpty;
   }
 
-  bool _canFadeStreamingContent(String nextRaw) {
-    if (_disableAnimations || !_uiTreatsAsStreaming) {
-      return false;
-    }
-    return nextRaw.trim().isNotEmpty;
-  }
+  // Hermez never fades content in or out. Streaming text appears as it
+  // arrives; the wrapper below stays in the tree only so the markdown subtree
+  // keeps its identity across the streaming/completed boundary.
+  bool _canFadeStreamingContent(String nextRaw) => false;
 
   void _setActiveVersionIndex(int nextIndex) {
     final raw = _resolvedMessageContent(null, nextIndex);
@@ -1316,16 +1314,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                   children: children,
                 );
               },
-              transitionBuilder: (child, anim) {
-                return FadeTransition(
-                  opacity: CurvedAnimation(
-                    parent: anim,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  ),
-                  child: child,
-                );
-              },
+              // Instant swap; nothing fades.
+              transitionBuilder: (child, anim) => child,
               child: _buildFooterSlot(
                 footer: footer,
                 hasFollowUps: hasFollowUps,
@@ -1336,13 +1326,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       ),
     );
 
-    // Animate on first appearance only, not on every streaming rebuild
+    // A new message is simply present: no fade on first appearance.
     if (!_hasAnimated) {
       _hasAnimated = true;
-      _fadeController.forward();
+      _fadeController.value = 1.0;
     }
 
-    return FadeTransition(opacity: _fadeController, child: content);
+    return content;
   }
 
   /// Builds the keyed child for the footer [AnimatedSwitcher]: the action row

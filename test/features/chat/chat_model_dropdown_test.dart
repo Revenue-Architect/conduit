@@ -156,8 +156,19 @@ void main() {
     check(
       find.byKey(const ValueKey('hermes-bot-activity-dot')).evaluate().length,
     ).equals(1);
+    // The activity dot breathes by size, never by opacity.
+    check(find.byType(FadeTransition).evaluate()).isEmpty();
     check(
-      tester.widget<FadeTransition>(find.byType(FadeTransition)).opacity.value,
+      tester
+          .widgetList<ScaleTransition>(
+            find.ancestor(
+              of: find.byKey(const ValueKey('hermes-bot-activity-dot')),
+              matching: find.byType(ScaleTransition),
+            ),
+          )
+          .first
+          .scale
+          .value,
     ).equals(1);
   });
 

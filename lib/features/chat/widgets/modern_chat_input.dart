@@ -4219,16 +4219,14 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         if (context.reduceMotion) {
           return child;
         }
-        final scale = Tween<double>(begin: 0.94, end: 1).animate(
-          CurvedAnimation(
+        // The old glyph shrinks away as the new one grows in its place.
+        return ScaleTransition(
+          scale: CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
             reverseCurve: Curves.easeInCubic,
           ),
-        );
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(scale: scale, child: child),
+          child: child,
         );
       },
       child: ConduitSystemAdaptiveIcon(

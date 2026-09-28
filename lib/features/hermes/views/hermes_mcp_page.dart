@@ -7,6 +7,7 @@ import '../../../core/utils/debug_logger.dart';
 import '../models/hermes_mcp.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../../../shared/widgets/conduit_dialog_route.dart';
 
 final class HermesMcpPage extends ConsumerStatefulWidget {
   const HermesMcpPage({super.key});
@@ -73,7 +74,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     final command = TextEditingController();
     final args = TextEditingController();
     final secret = TextEditingController();
-    final accepted = await showDialog<bool>(
+    final accepted = await showConduitDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add MCP server'),
@@ -166,7 +167,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
   Future<void> _addPreset() async {
     final entries = await _service.mcpCatalog();
     if (!mounted) return;
-    final selected = await showDialog<HermesMcpCatalogEntry>(
+    final selected = await showConduitDialog<HermesMcpCatalogEntry>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Add catalog server'),
@@ -191,7 +192,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
 
   Future<void> _setApiKey(String name) async {
     final value = TextEditingController();
-    final accepted = await showDialog<bool>(
+    final accepted = await showConduitDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Set API key for $name'),
@@ -243,7 +244,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
   }
 
   Future<void> _remove(String name) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConduitDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Remove $name?'),

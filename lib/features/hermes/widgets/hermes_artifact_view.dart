@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../motion/hermez_motion.dart';
 import '../providers/hermes_artifact_provider.dart';
 import '../services/hermes_artifact_client.dart';
 import '../services/hermes_media_parser.dart';
@@ -19,6 +21,8 @@ class HermesArtifactView extends ConsumerStatefulWidget {
     this.sessionId,
     this.maxImageHeight = 340,
     this.download,
+    this.initialBytes,
+    this.previewMorphId,
   });
 
   final HermesMediaArtifact artifact;
@@ -29,6 +33,13 @@ class HermesArtifactView extends ConsumerStatefulWidget {
   /// Kanban attachments, which are downloaded by board and attachment id.
   final Future<HermesArtifactBytes> Function()? download;
 
+  /// Bytes the caller already holds, such as a grid thumbnail's source.
+  /// The preview paints them on its first frame instead of downloading again.
+  final HermesArtifactBytes? initialBytes;
+
+  /// Lets the preview image arrive from the tile that opened it.
+  final String? previewMorphId;
+
   @override
   ConsumerState<HermesArtifactView> createState() => _HermesArtifactViewState();
 }
@@ -37,6 +48,7 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
   Future<HermesArtifactBytes>? _imageDownload;
   bool _isActionInProgress = false;
   String? _actionError;
+  bool _useInitialBytes = true;
 
   bool get _isImage => widget.artifact.kind == HermesMediaKind.image;
 
@@ -68,7 +80,14 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
   Widget build(BuildContext context) =>
       _isImage ? _buildImagePreview() : _buildFileCard(context);
 
-  Widget _buildImagePreview() => FutureBuilder<HermesArtifactBytes>(
+  Widget _buildImagePreview() {
+    final initial = widget.initialBytes;
+    if (initial != null && _useInitialBytes)
+      return _imageContent(initial.bytes);
+    return _downloadedPreview();
+  }
+
+  Widget _downloadedPreview() => FutureBuilder<HermesArtifactBytes>(
     future: _imageDownload,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
@@ -81,70 +100,77 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
         );
       }
 
-      final bytes = snapshot.data!.bytes;
-      final image = _extension == 'svg'
-          ? SvgPicture.memory(
-              bytes,
-              width: double.infinity,
-              height: widget.maxImageHeight,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => _imageErrorPreview(
-                context,
-                const HermesArtifactException(
-                  HermesArtifactFailureKind.unavailable,
-                ),
-              ),
-            )
-          : Image.memory(
-              bytes,
-              width: double.infinity,
-              height: widget.maxImageHeight,
-              fit: BoxFit.contain,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded || frame != null) return child;
-                return _loadingPreview(context);
-              },
-              errorBuilder: (_, _, _) => _imageErrorPreview(
-                context,
-                const HermesArtifactException(
-                  HermesArtifactFailureKind.unavailable,
-                ),
-              ),
-            );
-      return Column(
-        children: [
-          _imageFrame(
-            context,
-            InteractiveViewer(minScale: 1, maxScale: 5, child: image),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: _isActionInProgress
-                    ? null
-                    : () => _runAction(open: true),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text('Open'),
-              ),
-              TextButton.icon(
-                onPressed: _isActionInProgress
-                    ? null
-                    : () => _runAction(open: false),
-                icon: const Icon(Icons.share_outlined, size: 18),
-                label: const Text('Share'),
-              ),
-            ],
-          ),
-          if (_actionError != null)
-            Text(
-              _actionError!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-        ],
-      );
+      return _imageContent(snapshot.data!.bytes);
     },
   );
+
+  Widget _imageContent(Uint8List bytes) {
+    final image = _extension == 'svg'
+        ? SvgPicture.memory(
+            bytes,
+            width: double.infinity,
+            height: widget.maxImageHeight,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => _imageErrorPreview(
+              context,
+              const HermesArtifactException(
+                HermesArtifactFailureKind.unavailable,
+              ),
+            ),
+          )
+        : Image.memory(
+            bytes,
+            width: double.infinity,
+            height: widget.maxImageHeight,
+            fit: BoxFit.contain,
+            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+              if (wasSynchronouslyLoaded || frame != null) return child;
+              return _loadingPreview(context);
+            },
+            errorBuilder: (_, _, _) => _imageErrorPreview(
+              context,
+              const HermesArtifactException(
+                HermesArtifactFailureKind.unavailable,
+              ),
+            ),
+          );
+    return Column(
+      children: [
+        _imageFrame(
+          context,
+          InteractiveViewer(
+            minScale: 1,
+            maxScale: 5,
+            child: HermezMorph(id: widget.previewMorphId, child: image),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: _isActionInProgress
+                  ? null
+                  : () => _runAction(open: true),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text('Open'),
+            ),
+            TextButton.icon(
+              onPressed: _isActionInProgress
+                  ? null
+                  : () => _runAction(open: false),
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: const Text('Share'),
+            ),
+          ],
+        ),
+        if (_actionError != null)
+          Text(
+            _actionError!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+      ],
+    );
+  }
 
   Widget _imageFrame(BuildContext context, Widget child) => Container(
     width: double.infinity,
@@ -187,7 +213,10 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             TextButton.icon(
-              onPressed: () => setState(() => _imageDownload = _download()),
+              onPressed: () => setState(() {
+                _useInitialBytes = false;
+                _imageDownload = _download();
+              }),
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Retry'),
             ),

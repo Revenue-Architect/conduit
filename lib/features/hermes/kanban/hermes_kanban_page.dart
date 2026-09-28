@@ -5,14 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../shared/widgets/conduit_dialog_route.dart';
 import '../../../core/services/navigation_service.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_identifier.dart';
 import '../views/hermes_dashboard_auth_page.dart';
 import '../views/hermes_artifacts_page.dart';
+import '../views/hermes_page_chrome.dart';
 import '../widgets/hermez_visual_theme.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_technical_background.dart';
+import '../motion/hermez_motion.dart';
+import '../sheets/hermez_modal_sheet.dart';
 import 'hermes_kanban_client.dart';
 
 sealed class _KanbanLinkedSelection {
@@ -42,7 +47,7 @@ Future<T?> _settledDialog<T>(
       surfaceTintColor: Colors.transparent,
     ),
   );
-  final route = DialogRoute<T>(
+  final route = ConduitDialogRoute<T>(
     context: context,
     builder: (dialogContext) =>
         Theme(data: theme, child: builder(dialogContext)),
@@ -515,20 +520,20 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     }
   }
 
-  Future<void> _openTask(KanbanTask task) async {
+  Future<void> _openTask(KanbanTask task, [HermezMorphOrigin? origin]) async {
     final board = _board;
     if (board == null) return;
-    final selected = await showModalBottomSheet<_KanbanLinkedSelection>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.86,
+    final selected = await pushHermezSheetRoute<_KanbanLinkedSelection>(
+      context,
+      origin: origin,
+      heightFactor: 0.86,
+      builder: (context) => Material(
+        color: HermezChatPalette.forBrightness(Theme.of(context).brightness)
+            .surface,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
         child: _KanbanTaskSheet(
           board: board,
           task: task,
@@ -569,157 +574,175 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     );
     return Theme(
       data: hermezVisualTheme(Theme.of(context)),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Row(
-            children: [
-              Text(
-                'H',
-                style: Theme.of(context).textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -3),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(left: 3, top: 13),
-                child: CircleAvatar(
-                  radius: 4,
-                  backgroundColor: Color(0xFFFF5A26),
+      child: HermezRouteCanvas(
+        color: palette.canvas,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            title: Row(
+              children: [
+                Text(
+                  'H',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -3,
+                  ),
                 ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 3, top: 13),
+                  child: CircleAvatar(
+                    radius: 4,
+                    backgroundColor: Color(0xFFFF5A26),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Search tasks',
+                onPressed: () => setState(() => _showSearch = !_showSearch),
+                icon: const Icon(Icons.search_rounded),
+              ),
+              IconButton(
+                tooltip: 'Refresh board',
+                onPressed: _loading ? null : _refresh,
+                icon: const Icon(Icons.refresh_rounded),
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              tooltip: 'Search tasks',
-              onPressed: () => setState(() => _showSearch = !_showSearch),
-              icon: const Icon(Icons.search_rounded),
-            ),
-            IconButton(
-              tooltip: 'Refresh board',
-              onPressed: _loading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
-        ),
-        floatingActionButton: _board == null
-            ? null
-            : FloatingActionButton.extended(
-                onPressed: _busy ? null : () => _create(),
-                icon: const Icon(Icons.add),
-                label: const Text('New task'),
-              ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Kanban',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1.8,
-                      ),
-                    ),
-                    Text(
-                      'TURN IDEAS INTO ACTION',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        letterSpacing: 3.0,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+          floatingActionButton: _board == null
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: _busy ? null : () => _create(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('New task'),
                 ),
-              ),
-            ),
-            if (_boards.isNotEmpty)
-              SizedBox(
-                height: 58,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    for (final board in _boards)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(board.name),
-                          selected: board.slug == _board,
-                          selectedColor: palette.ink,
-                          backgroundColor: palette.surface,
-                          labelStyle: TextStyle(
-                            color: board.slug == _board
-                                ? palette.surface
-                                : palette.ink,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          side: BorderSide(
-                            color: board.slug == _board
-                                ? palette.ink
-                                : palette.border,
-                          ),
-                          onSelected: (_) => _selectBoard(board.slug),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            if (_showSearch)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: TextField(
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search_rounded),
-                    hintText: 'Search this board',
-                  ),
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                ),
-              ),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+          body: Column(
+            children: [
+              HermezTechnicalBackground(
+                variant: HermezBackgroundVariant.editorial,
+                morphId: hermezMorphPart(hermezBoardMorphId, 'motif'),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.cloud_off_outlined),
-                        Text(_error!, textAlign: TextAlign.center),
-                        if (_snapshot != null)
-                          const Text(
-                            'Showing the last loaded board; it may be stale.',
-                          ),
-                        TextButton(
-                          onPressed: _loadBoards,
-                          child: const Text('Retry'),
+                        HermezMorphText(
+                          'Kanban',
+                          id: hermezMorphPart(hermezBoardMorphId, 'title'),
+                          style:
+                              (Theme.of(context).textTheme.displaySmall ??
+                                      const TextStyle())
+                                  .copyWith(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.8,
+                                  ),
                         ),
-                        if (_error!.contains('Dashboard sign-in'))
-                          FilledButton(
-                            onPressed: _signIn,
-                            child: const Text('Open Dashboard sign-in'),
-                          ),
-                        if (_error!.contains('Native Hermes sign-in'))
-                          FilledButton(
-                            onPressed: () async {
-                              await context.pushNamed<void>(
-                                RouteNames.hermesSettings,
-                              );
-                              if (mounted) await _loadBoards();
-                            },
-                            child: const Text('Open Hermes sign-in'),
-                          ),
+                        Text(
+                          'TURN IDEAS INTO ACTION',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                letterSpacing: 3.0,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
-            Expanded(child: _boardBody()),
-          ],
+              if (_boards.isNotEmpty)
+                SizedBox(
+                  height: 58,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      for (final board in _boards)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(board.name),
+                            selected: board.slug == _board,
+                            selectedColor: palette.ink,
+                            backgroundColor: palette.surface,
+                            labelStyle: TextStyle(
+                              color: board.slug == _board
+                                  ? palette.surface
+                                  : palette.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            side: BorderSide(
+                              color: board.slug == _board
+                                  ? palette.ink
+                                  : palette.border,
+                            ),
+                            onSelected: (_) => _selectBoard(board.slug),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (_showSearch)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search_rounded),
+                      hintText: 'Search this board',
+                    ),
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                  ),
+                ),
+              if (_loading) const LinearProgressIndicator(minHeight: 2),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.cloud_off_outlined),
+                          Text(_error!, textAlign: TextAlign.center),
+                          if (_snapshot != null)
+                            const Text(
+                              'Showing the last loaded board; it may be stale.',
+                            ),
+                          TextButton(
+                            onPressed: _loadBoards,
+                            child: const Text('Retry'),
+                          ),
+                          if (_error!.contains('Dashboard sign-in'))
+                            FilledButton(
+                              onPressed: _signIn,
+                              child: const Text('Open Dashboard sign-in'),
+                            ),
+                          if (_error!.contains('Native Hermes sign-in'))
+                            FilledButton(
+                              onPressed: () async {
+                                await context.pushNamed<void>(
+                                  RouteNames.hermesSettings,
+                                );
+                                if (mounted) await _loadBoards();
+                              },
+                              child: const Text('Open Hermes sign-in'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(child: _boardBody()),
+            ],
+          ),
         ),
       ),
     );
@@ -868,12 +891,20 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: Text('No tasks in ${_label(lane)}.'),
             ),
-          for (var index = 0; index < visible.length; index++) ...[
-            _KanbanTaskCard(
-              task: visible[index],
-              onTap: () => _openTask(visible[index]),
+          if (visible.isNotEmpty)
+            HermezMotionGroup(
+              children: [
+                for (final task in visible)
+                  KeyedSubtree(
+                    key: ValueKey<String>('task:${task.id}'),
+                    child: _KanbanTaskCard(
+                      task: task,
+                      board: _board,
+                      onOpen: (origin) => _openTask(task, origin),
+                    ),
+                  ),
+              ],
             ),
-          ],
         ],
       ),
     );
@@ -899,109 +930,128 @@ String _kanbanTime(Object? raw) {
 }
 
 class _KanbanTaskCard extends StatelessWidget {
-  const _KanbanTaskCard({required this.task, required this.onTap});
+  const _KanbanTaskCard({
+    required this.task,
+    required this.board,
+    required this.onOpen,
+  });
   final KanbanTask task;
-  final VoidCallback onTap;
+  final String? board;
+  final ValueChanged<HermezMorphOrigin?> onOpen;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            task.status == 'done'
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
-            size: 20,
-            color: task.status == 'done'
-                ? const Color(0xFF17A46A)
-                : Theme.of(context).colorScheme.outline,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+    child: HermezMotionSurface(
+      semanticLabel: task.title,
+      originRadius: 14,
+      originColor: Theme.of(context).colorScheme.surface,
+      onOpen: onOpen,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 4,
-                      backgroundColor: task.status == 'done'
-                          ? const Color(0xFF18704B)
-                          : const Color(0xFFFF5A26),
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        task.title,
-                        style: Theme.of(context).textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ],
-                ),
-                if (task.body != null || task.summary != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    task.summary ?? task.body!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 4,
-                  children: [
-                    if (task.assignee != null)
-                      _TaskMeta(Icons.person_outline_rounded, task.assignee!),
-                    if (task.priority != null)
-                      _TaskMeta(Icons.flag_outlined, '${task.priority}'),
-                    if (task.commentCount != null && task.commentCount! > 0)
-                      _TaskMeta(
-                        Icons.mode_comment_outlined,
-                        '${task.commentCount}',
-                      ),
-                  ],
-                ),
-                if (task.status == 'ready' && task.assignee == null)
-                  const Text('Assign a Hermes profile to start agent work.'),
-                if (task.childTotal != null && task.childTotal! > 0) ...[
-                  const SizedBox(height: 8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              task.status == 'done'
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 20,
+              color: task.status == 'done'
+                  ? const Color(0xFF17A46A)
+                  : Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: LinearProgressIndicator(
-                          value: ((task.childDone ?? 0) / task.childTotal!)
-                              .clamp(0.0, 1.0),
-                          minHeight: 5,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                      CircleAvatar(
+                        radius: 4,
+                        backgroundColor: task.status == 'done'
+                            ? const Color(0xFF18704B)
+                            : const Color(0xFFFF5A26),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${task.childDone ?? 0}/${task.childTotal}',
-                        style: Theme.of(context).textTheme.labelSmall,
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: HermezMorphText(
+                          task.title,
+                          id: hermezMorphPart(
+                            hermezKanbanTaskMorphId(board, task.id),
+                            'title',
+                          ),
+                          maxLines: 3,
+                          style:
+                              (Theme.of(context).textTheme.titleSmall ??
+                                      const TextStyle(fontSize: 14))
+                                  .copyWith(fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ],
                   ),
+                  if (task.body != null || task.summary != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      task.summary ?? task.body!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      if (task.assignee != null)
+                        _TaskMeta(Icons.person_outline_rounded, task.assignee!),
+                      if (task.priority != null)
+                        _TaskMeta(Icons.flag_outlined, '${task.priority}'),
+                      if (task.commentCount != null && task.commentCount! > 0)
+                        _TaskMeta(
+                          Icons.mode_comment_outlined,
+                          '${task.commentCount}',
+                        ),
+                    ],
+                  ),
+                  if (task.status == 'ready' && task.assignee == null)
+                    const Text('Assign a Hermes profile to start agent work.'),
+                  if (task.childTotal != null && task.childTotal! > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LinearProgressIndicator(
+                            value: ((task.childDone ?? 0) / task.childTotal!)
+                                .clamp(0.0, 1.0),
+                            minHeight: 5,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${task.childDone ?? 0}/${task.childTotal}',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          const Icon(Icons.chevron_right_rounded, size: 20),
-        ],
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, size: 20),
+          ],
+        ),
       ),
     ),
   );
@@ -1272,14 +1322,22 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
               ),
             ],
           ),
-          Text(
+          HermezMorphText(
             task.title,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-              height: 1.12,
+            id: hermezMorphPart(
+              hermezKanbanTaskMorphId(widget.board, task.id),
+              'title',
             ),
+            maxLines: 4,
+            style:
+                (Theme.of(context).textTheme.headlineMedium ??
+                        const TextStyle())
+                    .copyWith(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                      height: 1.12,
+                    ),
           ),
           const SizedBox(height: 10),
           Wrap(

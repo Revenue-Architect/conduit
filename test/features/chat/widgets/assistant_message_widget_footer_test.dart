@@ -1477,7 +1477,7 @@ Example JSON, not a UI:
     expect(_hasInProgressFadeAncestor(tester, actionsFinder), isFalse);
   });
 
-  testWidgets('streaming body fades in once when first content arrives', (
+  testWidgets('streaming body never fades when first content arrives', (
     tester,
   ) async {
     ChatMessage streamingMessage(String content) => ChatMessage(
@@ -1512,10 +1512,8 @@ Example JSON, not a UI:
       const ValueKey('assistant-streaming-content-fade'),
     );
     expect(fadeFinder, findsOneWidget);
-    expect(
-      tester.widget<FadeTransition>(fadeFinder).opacity.value,
-      lessThan(1),
-    );
+    // Hermez never fades content in: the body is fully opaque at once.
+    expect(tester.widget<FadeTransition>(fadeFinder).opacity.value, 1);
 
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.widget<FadeTransition>(fadeFinder).opacity.value, 1);
@@ -1532,7 +1530,7 @@ Example JSON, not a UI:
     expect(tester.widget<FadeTransition>(fadeFinder).opacity.value, 1);
   });
 
-  testWidgets('streaming body fades when first content is present on mount', (
+  testWidgets('streaming body is opaque when content is present on mount', (
     tester,
   ) async {
     final message = ChatMessage(
@@ -1550,10 +1548,8 @@ Example JSON, not a UI:
       const ValueKey('assistant-streaming-content-fade'),
     );
     expect(fadeFinder, findsOneWidget);
-    expect(
-      tester.widget<FadeTransition>(fadeFinder).opacity.value,
-      lessThan(1),
-    );
+    // Hermez never fades content in: the body is fully opaque at once.
+    expect(tester.widget<FadeTransition>(fadeFinder).opacity.value, 1);
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.widget<FadeTransition>(fadeFinder).opacity.value, 1);
   });

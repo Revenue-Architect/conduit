@@ -34,9 +34,13 @@ final hermesSteelViewerUrlProvider =
     );
 
 class HermesSteelViewerUrlController extends Notifier<String> {
+  // Personal builds can supply the installed viewer without baking a private
+  // tailnet address into the public source or changing other installations.
+  static const buildDefault = String.fromEnvironment('HERMES_STEEL_VIEWER_URL');
   @override
   String build() =>
-      PreferencesStore.getString(PreferenceKeys.hermesSteelViewerUrl) ?? '';
+      PreferencesStore.getString(PreferenceKeys.hermesSteelViewerUrl) ??
+      buildDefault;
 
   Future<void> save(String source) async {
     final value = source.trim();
@@ -45,7 +49,7 @@ class HermesSteelViewerUrlController extends Notifier<String> {
     }
     await PreferencesStore.putChecked(
       PreferenceKeys.hermesSteelViewerUrl,
-      value.isEmpty ? null : value,
+      value,
     );
     state = value;
   }

@@ -1,24 +1,28 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_pending_decision_store.dart';
-import '../views/hermes_page_chrome.dart';
+import '../motion/hermez_motion.dart';
+import '../widgets/hermez_bot_mark.dart';
+import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_sheet_parts.dart';
+import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
 
 /// Null/false means the sheet was dismissed or failed; dismissal never sends
 /// a denial to Hermes. Only explicit actions resolve a pending request.
 Future<bool?> showHermesAttentionResolutionSheet(
   BuildContext context,
-  HermesPendingDesktopDecision decision,
-) => showModalBottomSheet<bool>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  backgroundColor: Colors.transparent,
+  HermesPendingDesktopDecision decision, {
+  HermezMorphOrigin? origin,
+}) => pushHermezSheetRoute<bool>(
+  context,
+  origin: origin,
   builder: (_) => _ResolutionSheet(decision: decision),
 );
 
@@ -85,11 +89,15 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     final decision = widget.decision;
     final kind = decision.kind;
     final sensitive =
         kind == HermesPendingDesktopDecisionKind.secret ||
         kind == HermesPendingDesktopDecisionKind.sudo;
+    final expired = !decision.expiresAt.isAfter(DateTime.now().toUtc());
     final title = switch (kind) {
       HermesPendingDesktopDecisionKind.approval => 'Approve this action?',
       HermesPendingDesktopDecisionKind.clarification =>
@@ -99,18 +107,86 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
       HermesPendingDesktopDecisionKind.mcpSetup =>
         'Connect ${decision.mcpServer ?? 'MCP server'}?',
     };
+    final lead = switch (kind) {
+      HermesPendingDesktopDecisionKind.approval =>
+        'Hermes paused and is waiting for your approval before it continues.',
+      HermesPendingDesktopDecisionKind.clarification =>
+        'Hermes paused to ask you something.',
+      HermesPendingDesktopDecisionKind.sudo =>
+        'Hermes needs elevated access to continue.',
+      HermesPendingDesktopDecisionKind.secret =>
+        'Hermes needs a credential to continue. It is sent only to this run.',
+      HermesPendingDesktopDecisionKind.mcpSetup =>
+        'Hermes wants to connect a tool server.',
+    };
+    final prompt = decision.prompt ?? 'Hermes is waiting for your input.';
+    final remaining = decision.expiresAt.difference(DateTime.now().toUtc());
     return HermezModalSheet(
       title: title,
       eyebrow: 'Attention',
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          HermesPanel(
-            child: Text(decision.prompt ?? 'Hermes is waiting for your input.'),
+          Text(
+            lead,
+            style: HermezType.body(palette)
+                .copyWith(color: palette.muted, fontSize: 15),
           ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              HermezBotMark(
+                identity: HermezBotIdentity.neutral,
+                size: 48,
+                label: 'Hermes',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Hermes', style: HermezType.section(palette)),
+                    Text(
+                      'Waiting for your response',
+                      style: HermezType.meta(palette),
+                    ),
+                  ],
+                ),
+              ),
+              if (!expired && remaining.inMinutes < 24 * 60)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    remaining.inMinutes < 1
+                        ? 'EXPIRES SOON'
+                        : 'EXPIRES IN ${remaining.inMinutes} MIN',
+                    style: HermezType.technical(palette.accent),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (kind == HermesPendingDesktopDecisionKind.approval)
+            _CommandBlock(text: prompt)
+          else
+            HermezSurface(
+              kind: HermezSurfaceKind.utility,
+              border: Border.all(color: palette.border.withValues(alpha: 0.75)),
+              child: Text(prompt, style: HermezType.body(palette)),
+            ),
           if (kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
             const SizedBox(height: 12),
-            Text('Requested action: ${decision.mcpAction ?? 'setup'}'),
+            Text(
+              'Requested action: ${decision.mcpAction ?? 'setup'}',
+              style: HermezType.meta(palette),
+            ),
           ],
           if (decision.choices.isNotEmpty) ...[
             const SizedBox(height: 15),
@@ -150,46 +226,45 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
               ),
             ),
           ],
-          if (!decision.expiresAt.isAfter(DateTime.now().toUtc()))
+          if (expired)
             const Padding(
               padding: EdgeInsets.only(top: 14),
               child: Text('This request has expired. Reopen the conversation.'),
             ),
-          if (_error != null)
-            Padding(
+          HermezReveal(
+            visible: _error != null,
+            child: Padding(
               padding: const EdgeInsets.only(top: 14),
               child: Text(
-                _error!,
+                _error ?? '',
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
+          ),
         ],
       ),
       footer: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (kind == HermesPendingDesktopDecisionKind.approval ||
-              kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _busy
-                    ? null
-                    : () => _send(
-                        kind == HermesPendingDesktopDecisionKind.approval
-                            ? 'deny'
-                            : 'decline',
-                      ),
-                child: Text(
-                  kind == HermesPendingDesktopDecisionKind.approval
-                      ? 'Deny'
-                      : 'Not now',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Expanded(
-            child: FilledButton(
-              onPressed: _busy
+            flex: 6,
+            child: HermezActionTile(
+              primary: true,
+              showChevron: false,
+              icon: Icons.check_rounded,
+              busy: _busy,
+              title: switch (kind) {
+                HermesPendingDesktopDecisionKind.approval => 'Approve once',
+                HermesPendingDesktopDecisionKind.mcpSetup => 'Connect',
+                _ => 'Send response',
+              },
+              subtitle: switch (kind) {
+                HermesPendingDesktopDecisionKind.approval => 'Run this once',
+                HermesPendingDesktopDecisionKind.mcpSetup =>
+                  'Allow this server',
+                _ => 'Hermes continues',
+              },
+              onTap: _busy
                   ? null
                   : () {
                       final value = switch (kind) {
@@ -203,12 +278,101 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
                       };
                       if (value.isNotEmpty) _send(value);
                     },
-              child: Text(switch (kind) {
-                HermesPendingDesktopDecisionKind.approval => 'Approve once',
-                HermesPendingDesktopDecisionKind.mcpSetup => 'Connect',
-                _ => 'Send response',
-              }),
             ),
+          ),
+          if (kind == HermesPendingDesktopDecisionKind.approval ||
+              kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 5,
+              child: HermezActionTile(
+                showChevron: false,
+                icon: Icons.close_rounded,
+                title: kind == HermesPendingDesktopDecisionKind.approval
+                    ? 'Deny'
+                    : 'Not now',
+                subtitle: kind == HermesPendingDesktopDecisionKind.approval
+                    ? "Don't run"
+                    : 'Decline',
+                onTap: _busy
+                    ? null
+                    : () => _send(
+                        kind == HermesPendingDesktopDecisionKind.approval
+                            ? 'deny'
+                            : 'decline',
+                      ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The request text as the mockups show a command: monospace, on a quiet
+/// panel, with a copy control. The text is exactly what Hermes sent.
+class _CommandBlock extends StatelessWidget {
+  const _CommandBlock({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: palette.canvas,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: palette.border.withValues(alpha: 0.75)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: palette.border.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '>_',
+              style: TextStyle(
+                color: palette.ink,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: SelectableText(
+                text,
+                style: TextStyle(
+                  color: palette.ink,
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Copy',
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) {
+                ScaffoldMessenger.maybeOf(context)
+                    ?.showSnackBar(const SnackBar(content: Text('Copied')));
+              }
+            },
+            icon: Icon(Icons.copy_rounded, size: 20, color: palette.ink),
           ),
         ],
       ),

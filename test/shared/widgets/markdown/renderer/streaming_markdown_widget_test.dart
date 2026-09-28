@@ -1048,15 +1048,19 @@ void main() {
         theme: AppTheme.light(TweakcnThemes.t3Chat),
         localizationsDelegates: conduitLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        // Messages live in a scrolling timeline in the app; long content
+        // must not be laid out into a fixed-height body here.
         home: Scaffold(
-          body: MediaQuery(
-            data: MediaQueryData(disableAnimations: disableAnimations),
-            child: AssistantMessageWidget(
-              message: message,
-              isStreaming: isStreaming,
-              showFollowUps: false,
-              suppressStreamingHaptics: suppressStreamingHaptics,
-              onDelete: () {},
+          body: SingleChildScrollView(
+            child: MediaQuery(
+              data: MediaQueryData(disableAnimations: disableAnimations),
+              child: AssistantMessageWidget(
+                message: message,
+                isStreaming: isStreaming,
+                showFollowUps: false,
+                suppressStreamingHaptics: suppressStreamingHaptics,
+                onDelete: () {},
+              ),
             ),
           ),
         ),

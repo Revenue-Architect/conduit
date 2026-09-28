@@ -749,7 +749,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       pageBuilder: (context, state) => _buildHermezPage(
         context: context,
         state: state,
-        motion: HermezRouteMotion.morph,
         child: HermesBotDetailPage(
           profile:
               HermesConfig.isValidDesktopProfile(
@@ -938,20 +937,28 @@ class NavigationLoggingObserver extends NavigatorObserver {
   }
 }
 
+/// Hermes destinations use the Hermez motion shell. A destination opened from
+/// a visible object receives that object's [HermezMorphOrigin] as `extra` and
+/// grows out of it; anything else slides in as a sibling. Nothing fades.
 Page<void> _buildHermezPage({
   required BuildContext context,
   required GoRouterState state,
   required Widget child,
-  HermezRouteMotion motion = HermezRouteMotion.standard,
 }) {
   if (usesNoTransitionForNativeSheet(state.extra)) {
     return _buildNoTransitionPage(state: state, child: child);
   }
+  final origin = state.extra is HermezMorphOrigin
+      ? state.extra! as HermezMorphOrigin
+      : null;
   return buildHermezMotionPage(
     pageKey: state.pageKey,
     name: state.name,
     child: child,
-    motion: motion,
+    motion: origin == null
+        ? HermezRouteMotion.standard
+        : HermezRouteMotion.expand,
+    origin: origin,
     reducedMotion: context.reduceMotion,
   );
 }

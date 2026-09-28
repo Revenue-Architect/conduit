@@ -768,14 +768,7 @@ class ConduitMarkdown {
                 if (!loaded) {
                   return AspectRatio(aspectRatio: 16 / 9, child: placeholder);
                 }
-                return AnimatedOpacity(
-                  opacity: 1,
-                  duration: context.motionDuration(
-                    AnimationDuration.microInteraction,
-                  ),
-                  curve: Curves.easeOutCubic,
-                  child: child,
-                );
+                return child;
               },
               errorBuilder: (context, error, stackTrace) =>
                   Center(child: buildImageError(context, theme)),

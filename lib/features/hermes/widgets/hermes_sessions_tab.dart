@@ -24,6 +24,7 @@ import '../providers/hermes_session_totals_provider.dart';
 import 'hermes_bot_tile.dart';
 import 'hermes_bot_avatar.dart';
 import 'hermez_bot_mark.dart';
+import 'hermez_technical_background.dart';
 import 'hermes_session_tile.dart';
 
 /// Sidebar tab listing the user's Hermes server-side conversations, with one
@@ -167,14 +168,17 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                   ),
             child: Column(
               children: [
-                _SectionHeader(
-                  title: AppLocalizations.of(context)!.hermesBotsTitle,
-                  count: bots.length,
-                  expanded: expanded,
-                  onToggle: () {
-                    ConduitHaptics.selectionClick();
-                    ref.read(hermesShowBotsProvider.notifier).toggle();
-                  },
+                HermezTechnicalBackground(
+                  variant: HermezBackgroundVariant.editorial,
+                  child: _SectionHeader(
+                    title: AppLocalizations.of(context)!.hermesBotsTitle,
+                    count: bots.length,
+                    expanded: expanded,
+                    onToggle: () {
+                      ConduitHaptics.selectionClick();
+                      ref.read(hermesShowBotsProvider.notifier).toggle();
+                    },
+                  ),
                 ),
                 if (expanded)
                   for (var index = 0; index < bots.length; index++) ...[
@@ -204,8 +208,8 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         ? ref.watch(hermesBotSessionsProvider(bot.name))
         : null;
     final scopedOwned = scoped?.asData?.value;
-    final owned = scopedOwned == null ||
-            (scopedOwned.isEmpty && recentOwned.isNotEmpty)
+    final owned =
+        scopedOwned == null || (scopedOwned.isEmpty && recentOwned.isNotEmpty)
         ? recentOwned
         : scopedOwned;
     final conversationCount = profileTotals?[bot.name] ?? owned.length;
@@ -365,10 +369,7 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                   Spacing.xs,
                 ),
                 child: widget.standalone
-                    ? HermesSessionTile(
-                        session: sessions[index],
-                        compact: true,
-                      )
+                    ? HermesSessionTile(session: sessions[index], compact: true)
                     : DecoratedBox(
                         decoration: BoxDecoration(
                           color: theme.surfaceBackground,
@@ -442,9 +443,7 @@ class _HermesHomeEntry extends StatelessWidget {
       ),
       child: Material(
         color: theme.surfaceBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ListTile(
           key: const ValueKey('hermes-home-entry'),
           leading: Icon(Icons.home_outlined, color: theme.buttonPrimary),

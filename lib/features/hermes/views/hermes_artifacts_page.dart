@@ -10,7 +10,9 @@ import '../services/hermes_artifact_client.dart';
 import '../services/hermes_media_parser.dart';
 import '../widgets/hermes_artifact_view.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
+import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_sheet_parts.dart';
 import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 import '../sheets/hermez_modal_sheet.dart';
@@ -316,50 +318,68 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
                           }
                           return _ArtifactTile(
                             file: file,
-                            onTap: () async {
+                            onOpen: (origin, bytes) async {
+                              final morphId = hermezArtifactMorphId(file.path);
+                              if (bytes != null) {
+                                // Decode the full image before the flight so
+                                // the preview arrives painted, not loading.
+                                try {
+                                  await precacheImage(
+                                    MemoryImage(bytes.bytes),
+                                    context,
+                                  );
+                                } catch (_) {}
+                                if (!context.mounted) return;
+                              }
                               final selected =
                                   await showHermezSheet<HermesSessionSummary>(
                                     context,
+                                    origin: origin,
                                     title: file.name,
+                                    titleMorphId: hermezMorphPart(
+                                      morphId,
+                                      'name',
+                                    ),
                                     eyebrow: 'Artifact',
+                                    leading: _ArtifactKindTile(file: file),
+                                    subtitle: Text(
+                                      '${file.name.split('.').last.toUpperCase()} · Hermes artifact',
+                                      style: TextStyle(
+                                        color: palette.muted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                     body: Column(
                                       crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                          CrossAxisAlignment.stretch,
                                       children: [
-                                        Text(
-                                          file.name
-                                              .split('.')
-                                              .last
-                                              .toUpperCase(),
-                                        ),
-                                        const SizedBox(height: 14),
                                         HermesArtifactView(
                                           artifact: _artifact(file),
                                           maxImageHeight: 480,
+                                          initialBytes: bytes,
+                                          previewMorphId: bytes == null
+                                              ? null
+                                              : hermezMorphPart(
+                                                  morphId,
+                                                  'image',
+                                                ),
                                         ),
                                         const SizedBox(height: 14),
-                                        HermesPanel(
+                                        HermezActionTile(
+                                          icon: Icons.forum_outlined,
+                                          title: related == null
+                                              ? 'Source unavailable'
+                                              : 'Related conversation',
+                                          subtitle: related == null
+                                              ? 'Hermes did not record where this file came from.'
+                                              : related.title,
+                                          showChevron: related != null,
                                           onTap: related == null
                                               ? null
                                               : () => Navigator.pop(
                                                   context,
                                                   related,
                                                 ),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  related == null
-                                                      ? 'Source unavailable for this file.'
-                                                      : 'Observed in ${related.title}',
-                                                ),
-                                              ),
-                                              if (related != null)
-                                                const Icon(
-                                                  Icons.chevron_right_rounded,
-                                                ),
-                                            ],
-                                          ),
                                         ),
                                       ],
                                     ),
@@ -384,9 +404,10 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
 }
 
 class _ArtifactTile extends ConsumerWidget {
-  const _ArtifactTile({required this.file, required this.onTap});
+  const _ArtifactTile({required this.file, required this.onOpen});
   final HermesRemoteFile file;
-  final VoidCallback onTap;
+  final void Function(HermezMorphOrigin? origin, HermesArtifactBytes? bytes)
+  onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -399,54 +420,114 @@ class _ArtifactTile extends ConsumerWidget {
             file.name.split('.').last.toLowerCase() != 'svg'
         ? ref.watch(_thumbnailProvider(file.path))
         : null;
-    return HermesPanel(
-      onTap: onTap,
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 116,
-            width: double.infinity,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ColoredBox(
-                color: palette.canvas,
-                child: thumbnail != null
-                    ? thumbnail.asData == null
-                          ? const Icon(Icons.image_outlined, size: 32)
-                          : Image.memory(
-                              thumbnail.asData!.value.bytes,
-                              fit: BoxFit.cover,
-                              cacheWidth: 400,
-                              errorBuilder: (_, _, _) => const Icon(
-                                Icons.image_not_supported_outlined,
-                              ),
-                            )
-                    : Icon(
-                        artifact.kind == HermesMediaKind.file
-                            ? Icons.description_outlined
-                            : Icons.perm_media_outlined,
-                        size: 37,
-                        color: palette.accent,
-                      ),
+    final bytes = thumbnail?.asData?.value;
+    final morphId = hermezArtifactMorphId(file.path);
+    return HermezMotionSurface(
+      semanticLabel: file.name,
+      originRadius: 19,
+      originColor: palette.surface,
+      originBorderColor: palette.border,
+      onOpen: (origin) => onOpen(origin, bytes),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: palette.border),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 116,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: ColoredBox(
+                    color: palette.canvas,
+                    child: thumbnail != null
+                        ? bytes == null
+                              ? const Icon(Icons.image_outlined, size: 32)
+                              : HermezMorph(
+                                  id: hermezMorphPart(morphId, 'image'),
+                                  child: Image.memory(
+                                    bytes.bytes,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: 116,
+                                    cacheWidth: 400,
+                                    gaplessPlayback: true,
+                                    errorBuilder: (_, _, _) => const Icon(
+                                      Icons.image_not_supported_outlined,
+                                    ),
+                                  ),
+                                )
+                        : Icon(
+                            artifact.kind == HermesMediaKind.file
+                                ? Icons.description_outlined
+                                : Icons.perm_media_outlined,
+                            size: 37,
+                            color: palette.accent,
+                          ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              HermezMorphText(
+                file.name,
+                id: hermezMorphPart(morphId, 'name'),
+                maxLines: 2,
+                style: TextStyle(
+                  color: palette.ink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                file.name.split('.').last.toUpperCase(),
+                style: TextStyle(fontSize: 10, color: palette.muted),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            file.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            file.name.split('.').last.toUpperCase(),
-            style: TextStyle(fontSize: 10, color: palette.muted),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+/// The file-type tile beside an artifact's title in its sheet.
+class _ArtifactKindTile extends StatelessWidget {
+  const _ArtifactKindTile({required this.file});
+  final HermesRemoteFile file;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final ext = file.name.split('.').last.toLowerCase();
+    final kind = _artifact(file).kind;
+    final (icon, color) = switch (kind) {
+      _ when ext == 'pdf' => (
+        Icons.picture_as_pdf_rounded,
+        const Color(0xFFE5452B),
+      ),
+      HermesMediaKind.image => (Icons.image_outlined, palette.ink),
+      HermesMediaKind.audio => (Icons.graphic_eq_rounded, palette.ink),
+      HermesMediaKind.video => (Icons.movie_outlined, palette.ink),
+      _ => (Icons.description_outlined, palette.ink),
+    };
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: palette.canvas,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border.withValues(alpha: 0.7)),
+      ),
+      child: Icon(icon, color: color, size: 30),
     );
   }
 }

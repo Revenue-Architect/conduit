@@ -2,9 +2,10 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/utils/system_ui_style.dart';
+import '../../features/hermes/motion/hermez_motion_route.dart'
+    show HermezPushPageTransitionsBuilder;
 import 'theme_extensions.dart';
 import 'tweakcn_themes.dart';
 import 'color_tokens.dart';
@@ -349,14 +350,17 @@ class AppTheme {
     return (lighter + 0.05) / (darker + 0.05);
   }
 
+  // Android's Zoom transition fades pages in and out. Hermez uses a physical
+  // push everywhere instead: the new page slides over and the old one shifts
+  // back, with no opacity change.
   static const PageTransitionsTheme _pageTransitionsTheme =
       PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.android: HermezPushPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+          TargetPlatform.linux: HermezPushPageTransitionsBuilder(),
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+          TargetPlatform.windows: HermezPushPageTransitionsBuilder(),
         },
       );
 }
@@ -454,7 +458,7 @@ class ThemeTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return child.animate().fadeIn(duration: duration);
+    return child;
   }
 }
 

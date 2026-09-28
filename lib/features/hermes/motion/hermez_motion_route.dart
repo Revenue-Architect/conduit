@@ -1,87 +1,697 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
-import '../../../shared/theme/theme_extensions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+
+import 'hermez_morph_origin.dart';
 import 'hermez_motion_tokens.dart';
 
-/// Hermez page transition. The shared element, when one exists, is the motion.
-/// This shell only establishes the destination and lets the source recede.
+/// What a Hermez route becomes when it has finished growing.
+enum HermezExpandShape {
+  /// The whole screen.
+  page,
+
+  /// A sheet anchored to the bottom edge. It can be dragged down to close.
+  sheet,
+}
+
+/// Page for GoRouter destinations owned by Hermez.
+///
+/// Nothing in these transitions animates opacity. A destination either grows
+/// out of the object that opened it ([HermezRouteMotion.expand]) or slides in
+/// over its sibling ([HermezRouteMotion.standard]). The screen underneath
+/// recedes or shifts back and returns on Back.
+class HermezMotionPage<T> extends Page<T> {
+  const HermezMotionPage({
+    super.key,
+    super.name,
+    super.arguments,
+    super.restorationId,
+    required this.child,
+    this.motion = HermezRouteMotion.standard,
+    this.origin,
+    this.reducedMotion = false,
+  });
+
+  final Widget child;
+  final HermezRouteMotion motion;
+  final HermezMorphOrigin? origin;
+  final bool reducedMotion;
+
+  @override
+  Route<T> createRoute(BuildContext context) => _HermezPageBasedRoute<T>(this);
+}
+
+/// Builds a Hermez page for a GoRouter route.
 Page<void> buildHermezMotionPage({
   required LocalKey pageKey,
   required Widget child,
   String? name,
   HermezRouteMotion motion = HermezRouteMotion.standard,
+  HermezMorphOrigin? origin,
   bool reducedMotion = false,
-}) {
-  final duration = reducedMotion
-      ? const Duration(milliseconds: 120)
-      : const Duration(milliseconds: 380);
-  return CustomTransitionPage<void>(
-    key: pageKey,
-    name: name,
-    child: child,
-    transitionDuration: duration,
-    reverseTransitionDuration: duration,
-    transitionsBuilder: (context, animation, secondaryAnimation, pageChild) {
-      return buildHermezRouteTransition(
-        context: context,
-        animation: animation,
-        secondaryAnimation: secondaryAnimation,
-        motion: motion,
-        child: pageChild,
-      );
-    },
+}) => HermezMotionPage<void>(
+  key: pageKey,
+  name: name,
+  motion: motion,
+  origin: origin,
+  reducedMotion: reducedMotion,
+  child: child,
+);
+
+/// Pushes a Hermez sheet that grows out of [origin], or rises from the bottom
+/// edge when there is no source object. Tapping outside, Back, or dragging it
+/// down closes it. Closing never implies an action.
+///
+/// The result arrives once the sheet has finished contracting home, so a
+/// caller that navigates next never starts under a sheet still in flight.
+Future<T?> pushHermezSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+  HermezMorphOrigin? origin,
+  double heightFactor = 0.91,
+  bool reducedMotion = false,
+}) async {
+  final route = HermezRoute<T>(
+    builder: builder,
+    motion: HermezRouteMotion.expand,
+    shape: HermezExpandShape.sheet,
+    origin: origin,
+    heightFactor: heightFactor,
+    reducedMotion: reducedMotion,
+  );
+  final result = await Navigator.of(context).push<T>(route);
+  await route.completed;
+  return result;
+}
+
+/// A Hermez route for imperative navigation.
+class HermezRoute<T> extends PageRoute<T> with HermezRouteTransitions<T> {
+  HermezRoute({
+    required this.builder,
+    this.motion = HermezRouteMotion.standard,
+    this.shape = HermezExpandShape.page,
+    this.origin,
+    this.heightFactor = 0.91,
+    this.reducedMotion = false,
+    super.settings,
+  });
+
+  final WidgetBuilder builder;
+  @override
+  final HermezRouteMotion motion;
+  @override
+  final HermezExpandShape shape;
+  @override
+  final HermezMorphOrigin? origin;
+  @override
+  final double heightFactor;
+  @override
+  final bool reducedMotion;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final page = Semantics(
+      scopesRoute: true,
+      explicitChildNodes: true,
+      child: builder(context),
+    );
+    return shape == HermezExpandShape.sheet
+        ? _HermezSheetPlacement(route: this, child: page)
+        : page;
+  }
+}
+
+/// Places a sheet inside its full-screen route page: lifted above the
+/// keyboard, offset by a drag in progress, and draggable down to close.
+class _HermezSheetPlacement<T> extends StatelessWidget {
+  const _HermezSheetPlacement({required this.route, required this.child});
+
+  final HermezRouteTransitions<T> route;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final target = _HermezSheetFrame._sheetRect(
+          constraints.biggest,
+          media,
+          route.heightFactor,
+        );
+        final sheet = MediaQuery(
+          data: media.copyWith(
+            padding: media.padding.copyWith(
+              top: 0,
+              bottom: media.viewInsets.bottom > 0 ? 0 : media.padding.bottom,
+            ),
+            viewPadding: media.viewPadding.copyWith(top: 0),
+            viewInsets: media.viewInsets.copyWith(bottom: 0),
+          ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragUpdate: (details) =>
+                route._handleDragUpdate(details, target.height),
+            onVerticalDragEnd: (details) =>
+                route._handleDragEnd(details, target.height),
+            child: child,
+          ),
+        );
+        return ValueListenableBuilder<double>(
+          valueListenable: route._dragOffset,
+          child: sheet,
+          builder: (context, drag, sheet) => Stack(
+            children: [
+              Positioned.fromRect(
+                rect: target.shift(Offset(0, drag)),
+                child: sheet!,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HermezPageBasedRoute<T> extends PageRoute<T>
+    with HermezRouteTransitions<T> {
+  _HermezPageBasedRoute(HermezMotionPage<T> page) : super(settings: page);
+
+  HermezMotionPage<T> get _page => settings as HermezMotionPage<T>;
+
+  @override
+  HermezRouteMotion get motion => _page.motion;
+  @override
+  HermezExpandShape get shape => HermezExpandShape.page;
+  @override
+  HermezMorphOrigin? get origin => _page.origin;
+  @override
+  double get heightFactor => 1;
+  @override
+  bool get reducedMotion => _page.reducedMotion;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => Semantics(
+    scopesRoute: true,
+    explicitChildNodes: true,
+    child: _page.child,
   );
 }
 
-Widget buildHermezRouteTransition({
-  required BuildContext context,
-  required Animation<double> animation,
-  required Animation<double> secondaryAnimation,
-  required HermezRouteMotion motion,
-  required Widget child,
-}) {
-  if (context.reduceMotion) {
-    return FadeTransition(opacity: animation, child: child);
-  }
-  final incoming = CurvedAnimation(
-    parent: animation,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
-  );
-  final outgoing = CurvedAnimation(
-    parent: secondaryAnimation,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
-  );
-  final beginOffset = switch (motion) {
-    HermezRouteMotion.sharedAxis => const Offset(0.035, 0),
-    HermezRouteMotion.morph => Offset.zero,
-    HermezRouteMotion.modal => const Offset(0, 0.02),
-    HermezRouteMotion.standard => const Offset(0, 0.012),
+/// Shared transition behavior for Hermez routes.
+mixin HermezRouteTransitions<T> on PageRoute<T> {
+  HermezRouteMotion get motion;
+  HermezExpandShape get shape;
+  HermezMorphOrigin? get origin;
+  double get heightFactor;
+  bool get reducedMotion;
+
+  /// What this route does to the screen under it.
+  HermezCoverKind get coverKind => switch (effectiveMotion) {
+    HermezRouteMotion.expand => HermezCoverKind.recede,
+    HermezRouteMotion.standard => HermezCoverKind.shift,
+    HermezRouteMotion.none => HermezCoverKind.none,
   };
-  final beginScale = motion == HermezRouteMotion.morph ? 1.0 : 0.992;
-  return FadeTransition(
-    opacity: motion == HermezRouteMotion.morph
-        ? const AlwaysStoppedAnimation<double>(1)
-        : incoming,
-    child: SlideTransition(
-      position: Tween<Offset>(begin: beginOffset, end: Offset.zero).animate(
-        incoming,
+
+  HermezRouteMotion get effectiveMotion {
+    if (reducedMotion) return HermezRouteMotion.none;
+    if (motion == HermezRouteMotion.expand &&
+        origin == null &&
+        shape == HermezExpandShape.page) {
+      return HermezRouteMotion.standard;
+    }
+    return motion;
+  }
+
+  HermezMotionWeight get _weight => effectiveMotion == HermezRouteMotion.expand
+      ? HermezMotionWeight.heavy
+      : HermezMotionWeight.medium;
+
+  HermezCoverKind _nextCover = HermezCoverKind.shift;
+  final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0);
+  AnimationController? _dragSettle;
+
+  @override
+  Duration get transitionDuration => effectiveMotion == HermezRouteMotion.none
+      ? Duration.zero
+      : HermezMotion.settleFor(_weight);
+
+  @override
+  Duration get reverseTransitionDuration => transitionDuration;
+
+  // A page that grows out of an object keeps the source screen painted
+  // underneath, so Back can contract into it on the first frame instead of
+  // waiting for the source to be rebuilt onstage.
+  @override
+  bool get opaque =>
+      shape == HermezExpandShape.page &&
+      effectiveMotion != HermezRouteMotion.expand;
+
+  @override
+  bool get barrierDismissible => shape == HermezExpandShape.sheet;
+
+  @override
+  String? get barrierLabel => shape == HermezExpandShape.sheet ? 'Close' : null;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  void didChangeNext(Route<dynamic>? nextRoute) {
+    super.didChangeNext(nextRoute);
+    if (nextRoute == null) return;
+    _nextCover = nextRoute is HermezRouteTransitions
+        ? nextRoute.coverKind
+        : HermezCoverKind.shift;
+  }
+
+  @override
+  void dispose() {
+    _dragSettle?.dispose();
+    _dragOffset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curve = HermezMotion.curveFor(_weight);
+    Widget result = switch (effectiveMotion) {
+      HermezRouteMotion.none =>
+        shape == HermezExpandShape.sheet
+            ? _HermezSheetFrame(
+                route: this,
+                progress: kAlwaysCompleteAnimation,
+                child: child,
+              )
+            : child,
+      HermezRouteMotion.standard => HermezPushTransition(
+        animation: CurvedAnimation(
+          parent: animation,
+          curve: curve,
+          reverseCurve: curve.flipped,
+        ),
+        child: child,
       ),
-      child: ScaleTransition(
-        scale: Tween<double>(begin: beginScale, end: 1).animate(incoming),
-        child: ScaleTransition(
+      HermezRouteMotion.expand => _HermezSheetFrame(
+        route: this,
+        progress: CurvedAnimation(
+          parent: animation,
+          curve: curve,
+          reverseCurve: curve.flipped,
+        ),
+        child: child,
+      ),
+    };
+    if (_nextCover != HermezCoverKind.none && !reducedMotion) {
+      final coverCurve = _nextCover == HermezCoverKind.recede
+          ? HermezMotion.curveHeavy
+          : HermezMotion.curveMedium;
+      result = HermezCoveredTransition(
+        kind: _nextCover,
+        animation: CurvedAnimation(
+          parent: secondaryAnimation,
+          curve: coverCurve,
+          reverseCurve: coverCurve.flipped,
+        ),
+        child: result,
+      );
+    }
+    return result;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details, double extent) {
+    _dragSettle?.stop();
+    _dragOffset.value = math.max(0, _dragOffset.value + details.delta.dy);
+  }
+
+  void _handleDragEnd(DragEndDetails details, double extent) {
+    final velocity = details.primaryVelocity ?? 0;
+    final offset = _dragOffset.value;
+    if (velocity > 700 || offset > extent * 0.28) {
+      if (isCurrent) navigator?.pop();
+      return;
+    }
+    final nav = navigator;
+    if (nav == null) {
+      _dragOffset.value = 0;
+      return;
+    }
+    final settle = _dragSettle ??= AnimationController.unbounded(vsync: nav)
+      ..addListener(() => _dragOffset.value = math.max(0, _dragSettle!.value));
+    settle.value = offset;
+    settle.animateWith(
+      SpringSimulation(
+        HermezMotion.springMedium.toFlutter(),
+        offset,
+        0,
+        velocity,
+      ),
+    );
+  }
+}
+
+/// What a route does to the screen it covers.
+enum HermezCoverKind {
+  /// Scale back slightly: something is coming toward the user.
+  recede,
+
+  /// Move back along the reading direction: a sibling is sliding over.
+  shift,
+
+  /// Stay still.
+  none,
+}
+
+/// A sibling page sliding over the one it came from. No opacity change.
+class HermezPushTransition extends StatelessWidget {
+  const HermezPushTransition({
+    super.key,
+    required this.animation,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset(rtl ? -1 : 1, 0),
+        end: Offset.zero,
+      ).animate(animation),
+      // The leading-edge shadow exists only while the page is moving.
+      child: CustomPaint(
+        painter: _EdgeShadowPainter(animation, rtl: rtl),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _EdgeShadowPainter extends CustomPainter {
+  _EdgeShadowPainter(this.animation, {required this.rtl})
+    : super(repaint: animation);
+
+  final Animation<double> animation;
+  final bool rtl;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = animation.value;
+    if (t <= 0 || t >= 1) return;
+    const width = 28.0;
+    final rect = rtl
+        ? Rect.fromLTWH(size.width, 0, width, size.height)
+        : Rect.fromLTWH(-width, 0, width, size.height);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: rtl ? Alignment.centerLeft : Alignment.centerRight,
+          end: rtl ? Alignment.centerRight : Alignment.centerLeft,
+          colors: const [Color(0x24000000), Color(0x00000000)],
+        ).createShader(rect),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_EdgeShadowPainter oldDelegate) =>
+      oldDelegate.animation != animation || oldDelegate.rtl != rtl;
+}
+
+/// The screen underneath a Hermez route while that route arrives or leaves.
+class HermezCoveredTransition extends StatelessWidget {
+  const HermezCoveredTransition({
+    super.key,
+    required this.kind,
+    required this.animation,
+    required this.child,
+  });
+
+  final HermezCoverKind kind;
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (kind) {
+      case HermezCoverKind.none:
+        return child;
+      case HermezCoverKind.recede:
+        return ScaleTransition(
           scale: Tween<double>(
             begin: 1,
             end: HermezMotion.sourceBackgroundScale,
-          ).animate(outgoing),
-          child: FadeTransition(
-            opacity: Tween<double>(begin: 1, end: 0.94).animate(outgoing),
-            child: child,
-          ),
-        ),
+          ).animate(animation),
+          child: child,
+        );
+      case HermezCoverKind.shift:
+        final rtl = Directionality.of(context) == TextDirection.rtl;
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset.zero,
+            end: Offset(
+              rtl ? HermezMotion.pushBackShift : -HermezMotion.pushBackShift,
+              0,
+            ),
+          ).animate(animation),
+          child: child,
+        );
+    }
+  }
+}
+
+/// Grows a route out of its origin rectangle into a page or a sheet.
+///
+/// The destination is laid out once at its final size and revealed through a
+/// rounded aperture that travels from the source object. Shared parts fly
+/// above it as Hero flights; everything else is uncovered as the aperture
+/// grows.
+class _HermezSheetFrame<T> extends StatelessWidget {
+  const _HermezSheetFrame({
+    required this.route,
+    required this.progress,
+    required this.child,
+  });
+
+  final HermezRouteTransitions<T> route;
+  final Animation<double> progress;
+  final Widget child;
+
+  static const _sheetRadius = 30.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final sheet = route.shape == HermezExpandShape.sheet;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        final target = sheet
+            ? _sheetRect(size, media, route.heightFactor)
+            : Offset.zero & size;
+        final targetRadius = sheet
+            ? const BorderRadius.vertical(top: Radius.circular(_sheetRadius))
+            : BorderRadius.zero;
+        final origin = route.origin;
+        final fallback = Rect.fromLTWH(
+          target.left,
+          size.height,
+          target.width,
+          target.height,
+        );
+        // The page subtree stays full screen at the navigator origin (Hero
+        // flights measure against it); a sheet places itself inside it via
+        // [_HermezSheetPlacement]. This frame only clips.
+        final content = child;
+        return AnimatedBuilder(
+          animation: Listenable.merge([progress, route._dragOffset]),
+          child: content,
+          builder: (context, content) {
+            final t = progress.value;
+            final settledT = t.clamp(0.0, 1.0);
+            final drag = route._dragOffset.value;
+            final end = target.shift(Offset(0, drag));
+            final from = origin?.resolve() ?? fallback;
+            final rect = Rect.lerp(from, end, t)!;
+            final originRadius = BorderRadius.circular(
+              origin?.radius ?? (sheet ? _sheetRadius : 0),
+            );
+            final radius = BorderRadius.lerp(
+              origin == null && sheet ? targetRadius : originRadius,
+              targetRadius,
+              settledT,
+            )!;
+            final surface = Theme.of(context).colorScheme.surface;
+            final slabColor = Color.lerp(
+              origin?.color ?? surface,
+              surface,
+              settledT,
+            )!;
+            final aperture = radius.toRRect(rect);
+            final lift = sheet ? 1.0 : (1 - settledT);
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (sheet)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ColoredBox(
+                        color: Color.lerp(
+                          const Color(0x00000000),
+                          const Color(0x52000000),
+                          (settledT * (1 - drag / (target.height * 1.6))).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                        )!,
+                      ),
+                    ),
+                  ),
+                Positioned.fromRect(
+                  rect: rect,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: slabColor,
+                        borderRadius: radius,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0x2E000000),
+                            blurRadius: lerpDouble(0, 30, settledT)! * lift,
+                            spreadRadius: lerpDouble(0, -2, settledT)! * lift,
+                            offset: Offset(
+                              0,
+                              lerpDouble(0, 10, settledT)! * lift,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: ClipRRect(
+                    clipper: _ApertureClipper(aperture),
+                    clipBehavior: Clip.antiAlias,
+                    child: content,
+                  ),
+                ),
+                // The source's outline thins away as it grows, and returns as
+                // it contracts, so the object keeps its edge at both ends.
+                if (origin?.borderColor case final edge?)
+                  if (settledT < 0.5)
+                    Positioned.fromRect(
+                      rect: rect,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: radius,
+                            border: Border.all(
+                              color: edge,
+                              width: 1 - settledT * 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  static Rect _sheetRect(Size size, MediaQueryData media, double factor) {
+    final top = media.padding.top + 8;
+    final bottom = size.height - media.viewInsets.bottom;
+    final height = math.min(bottom - top, size.height * factor);
+    return Rect.fromLTRB(0, bottom - math.max(height, 0), size.width, bottom);
+  }
+}
+
+class _ApertureClipper extends CustomClipper<RRect> {
+  const _ApertureClipper(this.rrect);
+  final RRect rrect;
+
+  @override
+  RRect getClip(Size size) => rrect;
+
+  @override
+  bool shouldReclip(_ApertureClipper oldClipper) => oldClipper.rrect != rrect;
+}
+
+/// Platform page transitions for non-Hermez Material routes on Android: the
+/// same fade-free push used by Hermez sibling routes.
+class HermezPushPageTransitionsBuilder extends PageTransitionsBuilder {
+  const HermezPushPageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration =>
+      HermezMotion.settleFor(HermezMotionWeight.medium);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curve = HermezMotion.curveMedium;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
+    return HermezCoveredTransition(
+      kind: HermezCoverKind.shift,
+      animation: CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: curve,
+        reverseCurve: curve.flipped,
       ),
-    ),
-  );
+      child: route.fullscreenDialog
+          ? SlideTransition(
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: curve,
+                      reverseCurve: curve.flipped,
+                    ),
+                  ),
+              child: child,
+            )
+          : HermezPushTransition(
+              animation: CurvedAnimation(
+                parent: animation,
+                curve: curve,
+                reverseCurve: curve.flipped,
+              ),
+              child: child,
+            ),
+    );
+  }
 }

@@ -4,6 +4,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
+import '../../hermes/motion/hermez_motion_tokens.dart';
 import '../../../shared/theme/theme_extensions.dart';
 
 const double kConversationTileHorizontalGutter = Spacing.sm;
@@ -203,7 +204,16 @@ class _ChatStyleSidebarTileState extends State<ChatStyleSidebarTile> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: effectiveEnabled ? widget.onTap : null,
-                child: widget.child,
+                // The row gives under the finger and springs back; the pressed
+                // tint itself stays instant.
+                child: AnimatedScale(
+                  scale: _pressed ? HermezMotion.pressCard : 1,
+                  duration: context.reduceMotion
+                      ? Duration.zero
+                      : HermezMotion.settleFor(HermezMotionWeight.light),
+                  curve: HermezMotion.curveLight,
+                  child: widget.child,
+                ),
               ),
             ),
           ),

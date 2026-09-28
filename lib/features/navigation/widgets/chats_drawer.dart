@@ -11,6 +11,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../auth/providers/unified_auth_providers.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../hermes/motion/hermez_motion_tokens.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../core/services/navigation_service.dart';
@@ -43,6 +44,37 @@ IconData sidebarSectionDisclosureIcon(bool isExpanded) {
         : CupertinoIcons.chevron_right;
   }
   return isExpanded ? Icons.expand_more : Icons.chevron_right_rounded;
+}
+
+/// Section disclosure that turns in place on a spring instead of swapping
+/// glyphs.
+class SidebarDisclosureChevron extends StatelessWidget {
+  const SidebarDisclosureChevron({
+    super.key,
+    required this.expanded,
+    this.color,
+    this.size,
+  });
+
+  final bool expanded;
+  final Color? color;
+  final double? size;
+
+  @override
+  Widget build(BuildContext context) => AnimatedRotation(
+    turns: expanded ? 0.25 : 0,
+    duration: context.reduceMotion
+        ? Duration.zero
+        : HermezMotion.settleFor(HermezMotionWeight.light),
+    curve: HermezMotion.curveLight,
+    child: Icon(
+      Platform.isIOS
+          ? CupertinoIcons.chevron_right
+          : Icons.chevron_right_rounded,
+      color: color,
+      size: size,
+    ),
+  );
 }
 
 /// Defines the section types that can be collapsed in the chats drawer
@@ -280,13 +312,8 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
             duration: motionDuration,
             switchInCurve: Curves.easeOut,
             switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.86, end: 1).animate(animation),
-                child: child,
-              ),
-            ),
+            transitionBuilder: (child, animation) =>
+                ScaleTransition(scale: animation, child: child),
             child: refreshIndicator,
           ),
         ),
@@ -1168,8 +1195,8 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
     final headerContent = Row(
       children: [
         if (onToggle != null) ...[
-          Icon(
-            sidebarSectionDisclosureIcon(isExpanded),
+          SidebarDisclosureChevron(
+            expanded: isExpanded,
             color: theme.iconSecondary,
             size: IconSize.listItem,
           ),
@@ -1229,9 +1256,9 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                SidebarDisclosureChevron(
                   key: const ValueKey<String>('folders-section-leading'),
-                  sidebarSectionDisclosureIcon(isExpanded),
+                  expanded: isExpanded,
                   color: theme.iconSecondary,
                   size: IconSize.listItem,
                 ),

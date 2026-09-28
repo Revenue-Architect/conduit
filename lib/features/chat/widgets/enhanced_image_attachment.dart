@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -901,7 +900,7 @@ class _EnhancedImageAttachmentState
     if (widget.disableAnimation || context.reduceMotion) {
       return error;
     }
-    return error.animate().fadeIn(duration: const Duration(milliseconds: 200));
+    return error;
   }
 
   Widget _buildNetworkImage() {
@@ -1070,10 +1069,7 @@ class _EnhancedImageAttachmentState
                     final hero = flightDirection == HeroFlightDirection.push
                         ? fromHeroContext.widget as Hero
                         : toHeroContext.widget as Hero;
-                    return FadeTransition(
-                      opacity: animation,
-                      child: hero.child,
-                    );
+                    return hero.child;
                   },
               child: imageWidget,
             ),

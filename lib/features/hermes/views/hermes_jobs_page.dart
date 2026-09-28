@@ -8,12 +8,15 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
-import '../../../shared/widgets/utility_components.dart';
 import '../models/hermes_job.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../utils/hermes_schedule_format.dart';
 import '../widgets/hermes_job_editor.dart';
+import '../motion/hermez_motion.dart';
+import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_technical_background.dart';
+import 'hermes_page_chrome.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
 
 AppLocalizations _l10n(BuildContext context) =>
@@ -60,72 +63,148 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
 
-    return UtilityPageScaffold.settings(
-      title: l10n.hermesScheduledAgentsTitle,
-      children: [
-        ConduitButton(
-          text: l10n.hermesJobNew,
-          icon: Icons.add,
-          isFullWidth: true,
-          isLoading: _creating,
-          onPressed: writable && !_creating ? _createJob : null,
+    final jobs = jobsAsync.asData?.value;
+    final active = jobs?.where((job) => job.enabled).length;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    // The job controls, snackbars, and dialogs here come from material_ui, so
+    // the page keeps a material_ui Scaffold and carries the Hermez header and
+    // canvas inside it. The title arrives from Home's schedule card.
+    return HermezRouteCanvas(
+      color: palette.canvas,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
         ),
-        if (!writable) ...[
-          const SizedBox(height: Spacing.sm),
-          Text(
-            l10n.hermesJobAdminDisabled,
-            style: AppTypography.bodySmallStyle.copyWith(
-              color: theme.textSecondary,
-            ),
-          ),
-        ],
-        const SizedBox(height: Spacing.lg),
-        jobsAsync.when(
-          data: (jobs) {
-            if (jobs.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
-                child: Center(
-                  child: Text(
-                    '${l10n.hermesNoSchedulesYet}\n${l10n.hermesJobEmptyMessage}',
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodySmallStyle.copyWith(
-                      color: theme.textSecondary,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HermezPageHeader(
+                title: l10n.hermesScheduledAgentsTitle,
+                titleMorphId: hermezMorphPart(hermezScheduleMorphId, 'title'),
+                motifMorphId: hermezMorphPart(hermezScheduleMorphId, 'motif'),
+                subtitle: jobs == null
+                    ? 'Cron-driven Hermes agents'
+                    : '$active active · ${jobs.length} total',
+                palette: palette,
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(hermesJobsProvider);
+                    await ref.read(hermesJobsProvider.future);
+                  },
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
+                    children: _content(
+                      context,
+                      jobsAsync,
+                      writable,
+                      theme,
+                      l10n,
                     ),
                   ),
                 ),
-              );
-            }
-            return Column(
-              children: [
-                for (final job in jobs) ...[
-                  _JobCard(
-                    key: ValueKey<String>(job.id),
-                    job: job,
-                    writable: writable,
-                  ),
-                  const SizedBox(height: Spacing.sm),
-                ],
-              ],
-            );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: Spacing.xl),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (error, _) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
-            child: Center(
-              child: Text(
-                l10n.hermesJobLoadFailed,
-                textAlign: TextAlign.center,
-                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _content(
+    BuildContext context,
+    AsyncValue<List<HermesJob>> jobsAsync,
+    bool writable,
+    ConduitThemeExtension theme,
+    AppLocalizations l10n,
+  ) {
+    return [
+      HermezEntrance(
+        order: 0,
+        child: HermezTechnicalBackground(
+          variant: HermezBackgroundVariant.mechanical,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8, right: 12, bottom: 16),
+            child: ConduitButton(
+              text: l10n.hermesJobNew,
+              icon: Icons.add,
+              isFullWidth: true,
+              isLoading: _creating,
+              onPressed: writable && !_creating ? _createJob : null,
             ),
           ),
         ),
+      ),
+      if (!writable) ...[
+        const SizedBox(height: Spacing.sm),
+        Text(
+          l10n.hermesJobAdminDisabled,
+          style: AppTypography.bodySmallStyle.copyWith(
+            color: theme.textSecondary,
+          ),
+        ),
       ],
-    );
+      const SizedBox(height: Spacing.lg),
+      jobsAsync.when(
+        data: (jobs) {
+          if (jobs.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
+              child: Center(
+                child: Text(
+                  '${l10n.hermesNoSchedulesYet}\n${l10n.hermesJobEmptyMessage}',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodySmallStyle.copyWith(
+                    color: theme.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          }
+          // Jobs that arrive unroll, jobs that go roll away, and the rest
+          // travel to their new places.
+          return HermezEntrance(
+            order: 1,
+            child: HermezMotionGroup(
+              children: [
+                for (final job in jobs)
+                  Padding(
+                    key: ValueKey<String>('slot:${job.id}'),
+                    padding: const EdgeInsets.only(bottom: Spacing.sm),
+                    child: _JobCard(
+                      key: ValueKey<String>(job.id),
+                      job: job,
+                      writable: writable,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: Spacing.xl),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (error, _) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
+          child: Center(
+            child: Text(
+              l10n.hermesJobLoadFailed,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   Future<void> _createJob() async {
@@ -181,12 +260,15 @@ class _JobCardState extends ConsumerState<_JobCard> {
         ref.watch(hermesConfigProvider.select((config) => config.mode)) ==
         HermesBackendMode.desktopGateway;
 
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     return Container(
       padding: const EdgeInsets.all(Spacing.md),
       decoration: BoxDecoration(
-        color: theme.surfaceBackground,
-        borderRadius: BorderRadius.circular(AppBorderRadius.card),
-        border: Border.all(color: theme.cardBorder),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: palette.border.withValues(alpha: 0.8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,7 +392,9 @@ class _JobCardState extends ConsumerState<_JobCard> {
             if (job.lastError?.isNotEmpty == true)
               Text(
                 job.lastError!,
-                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: theme.error,
+                ),
               ),
             if (job.lastDeliveryError?.isNotEmpty == true)
               Text(

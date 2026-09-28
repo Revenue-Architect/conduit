@@ -15,6 +15,7 @@ import '../models/hermes_capabilities.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../../../shared/widgets/conduit_dialog_route.dart';
 
 class HermesCapabilitiesSection extends ConsumerWidget {
   const HermesCapabilitiesSection({super.key});
@@ -159,7 +160,7 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                           toolset.tools.take(3).join(' · '),
                       ].join('\n'),
                       subtitleMaxLines: 5,
-                      onTap: () => showDialog<void>(
+                      onTap: () => showConduitDialog<void>(
                         context: context,
                         builder: (dialogContext) => AlertDialog(
                           title: Text(toolset.label),

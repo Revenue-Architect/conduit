@@ -9,6 +9,7 @@ import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_pending_decision_store.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 
 final _attentionDecisionsProvider =
@@ -85,6 +86,7 @@ class HermesAttentionPage extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
           children: [
             HermesPanel(
+              backgroundVariant: HermezBackgroundVariant.mechanical,
               child: Row(
                 children: [
                   CircleAvatar(backgroundColor: palette.accent, radius: 11),

@@ -5,6 +5,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'platform_ui_capabilities.dart';
+import '../../conduit_dialog_route.dart';
 
 enum AdaptiveSnackBarType { info, success, warning, error }
 
@@ -281,7 +282,7 @@ class AdaptiveAlertDialog {
       );
       return;
     }
-    await showDialog<void>(
+    await showConduitDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
@@ -362,7 +363,7 @@ class AdaptiveAlertDialog {
           ),
         );
       }
-      return await showDialog<String?>(
+      return await showConduitDialog<String?>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(title),

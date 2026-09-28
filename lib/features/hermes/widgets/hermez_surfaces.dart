@@ -2,11 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../motion/hermez_motion.dart';
 import 'hermez_chat_palette.dart';
 
 enum HermezSurfaceKind { hero, utility, list, technical }
 
-enum HermezMotif { none, slash, arc, crop }
+enum HermezMotif { none, slash, arc, crop, etched }
 
 class HermezType {
   const HermezType._();
@@ -98,6 +99,11 @@ class HermezSectionBar extends StatelessWidget {
 }
 
 /// One of four Hermez surfaces. Geometry is drawn in Flutter and ignores input.
+///
+/// A tappable surface is a physical object: it compresses under the finger
+/// and springs back (see [HermezMotionSurface]). With [morphId] its body can
+/// travel to another screen and become that screen's surface. [onOpen]
+/// passes where the surface sits so a destination can grow out of it.
 class HermezSurface extends StatelessWidget {
   const HermezSurface({
     super.key,
@@ -105,16 +111,45 @@ class HermezSurface extends StatelessWidget {
     this.kind = HermezSurfaceKind.utility,
     this.motif = HermezMotif.none,
     this.onTap,
+    this.onOpen,
     this.padding = const EdgeInsets.all(16),
     this.indexLabel,
+    this.morphId,
+    this.motifMorphId,
+    this.border,
+    this.weight = HermezMotionWeight.medium,
+    this.semanticLabel,
   });
 
   final Widget child;
   final HermezSurfaceKind kind;
   final HermezMotif motif;
   final VoidCallback? onTap;
+  final ValueChanged<HermezMorphOrigin?>? onOpen;
   final EdgeInsets padding;
   final String? indexLabel;
+  final String? morphId;
+
+  /// Lets this surface's construction marks travel to the matching surface
+  /// on the next screen instead of appearing there from nowhere.
+  final String? motifMorphId;
+  final BoxBorder? border;
+  final HermezMotionWeight weight;
+  final String? semanticLabel;
+
+  static double radiusFor(HermezSurfaceKind kind) => switch (kind) {
+    HermezSurfaceKind.hero => 28.0,
+    HermezSurfaceKind.utility => 18.0,
+    HermezSurfaceKind.list => 0.0,
+    HermezSurfaceKind.technical => 22.0,
+  };
+
+  static Color colorFor(HermezSurfaceKind kind, HermezChatPalette palette) =>
+      switch (kind) {
+        HermezSurfaceKind.technical => const Color(0xFF17181C),
+        HermezSurfaceKind.list => Colors.transparent,
+        _ => palette.surface,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -122,45 +157,68 @@ class HermezSurface extends StatelessWidget {
       Theme.of(context).brightness,
     );
     final technical = kind == HermezSurfaceKind.technical;
-    final radius = switch (kind) {
-      HermezSurfaceKind.hero => 28.0,
-      HermezSurfaceKind.utility => 18.0,
-      HermezSurfaceKind.list => 0.0,
-      HermezSurfaceKind.technical => 22.0,
-    };
-    final color = technical ? const Color(0xFF17181C) : palette.surface;
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(radius),
-    );
-    final content = Padding(padding: padding, child: child);
-    return Material(
-      color: kind == HermezSurfaceKind.list ? Colors.transparent : color,
-      clipBehavior: Clip.antiAlias,
-      shape: shape,
-      child: Stack(
-        children: [
-          if (motif != HermezMotif.none && kind != HermezSurfaceKind.list)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _MotifPainter(
-                    motif: motif,
-                    accent: palette.accent,
-                    ink: technical ? const Color(0xFFF6F5F2) : palette.ink,
-                    indexLabel: indexLabel,
+    final radius = radiusFor(kind);
+    final color = colorFor(kind, palette);
+    final borderRadius = BorderRadius.circular(radius);
+    final surface = Stack(
+      children: [
+        Positioned.fill(
+          child: HermezMorphSurface(
+            id: morphId,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: borderRadius,
+              border: border,
+            ),
+          ),
+        ),
+        ClipRRect(
+          borderRadius: borderRadius,
+          clipBehavior: kind == HermezSurfaceKind.list
+              ? Clip.none
+              : Clip.antiAlias,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Stack(
+              children: [
+                if (motif != HermezMotif.none && kind != HermezSurfaceKind.list)
+                  Positioned.fill(
+                    child: HermezMorph(
+                      id: motifMorphId,
+                      flight: HermezMorphFlight.stretch,
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _MotifPainter(
+                            motif: motif,
+                            accent: palette.accent,
+                            ink: technical
+                                ? const Color(0xFFF6F5F2)
+                                : palette.ink,
+                            indexLabel: indexLabel,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                Padding(padding: padding, child: child),
+              ],
             ),
-          if (onTap == null)
-            content
-          else
-            InkWell(
-              onTap: onTap,
-              child: content,
-            ),
-        ],
-      ),
+          ),
+        ),
+      ],
+    );
+    if (onTap == null && onOpen == null) return surface;
+    return HermezMotionSurface(
+      onTap: onTap,
+      onOpen: onOpen,
+      weight: weight,
+      semanticLabel: semanticLabel,
+      originRadius: radius,
+      originColor: color,
+      originBorderColor: border is Border
+          ? (border! as Border).top.color
+          : null,
+      child: surface,
     );
   }
 }
@@ -185,9 +243,36 @@ class _MotifPainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
+    final line = Paint()
+      ..color = ink.withValues(alpha: .09)
+      ..strokeWidth = .65
+      ..style = PaintingStyle.stroke;
+    if (motif != HermezMotif.none) {
+      canvas.drawLine(Offset(size.width - 92, 0), Offset(size.width, 92), line);
+      canvas.drawLine(Offset(size.width - 68, 0), Offset(size.width, 68), line);
+    }
     switch (motif) {
       case HermezMotif.none:
         return;
+      case HermezMotif.etched:
+        final edge = Path()
+          ..moveTo(size.width - 48, size.height)
+          ..lineTo(size.width, size.height - 48)
+          ..lineTo(size.width, size.height)
+          ..close();
+        canvas.drawPath(edge, Paint()..color = ink.withValues(alpha: .08));
+        for (var i = 0; i < 4; i++) {
+          canvas.drawLine(
+            Offset(size.width - 26 + i * 5, size.height - 4),
+            Offset(size.width - 4, size.height - 26 + i * 5),
+            line,
+          );
+        }
+        canvas.drawLine(
+          Offset(size.width - 18, size.height - 3),
+          Offset(size.width - 3, size.height - 18),
+          accentPaint,
+        );
       case HermezMotif.slash:
         canvas.drawLine(
           Offset(size.width - 28, 10),
@@ -196,10 +281,7 @@ class _MotifPainter extends CustomPainter {
         );
       case HermezMotif.arc:
         canvas.drawArc(
-          Rect.fromCircle(
-            center: Offset(size.width - 8, 8),
-            radius: 36,
-          ),
+          Rect.fromCircle(center: Offset(size.width - 8, 8), radius: 36),
           math.pi * 0.35,
           math.pi * 0.7,
           false,
@@ -211,10 +293,7 @@ class _MotifPainter extends CustomPainter {
           ..lineTo(size.width, size.height * 0.42)
           ..lineTo(size.width * 0.72, 0)
           ..close();
-        canvas.drawPath(
-          crop,
-          Paint()..color = ink.withValues(alpha: 0.05),
-        );
+        canvas.drawPath(crop, Paint()..color = ink.withValues(alpha: 0.05));
         canvas.drawLine(
           Offset(size.width - 36, 14),
           Offset(size.width - 12, 42),
@@ -242,5 +321,6 @@ class _MotifPainter extends CustomPainter {
   bool shouldRepaint(_MotifPainter oldDelegate) =>
       motif != oldDelegate.motif ||
       accent != oldDelegate.accent ||
+      ink != oldDelegate.ink ||
       indexLabel != oldDelegate.indexLabel;
 }

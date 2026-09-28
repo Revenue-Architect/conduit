@@ -317,7 +317,7 @@ class _HermesBotActivityDotState extends State<_HermesBotActivityDot>
     vsync: this,
     duration: AnimationDuration.slow,
   );
-  late final Animation<double> _opacity = Tween<double>(begin: 1, end: 0.35)
+  late final Animation<double> _pulse = Tween<double>(begin: 1, end: 0.55)
       .animate(
         CurvedAnimation(parent: _controller, curve: AnimationCurves.easeInOut),
       );
@@ -342,8 +342,9 @@ class _HermesBotActivityDotState extends State<_HermesBotActivityDot>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _opacity,
+    // The dot breathes by size, never by opacity.
+    return ScaleTransition(
+      scale: _pulse,
       child: DecoratedBox(
         key: const ValueKey('hermes-bot-activity-dot'),
         decoration: BoxDecoration(
@@ -3882,12 +3883,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ] else ...[
                   ConstrainedBox(
                     constraints: BoxConstraints(minHeight: greetingHeight),
-                    child: AnimatedOpacity(
-                      duration: context.motionDuration(
-                        const Duration(milliseconds: 260),
-                      ),
-                      curve: Curves.easeOutCubic,
-                      opacity: _greetingReady ? 1 : 0,
+                    child: Visibility(
+                      visible: _greetingReady,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
                       child: Align(
                         alignment: Alignment.center,
                         child: _useHermezChatVisuals
@@ -4369,8 +4369,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                             : const Offset(0, 0.15),
                         end: Offset.zero,
                       ).animate(animation);
-                      return FadeTransition(
-                        opacity: animation,
+                      return ScaleTransition(
+                        scale: animation,
                         child: SlideTransition(
                           position: slideAnimation,
                           child: child,

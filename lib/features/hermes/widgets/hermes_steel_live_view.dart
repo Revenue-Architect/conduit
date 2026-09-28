@@ -126,14 +126,29 @@ class HermesSteelFullScreenPage extends ConsumerWidget {
     final turn = ref.watch(hermesDesktopTurnStateProvider).asData?.value;
     final sameRunningSession =
         activeSession == sessionId && turn == HermesDesktopTurnState.running;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     return Scaffold(
-      appBar: AppBar(title: const Text('Live browser')),
+      backgroundColor: palette.canvas,
+      appBar: AppBar(
+        title: const Text('Live browser'),
+        backgroundColor: palette.canvas,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+      ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: sameRunningSession
-                  ? HermesSteelLiveView(viewerUrl: viewerUrl)
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: _AfterArrival(
+                        placeholder: const _BrowserAperture(),
+                        child: HermesSteelLiveView(viewerUrl: viewerUrl),
+                      ),
+                    )
                   : const Center(child: Text('This run is no longer active.')),
             ),
             const Padding(
@@ -142,6 +157,71 @@ class HermesSteelFullScreenPage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Holds a platform view back while its route is still moving. A WebView
+/// under a changing clip or transform can tear; the aperture travels as a
+/// placeholder and the real browser appears once the route has settled.
+class _AfterArrival extends StatefulWidget {
+  const _AfterArrival({required this.placeholder, required this.child});
+
+  final Widget placeholder;
+  final Widget child;
+
+  @override
+  State<_AfterArrival> createState() => _AfterArrivalState();
+}
+
+class _AfterArrivalState extends State<_AfterArrival> {
+  Animation<double>? _animation;
+  bool _arrived = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (identical(animation, _animation)) return;
+    _animation?.removeStatusListener(_onStatus);
+    _animation = animation;
+    animation?.addStatusListener(_onStatus);
+    _arrived = animation == null || animation.isCompleted;
+  }
+
+  void _onStatus(AnimationStatus status) {
+    final arrived = status == AnimationStatus.completed;
+    if (arrived != _arrived && mounted) setState(() => _arrived = arrived);
+  }
+
+  @override
+  void dispose() {
+    _animation?.removeStatusListener(_onStatus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _arrived ? widget.child : widget.placeholder;
+}
+
+class _BrowserAperture extends StatelessWidget {
+  const _BrowserAperture();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: Center(
+        child: Icon(Icons.language_rounded, color: palette.muted, size: 32),
       ),
     );
   }

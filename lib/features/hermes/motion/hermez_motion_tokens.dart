@@ -1,18 +1,33 @@
+import 'package:flutter/animation.dart';
+import 'package:flutter/physics.dart';
 import 'package:nib_motion/nib_motion.dart';
 
-import '../../../core/services/navigation_service.dart';
 import '../models/hermes_config.dart';
 
 /// Physical weights for Hermez objects. Screens pick a weight, not raw springs.
+///
+/// Larger objects carry more mass: they compress less and settle slower.
 enum HermezMotionWeight { light, medium, heavy }
 
 /// How a Hermez route relates to the screen it came from.
-enum HermezRouteMotion { standard, morph, sharedAxis, modal }
+enum HermezRouteMotion {
+  /// A sibling destination with no single source object. The page slides in
+  /// from the trailing edge and the source shifts back. No opacity change.
+  standard,
+
+  /// The destination grows out of the object the user touched. Requires a
+  /// [HermezMorphOrigin]; without one it falls back to [standard].
+  expand,
+
+  /// No transition: reduced motion, or a native-sheet handoff.
+  none,
+}
 
 /// Hermez-owned motion constants.
 ///
-/// Conduit's [AnimationService] still serves the rest of the app. Hermez
-/// physical motion does not go through those shortened duration helpers.
+/// Conduit's `AnimationService` still serves the rest of the app. Hermez
+/// physical motion does not go through those shortened duration helpers, and
+/// nothing in Hermez animates opacity: objects travel, grow, and recede.
 abstract final class HermezMotion {
   static const springLight = NibSpringDescription(
     mass: 0.65,
@@ -33,12 +48,26 @@ abstract final class HermezMotion {
   static const staggerFast = Duration(milliseconds: 25);
   static const staggerNormal = Duration(milliseconds: 35);
 
-  /// Source screen recedes this far while a morph route covers it.
+  /// Source screen recedes this far while an expanding object covers it.
   static const sourceBackgroundScale = 0.988;
 
-  static const pressLight = 0.96;
-  static const pressCard = 0.98;
+  /// How far a sibling page shifts back while another slides over it, as a
+  /// fraction of its width.
+  static const pushBackShift = 0.14;
+
+  /// Secondary content travels this far into place behind a shared object.
+  static const entranceRise = 26.0;
+
+  static const pressLight = 0.955;
+  static const pressCard = 0.978;
   static const pressHeavy = 0.99;
+
+  /// Pointer travel that turns a press into a scroll.
+  static const pressSlop = 12.0;
+
+  static final HermezSpringCurve curveLight = HermezSpringCurve(springLight);
+  static final HermezSpringCurve curveMedium = HermezSpringCurve(springMedium);
+  static final HermezSpringCurve curveHeavy = HermezSpringCurve(springHeavy);
 
   static NibSpringDescription springFor(HermezMotionWeight weight) =>
       switch (weight) {
@@ -46,6 +75,17 @@ abstract final class HermezMotion {
         HermezMotionWeight.medium => springMedium,
         HermezMotionWeight.heavy => springHeavy,
       };
+
+  static HermezSpringCurve curveFor(HermezMotionWeight weight) =>
+      switch (weight) {
+        HermezMotionWeight.light => curveLight,
+        HermezMotionWeight.medium => curveMedium,
+        HermezMotionWeight.heavy => curveHeavy,
+      };
+
+  /// How long a spring of this weight takes to settle from rest to rest.
+  static Duration settleFor(HermezMotionWeight weight) =>
+      curveFor(weight).settleDuration;
 
   static NibTransition transitionFor(HermezMotionWeight weight) =>
       NibTransition(spring: springFor(weight));
@@ -57,6 +97,43 @@ abstract final class HermezMotion {
   };
 }
 
+/// A [Curve] that follows a Hermez spring from rest at 0 to rest at 1.
+///
+/// Route controllers and [AnimatedSize] are driven by time. This lets them
+/// move with the same physics as NibMotion's spring solver: the curve is the
+/// spring's own position, sampled over the time it takes to settle.
+class HermezSpringCurve extends Curve {
+  HermezSpringCurve(this.spring)
+    : _simulation = SpringSimulation(spring.toFlutter(), 0, 1, 0),
+      _settleSeconds = _settleTime(spring);
+
+  final NibSpringDescription spring;
+  final SpringSimulation _simulation;
+  final double _settleSeconds;
+
+  Duration get settleDuration =>
+      Duration(microseconds: (_settleSeconds * 1e6).round());
+
+  // Hermez springs are close to critically damped, so any overshoot is a
+  // fraction of a pixel. Clamping keeps Hero flights and intervals, which
+  // require values in [0, 1], safe.
+  @override
+  double transformInternal(double t) =>
+      _simulation.x(t * _settleSeconds).clamp(0.0, 1.0);
+
+  static double _settleTime(NibSpringDescription spring) {
+    final simulation = SpringSimulation(spring.toFlutter(), 0, 1, 0);
+    const step = 1 / 600;
+    for (var time = step; time < 3; time += step) {
+      if ((simulation.x(time) - 1).abs() < 0.0012 &&
+          simulation.dx(time).abs() < 0.08) {
+        return time;
+      }
+    }
+    return 3;
+  }
+}
+
 /// Stable shared-element id for one Hermes profile. Null when the name cannot
 /// be a profile, so two empty routes cannot share a Hero tag.
 String? hermezBotMorphId(String profile) {
@@ -64,10 +141,31 @@ String? hermezBotMorphId(String profile) {
   return 'bot:$profile';
 }
 
-/// Route category for Hermes destinations. Non-Hermes routes stay on the
-/// existing platform transition.
-HermezRouteMotion hermezRouteMotionFor(String? routeName) =>
-    switch (routeName) {
-      RouteNames.hermesBotDetail => HermezRouteMotion.morph,
-      _ => HermezRouteMotion.standard,
-    };
+/// Part of a morphing object. The whole object and each part it carries keep
+/// separate tags so every part can fly with its own geometry.
+String? hermezMorphPart(String? id, String part) =>
+    id == null ? null : '$id#$part';
+
+/// The Home schedule summary and the Jobs workspace it opens.
+const hermezScheduleMorphId = 'schedule:summary';
+
+/// The Home board summary and the Kanban workspace it opens.
+const hermezBoardMorphId = 'kanban:summary';
+
+String? hermezKanbanTaskMorphId(String? board, String? taskId) {
+  if (board == null || board.isEmpty || taskId == null || taskId.isEmpty) {
+    return null;
+  }
+  return 'kanban:$board:$taskId';
+}
+
+String? hermezArtifactMorphId(String? path) =>
+    path == null || path.isEmpty ? null : 'artifact:$path';
+
+String? hermezJobMorphId(String? profile, String? jobId) =>
+    jobId == null || jobId.isEmpty ? null : 'job:${profile ?? ''}:$jobId';
+
+String? hermezBrowserMorphId(String? sessionId) =>
+    sessionId == null || sessionId.isEmpty
+    ? null
+    : 'session:$sessionId:browser';

@@ -2,7 +2,6 @@ import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'dart:io' show Platform;
@@ -195,7 +194,7 @@ class _LoadingOverlay extends StatelessWidget {
           ),
         ),
       ),
-    ).animate().fadeIn(duration: AnimationDuration.fast);
+    );
   }
 }
 
@@ -503,23 +502,10 @@ class ImprovedLoadingState extends StatefulWidget {
   State<ImprovedLoadingState> createState() => _ImprovedLoadingStateState();
 }
 
-class _ImprovedLoadingStateState extends State<ImprovedLoadingState>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
+class _ImprovedLoadingStateState extends State<ImprovedLoadingState> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: AnimationDuration.standard,
-      vsync: this,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: AnimationCurves.standard,
-    );
-    _animationController.forward();
 
     // Announce loading state for screen readers using localized messaging.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -537,12 +523,6 @@ class _ImprovedLoadingStateState extends State<ImprovedLoadingState>
   }
 
   @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (widget.customWidget != null) {
       return widget.customWidget!;
@@ -552,8 +532,8 @@ class _ImprovedLoadingStateState extends State<ImprovedLoadingState>
       return _buildSkeletonLoader();
     }
 
-    return FadeTransition(
-      opacity: _fadeAnimation,
+    // Loading states appear in place; nothing fades in.
+    return KeyedSubtree(
       child: Center(
         child: Semantics(
           label: widget.message ?? AppLocalizations.of(context)!.loadingContent,
@@ -730,12 +710,7 @@ class ImprovedEmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(isCompact ? Spacing.md : Spacing.lg),
-        child: showAnimation
-            ? content.animate().fadeIn(
-                duration: AnimationDuration.standard,
-                curve: AnimationCurves.standard,
-              )
-            : content,
+        child: content,
       ),
     );
   }

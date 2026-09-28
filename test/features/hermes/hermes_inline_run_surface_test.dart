@@ -79,6 +79,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('browser is discoverable before expanding activity', (
+    tester,
+  ) async {
+    await mount(tester, viewerUrl: 'http://steel.example/v1/sessions/debug');
+    expect(find.text('Watch browser'), findsOneWidget);
+    expect(find.text('Recent activity'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('stop requires confirmation and targets exact session', (
     tester,
   ) async {

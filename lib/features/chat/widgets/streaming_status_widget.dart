@@ -1,7 +1,6 @@
 import 'dart:io' show Platform;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/native_sheet_bridge.dart';
@@ -651,10 +650,8 @@ Widget _statusItemEntrance(
   required int index,
   required Widget child,
 }) {
-  if (context.reduceMotion) {
-    return child;
-  }
-  return child.animate().fadeIn(duration: 150.ms, delay: (30 * index).ms);
+  // Status rows appear in place; nothing fades in.
+  return child;
 }
 
 // Helper classes and functions

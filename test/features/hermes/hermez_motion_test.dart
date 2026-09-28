@@ -1,5 +1,7 @@
-import 'package:conduit/core/services/navigation_service.dart';
+import 'dart:math' as math;
+
 import 'package:conduit/features/hermes/motion/hermez_motion.dart';
+import 'package:conduit/features/hermes/widgets/hermez_sheet_parts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,24 +12,47 @@ void main() {
     expect(hermezBotMorphId('kai'), isNot(hermezBotMorphId('local')));
     expect(hermezBotMorphId(''), isNull);
     expect(hermezBotMorphId('Not A Profile'), isNull);
+    expect(hermezMorphPart('bot:kai', 'mark'), 'bot:kai#mark');
+    expect(hermezMorphPart(null, 'mark'), isNull);
   });
 
-  test('only bot detail uses the morph route', () {
+  test('source ids come from model ids, never list positions', () {
+    expect(hermezKanbanTaskMorphId('main', 't1'), 'kanban:main:t1');
+    expect(hermezKanbanTaskMorphId(null, 't1'), isNull);
+    expect(hermezKanbanTaskMorphId('main', ''), isNull);
     expect(
-      hermezRouteMotionFor(RouteNames.hermesBotDetail),
-      HermezRouteMotion.morph,
+      hermezArtifactMorphId('/opt/data/a.png'),
+      'artifact:/opt/data/a.png',
     );
-    expect(
-      hermezRouteMotionFor(RouteNames.hermesHome),
-      HermezRouteMotion.standard,
-    );
-    expect(
-      hermezRouteMotionFor(RouteNames.hermesJobs),
-      HermezRouteMotion.standard,
-    );
+    expect(hermezArtifactMorphId(''), isNull);
+    expect(hermezJobMorphId('kai', 'job-1'), 'job:kai:job-1');
+    expect(hermezJobMorphId('kai', null), isNull);
+    expect(hermezBrowserMorphId('s1'), 'session:s1:browser');
   });
 
-  test('heavier objects compress less than lighter ones', () {
+  test('spring curves start and end at rest', () {
+    for (final weight in HermezMotionWeight.values) {
+      final curve = HermezMotion.curveFor(weight);
+      expect(curve.transform(0), 0);
+      expect(curve.transform(1), 1);
+      expect(curve.transform(0.5), greaterThan(0.5));
+      expect(curve.transform(0.98), closeTo(1, 0.01));
+    }
+  });
+
+  test('heavier objects settle slower and compress less', () {
+    expect(
+      HermezMotion.settleFor(HermezMotionWeight.light),
+      lessThan(HermezMotion.settleFor(HermezMotionWeight.medium)),
+    );
+    expect(
+      HermezMotion.settleFor(HermezMotionWeight.medium),
+      lessThan(HermezMotion.settleFor(HermezMotionWeight.heavy)),
+    );
+    expect(
+      HermezMotion.settleFor(HermezMotionWeight.heavy),
+      lessThan(const Duration(milliseconds: 700)),
+    );
     expect(
       HermezMotion.pressScale(HermezMotionWeight.light),
       lessThan(HermezMotion.pressScale(HermezMotionWeight.medium)),
@@ -37,6 +62,50 @@ void main() {
       lessThan(HermezMotion.pressScale(HermezMotionWeight.heavy)),
     );
     expect(HermezMotion.pressScale(HermezMotionWeight.heavy), lessThan(1));
+  });
+
+  test('a page grows from its origin and otherwise slides in', () {
+    final withOrigin = HermezRoute<void>(
+      builder: (_) => const SizedBox(),
+      motion: HermezRouteMotion.expand,
+      origin: const HermezMorphOrigin.rect(Rect.fromLTWH(10, 10, 100, 80)),
+    );
+    expect(withOrigin.effectiveMotion, HermezRouteMotion.expand);
+    // The source stays painted underneath so Back contracts immediately.
+    expect(withOrigin.opaque, isFalse);
+
+    final withoutOrigin = HermezRoute<void>(
+      builder: (_) => const SizedBox(),
+      motion: HermezRouteMotion.expand,
+    );
+    expect(withoutOrigin.effectiveMotion, HermezRouteMotion.standard);
+
+    final sheet = HermezRoute<void>(
+      builder: (_) => const SizedBox(),
+      motion: HermezRouteMotion.expand,
+      shape: HermezExpandShape.sheet,
+    );
+    expect(sheet.effectiveMotion, HermezRouteMotion.expand);
+    expect(sheet.opaque, isFalse);
+    expect(sheet.barrierDismissible, isTrue);
+
+    final reduced = HermezRoute<void>(
+      builder: (_) => const SizedBox(),
+      motion: HermezRouteMotion.expand,
+      origin: const HermezMorphOrigin.rect(Rect.zero),
+      reducedMotion: true,
+    );
+    expect(reduced.effectiveMotion, HermezRouteMotion.none);
+    expect(reduced.transitionDuration, Duration.zero);
+  });
+
+  test('schedule weekdays come only from plain weekly cron patterns', () {
+    expect(hermezCronWeekdays('0 9 * * 1-5'), {1, 2, 3, 4, 5});
+    expect(hermezCronWeekdays('0 9 * * *'), {1, 2, 3, 4, 5, 6, 7});
+    expect(hermezCronWeekdays('30 7 * * sat,sun'), {6, 7});
+    expect(hermezCronWeekdays('0 9 * * 0'), {7});
+    expect(hermezCronWeekdays('0 9 1 * *'), isNull);
+    expect(hermezCronWeekdays('every morning'), isNull);
   });
 
   testWidgets('a motion surface invokes its action once', (tester) async {
@@ -53,8 +122,61 @@ void main() {
       ),
     );
     await tester.tap(find.text('Kai'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(taps, 1);
+  });
+
+  testWidgets('a motion surface reports its origin when opening', (
+    tester,
+  ) async {
+    HermezMorphOrigin? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 120,
+              height: 60,
+              child: HermezMotionSurface(
+                onOpen: (origin) => opened = origin,
+                child: const Text('Kai'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Kai'));
+    await tester.pumpAndSettle();
+    expect(opened, isNotNull);
+    expect(opened!.resolve().size, const Size(120, 60));
+  });
+
+  testWidgets('a scroll that starts on a surface does not open it', (
+    tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              for (var index = 0; index < 20; index++)
+                SizedBox(
+                  height: 90,
+                  child: HermezMotionSurface(
+                    onTap: () => taps++,
+                    child: Text('Row $index'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.drag(find.text('Row 2'), const Offset(0, -240));
+    await tester.pumpAndSettle();
+    expect(taps, 0);
   });
 
   testWidgets('a disabled motion surface does not fire', (tester) async {
@@ -75,26 +197,249 @@ void main() {
     expect(taps, 0);
   });
 
-  testWidgets('morph uses one hero tag and reduced motion skips the flight', (
+  testWidgets('a motion surface is a button for screen readers', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HermezMotionSurface(
+            semanticLabel: 'Open Kai',
+            onTap: () => taps++,
+            child: const SizedBox(width: 80, height: 80),
+          ),
+        ),
+      ),
+    );
+    final node = tester.getSemantics(find.bySemanticsLabel('Open Kai'));
+    expect(node.flagsCollection.isButton, isTrue);
+    tester.semantics.tap(find.semantics.byLabel('Open Kai'));
+    await tester.pumpAndSettle();
+    expect(taps, 1);
+    handle.dispose();
+  });
+
+  testWidgets('morph parts use one hero tag and reduced motion skips it', (
     tester,
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: HermezMorph(id: 'bot:kai', child: Text('Kai')),
+        home: Column(
+          children: [
+            HermezMorph(id: 'bot:kai#mark', child: Text('mark')),
+            HermezMorphText(
+              'Kai',
+              id: 'bot:kai#name',
+              style: TextStyle(fontSize: 15),
+            ),
+          ],
+        ),
       ),
     );
-    expect(tester.widget<Hero>(find.byType(Hero)).tag, 'bot:kai');
+    final tags = tester
+        .widgetList<Hero>(find.byType(Hero))
+        .map((hero) => hero.tag)
+        .toSet();
+    expect(tags, {'bot:kai#mark', 'bot:kai#name'});
 
     await tester.pumpWidget(
       const MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(disableAnimations: true),
-          child: HermezMorph(id: 'bot:kai', child: Text('Kai')),
+          child: Column(
+            children: [
+              HermezMorph(id: 'bot:kai#mark', child: Text('mark')),
+              HermezMorphText(
+                'Kai',
+                id: 'bot:kai#name',
+                style: TextStyle(fontSize: 15),
+              ),
+            ],
+          ),
         ),
       ),
     );
     expect(find.byType(Hero), findsNothing);
     expect(find.text('Kai'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a shared title flies between routes and Back returns it', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: HermezMotionSurface(
+                onOpen: (origin) => Navigator.of(context).push(
+                  HermezRoute<void>(
+                    motion: HermezRouteMotion.expand,
+                    origin: origin,
+                    builder: (_) => const Scaffold(
+                      body: Align(
+                        alignment: Alignment.topLeft,
+                        child: HermezMorphText(
+                          'Kai',
+                          id: 'bot:kai#name',
+                          style: TextStyle(fontSize: 34),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                child: const HermezMorphText(
+                  'Kai',
+                  id: 'bot:kai#name',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Kai'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    // One travelling copy while the placeholders hold their slots.
+    expect(find.text('Kai'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Kai')), Offset.zero);
+
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
+    expect(find.text('Kai'), findsOneWidget);
+    expect(tester.getCenter(find.text('Kai')), const Offset(400, 300));
+  });
+
+  testWidgets('a title flies between theme and Hermez text styles', (
+    tester,
+  ) async {
+    // Theme text styles use inherit: false; Hermez styles inherit. The
+    // flight must interpolate across that without throwing.
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: const Scaffold(
+          body: HermezMorphText(
+            'Kanban',
+            id: 'kanban:summary#title',
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      ),
+    );
+    navigator.currentState!.push(
+      HermezRoute<void>(
+        builder: (_) => const Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: HermezMorphText(
+              'Kanban',
+              id: 'kanban:summary#title',
+              style: TextStyle(inherit: false, fontSize: 36),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.takeException(), isNull);
+    }
+    await tester.pumpAndSettle();
+    expect(find.text('Kanban'), findsOneWidget);
+  });
+
+  testWidgets('a sheet title flies between its card and the sheet header', (
+    tester,
+  ) async {
+    // The sheet page stays at the navigator origin, so Hero flights land
+    // where the sheet's title really is and never float above the sheet.
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.binding.setSurfaceSize(const Size(400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: Align(
+            alignment: const Alignment(0, 0.6),
+            child: Builder(
+              builder: (context) => HermezMotionSurface(
+                onOpen: (origin) => pushHermezSheet<void>(
+                  context,
+                  origin: origin,
+                  builder: (_) => const Material(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: HermezMorphText(
+                          'Task',
+                          id: 'kanban:b:t#title',
+                          style: TextStyle(fontSize: 28),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                child: const HermezMorphText(
+                  'Task',
+                  id: 'kanban:b:t#title',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final start = tester.getTopLeft(find.text('Task')).dy;
+    await tester.tap(find.text('Task'));
+    await tester.pumpAndSettle();
+    final landed = tester.getTopLeft(find.text('Task')).dy;
+    navigator.currentState!.pop();
+    await tester.pump();
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 60));
+      final y = tester.getTopLeft(find.text('Task').first).dy;
+      expect(y, greaterThanOrEqualTo(math.min(start, landed) - 1));
+      expect(y, lessThanOrEqualTo(math.max(start, landed) + 1));
+    }
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a sheet can be dragged down to close', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const Scaffold()),
+    );
+    var closed = false;
+    pushHermezSheet<void>(
+      navigator.currentContext!,
+      builder: (_) => const ColoredBox(
+        color: Colors.white,
+        child: Center(child: Text('Sheet')),
+      ),
+    ).then((_) => closed = true);
+    await tester.pumpAndSettle();
+    expect(find.text('Sheet'), findsOneWidget);
+    await tester.fling(find.text('Sheet'), const Offset(0, 400), 1500);
+    await tester.pumpAndSettle();
+    expect(find.text('Sheet'), findsNothing);
+    expect(closed, isTrue);
   });
 }

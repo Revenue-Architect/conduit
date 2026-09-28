@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../../shared/theme/theme_extensions.dart';
+import '../motion/hermez_motion.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_live_run_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
@@ -52,6 +54,9 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   bool _expanded = false;
   bool _showBrowser = false;
   bool _busy = false;
+  bool _stopping = false;
+  final GlobalKey _surfaceKey = GlobalKey();
+  final GlobalKey _apertureKey = GlobalKey();
 
   @override
   void initState() {
@@ -163,7 +168,10 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     if (_busy || widget.turnState != HermesDesktopTurnState.running) return;
     if (!await confirmHermesStop(context) || !mounted) return;
     final sessionId = widget.sessionId;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _stopping = true;
+    });
     try {
       await (widget.interruptRun?.call(sessionId) ??
           widget.service.interrupt(sessionId));
@@ -175,7 +183,10 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       }
     } finally {
       if (mounted && widget.sessionId == sessionId) {
-        setState(() => _busy = false);
+        setState(() {
+          _busy = false;
+          _stopping = false;
+        });
       }
     }
   }
@@ -183,13 +194,48 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   Future<void> _review(HermesPendingDesktopDecision decision) async {
     if (decision.storedSessionId != widget.sessionId) return;
     final sessionId = widget.sessionId;
+    final surface = _surfaceKey.currentContext;
     final resolved = await showHermesAttentionResolutionSheet(
       context,
       decision,
+      origin: surface == null
+          ? null
+          : HermezMorphOrigin.of(
+              surface,
+              radius: 20,
+              color: HermezChatPalette.forBrightness(
+                Theme.of(context).brightness,
+              ).surface,
+            ),
     );
     if (resolved == true && mounted && widget.sessionId == sessionId) {
       ref.invalidate(hermesPendingSessionDecisionsProvider(sessionId));
     }
+  }
+
+  /// The inline browser aperture grows into the full-screen viewer and
+  /// contracts back into it on Back.
+  void _openBrowser(String viewerUrl) {
+    final aperture = _apertureKey.currentContext;
+    Navigator.of(context).push(
+      HermezRoute<void>(
+        motion: HermezRouteMotion.expand,
+        reducedMotion: context.reduceMotion,
+        origin: aperture == null
+            ? null
+            : HermezMorphOrigin.of(
+                aperture,
+                radius: 16,
+                color: HermezChatPalette.forBrightness(
+                  Theme.of(context).brightness,
+                ).canvas,
+              ),
+        builder: (_) => HermesSteelFullScreenPage(
+          viewerUrl: viewerUrl,
+          sessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -217,210 +263,351 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
               'Live activity unavailable',
           };
     final latest = _events.isEmpty ? null : _events.last;
-    return Material(
-      color: palette.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: palette.border),
-        borderRadius: BorderRadius.circular(20),
+    final reduced = context.reduceMotion;
+    final settle = reduced
+        ? Duration.zero
+        : HermezMotion.settleFor(HermezMotionWeight.medium);
+    // One surface. Its edge and status mark change with the run's state;
+    // everything else unrolls inside it.
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(
+        end: attention
+            ? palette.accent.withValues(alpha: 0.55)
+            : palette.border,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
-        alignment: Alignment.topCenter,
-        curve: Curves.easeOutCubic,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: () => setState(() {
-                  _expanded = !_expanded;
-                  if (!_expanded) _showBrowser = false;
-                }),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Row(
-                    children: [
-                      Icon(
-                        attention
-                            ? Icons.priority_high_rounded
-                            : Icons.radio_button_checked_rounded,
-                        color: attention || working
-                            ? palette.accent
-                            : palette.muted,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              title,
-                              style: TextStyle(
-                                color: palette.ink,
-                                fontWeight: FontWeight.w800,
-                              ),
+      duration: settle,
+      curve: HermezMotion.curveMedium,
+      builder: (context, edge, child) => DecoratedBox(
+        key: _surfaceKey,
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: edge ?? palette.border,
+            width: attention ? 1.5 : 1,
+          ),
+        ),
+        child: child,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          type: MaterialType.transparency,
+          child: HermezSize(
+            weight: HermezMotionWeight.medium,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HermezMotionSurface(
+                    weight: HermezMotionWeight.light,
+                    semanticLabel: _expanded
+                        ? '$title. Collapse activity'
+                        : '$title. Expand activity',
+                    onTap: () => setState(() {
+                      _expanded = !_expanded;
+                      if (!_expanded) _showBrowser = false;
+                    }),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Row(
+                        children: [
+                          HermezIconSwap(
+                            icon: attention
+                                ? Icons.priority_high_rounded
+                                : Icons.radio_button_checked_rounded,
+                            color: attention || working
+                                ? palette.accent
+                                : palette.muted,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    color: palette.ink,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  latest?.title ??
+                                      (attention
+                                          ? 'Review the request below'
+                                          : 'Live activity'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: palette.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
+                          ),
+                          if (_events.isNotEmpty)
                             Text(
-                              latest?.title ??
-                                  (attention
-                                      ? 'Review the request below'
-                                      : 'Live activity'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: palette.muted,
-                                fontSize: 12,
+                              '${_events.length}',
+                              style: TextStyle(color: palette.muted),
+                            ),
+                          const SizedBox(width: 6),
+                          AnimatedRotation(
+                            turns: _expanded ? 0.5 : 0,
+                            duration: settle,
+                            curve: HermezMotion.curveMedium,
+                            child: Icon(
+                              Icons.expand_more_rounded,
+                              color: palette.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  HermezReveal(
+                    visible: attention,
+                    weight: HermezMotionWeight.medium,
+                    revealKey: const ValueKey('inline-attention'),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            decisions.length == 1
+                                ? decisions.first.prompt ??
+                                      'Hermes needs your response.'
+                                : 'Hermes needs your attention · ${decisions.length} requests',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: palette.ink),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final decision in decisions.take(3))
+                                _RunChip(
+                                  label: decisions.length == 1
+                                      ? 'Review'
+                                      : 'Review request',
+                                  icon: Icons.arrow_outward_rounded,
+                                  emphasized: true,
+                                  onTap: () => _review(decision),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  HermezReveal(
+                    visible: !attention && pending.hasError,
+                    revealKey: const ValueKey('inline-pending-error'),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        onPressed: () => ref.invalidate(
+                          hermesPendingSessionDecisionsProvider(
+                            widget.sessionId,
+                          ),
+                        ),
+                        child: const Text('Could not load requests · Retry'),
+                      ),
+                    ),
+                  ),
+                  // Browser watch stays exactly as before: plain presence and
+                  // no animated clip or transform around the platform WebView,
+                  // which can render blank inside one.
+                  if (browserAvailable) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() {
+                            _showBrowser = !_showBrowser;
+                            if (_showBrowser) _expanded = true;
+                          }),
+                          icon: const Icon(Icons.visibility_outlined),
+                          label: Text(
+                            _showBrowser ? 'Close browser' : 'Watch browser',
+                          ),
+                        ),
+                        if (_showBrowser)
+                          TextButton.icon(
+                            onPressed: () => _openBrowser(viewerUrl),
+                            icon: const Icon(Icons.open_in_full),
+                            label: const Text('Expand'),
+                          ),
+                      ],
+                    ),
+                    if (_showBrowser) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        key: _apertureKey,
+                        height: 260,
+                        child: HermesSteelLiveView(viewerUrl: viewerUrl),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Watch only · Hermes controls this browser.',
+                        style: TextStyle(color: palette.muted, fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                  ],
+                  HermezReveal(
+                    visible: _expanded,
+                    weight: HermezMotionWeight.medium,
+                    revealKey: const ValueKey('inline-expanded'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 10),
+                        Text(
+                          'Recent activity',
+                          style: TextStyle(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        if (_events.isEmpty)
+                          Text(
+                            'Waiting for the first tool update…',
+                            style: TextStyle(color: palette.muted),
+                          )
+                        else
+                          SizedBox(
+                            height: 190,
+                            child: HermesLiveActivityTimeline(
+                              events: _events,
+                              running: working,
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _RunChip(
+                              label: 'Steer',
+                              icon: Icons.edit_outlined,
+                              onTap: working && !_busy ? _steer : null,
+                            ),
+                            _RunChip(
+                              label: _stopping ? 'Stopping…' : 'Stop',
+                              icon: Icons.stop_circle_outlined,
+                              busy: _stopping,
+                              onTap: working && !_busy ? _stop : null,
+                            ),
+                            _RunChip(
+                              label: 'Full activity',
+                              icon: Icons.chevron_right_rounded,
+                              quiet: true,
+                              onTap: () => context.pushNamed(
+                                RouteNames.hermesLiveRun,
+                                pathParameters: {'sessionId': widget.sessionId},
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      if (_events.isNotEmpty)
-                        Text(
-                          '${_events.length}',
-                          style: TextStyle(color: palette.muted),
-                        ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        _expanded
-                            ? Icons.expand_less_rounded
-                            : Icons.expand_more_rounded,
-                        color: palette.ink,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A run control. The surface stays put and compresses; its label changes
+/// in place while the action runs.
+class _RunChip extends StatelessWidget {
+  const _RunChip({
+    required this.label,
+    required this.icon,
+    this.onTap,
+    this.emphasized = false,
+    this.quiet = false,
+    this.busy = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool emphasized;
+  final bool quiet;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final enabled = onTap != null && !busy;
+    final dark = emphasized;
+    final foreground = dark
+        ? const Color(0xFFF6F5F2)
+        : enabled || busy
+        ? palette.ink
+        : palette.muted;
+    return HermezMotionSurface(
+      weight: HermezMotionWeight.light,
+      semanticLabel: label,
+      enabled: enabled,
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 42),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: dark
+              ? const Color(0xFF17181C)
+              : quiet
+              ? Colors.transparent
+              : palette.canvas,
+          borderRadius: BorderRadius.circular(999),
+          border: dark || quiet
+              ? null
+              : Border.all(color: palette.border.withValues(alpha: 0.8)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (busy)
+              SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: foreground,
+                ),
+              )
+            else
+              Icon(icon, size: 18, color: foreground),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (attention) ...[
-                const SizedBox(height: 10),
-                Text(
-                  decisions.length == 1
-                      ? decisions.first.prompt ?? 'Hermes needs your response.'
-                      : 'Hermes needs your attention · ${decisions.length} requests',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: palette.ink),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final decision in decisions.take(3))
-                      OutlinedButton(
-                        onPressed: () => _review(decision),
-                        child: Text(
-                          decisions.length == 1 ? 'Review' : 'Review request',
-                        ),
-                      ),
-                  ],
-                ),
-              ] else if (pending.hasError) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => ref.invalidate(
-                    hermesPendingSessionDecisionsProvider(widget.sessionId),
-                  ),
-                  child: const Text('Could not load requests · Retry'),
-                ),
-              ],
-              if (_expanded) ...[
-                const SizedBox(height: 12),
-                if (browserAvailable) ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            setState(() => _showBrowser = !_showBrowser),
-                        icon: const Icon(Icons.visibility_outlined),
-                        label: Text(
-                          _showBrowser ? 'Close browser' : 'Watch browser',
-                        ),
-                      ),
-                      if (_showBrowser)
-                        TextButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => HermesSteelFullScreenPage(
-                                viewerUrl: viewerUrl,
-                                sessionId: widget.sessionId,
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.open_in_full),
-                          label: const Text('Expand'),
-                        ),
-                    ],
-                  ),
-                  if (_showBrowser) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 260,
-                      child: HermesSteelLiveView(viewerUrl: viewerUrl),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Watch only · Hermes controls this browser.',
-                      style: TextStyle(color: palette.muted, fontSize: 12),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                ],
-                Text(
-                  'Recent activity',
-                  style: TextStyle(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                if (_events.isEmpty)
-                  Text(
-                    'Waiting for the first tool update…',
-                    style: TextStyle(color: palette.muted),
-                  )
-                else
-                  SizedBox(
-                    height: 190,
-                    child: HermesLiveActivityTimeline(
-                      events: _events,
-                      running: working,
-                    ),
-                  ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: working && !_busy ? _steer : null,
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Steer'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: working && !_busy ? _stop : null,
-                      icon: const Icon(Icons.stop_circle_outlined),
-                      label: const Text('Stop'),
-                    ),
-                    TextButton(
-                      onPressed: () => context.pushNamed(
-                        RouteNames.hermesLiveRun,
-                        pathParameters: {'sessionId': widget.sessionId},
-                      ),
-                      child: const Text('Full activity'),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

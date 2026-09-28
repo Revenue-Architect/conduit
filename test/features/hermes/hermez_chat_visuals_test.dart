@@ -4,6 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('starter chips work without a Scaffold Material ancestor', (
+    tester,
+  ) async {
+    String? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HermezEmptyChatGreeting(
+          greeting: 'Start chatting',
+          starters: const ['Plan today', 'Research a topic'],
+          onStarter: (value) => selected = value,
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Plan today'));
+    await tester.pump();
+    expect(selected, 'Plan today');
+    expect(tester.takeException(), isNull);
+  });
   test('Hermez visuals are exclusive to debug Android Hermes chat', () {
     for (final debugBuild in [false, true]) {
       for (final android in [false, true]) {

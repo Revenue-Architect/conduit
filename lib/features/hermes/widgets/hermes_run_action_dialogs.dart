@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/conduit_dialog_route.dart';
+
 Future<String?> promptHermesSteer(BuildContext context) async {
   var draft = '';
-  return showDialog<String>(
+  return showConduitDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Steer this run'),
@@ -29,7 +31,7 @@ Future<String?> promptHermesSteer(BuildContext context) async {
 }
 
 Future<bool> confirmHermesStop(BuildContext context) async =>
-    await showDialog<bool>(
+    await showConduitDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Stop this run?'),

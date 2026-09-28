@@ -13,6 +13,7 @@ import '../providers/hermes_session_totals_provider.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
+import '../widgets/hermez_bot_identity.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_relative_time.dart';
@@ -53,12 +54,14 @@ class HermesHomePage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     HermesJob job,
-    String profile,
-  ) async {
+    String profile, [
+    HermezMorphOrigin? origin,
+  ]) async {
     final run = await showHermesScheduledAgentSheet(
       context,
       job: job,
       profile: profile,
+      origin: origin,
     );
     if (run != null && context.mounted) {
       await openHermesSession(context, ref, run);
@@ -235,16 +238,21 @@ class HermesHomePage extends ConsumerWidget {
                         for (final (profile, job) in todayJobs.take(4))
                           _TodayRow(
                             title: job.displayName,
+                            titleMorphId: hermezMorphPart(
+                              hermezJobMorphId(profile, job.id),
+                              'title',
+                            ),
                             detail:
                                 'Scheduled · ${hermezRelativeLabel(job.nextRun!)}',
-                            onTap: () => _openJob(context, ref, job, profile),
+                            onOpen: (origin) =>
+                                _openJob(context, ref, job, profile, origin),
                           ),
                         for (final task in running.take(3))
                           _TodayRow(
                             title: task.title,
                             detail:
                                 'Running${task.assignee == null ? '' : ' · ${task.assignee}'}',
-                            onTap: () =>
+                            onOpen: (_) =>
                                 context.pushNamed(RouteNames.hermesKanban),
                           ),
                       ],
@@ -282,7 +290,13 @@ class HermesHomePage extends ConsumerWidget {
                   child: HermezSurface(
                     kind: HermezSurfaceKind.utility,
                     motif: HermezMotif.slash,
-                    onTap: () => context.pushNamed(RouteNames.hermesJobs),
+                    motifMorphId: hermezMorphPart(
+                      hermezScheduleMorphId,
+                      'motif',
+                    ),
+                    semanticLabel: 'Scheduled agents',
+                    onOpen: (origin) =>
+                        context.pushNamed(RouteNames.hermesJobs, extra: origin),
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,8 +306,9 @@ class HermesHomePage extends ConsumerWidget {
                           style: HermezType.technical(palette.accent),
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        HermezMorphText(
                           'Scheduled agents',
+                          id: hermezMorphPart(hermezScheduleMorphId, 'title'),
                           style: HermezType.section(palette),
                         ),
                         const SizedBox(height: 4),
@@ -321,7 +336,12 @@ class HermesHomePage extends ConsumerWidget {
                   child: HermezSurface(
                     kind: HermezSurfaceKind.utility,
                     motif: HermezMotif.arc,
-                    onTap: () => context.pushNamed(RouteNames.hermesKanban),
+                    motifMorphId: hermezMorphPart(hermezBoardMorphId, 'motif'),
+                    semanticLabel: 'Kanban',
+                    onOpen: (origin) => context.pushNamed(
+                      RouteNames.hermesKanban,
+                      extra: origin,
+                    ),
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,7 +351,11 @@ class HermesHomePage extends ConsumerWidget {
                           style: HermezType.technical(palette.muted),
                         ),
                         const SizedBox(height: 8),
-                        Text('Kanban', style: HermezType.section(palette)),
+                        HermezMorphText(
+                          'Kanban',
+                          id: hermezMorphPart(hermezBoardMorphId, 'title'),
+                          style: HermezType.section(palette),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           kanban == null
@@ -515,20 +539,26 @@ class _TodayRow extends StatelessWidget {
   const _TodayRow({
     required this.title,
     required this.detail,
-    required this.onTap,
+    required this.onOpen,
+    this.titleMorphId,
   });
 
   final String title;
   final String detail;
-  final VoidCallback onTap;
+  final ValueChanged<HermezMorphOrigin?> onOpen;
+  final String? titleMorphId;
 
   @override
   Widget build(BuildContext context) {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return InkWell(
-      onTap: onTap,
+    return HermezMotionSurface(
+      weight: HermezMotionWeight.light,
+      semanticLabel: title,
+      originRadius: 12,
+      originColor: palette.surface,
+      onOpen: onOpen,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -546,10 +576,9 @@ class _TodayRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  HermezMorphText(
                     title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    id: titleMorphId,
                     style: HermezType.body(palette),
                   ),
                   Text(detail, style: HermezType.meta(palette)),
@@ -573,128 +602,87 @@ class _BotCard extends ConsumerWidget {
       Theme.of(context).brightness,
     );
     final service = ref.watch(hermesApiServiceProvider);
-    final state =
-        service is HermesDesktopApiService && bot.chatSessionId != null
-        ? service.turnStateFor(bot.chatSessionId!)
-        : HermesDesktopTurnState.idle;
-    final running = state == HermesDesktopTurnState.running;
-    final status = running
-        ? 'Running'
-        : bot.lastActive == null
-        ? 'No recent activity'
-        : 'Used ${hermezRelativeLabel(bot.lastActive!).split(',').first.toLowerCase()}';
+    final running = hermezBotRunning(service, bot);
+    final status = hermezBotStatus(bot, running: running);
     final description = bot.description?.trim();
-    return HermezMotionSurface(
-      weight: HermezMotionWeight.medium,
+    final morphId = hermezBotMorphId(bot.name);
+    return HermezSurface(
+      kind: HermezSurfaceKind.utility,
+      motif: HermezMotif.etched,
+      motifMorphId: hermezMorphPart(morphId, 'motif'),
+      border: Border.all(color: palette.border.withValues(alpha: 0.8)),
       semanticLabel: bot.title,
-      onTap: () => context.pushNamed(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+      onOpen: (origin) => context.pushNamed(
         RouteNames.hermesBotDetail,
         pathParameters: {'profile': bot.name},
+        extra: origin,
       ),
-      child: DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: palette.border.withValues(alpha: 0.8)),
-      ),
-      child: HermezSurface(
-        kind: HermezSurfaceKind.utility,
-        motif: HermezMotif.etched,
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 116),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: HermezMorph(
-                      id: hermezBotMorphId(bot.name),
-                      child: _BotIdentity(
-                        markSize: 46,
-                        title: bot.title,
-                        titleStyle: HermezType.section(palette).copyWith(
-                          fontSize: 15,
-                        ),
-                        identity: hermezIdentityForBot(bot),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 116),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                HermezMorph(
+                  id: hermezMorphPart(morphId, 'mark'),
+                  child: HermezBotMark(
+                    identity: hermezIdentityForBot(bot),
+                    size: 46,
+                    label: bot.title,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      HermezMorphText(
+                        'BOT',
+                        id: hermezMorphPart(morphId, 'kind'),
+                        style: HermezBotStyles.kind(palette),
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      HermezMorphText(
+                        bot.title,
+                        id: hermezMorphPart(morphId, 'name'),
+                        style: HermezBotStyles.cardName(palette),
+                      ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: palette.ink,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            HermezMorphText(
+              description == null || description.isEmpty
+                  ? 'Hermes profile'
+                  : description,
+              id: hermezMorphPart(morphId, 'about'),
+              maxLines: 2,
+              style: HermezBotStyles.cardAbout(palette),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                HermezMorph(
+                  id: hermezMorphPart(morphId, 'dot'),
+                  child: HermezStatusDot(running: running),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: HermezMorphText(
+                    status,
+                    id: hermezMorphPart(morphId, 'status'),
+                    style: HermezType.meta(palette),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description == null || description.isEmpty
-                    ? 'Hermes profile'
-                    : description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: HermezType.meta(palette),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: running ? palette.accent : palette.muted,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      status,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: HermezType.meta(palette),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-      ),
-    );
-  }
-}
-
-class _BotIdentity extends StatelessWidget {
-  const _BotIdentity({
-    required this.identity,
-    required this.title,
-    required this.titleStyle,
-    required this.markSize,
-  });
-
-  final HermezBotIdentity identity;
-  final String title;
-  final TextStyle titleStyle;
-  final double markSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        HermezBotMark(identity: identity, size: markSize, label: title),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: titleStyle,
-          ),
-        ),
-      ],
     );
   }
 }
