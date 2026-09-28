@@ -45,6 +45,7 @@ import '../../hermes/models/hermes_model.dart';
 import '../../hermes/models/hermes_bot.dart';
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
+import '../../hermes/providers/hermes_live_run_providers.dart';
 import '../../hermes/services/hermes_decision_projection.dart';
 import '../../hermes/services/hermes_desktop_api_service.dart';
 import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
@@ -55,6 +56,7 @@ import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
 import '../../hermes/widgets/hermes_live_activity_disclosure.dart';
+import '../../hermes/widgets/hermes_inline_run_surface.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -495,7 +497,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _isDeactivated = false;
   double _inputHeight = 0;
   bool _didStartupFocus = false; // one-time auto-focus on startup
-  bool _liveActivityExpanded = false;
   String? _lastConversationId;
   int _conversationOwnerGeneration = 0;
   int? _timelineHistoryIndexDesyncLogGeneration;
@@ -2933,6 +2934,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         .watch(hermesDesktopTurnStateProvider)
         .asData
         ?.value;
+    final exactHermesSession =
+        isNativeHermesConversation(activeHermesConversation) &&
+        activeHermesSessionId != null &&
+        activeHermesConversation?.metadata['hermesSessionId']?.toString() ==
+            activeHermesSessionId &&
+        desktopService is HermesDesktopApiService;
+    final hasPendingHermesDecision = exactHermesSession
+        ? watchRef
+                  .watch(
+                    hermesPendingSessionDecisionsProvider(
+                      activeHermesSessionId,
+                    ),
+                  )
+                  .asData
+                  ?.value
+                  .isNotEmpty ??
+              false
+        : false;
     final showHermesActivity = shouldShowHermesLiveActivity(
       nativeConversation: isNativeHermesConversation(activeHermesConversation),
       conversationSessionId: activeHermesConversation
@@ -2941,6 +2960,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       activeSessionId: activeHermesSessionId,
       desktopService: desktopService is HermesDesktopApiService,
       turnState: activeHermesTurn,
+      hasPendingDecision: hasPendingHermesDecision,
     );
     _scheduleMarkdownPrewarm(messages, layoutMetadata: layoutMetadata);
     _syncLayoutBottomAnchor();
@@ -3061,14 +3081,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     activeHermesSessionId != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: HermesLiveActivityDisclosure(
+                    child: HermesInlineRunSurface(
                       key: ValueKey('hermes-live-$activeHermesSessionId'),
                       service: desktopService,
                       sessionId: activeHermesSessionId,
-                      expanded: _liveActivityExpanded,
-                      onToggle: () => setState(
-                        () => _liveActivityExpanded = !_liveActivityExpanded,
-                      ),
+                      turnState:
+                          activeHermesTurn ?? HermesDesktopTurnState.idle,
                     ),
                   ),
               ],

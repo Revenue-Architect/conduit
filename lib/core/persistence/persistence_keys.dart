@@ -90,6 +90,7 @@ final class PreferenceKeys {
       'hermes_pending_desktop_decisions_v1';
   static const String hermesArtifactProvenance =
       'hermes_artifact_provenance_v1';
+  static const String hermesSteelViewerUrl = 'hermes_steel_viewer_url_v1';
   static const String hermesDashboardCookieIdentities =
       'hermes_dashboard_cookie_identities_v1';
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import '../../../core/persistence/persistence_keys.dart';
@@ -145,6 +146,10 @@ final class HermesPendingDesktopDecision {
 final class HermesPendingDecisionStore {
   HermesPendingDecisionStore._();
 
+  static final StreamController<void> _changes =
+      StreamController<void>.broadcast();
+  static Stream<void> get changes => _changes.stream;
+
   static const int maxRecords = 64;
   static const Duration ttl = Duration(hours: 24);
   static Future<void> _writes = Future<void>.value();
@@ -285,7 +290,7 @@ final class HermesPendingDecisionStore {
     var records = const <HermesPendingDesktopDecision>[];
     await _serialize(() async {
       records = _read();
-      await _write(records);
+      await _write(records, notify: false);
     });
     return List.unmodifiable(
       records.where(
@@ -303,7 +308,7 @@ final class HermesPendingDecisionStore {
     var records = const <HermesPendingDesktopDecision>[];
     await _serialize(() async {
       records = _read();
-      await _write(records);
+      await _write(records, notify: false);
     });
     return List.unmodifiable(
       records.where(
@@ -336,14 +341,18 @@ final class HermesPendingDecisionStore {
     ];
   }
 
-  static Future<void> _write(List<HermesPendingDesktopDecision> records) {
+  static Future<void> _write(
+    List<HermesPendingDesktopDecision> records, {
+    bool notify = true,
+  }) async {
     final bounded = records.length <= maxRecords
         ? records
         : records.sublist(records.length - maxRecords);
-    return PreferencesStore.putChecked(
+    await PreferencesStore.putChecked(
       PreferenceKeys.hermesPendingDesktopDecisions,
       bounded.map((record) => record.toStorage()).toList(growable: false),
     );
+    if (notify) _changes.add(null);
   }
 
   static Future<void> _serialize(Future<void> Function() operation) {

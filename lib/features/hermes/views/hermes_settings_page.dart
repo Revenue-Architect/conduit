@@ -16,6 +16,7 @@ import '../models/hermes_capabilities.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_connection_service.dart';
+import '../services/hermes_steel_viewer.dart';
 import 'hermes_desktop_connection_section.dart';
 import 'hermes_settings_sections.dart';
 
@@ -34,6 +35,8 @@ class HermesSettingsPage extends ConsumerStatefulWidget {
 
 class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
   late final HermesConnectionController _connectionController;
+  late final TextEditingController _steelViewerUrl;
+  bool _savingSteelViewer = false;
 
   @override
   void initState() {
@@ -42,6 +45,9 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
       initialConfig: ref.read(hermesConfigProvider),
       gateway: ref.read(hermesConnectionGatewayProvider),
     )..addListener(_handleConnectionChanged);
+    _steelViewerUrl = TextEditingController(
+      text: ref.read(hermesSteelViewerUrlProvider),
+    );
   }
 
   void _handleConnectionChanged() {
@@ -78,6 +84,7 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
 
   @override
   void dispose() {
+    _steelViewerUrl.dispose();
     _connectionController.removeListener(_handleConnectionChanged);
     _connectionController.dispose();
     super.dispose();
@@ -113,6 +120,37 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
       messages: _messages(AppLocalizations.of(context)!),
     );
     ref.invalidate(hermesServerStatusProvider);
+  }
+
+  Future<void> _saveSteelViewer() async {
+    if (_savingSteelViewer) return;
+    setState(() => _savingSteelViewer = true);
+    try {
+      await ref
+          .read(hermesSteelViewerUrlProvider.notifier)
+          .save(_steelViewerUrl.text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Live browser viewer saved.')),
+        );
+      }
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enter a valid HTTP or HTTPS viewer URL.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save the viewer URL.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingSteelViewer = false);
+    }
   }
 
   @override
@@ -304,6 +342,44 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
           saveSettings: _saveSettings,
           testConnection: _testConnection,
         ),
+        if (!widget.isOnboarding) ...[
+          const SizedBox(height: Spacing.lg),
+          InsetGroupedSection(
+            title: 'Live browser',
+            flat: true,
+            padding: EdgeInsets.zero,
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _steelViewerUrl,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Steel viewer URL',
+                      hintText: 'http://your-steel-host/v1/sessions/debug',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Optional. Opens watch-only during an active Hermes run. '
+                    'Steel debug links may allow browser control; keep this URL private.',
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton(
+                      onPressed: _savingSteelViewer ? null : _saveSteelViewer,
+                      child: const Text('Save viewer'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
       SizedBox(height: PlatformInfo.isIOS ? Spacing.md : Spacing.lg),
       HermesTransportSection(controller: _connectionController),

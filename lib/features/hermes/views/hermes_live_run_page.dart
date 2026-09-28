@@ -14,6 +14,7 @@ import '../services/hermes_pending_decision_store.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
 import '../sheets/hermes_completed_run_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
+import '../widgets/hermes_run_action_dialogs.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_page_chrome.dart';
 
@@ -83,32 +84,7 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   }
 
   Future<void> _steer(HermesDesktopApiService service) async {
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Steer this run'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'What should Hermes change?',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
+    final text = await promptHermesSteer(context);
     if (!mounted || text == null || text.isEmpty) return;
     setState(() => _busy = true);
     try {
@@ -130,24 +106,8 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   }
 
   Future<void> _stop(HermesDesktopApiService service) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Stop this run?'),
-        content: const Text('Hermes will interrupt the active turn.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Stop'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
+    final confirm = await confirmHermesStop(context);
+    if (!confirm || !mounted) return;
     setState(() => _busy = true);
     try {
       await service.interrupt(widget.sessionId);

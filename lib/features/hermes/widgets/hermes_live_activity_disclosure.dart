@@ -13,12 +13,14 @@ bool shouldShowHermesLiveActivity({
   required String? activeSessionId,
   required bool desktopService,
   required HermesDesktopTurnState? turnState,
+  bool hasPendingDecision = false,
 }) =>
     nativeConversation &&
     conversationSessionId != null &&
     conversationSessionId == activeSessionId &&
     desktopService &&
-    (turnState == HermesDesktopTurnState.running ||
+    (hasPendingDecision ||
+        turnState == HermesDesktopTurnState.running ||
         turnState == HermesDesktopTurnState.synchronizing ||
         turnState == HermesDesktopTurnState.reconnecting);
 

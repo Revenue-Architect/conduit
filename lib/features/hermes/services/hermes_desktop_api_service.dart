@@ -489,6 +489,15 @@ final class HermesDesktopApiService
   Future<List<HermesPendingDesktopDecision>> pendingDecisionsForSession(
     String storedId,
   ) => _runtimePendingDecisionsForSession(storedId);
+
+  /// Local, exact-session presentation read. Never resumes a Desktop session
+  /// merely to decide whether its chat needs an attention footer.
+  Future<List<HermesPendingDesktopDecision>> pendingStoredDecisionsForSession(
+    String storedId,
+  ) => HermesPendingDecisionStore.forSession(
+    origin: _origin,
+    storedSessionId: storedId,
+  );
   @override
   Future<void> renameSession(String id, String title) =>
       _runtimeRenameSession(id, title);

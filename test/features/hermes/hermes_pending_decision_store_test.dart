@@ -1,6 +1,8 @@
 import 'package:checks/checks.dart';
 import 'package:conduit/core/persistence/persistence_keys.dart';
 import 'package:conduit/core/persistence/preferences_store.dart';
+import 'package:conduit/features/hermes/models/hermes_config.dart';
+import 'package:conduit/features/hermes/services/hermes_desktop_api_service.dart';
 import 'package:conduit/features/hermes/services/hermes_pending_decision_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,66 @@ void main() {
   });
 
   tearDown(PreferencesStore.debugReset);
+
+  test(
+    'inline attention reads stored decisions without resuming Desktop',
+    () async {
+      final service = HermesDesktopApiService(
+        config: const HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example/v1',
+          mode: HermesBackendMode.desktopGateway,
+          desktopAuthKind: HermesDesktopAuthKind.nativePkce,
+        ),
+      );
+      addTearDown(service.close);
+      await HermesPendingDecisionStore.upsert(
+        origin: 'https://hermes.example:443',
+        storedSessionId: 'session-1',
+        runtimeId: 'runtime-1',
+        requestId: 'request-1',
+        kind: HermesPendingDesktopDecisionKind.approval,
+      );
+      final decisions = await service.pendingStoredDecisionsForSession(
+        'session-1',
+      );
+      expect(decisions.map((item) => item.requestId), ['request-1']);
+      expect(
+        await service.pendingStoredDecisionsForSession('session-2'),
+        isEmpty,
+      );
+    },
+  );
+
+  test('pending change notifications fire for mutations, not reads', () async {
+    var updates = 0;
+    final subscription = HermesPendingDecisionStore.changes.listen(
+      (_) => updates++,
+    );
+    addTearDown(subscription.cancel);
+    await HermesPendingDecisionStore.upsert(
+      origin: 'https://hermes.example:443',
+      storedSessionId: 'session-1',
+      runtimeId: 'runtime-1',
+      requestId: 'request-1',
+      kind: HermesPendingDesktopDecisionKind.approval,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(updates, 1);
+    await HermesPendingDecisionStore.forSession(
+      origin: 'https://hermes.example:443',
+      storedSessionId: 'session-1',
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(updates, 1);
+    await HermesPendingDecisionStore.resolve(
+      origin: 'https://hermes.example:443',
+      runtimeId: 'runtime-1',
+      requestId: 'request-1',
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(updates, 2);
+  });
 
   test('inbox reads only the current origin and requested profile', () async {
     for (final (origin, profile, request) in [
