@@ -477,6 +477,44 @@ void main() {
     );
   });
 
+  testWidgets('Hermes compartment opens locally; only its Button sends a '
+      'turn', (tester) async {
+    final payload = File(
+      'test/fixtures/hermes/a2ui/status-overview.jsonl',
+    ).readAsStringSync();
+    final selected = <String>[];
+    final message = ChatMessage(
+      id: 'hermes-a2ui-status-overview',
+      role: 'assistant',
+      content: 'NVR storage needs a look.\n```a2ui\n$payload\n```',
+      timestamp: DateTime(2024, 1, 1),
+      metadata: const {'transport': kHermesTransport, 'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      _buildAssistantHarness(
+        message,
+        hermesConfigOverride: _dashboardCookieHermesConfig,
+        scrollable: true,
+        onFollowUpSelected: selected.add,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Last check'), findsNothing);
+    await tester.ensureVisible(find.text('DETAILS / 4'));
+    await tester.tap(find.text('DETAILS / 4'));
+    await tester.pumpAndSettle();
+    expect(find.text('Last check'), findsOneWidget);
+    expect(selected, isEmpty);
+
+    await tester.ensureVisible(find.text('Inspect storage'));
+    await tester.tap(find.text('Inspect storage'));
+    await tester.pump();
+    expect(selected, hasLength(1));
+    expect(selected.single, contains('storage.inspect'));
+  });
+
   testWidgets('Hermes ordinary json fences remain Markdown code', (
     tester,
   ) async {

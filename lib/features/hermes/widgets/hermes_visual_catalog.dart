@@ -7,6 +7,7 @@ import 'package:genui/genui.dart';
 // ignore: depend_on_referenced_packages
 import 'package:json_schema_builder/json_schema_builder.dart';
 
+import 'hermes_visual_structure.dart';
 import 'hermez_visual_theme.dart';
 
 /// Extends GenUI's safe, no-asset basic catalog with app-owned data widgets.
@@ -19,6 +20,7 @@ Catalog createHermesVisualCatalog() {
       _statusBadge,
       _metricTile,
       _miniChart,
+      ...hermesStructureCatalogItems,
     ],
   );
 }

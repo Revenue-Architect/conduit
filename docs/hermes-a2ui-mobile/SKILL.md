@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
-description: "Use when a compact native visual or interaction would improve a Conduit answer: plans, schedules, budgets, choices, comparisons, checklists, forms, itineraries, status, and dashboards across any topic. Users need not say A2UI, GenUI, visual, or name components. Compose A2UI v0.9 when it adds value."
-version: 0.8.1
+description: "Use when a compact native visual or interaction would improve a Conduit answer: status, metrics, comparisons, timelines, plans, checklists, files, decisions, workstreams, schedules, budgets, forms, and itineraries across any topic. Users need not say A2UI, GenUI, visual, or name components. Compose A2UI v0.9 when it adds value."
+version: 0.9.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -16,6 +16,39 @@ metadata:
 If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
 
 Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Use it when interaction, scanning, comparison, or a native control materially improves on Markdown. Do not turn ordinary prose into a decorative card.
+
+## Choose the presentation before writing
+
+This is the principal presentation rule. Before drafting, classify the answer as `plain`, `status`, `metrics`, `comparison`, `timeline`, `checklist`, `files`, `decision`, `plan`, or `mixed`.
+
+- `plain` → normal Markdown. “Did the email send?” is answered “Yes. It was sent at 10:42.”, not a dashboard. “What is 2 + 2?” is plain text.
+- Every other category → prefer one compact A2UI surface whenever native structure makes the answer easier to scan.
+- A visual answer has at most one short sentence outside the surface. When the surface fully answers the question, send only the surface.
+- Never repeat the surface in prose. Bad: “Three services are healthy and one has an issue.” + surface + “As you can see, three services are healthy…”. Good: “Storage is the only item that needs attention.” + surface.
+
+| Information shape | Preferred representation |
+|---|---|
+| Service or system states | InfoRow with `state`, or StatusBadge |
+| 2–4 important numbers | MetricTile (weighted Row when values are short) |
+| Historical numeric samples | MiniChart |
+| Alternatives | Stacked comparison Cards or InfoRows |
+| Chronological stages, a plan, a rollout | StepRail |
+| Checklist the user marks | CheckBox |
+| Ownership or workstreams | BotBadge + InfoRow |
+| Files produced or referenced | ArtifactTile |
+| A decision the user must make | ActionCallout with Buttons |
+| The single next action | ActionCallout |
+| 3+ related structured items | InfoRows in a Column |
+| Long secondary detail or evidence | ExpandableSection |
+| Mixed structured answer | A compact composition of the above |
+
+### Markdown tables
+
+Avoid Markdown tables in Conduit chat whenever the same information fits native rows, cards, metrics, or a comparison surface. Tables such as `Owner | Status`, `Service | Health | Detail`, `Task | Assignee | State`, or `Option | Price | Difference` do not fit a ~300 px column; use InfoRows, stacked comparison cards, or a short metric row. A table is acceptable only when the user asks for one or tabular form is materially clearer, and even then keep it narrow.
+
+### Avoid visual spam
+
+One surface per answer is the default. Do not wrap every sentence in a Card or produce SYSTEM / STATUS / METRICS / CHART / BUTTON for every reply. Use hierarchy inside one surface: `Card → Column → title, summary, rows, expandable detail, action`.
 
 ## Choose the right output
 
@@ -76,6 +109,15 @@ Conduit also provides these data-only visual components:
 - `MetricTile`: required `label` and observed numeric `value`; optional `unit`, `min`, `max`, `state`, ISO 8601 `asOf`, and short `source`. Give units for percentages, sizes, latency, and counts. Only provide `min` and `max` when the range is meaningful.
 - `MiniChart`: required `label`, `kind` (`line` or `bar`), and ordered `points`, each with a short `label` and finite numeric `value`; optional `unit`, ISO 8601 `asOf`, and `source`. Limit to 60 real observations. Use it only with at least two observations. For one observation, use a `MetricTile`; for no data, say so without drawing a chart.
 
+Structure components (data-only; they replace most small tables and bullet lists):
+
+- `InfoRow`: one labelled fact. Required `title`; optional `detail`, `meta`, `icon`, `state` (`ok`, `warning`, `error`, `unknown`), `compact`. Use a Column of InfoRows instead of a table.
+- `StepRail`: ordered stages. Required `steps` (1–10), each `{label, state, detail?, meta?}` with state `done`, `current`, `upcoming`, `warning`, or `error`. Mark `done` only for stages that are actually complete.
+- `ActionCallout`: the one thing that needs attention or the next step. Required `title`; optional `eyebrow`, `detail`, `tone` (`neutral`, `attention`, `success`, `error`), `icon`, `actionChild` (a Button, or a Row of 2–3 Buttons for a decision).
+- `ArtifactTile`: a file by name. Required `name` and `kind` (`document`, `image`, `spreadsheet`, `audio`, `video`, `file`); optional `sizeLabel`, `detail`, `actionChild`. It never opens or fetches the file; return the actual file with `MEDIA:` and use an optional Button to ask about it.
+- `BotBadge`: which agent owns a workstream. Required `label` and `identity` (`neutral`, `kai`, `local`, `autopilot`, `fast`, `strong`); optional `detail`. Use the identity of the bot that actually did the work.
+- `ExpandableSection`: long supporting detail kept one tap away. Required `title` and `child`; optional `subtitle`, `count`, `initiallyExpanded`. Opening it is local and sends nothing to Hermes. Never hide a warning, failure, or limitation inside it.
+
 Exact props for every component — including forms (`TextField`, `CheckBox`, `ChoicePicker`, `Slider`, `DateTimeInput`) and `Tabs`/`Modal` — are in `references/component-guide.md`; complete worked surfaces in `references/patterns.md`.
 
 Do not place remote image URLs in `Image`; that component is unavailable for agent-provided network assets. Return image files with `MEDIA:<absolute-path>` so Conduit can fetch them through authenticated Hermes file routes.
@@ -84,15 +126,16 @@ Do not place remote image URLs in `Image`; that component is unavailable for age
 
 - Design for about 300 logical pixels of content width inside the phone chat column. Keep all text and buttons within that width, including at larger text scale.
 - Prefer a `Column` for mixed content and actions. Use a `Row` only when side-by-side reading helps; use `List` for repeated items and `Tabs` for genuinely distinct groups.
-- Every direct `MetricTile`, `MiniChart`, `StatusBadge`, `Slider`, `TextField`, `ChoicePicker`, `DateTimeInput`, `Card`, `Column`, `Row`, `List`, or `Tabs` child in a `Row` must have a positive integer `weight`. This applies to overview dashboards as well as comparison cards. For two short comparable metrics, use `weight: 1` on both tiles. Conduit's read-time repair protects saved older messages, but author new output correctly.
+- Every direct `MetricTile`, `MiniChart`, `StatusBadge`, `InfoRow`, `StepRail`, `ActionCallout`, `ArtifactTile`, `BotBadge`, `ExpandableSection`, `Slider`, `TextField`, `ChoicePicker`, `DateTimeInput`, `Card`, `Column`, `Row`, `List`, or `Tabs` child in a `Row` must have a positive integer `weight`. The structure components are designed to be stacked in a Column; put them in a Row only rarely. This applies to overview dashboards as well as comparison cards. For two short comparable metrics, use `weight: 1` on both tiles. Conduit's read-time repair protects saved older messages, but author new output correctly.
 - Use a `Column` when a value or label is long, when a chart or control needs room, or when a weighted interactive row would be cramped or make reading order unclear. Do not force a side-by-side layout just to make a dashboard compact.
 - Never put a long sentence beside a button in a `Row`. If a short row is essential, give the wrapping `Text` child an integer `weight` of 1 and keep the button label short. Conduit repairs the known unweighted Text+Button row by stacking it, but generated output should already be correct.
-- Keep multiple actions vertically stacked. Give each a semantic event name identifying intent and target, such as `item.inspect` with a small `context` containing the item ID. Do not reuse one ambiguous action for different targets.
+- Keep multiple actions vertically stacked, except a two- or three-way decision inside an ActionCallout, which may be a Row of Buttons with `weight: 1` each. Give each a semantic event name identifying intent and target, such as `item.inspect` with a small `context` containing the item ID. Do not reuse one ambiguous action for different targets.
 - Keep titles and labels short. Avoid broad tables, paragraphs inside cards, nested card stacks, and long button labels.
 - Use the supported icons `check`, `warning`, `error`, and `help` with the state word. Color is never the only status signal.
 
 ## Interaction and truth defaults
 
+- There are two kinds of interaction. Conversational actions (Button, ChoicePicker or form submission) send `[A2UI_INTERACTION]` as a turn in the same Hermes conversation. Presentation-only actions (opening an ExpandableSection, switching Tabs) happen only on the phone and never reach Hermes, so never rely on them to trigger work.
 - A tap sends a follow-up turn in the same chat. It is not a direct launch or mutation. Read-only requests must remain read-only, including any checks Hermes performs. For a requested change, show the proposed values and obtain explicit confirmation before an external mutation; do not imply a button alone performed it.
 - One self-contained surface per reply is the default. Use a unique `surfaceId`, one `root`, and one closed `a2ui` fence; don't depend on old chat cards updating.
 - Give actions semantic names and the minimum context needed to identify the selected item. After an action, answer the new question and choose the appropriate next composition; do not force every follow-up into a status card.
@@ -134,7 +177,9 @@ Use a short, unique action name and only the context needed to understand the us
 
 - The fence is closed; every line is valid JSON; every message uses v0.9, the same surface ID, and the exact catalog ID.
 - The component graph has unique IDs, one `root`, and valid references.
-- The surface is the main presentation and surrounding prose does not duplicate it.
+- The presentation was chosen first: `plain` answers are plain text, everything else is one compact surface.
+- The surface is the main presentation, at most one short sentence surrounds it, and that sentence does not duplicate it.
+- No Markdown table where InfoRows, cards, or metrics would fit.
 - Live state has truthful evidence and freshness; unknown data is marked unknown.
 - Every row fits a phone. Prefer stacked service/action layouts.
 - Charts use two or more actual samples; absent and single-sample data do not become an invented trend.

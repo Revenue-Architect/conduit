@@ -349,3 +349,27 @@ Profile APK SHA-256 `393b13910cdf05aabfd6227c4fd2ff6ca3bbb7b3bbe8fdcdd2ce4b87bf8
   - Run now is accepted, with send and success cues
 - **Run history with data could not be shown.** Hermes skips every scheduled job with `drift_skip:silent` (the global model changed from deepseek to custom after the jobs were created), so no run sessions exist and "No runs yet" is truthful. Re-pinning the jobs on the server (`hermes cron edit … --provider … --model …`) is the user's call.
 
+
+## 2026-09-29: a2UI visual-first chat, with six structure components
+
+Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfeee6ed`, installed on the S25.
+
+- **Components** (`widgets/hermes_visual_structure.dart`, registered in the Hermes catalog): InfoRow, StepRail, ActionCallout, ArtifactTile, BotBadge and ExpandableSection.
+  - They are data-only: no I/O, no URLs, no `dispatchEvent`.
+  - Unknown props and out-of-range values are rejected, either by the normalizer's schema check or by a "Visual unavailable" notice.
+  - ExpandableSection wraps `HermezExpandableSection`, with compartment cues and state held locally.
+- **Interaction lock** (`widgets/hermes_a2ui_interaction_lock.dart`) replaces the surface-wide `IgnorePointer`.
+  - When a surface is read-only, busy or has a tap in flight, it is still inert, except for a compartment header, which can open because that reveals content already in the reply and sends nothing.
+  - Anything inside the compartment keeps the lock.
+  - `_forwardInteractions` still drops submissions under the same conditions.
+- **Normalizer:** an unweighted Button-only row (for example Approve / Hold) gets `weight: 1` per button. At 200% text on 300 px it overflowed by 154 px.
+- **Validator** (`a2ui_check.py`): knows the six types, their required props, enums, per-prop lengths, StepRail steps, and `actionChild` references. It caught all 14 negative cases.
+  - Two older fixtures, `metric-row-ranged-unweighted` and `synthetic-22`, still fail by design; they are normalizer repair inputs, and they failed the old validator too.
+- **Fixtures:** 8 new ones in `test/fixtures/hermes/a2ui/`, all passing the validator. The tests are `hermes_visual_structure_test.dart` (31), additions to the normalizer tests, and one chat E2E in which expanding sends no turn and a Button sends one.
+  - In `test/features/hermes` and `test/features/chat`, 1927 pass. The 4 failures are the known baseline ones.
+- **Authoring skill:** SKILL.md 0.9.0 adds "Choose the presentation before writing" (plain vs structured categories, a trigger table, table avoidance, no duplicated prose, no visual spam) and the difference between conversational and presentation-only interaction.
+  - `component-guide.md` has the schemas; `patterns.md` has 8 new patterns (7–14), all valid.
+- **Device QA:** a surface Hermes echoed in a temporary chat rendered all six components, in portrait and landscape.
+  - EVIDENCE / 2 opened in place and pushed the content below down, with no turn sent.
+  - Hold sent exactly one turn ("Qa · Hold"), and Hermes received the interaction.
+- **Not done:** the updated skill is **not deployed** to the Hermes server (`/opt/data/…`); deploying it is the user's call. Until it is, Hermes doesn't know the new components, and prompt QA (spec §42) can't run.

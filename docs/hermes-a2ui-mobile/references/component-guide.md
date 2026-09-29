@@ -32,6 +32,25 @@ Source of truth: `catalog-v0_9-basic.json` and `common-types-v0_9.json` in this 
 | StatusBadge | label, state: ok warning error unknown | detail | Always show a state word next to the icon |
 | MetricTile | label, value (number) | unit, min, max, state, asOf, source | Only numbers actually observed |
 | MiniChart | label, kind: line bar, points: [{"label","value"}] | unit, asOf, source | Only with >= 2 real observations |
+| InfoRow | title (≤80) | detail (≤160), meta (≤60), icon, state: ok warning error unknown, compact (bool) | One labelled fact; replaces a table row. State shows as icon + word |
+| StepRail | steps: 1–10 × {"label" (≤60), "state"} | per step: detail (≤120), meta (≤40) | step state: done current upcoming warning error |
+| ActionCallout | title (≤100) | eyebrow (≤32), detail (≤200), tone: neutral attention success error, icon, actionChild (id) | The one thing needing attention or the next step |
+| ArtifactTile | name (≤80), kind: document image spreadsheet audio video file | sizeLabel (≤24), detail (≤120), actionChild (id) | Names a file; never opens or fetches it |
+| BotBadge | label (≤40), identity: neutral kai local autopilot fast strong | detail (≤80) | Who owns a workstream |
+| ExpandableSection | title (≤60), child (id) | subtitle (≤120), count (0–9999), initiallyExpanded (bool) | Local disclosure; sends no turn |
+
+## Structure components (Conduit)
+
+Data-only components rendered natively by Conduit. They make no network or file access, take no URLs or file tokens, and reject unknown props: an invalid value shows a small “Visual unavailable” notice (or the whole card is declined) instead of the component. Lengths are character limits.
+
+- **InfoRow** — `{"id":"r1","component":"InfoRow","title":"NVR","detail":"Storage at 91%","meta":"checked 18:04","icon":"storage","state":"warning"}`. `compact: true` tightens vertical padding for lists of 4+ rows. Icon enum: `check warning error info clock calendar person bot file link storage server chart task`. A Column of InfoRows is the default replacement for a Markdown table.
+- **StepRail** — `{"id":"plan","component":"StepRail","steps":[{"label":"Build","state":"done"},{"label":"UAT","state":"current","meta":"Nov 18"},{"label":"Launch","state":"upcoming"}]}`. A vertical rail; each state is also written as a word. Use `warning`/`error` for a blocked stage and say why in `detail`.
+- **ActionCallout** — `{"id":"next","component":"ActionCallout","eyebrow":"Needs you","title":"Approve the refund?","detail":"Carrier confirmed delivery.","tone":"attention","actionChild":"choices"}`. `actionChild` references a Button, or a Row of 2–3 Buttons with `weight: 1` each. Use at most one per surface.
+- **ArtifactTile** — `{"id":"f1","component":"ArtifactTile","name":"launch-brief.md","kind":"document","sizeLabel":"2 KB"}`. Only names and describes. Deliver the real file with `MEDIA:<absolute-path>`; an optional `actionChild` Button asks Hermes about it in chat.
+- **BotBadge** — `{"id":"b1","component":"BotBadge","label":"Kai","identity":"kai","detail":"Inventory migration"}`. Pair each badge with the InfoRow(s) describing that bot's work.
+- **ExpandableSection** — `{"id":"ev","component":"ExpandableSection","title":"Evidence","subtitle":"6 sources reviewed","count":3,"child":"ev-list"}`. The header shows `TITLE / count`; the child is usually a Column of InfoRows. Opening and closing happen on the phone only and never send `[A2UI_INTERACTION]`, even on a read-only or busy message. A Button inside still sends exactly one turn when tapped. Keep warnings, failures, and limitations outside it.
+
+In a Row, every structure component needs a positive integer `weight`; they are designed for Columns.
 
 ## Icons
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 
 import '../services/hermes_a2ui_layout_normalizer.dart';
+import 'hermes_a2ui_interaction_lock.dart';
 import 'hermes_visual_catalog.dart';
 import 'hermez_visual_theme.dart';
 
@@ -183,8 +184,8 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
 
     final surface = Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: IgnorePointer(
-        ignoring:
+      child: HermesA2uiInteractionLock(
+        locked:
             _interactionInFlight ||
             widget.isBusy ||
             widget.onInteraction == null,

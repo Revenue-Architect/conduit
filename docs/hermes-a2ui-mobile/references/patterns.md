@@ -55,3 +55,79 @@ Both direct MetricTile children have positive weights so the ranged CPU indicato
 ```
 
 Notes: `value` starts as the currently selected option values (often `[]`). `variant: "mutuallyExclusive"` (default) makes it single-choice; `displayStyle: "checkbox"` (default) shows checkboxes instead of chips.
+
+## Structure patterns
+
+These use Conduit's structure components (see `component-guide.md`). Values are illustrative; show only what was actually checked or done this turn.
+
+## 7. Service status — rows, not a table
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"service-status-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"service-status-01","components":[{"id":"root","component":"Card","child":"body"},{"id":"body","component":"Column","children":["h","s1","s2","s3","details"]},{"id":"h","component":"Text","text":"Services · checked 18:04","variant":"h5"},{"id":"s1","component":"InfoRow","title":"Hermes","detail":"Gateway connected","state":"ok","icon":"server","compact":true},{"id":"s2","component":"InfoRow","title":"Immich","detail":"API responded","state":"ok","icon":"server","compact":true},{"id":"s3","component":"InfoRow","title":"NVR","detail":"Storage at 91%","state":"warning","icon":"storage","compact":true},{"id":"details","component":"ExpandableSection","title":"Checks run","count":2,"child":"checks"},{"id":"checks","component":"Column","children":["c1","c2"]},{"id":"c1","component":"InfoRow","title":"Container list","detail":"All 3 running"},{"id":"c2","component":"InfoRow","title":"NVR volume","detail":"1.8 of 2.0 TB used"}]}}
+```
+
+Surrounding prose: one sentence at most, such as “Only the NVR needs attention.”
+
+## 8. Multi-agent workstreams
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"workstreams-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"workstreams-01","components":[{"id":"root","component":"Card","child":"body"},{"id":"body","component":"Column","children":["b1","r1","b2","r2","next"]},{"id":"b1","component":"BotBadge","label":"Kai","identity":"kai","detail":"Inventory migration"},{"id":"r1","component":"InfoRow","title":"Running","detail":"412 of 600 products synced","state":"ok","compact":true},{"id":"b2","component":"BotBadge","label":"Strong","identity":"strong","detail":"Code review"},{"id":"r2","component":"InfoRow","title":"Blocked","detail":"Waiting on API access","state":"error","compact":true},{"id":"next","component":"ActionCallout","eyebrow":"Next","title":"Grant API access to unblock the review","tone":"attention"}]}}
+```
+
+One BotBadge per bot that actually worked, each followed by what it did. Use this instead of an `Owner | Status` table.
+
+## 9. Project timeline
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"project-timeline-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"project-timeline-01","components":[{"id":"root","component":"StepRail","steps":[{"label":"Discovery","state":"done"},{"label":"Implementation","state":"done"},{"label":"Validation","state":"current","detail":"One item left"},{"label":"Release","state":"upcoming","meta":"Nov 23"}]}]}}
+```
+
+Mark `done` only for stages that are actually complete.
+
+## 10. Decision needed
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"decision-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"decision-01","components":[{"id":"root","component":"ActionCallout","eyebrow":"Needs you","title":"Approve the refund for order 1042?","detail":"Both items returned; carrier confirmed delivery.","tone":"attention","icon":"task","actionChild":"choices"},{"id":"choices","component":"Row","children":["approve","hold"]},{"id":"approve","component":"Button","child":"approve-label","action":{"event":{"name":"refund.approve","context":{"order":"1042"}}},"weight":1},{"id":"approve-label","component":"Text","text":"Approve"},{"id":"hold","component":"Button","child":"hold-label","action":{"event":{"name":"refund.hold","context":{"order":"1042"}}},"weight":1},{"id":"hold-label","component":"Text","text":"Hold"}]}}
+```
+
+Each choice is one Button with its own event and `weight: 1`. A tap sends one turn and changes nothing by itself.
+
+## 11. Artifact summary
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"artifacts-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"artifacts-01","components":[{"id":"root","component":"Column","children":["a1","a2"]},{"id":"a1","component":"ArtifactTile","name":"launch-brief.md","kind":"document","sizeLabel":"2 KB","detail":"Final copy for review"},{"id":"a2","component":"ArtifactTile","name":"inventory-map.csv","kind":"spreadsheet","sizeLabel":"48 KB"}]}}
+```
+
+Tiles name the files; deliver the files themselves with `MEDIA:` lines outside the fence.
+
+## 12. Visual executive summary
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"exec-summary-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"exec-summary-01","components":[{"id":"root","component":"Card","child":"body"},{"id":"body","component":"Column","children":["h","metrics","rail","risks","next"]},{"id":"h","component":"Text","text":"Q4 launch","variant":"h4"},{"id":"metrics","component":"Row","children":["m1","m2"]},{"id":"m1","component":"MetricTile","label":"Tasks done","value":18,"unit":"of 24","weight":1},{"id":"m2","component":"MetricTile","label":"Open risks","value":2,"state":"warning","weight":1},{"id":"rail","component":"StepRail","steps":[{"label":"Build","state":"done"},{"label":"UAT","state":"current","meta":"Nov 18"},{"label":"Launch","state":"upcoming","meta":"Nov 23"}]},{"id":"risks","component":"ExpandableSection","title":"Risks","count":2,"child":"risk-list"},{"id":"risk-list","component":"Column","children":["k1","k2"]},{"id":"k1","component":"InfoRow","title":"Payment provider","detail":"Sandbox approval pending","state":"warning"},{"id":"k2","component":"InfoRow","title":"Copy review","detail":"Legal sign-off due Nov 16","state":"unknown"},{"id":"next","component":"ActionCallout","eyebrow":"Next","title":"Chase the payment provider approval","tone":"neutral"}]}}
+```
+
+Numbers, where it stands, what could go wrong (one tap away), and the next step, in one surface.
+
+## 13. Expandable evidence
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"evidence-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"evidence-01","components":[{"id":"root","component":"Column","children":["answer","evidence","question"]},{"id":"answer","component":"StatusBadge","label":"Option A","state":"ok","detail":"Best supported by evidence"},{"id":"evidence","component":"ExpandableSection","title":"Evidence","subtitle":"6 sources reviewed","count":3,"child":"ev"},{"id":"ev","component":"Column","children":["e1","e2","e3"]},{"id":"e1","component":"InfoRow","title":"Vendor benchmark","detail":"A is 2x faster on the sample workload","icon":"chart"},{"id":"e2","component":"InfoRow","title":"Pricing page","detail":"A costs 15% less at our volume","icon":"link"},{"id":"e3","component":"InfoRow","title":"Support thread","detail":"B deprecates an API we need","icon":"info"},{"id":"question","component":"ActionCallout","eyebrow":"Open question","title":"Confirm API availability for option A","tone":"attention"}]}}
+```
+
+The conclusion and the open question stay visible; supporting evidence sits one tap away.
+
+## 14. Plan with next action
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"plan-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"plan-01","components":[{"id":"root","component":"Column","children":["plan","next"]},{"id":"plan","component":"StepRail","steps":[{"label":"Back up the database","state":"upcoming"},{"label":"Apply the migration","state":"upcoming"},{"label":"Verify and reopen","state":"upcoming","detail":"Smoke test checkout"}]},{"id":"next","component":"ActionCallout","eyebrow":"Next","title":"Start with the backup","tone":"neutral","actionChild":"go"},{"id":"go","component":"Button","child":"go-label","action":{"event":{"name":"plan.start_backup"}}},{"id":"go-label","component":"Text","text":"Start backup"}]}}
+```
+
+A rollout or plan is a StepRail; the single next step is an ActionCallout with one Button.

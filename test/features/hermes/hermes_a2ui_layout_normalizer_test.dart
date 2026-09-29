@@ -215,6 +215,57 @@ void main() {
     }
   });
 
+  test('accepts the visual-first structure surfaces unchanged', () {
+    for (final fixture in const [
+      'status-overview',
+      'workstreams',
+      'project-timeline',
+      'artifact-summary',
+      'bot-workstreams',
+      'expandable-details',
+      'mixed-executive-summary',
+    ]) {
+      final input = File('test/fixtures/hermes/a2ui/$fixture.jsonl')
+          .readAsStringSync();
+      final result = normalizeHermesA2uiPayload(input, catalog: catalog);
+      expect(result.isReady, isTrue, reason: fixture);
+      expect(result.changed, isFalse, reason: fixture);
+    }
+  });
+
+  test('shares the width of an unweighted Button-only row, idempotently', () {
+    final input = File('test/fixtures/hermes/a2ui/action-needed.jsonl')
+        .readAsStringSync();
+
+    final result = normalizeHermesA2uiPayload(input, catalog: catalog);
+
+    expect(result.isReady, isTrue);
+    expect(result.changed, isTrue);
+    final update = jsonDecode(
+      result.payload.trim().split('\n').last,
+    ) as Map<String, dynamic>;
+    final components =
+        ((update['updateComponents'] as Map<String, dynamic>)['components']
+                as List)
+            .cast<Map<String, dynamic>>();
+    final byId = {for (final c in components) c['id']: c};
+    expect(byId['choices']!['component'], 'Row');
+    expect(byId['approve']!['weight'], 1);
+    expect(byId['hold']!['weight'], 1);
+    expect(byId['approve']!['action'], {
+      'event': {
+        'name': 'refund.approve',
+        'context': {'order': '1042'},
+      },
+    });
+
+    final repeated = normalizeHermesA2uiPayload(
+      result.payload,
+      catalog: catalog,
+    );
+    expect(repeated.changed, isFalse);
+  });
+
   test('stacks rows that mix charts or controls with other children', () {
     const input =
         '''

@@ -42,6 +42,12 @@ const _stackInRowComponentTypes = {
   'Row',
   'List',
   'Tabs',
+  'InfoRow',
+  'StepRail',
+  'ActionCallout',
+  'ArtifactTile',
+  'BotBadge',
+  'ExpandableSection',
 };
 final _actionNamePattern = RegExp(
   r'^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$',
@@ -84,7 +90,7 @@ class HermesA2uiNormalizationResult {
 }
 
 /// Validates and repairs a completed A2UI v0.9 block before GenUI receives it.
-/// Unweighted MetricTile-only rows receive flex weights for comparison. Rows
+/// Unweighted MetricTile-only and Button-only rows receive flex weights. Rows
 /// containing charts, badges, width-dependent built-in controls/media, mixed
 /// metric content, or an unweighted Text beside a Button become Columns.
 /// Existing positive weights, component IDs, order, values, and actions remain
@@ -358,6 +364,20 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
         }
         continue;
       }
+      // A choice row (Approve / Hold) keeps its buttons side by side, but
+      // shares the width so large text wraps inside each button instead of
+      // pushing the row off screen.
+      final allButtons =
+          children.length > 1 &&
+          children.every((child) => child['component'] == 'Button');
+      if (allButtons) {
+        for (final child in children) {
+          if (child.containsKey('weight')) continue;
+          child['weight'] = 1;
+          changed = true;
+        }
+        continue;
+      }
 
       final hasUnweightedWidthDependentChild = children.any(
         (child) =>
@@ -477,7 +497,7 @@ bool _hasSafeComponentGraph(Map<String, Map<String, dynamic>> components) {
     visiting.add(id);
     final references = <String>[];
 
-    for (final key in const ['child', 'content', 'trigger']) {
+    for (final key in const ['child', 'actionChild', 'content', 'trigger']) {
       final reference = component[key];
       if (reference == null) continue;
       if (reference is! String) return false;

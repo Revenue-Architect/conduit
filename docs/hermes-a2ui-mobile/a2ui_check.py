@@ -37,7 +37,29 @@ KNOWN = {
     "Slider", "DateTimeInput",
     # Conduit app components
     "StatusBadge", "MetricTile", "MiniChart",
+    "InfoRow", "StepRail", "ActionCallout", "ArtifactTile", "BotBadge",
+    "ExpandableSection",
 }
+
+# Structural Hermez components: every prop is declared (anything else is
+# rejected), with the same bounds the Flutter widgets enforce.
+_ICONS = {
+    "check", "warning", "error", "info", "clock", "calendar", "person", "bot",
+    "file", "link", "storage", "server", "chart", "task",
+}
+STRUCTURE_PROPS = {
+    "InfoRow": {"title": 80, "detail": 160, "meta": 60, "icon": None,
+                "state": None, "compact": None},
+    "StepRail": {"steps": None},
+    "ActionCallout": {"eyebrow": 32, "title": 100, "detail": 200, "tone": None,
+                      "icon": None, "actionChild": 128},
+    "ArtifactTile": {"name": 80, "kind": None, "sizeLabel": 24, "detail": 120,
+                     "actionChild": 128},
+    "BotBadge": {"label": 40, "identity": None, "detail": 80},
+    "ExpandableSection": {"title": 60, "subtitle": 120, "count": None,
+                          "child": 128, "initiallyExpanded": None},
+}
+STEP_STATES = {"done", "current", "upcoming", "warning", "error"}
 
 # Keep in sync with _stackInRowComponentTypes in Conduit's read-time normalizer.
 # These supported component types need a bounded, allocated share of horizontal
@@ -46,6 +68,8 @@ KNOWN = {
 ROW_WIDTH_DEPENDENT = {
     "MetricTile", "MiniChart", "StatusBadge", "Slider", "TextField",
     "ChoicePicker", "DateTimeInput", "Card", "Column", "Row", "List", "Tabs",
+    "InfoRow", "StepRail", "ActionCallout", "ArtifactTile", "BotBadge",
+    "ExpandableSection",
 }
 
 REQUIRED = {
@@ -57,11 +81,21 @@ REQUIRED = {
     "DateTimeInput": ["value"],
     "StatusBadge": ["label", "state"], "MetricTile": ["label", "value"],
     "MiniChart": ["label", "kind", "points"],
+    "InfoRow": ["title"], "StepRail": ["steps"], "ActionCallout": ["title"],
+    "ArtifactTile": ["name", "kind"], "BotBadge": ["label", "identity"],
+    "ExpandableSection": ["title", "child"],
 }
 
 ENUMS = {
     "StatusBadge": {"state": {"ok", "warning", "error", "unknown"}},
     "MiniChart": {"kind": {"line", "bar"}},
+    "InfoRow": {"state": {"ok", "warning", "error", "unknown"}, "icon": _ICONS},
+    "ActionCallout": {"tone": {"neutral", "attention", "success", "error"},
+                      "icon": _ICONS},
+    "ArtifactTile": {"kind": {"document", "image", "spreadsheet", "audio",
+                              "video", "file"}},
+    "BotBadge": {"identity": {"neutral", "kai", "local", "autopilot", "fast",
+                              "strong"}},
     "Text": {"variant": {"h1", "h2", "h3", "h4", "h5", "caption", "body"}},
     "Button": {"variant": {"default", "primary", "borderless"}},
     "TextField": {"variant": {"longText", "number", "shortText", "obscured"}},
@@ -165,6 +199,44 @@ def check_components(name, comps, errors, warnings):
                         for k, v in context.items()
                     ):
                         errors.append(f"{name}: Button {cid!r} event context contains an unsafe value")
+        if ctype in STRUCTURE_PROPS:
+            spec = STRUCTURE_PROPS[ctype]
+            for prop in set(c) - {"id", "component", "weight"} - set(spec):
+                errors.append(f"{name}: {ctype} {cid!r} has unsupported prop {prop!r}")
+            for prop, limit in spec.items():
+                if limit is None or prop not in c:
+                    continue
+                v = c[prop]
+                if not isinstance(v, str) or not v.strip() or len(v) > limit:
+                    errors.append(
+                        f"{name}: {ctype} {cid!r} {prop} must be a non-empty string of at most {limit} chars"
+                    )
+            for flag in ("compact", "initiallyExpanded"):
+                if flag in c and flag in spec and not isinstance(c[flag], bool):
+                    errors.append(f"{name}: {ctype} {cid!r} {flag} must be a boolean")
+            if ctype == "ExpandableSection" and "count" in c:
+                n = c["count"]
+                if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n <= 9999:
+                    errors.append(f"{name}: ExpandableSection {cid!r} count must be an integer 0-9999")
+            if ctype == "StepRail":
+                steps = c.get("steps")
+                if not isinstance(steps, list) or not 1 <= len(steps) <= 10:
+                    errors.append(f"{name}: StepRail {cid!r} needs 1-10 steps")
+                else:
+                    for st in steps:
+                        if not isinstance(st, dict) or set(st) - {"label", "detail", "meta", "state"}:
+                            errors.append(f"{name}: StepRail {cid!r} steps accept only label/detail/meta/state")
+                            break
+                        if not isinstance(st.get("label"), str) or not st["label"].strip() or len(st["label"]) > 60:
+                            errors.append(f"{name}: StepRail {cid!r} every step needs a label of at most 60 chars")
+                            break
+                        if st.get("state") not in STEP_STATES:
+                            errors.append(f"{name}: StepRail {cid!r} step state must be one of {sorted(STEP_STATES)}")
+                            break
+                        if any(k in st and (not isinstance(st[k], str) or len(st[k]) > lim)
+                               for k, lim in (("detail", 120), ("meta", 40))):
+                            errors.append(f"{name}: StepRail {cid!r} step detail/meta too long or not text")
+                            break
         if ctype == "Tabs":
             tabs = c.get("tabs")
             if not isinstance(tabs, list) or not tabs:
@@ -183,6 +255,8 @@ def check_components(name, comps, errors, warnings):
         refs = []
         if isinstance(c.get("child"), str):
             refs.append(c["child"])
+        if isinstance(c.get("actionChild"), str):
+            refs.append(c["actionChild"])
         ch = c.get("children")
         if isinstance(ch, list):
             refs.extend([x for x in ch if isinstance(x, str)])
@@ -220,6 +294,8 @@ def check_components(name, comps, errors, warnings):
             c = by_id[cur]
             if isinstance(c.get("child"), str):
                 stack.append(c["child"])
+            if isinstance(c.get("actionChild"), str):
+                stack.append(c["actionChild"])
             if isinstance(c.get("children"), list):
                 stack.extend([x for x in c["children"] if isinstance(x, str)])
             if isinstance(c.get("tabs"), list):
