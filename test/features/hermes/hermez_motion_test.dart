@@ -7,8 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('every Hermez spring keeps moving until it settles, then ends at 1', () {
-    for (final weight in HermezMotionWeight.values) {
-      final curve = HermezMotion.curveFor(weight);
+    for (final (weight, curve) in [
+      for (final weight in HermezMotionWeight.values)
+        (weight, HermezMotion.curveFor(weight)),
+      ('push', HermezMotion.curvePush),
+    ]) {
       // No dead hold: an overshooting spring clamped to 1 used to sit still
       // for the second half of its duration and then snap when it ended.
       expect(curve.transform(0.7), lessThan(0.999), reason: '$weight');

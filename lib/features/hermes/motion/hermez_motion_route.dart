@@ -249,6 +249,15 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
       ? HermezMotionWeight.heavy
       : HermezMotionWeight.medium;
 
+  /// A sheet pushes the screen it grew out of and pulls it back, so it moves
+  /// with that screen's weight in both directions.
+  bool get _pushes =>
+      effectiveMotion == HermezRouteMotion.expand &&
+      shape == HermezExpandShape.sheet;
+
+  HermezSpringCurve get _curve =>
+      _pushes ? HermezMotion.curvePush : HermezMotion.curveFor(_weight);
+
   HermezCoverKind _nextCover = HermezCoverKind.shift;
   final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0);
   AnimationController? _dragSettle;
@@ -256,12 +265,15 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
   @override
   Duration get transitionDuration => effectiveMotion == HermezRouteMotion.none
       ? Duration.zero
-      : HermezMotion.settleFor(_weight);
+      : _curve.settleDuration;
 
   // Leaving is quicker than arriving: the object returns home decisively.
+  // A sheet is the exception: pulling the screen back down takes the same
+  // effort as pushing it up.
   @override
-  Duration get reverseTransitionDuration =>
-      effectiveMotion == HermezRouteMotion.expand
+  Duration get reverseTransitionDuration => _pushes
+      ? transitionDuration
+      : effectiveMotion == HermezRouteMotion.expand
       ? HermezMotion.settleFor(HermezMotionWeight.medium)
       : transitionDuration;
 
@@ -357,7 +369,7 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final curve = HermezMotion.curveFor(_weight);
+    final curve = _curve;
     final rtl = Directionality.of(context) == TextDirection.rtl;
     // Every wrapper below is present on every frame, whatever the route is
     // doing. Swapping one widget type for another (a slide for a scale when
@@ -394,13 +406,13 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     final sheet = _nextSheet;
     return HermezCoveredTransition(
       kind: reducedMotion ? HermezCoverKind.none : _nextCover,
-      animation: hermezCurved(
-        secondaryAnimation,
-        _nextCover == HermezCoverKind.recede ||
-                _nextCover == HermezCoverKind.lift
-            ? HermezMotion.curveHeavy
-            : HermezMotion.curveMedium,
-      ),
+      animation: hermezCurved(secondaryAnimation, switch (_nextCover) {
+        HermezCoverKind.recede => HermezMotion.curveHeavy,
+        // The same curve the sheet on top moves on, so the push and the
+        // sheet's edge stay in contact.
+        HermezCoverKind.lift => HermezMotion.curvePush,
+        _ => HermezMotion.curveMedium,
+      }),
       // The sheet's rising edge pushes this screen up, and its drag pulls
       // it back down.
       follow: sheet?._dragOffset,
@@ -918,7 +930,9 @@ abstract final class HermezRouteExits {
 Rect hermezSheetAperture(Rect card, Rect end, double t) {
   const widen = 0.3;
   final across = Curves.easeOut.transform((t / widen).clamp(0.0, 1.0));
-  final rise = Curves.easeInOut.transform(
+  // The rise starts slowly, as if taking the screen's weight, then carries
+  // it: resistance at first contact rather than a snap.
+  final rise = Curves.easeInOutCubic.transform(
     ((t - widen) / (1 - widen)).clamp(0.0, 1.0),
   );
   return Rect.fromLTRB(

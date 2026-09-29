@@ -50,6 +50,15 @@ abstract final class HermezMotion {
     damping: 34,
   );
 
+  // A sheet pushing the screen it grew out of: heavier and slower than a
+  // page, still critically damped, so the push and the pull read as moving
+  // real weight (~0.5 s to 99 %, ~0.6 s to rest).
+  static const springPush = NibSpringDescription(
+    mass: 1.3,
+    stiffness: 240,
+    damping: 35.3,
+  );
+
   static const staggerFast = Duration(milliseconds: 25);
   static const staggerNormal = Duration(milliseconds: 35);
 
@@ -73,6 +82,7 @@ abstract final class HermezMotion {
   static final HermezSpringCurve curveLight = HermezSpringCurve(springLight);
   static final HermezSpringCurve curveMedium = HermezSpringCurve(springMedium);
   static final HermezSpringCurve curveHeavy = HermezSpringCurve(springHeavy);
+  static final HermezSpringCurve curvePush = HermezSpringCurve(springPush);
 
   static NibSpringDescription springFor(HermezMotionWeight weight) =>
       switch (weight) {
