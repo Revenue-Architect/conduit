@@ -60,7 +60,11 @@ void main() {
     );
     await tester.pumpWidget(covered(HermezCoverKind.shift));
     final element = tester.element(find.byKey(const ValueKey('home')));
-    for (final kind in [HermezCoverKind.recede, HermezCoverKind.none]) {
+    for (final kind in [
+      HermezCoverKind.recede,
+      HermezCoverKind.lift,
+      HermezCoverKind.none,
+    ]) {
       await tester.pumpWidget(covered(kind));
       // Same element: switching the cover did not remount the page.
       expect(tester.element(find.byKey(const ValueKey('home'))), same(element));
@@ -495,6 +499,93 @@ void main() {
     expect(faceShown, isTrue);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a sheet pushes the screen it grew from up, and lets it down', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        onGenerateRoute: (_) => HermezRoute<void>(
+          builder: (context) => Scaffold(
+            body: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Text('Screen top'),
+                const Spacer(),
+                HermezMotionSurface(
+                  onOpen: (origin) => pushHermezSheet<void>(
+                    context,
+                    origin: origin,
+                    builder: (_) => const Material(child: Text('Sheet body')),
+                  ),
+                  child: const SizedBox(
+                    width: 200,
+                    height: 80,
+                    child: Center(child: Text('Card')),
+                  ),
+                ),
+                const SizedBox(height: 60),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final rest = tester.getTopLeft(find.text('Screen top')).dy;
+    final lift = HermezCoveredTransition.liftFor(const Size(400, 900));
+
+    await tester.tap(find.text('Card'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    final rising = tester.getTopLeft(find.text('Screen top')).dy;
+    expect(rising, lessThan(rest));
+    await tester.pumpAndSettle();
+    final lifted = tester.getTopLeft(find.text('Screen top')).dy;
+    // Pushed up by the lift, less the slight recede toward the centre.
+    final expected =
+        rest -
+        HermezCoveredTransition.liftRect(
+          Rect.fromLTWH(0, rest, 10, 10),
+          screen: const Size(400, 900),
+          value: 1,
+        ).top;
+    expect(rest - lifted, closeTo(expected, 0.5));
+    expect(rest - lifted, greaterThan(lift * 0.8));
+    expect(lifted, lessThan(rising));
+
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    final falling = tester.getTopLeft(find.text('Screen top')).dy;
+    expect(falling, greaterThan(lifted));
+    await tester.pumpAndSettle();
+    // Back exactly where it was.
+    expect(tester.getTopLeft(find.text('Screen top')).dy, rest);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('a lifted card rectangle rises and recedes about the screen', () {
+    const screen = Size(400, 900);
+    const card = Rect.fromLTWH(100, 700, 200, 80);
+    expect(
+      HermezCoveredTransition.liftRect(card, screen: screen, value: 0),
+      card,
+    );
+    final lifted = HermezCoveredTransition.liftRect(
+      card,
+      screen: screen,
+      value: 1,
+    );
+    expect(lifted.top, lessThan(card.top));
+    expect(lifted.width, lessThan(card.width));
   });
 
   testWidgets('a sheet can be dragged down to close', (tester) async {
