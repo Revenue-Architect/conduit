@@ -1,6 +1,6 @@
 ---
 name: a2ui-mobile
-description: "Use when a compact native visual or interaction would improve a Conduit answer: status, metrics, comparisons, timelines, plans, checklists, files, decisions, workstreams, schedules, budgets, forms, and itineraries across any topic. Users need not say A2UI, GenUI, visual, or name components."
+description: "Platform tui = Conduit app: load before any status, plan, timeline, comparison, checklist, files, decision, workstream, or dashboard reply; it renders native cards instead of Markdown. Plain one-line answers stay text."
 version: 0.9.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
@@ -12,6 +12,8 @@ metadata:
 ---
 
 # A2UI Mobile Skill
+
+Conduit sessions show `Platform: tui` in the Hermes runtime section. On WhatsApp, Teams, webhooks, cron, and other platforms, do not emit A2UI; answer in the platform's normal format.
 
 If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
 

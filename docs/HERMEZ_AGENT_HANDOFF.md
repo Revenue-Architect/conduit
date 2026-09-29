@@ -388,3 +388,16 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
 - **Restarted hermes-agent:** the skill index is cached in memory per profile (`.skills_prompt_snapshot.json`), so new skills only appear after a restart. The restart made one user message fail with a 502; it was retried and succeeded.
 - **Rollback:** rename the `.bak-20260929` files back, trash the profile copies, and restart.
 - **Prompt QA (§42) is still to do after the restart.** Before the restart, fast answered a rollout plan in Markdown because the skill was not in its index. That test also led fast to do extensive read-only recon (LAN/port probes) about an NVR that does not exist; the NVR in the test data was invented.
+
+### Getting Hermes to actually use the skill (same evening)
+
+- **Where Conduit chats run:** the main Hermes profile (session source `mobile`, model `deepseek-flash`). The system prompt says `Platform: tui`; the word Conduit never appears. The skill index shows only about 60 characters of each description.
+- **The skill alone was not enough.** Even with the trigger at the front of the description ("Platform tui = Conduit app: load before any status, plan…"), `deepseek-flash` answered a rollout plan in Markdown without opening the skill.
+- **The fix:** a five-line section in the server `SOUL.md`, "Conduit replies (Platform: tui)". It says to load `a2ui-mobile` before any structured answer, keep one-liners as text, and never emit A2UI on other platforms. The original is kept as `SOUL.md.bak-20260929`.
+  - The skill body now also says: Conduit = `Platform: tui`; no A2UI on WhatsApp, Teams, webhook, cron or cli.
+- **Verified on the S25 after the change:**
+  - A dashboard request used InfoRow, ExpandableSection and ActionCallout; it rendered, and the compartment opened locally.
+  - "Plan a 4-stage rollout for a website launch." gave a StepRail, a STAGE GATES compartment and a Next-step ActionCallout, with one intro sentence.
+  - The same payloads render cleanly in widget tests.
+- **Known side effect:** the Hermes desktop/TUI also reports `Platform: tui`, so it may receive A2UI blocks, which it shows as code.
+- **Not yet run:** the §42 plain-text check ("What is 2 + 2?") and the remaining prompts.
