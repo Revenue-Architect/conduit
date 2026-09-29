@@ -313,3 +313,22 @@ Profile APK SHA-256 `cf6c01722423730c73ff235058c32a72ea87635e7db8ab853046bf93038
 - **Tests:** presence state mapping, float without opacity, small marks still, reduced motion, and a lit card still taps once and still scrolls. Wide suites: 2654 pass, plus the 8 known baseline failures.
 - **Open:** listening QA of cue levels on the phone speaker; exercising a real run on device for the engage, attention, complete and fail cues and presence.
 
+## 2026-09-29: physical compartments (spec "Physical animation prompt")
+
+Profile APK SHA-256 `c429b68cad64dea277aaf408f3a4793365a7282fa044e1f210e32aa098b0e1c0`, installed on the S25.
+
+- **Built:**
+  - the `HermezExpandableSection` primitive, with 9 tests: layout displacement, rapid reverse, parent control, feedback once per tap and silence otherwise, semantics, inert while closed, reduced motion, and no business imports
+  - Bot Detail Systems (replacing the `ExpansionTile`)
+  - Home TODAY
+  - scheduled agent run history
+  - inline run header alignment
+
+  Details are in `HERMEZ_MOTION_SYSTEM.md`.
+- **Device (wireless debug):**
+  - Home TODAY opens in place, pushing Schedule, Kanban and Recent down (about 150 dp). Two open/close cycles plus a rapid double tap ran 193 frames, 0 dropped, max raster 10.6 ms.
+  - Bot Detail SYSTEMS / 120 opens and pushes Knowledge down. Over 714 frames there was 1 dropped frame: mounting 120 rows on the open's first frame, 8.7 ms build.
+  - A scheduled sheet with no runs shows the empty state unchanged; the drag-to-close and the close button were both exercised.
+  - Run history with data was not seen on device, because no job has runs and Run now was not pressed (it starts a real job).
+- **Not done:** Phase 6 (Knowledge is not dense, so it stays), Phase 7 (Kanban task activity already has its own show-all toggle), Phase 8 (artifact context).
+

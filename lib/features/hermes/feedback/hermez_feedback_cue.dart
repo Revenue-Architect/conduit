@@ -23,6 +23,9 @@ enum HermezFeedbackCue {
 
   approvalAccepted,
   approvalRejected,
+
+  compartmentOpen,
+  compartmentClose,
 }
 
 /// How one cue sounds and feels.
@@ -119,5 +122,16 @@ const Map<HermezFeedbackCue, HermezFeedbackRecipe> hermezFeedbackRecipes = {
     sound: '$_dir/approval_reject.wav',
     volume: 0.28,
     haptic: HapticType.medium,
+  ),
+  // An in-place compartment: the quietest mechanism in the family.
+  HermezFeedbackCue.compartmentOpen: HermezFeedbackRecipe(
+    sound: '$_dir/object_open.wav',
+    volume: 0.20,
+    haptic: HapticType.selection,
+  ),
+  HermezFeedbackCue.compartmentClose: HermezFeedbackRecipe(
+    sound: '$_dir/object_close.wav',
+    volume: 0.18,
+    haptic: HapticType.selection,
   ),
 };

@@ -23,6 +23,7 @@ import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_bot_knowledge.dart';
 import '../widgets/hermez_bot_presence.dart';
+import '../widgets/hermez_expandable_section.dart';
 
 final class _BotData {
   const _BotData(this.sessions, this.skills, this.tools, this.jobs);
@@ -102,6 +103,9 @@ class HermesBotDetailPage extends ConsumerStatefulWidget {
 
 class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
   bool _opening = false;
+
+  /// Screen-local: whether the Systems compartment is open.
+  bool _systemsExpanded = false;
 
   Future<void> _openChat(HermesBot bot) async {
     final service = ref.read(hermesApiServiceProvider);
@@ -422,41 +426,48 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                       ),
                   ],
                 ),
-              if (curated.rest.isNotEmpty)
-                Theme(
-                  data: Theme.of(context)
-                      .copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    expansionAnimationStyle: AnimationStyle(
-                      duration: HermezMotion.settleFor(
-                        HermezMotionWeight.medium,
+              if (curated.rest.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                // More of the same object: the capabilities compartment
+                // opens in place and pushes Knowledge and the rest down.
+                HermezExpandableSection(
+                  expanded: _systemsExpanded,
+                  onExpansionChanged: (expanded) =>
+                      setState(() => _systemsExpanded = expanded),
+                  semanticLabel: 'All skills and tools',
+                  openFeedback: HermezFeedbackCue.compartmentOpen,
+                  closeFeedback: HermezFeedbackCue.compartmentClose,
+                  header: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        // The rows inside: every capability not featured.
+                        'SYSTEMS / ${curated.rest.length}',
+                        style: HermezType.technical(palette.muted),
                       ),
-                      reverseDuration: HermezMotion.settleFor(
-                        HermezMotionWeight.light,
+                      const SizedBox(height: 3),
+                      Text(
+                        'All skills & tools',
+                        style: HermezType.section(palette)
+                            .copyWith(fontSize: 14),
                       ),
-                      curve: HermezMotion.curveMedium,
-                      reverseCurve: HermezMotion.curveLight.flipped,
-                    ),
-                    title: Text(
-                      'All skills and tools',
-                      style: HermezType.section(palette).copyWith(fontSize: 14),
-                    ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       for (final name in curated.rest)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              name.replaceAll('_', ' '),
-                              style: HermezType.meta(palette),
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            name.replaceAll('_', ' '),
+                            style: HermezType.meta(palette),
                           ),
                         ),
                     ],
                   ),
                 ),
+              ],
             ],
           ),
         ),

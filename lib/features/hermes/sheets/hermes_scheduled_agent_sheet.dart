@@ -14,6 +14,7 @@ import '../widgets/hermez_sheet_parts.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
 import '../feedback/hermez_feedback.dart';
+import '../widgets/hermez_expandable_section.dart';
 
 /// Returns a real cron-run session when the user selects one. The caller opens
 /// it after the sheet closes, avoiding navigation beneath an active modal.
@@ -45,6 +46,9 @@ enum _SheetAction { run, toggle }
 class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
   late HermesJob _job = widget.job;
   late Future<List<HermesSessionSummary>> _runs = _loadRuns();
+
+  /// Screen-local: whether the run history compartment is open.
+  bool _historyExpanded = false;
   _SheetAction? _busy;
   String? _error;
 
@@ -335,11 +339,16 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
             ),
           ),
           const SizedBox(height: 22),
-          const HermezSectionLabel('Run history', icon: Icons.history_rounded),
-          const SizedBox(height: 10),
           FutureBuilder<List<HermesSessionSummary>>(
             future: _runs,
             builder: (context, snapshot) {
+              const label = Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: HermezSectionLabel(
+                  'Run history',
+                  icon: Icons.history_rounded,
+                ),
+              );
               final Widget content;
               if (!snapshot.hasData && !snapshot.hasError) {
                 content = const Padding(
@@ -361,26 +370,65 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
                 );
               } else {
                 final runs = snapshot.data!.take(20).toList();
-                content = Column(
+                final latest = runs.first.updatedAt;
+                // A compartment: the history opens in place and pushes the
+                // footer actions down. Same rows, same taps.
+                content = HermezExpandableSection(
                   key: const ValueKey('runs-data'),
-                  children: [
-                    for (var index = 0; index < runs.length; index++)
-                      _RunRow(
-                        run: runs[index],
-                        first: index == 0,
-                        last: index == runs.length - 1,
-                        time: runs[index].updatedAt == null
-                            ? 'Run'
-                            : hermezRelativeLabel(runs[index].updatedAt!),
-                        onTap: () => Navigator.pop(context, runs[index]),
+                  expanded: _historyExpanded,
+                  onExpansionChanged: (expanded) =>
+                      setState(() => _historyExpanded = expanded),
+                  semanticLabel: 'Run history, ${runs.length} runs',
+                  openFeedback: HermezFeedbackCue.compartmentOpen,
+                  closeFeedback: HermezFeedbackCue.compartmentClose,
+                  header: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RUN HISTORY / ${runs.length}',
+                        style: HermezType.technical(palette.muted),
                       ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        latest == null
+                            ? 'Latest run'
+                            : 'Latest · ${hermezRelativeLabel(latest)}',
+                        style: HermezType.meta(palette)
+                            .copyWith(color: palette.ink),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < runs.length; index++)
+                        _RunRow(
+                          run: runs[index],
+                          first: index == 0,
+                          last: index == runs.length - 1,
+                          time: runs[index].updatedAt == null
+                              ? 'Run'
+                              : hermezRelativeLabel(runs[index].updatedAt!),
+                          onTap: () => Navigator.pop(context, runs[index]),
+                        ),
+                    ],
+                  ),
                 );
               }
-              return HermezPresence(
-                presenceKey: content.key!,
-                weight: HermezMotionWeight.medium,
-                child: content,
+              // Loading, error, and empty keep their label and stay in view:
+              // a failure is never folded away. The compartment carries its
+              // own header.
+              final isData = content.key == const ValueKey('runs-data');
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!isData) label,
+                  HermezPresence(
+                    presenceKey: content.key!,
+                    weight: HermezMotionWeight.medium,
+                    child: content,
+                  ),
+                ],
               );
             },
           ),

@@ -368,6 +368,12 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                   semanticLabel: _expanded
                       ? '$title. Collapse activity'
                       : '$title. Expand activity',
+                  // The same grammar as HermezExpandableSection: an
+                  // in-place compartment with its own quiet latch.
+                  semanticsExpanded: _expanded,
+                  feedbackCue: _expanded
+                      ? HermezFeedbackCue.compartmentClose
+                      : HermezFeedbackCue.compartmentOpen,
                   onTap: () => setState(() {
                     _expanded = !_expanded;
                     if (!_expanded) _showBrowser = false;

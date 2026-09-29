@@ -112,3 +112,28 @@ Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: sph
   - White shells take a faint warm reflection and a border catch; dark shells a graphite sheen and an orange edge.
   - It sits inside the pressable surface, so it compresses with it. Off with reduced motion.
 
+## Physical compartments (in-place expansion)
+
+`HermezExpandableSection` (`widgets/hermez_expandable_section.dart`) is for more of the same object on the same screen. When the object becomes another screen, use a route or sheet morph instead.
+
+- **Layout.** It sits in normal layout, so opening pushes the following content down. There is no Stack, overlay, or translate.
+- **State.** The parent owns `expanded`; the header only reports `onExpansionChanged`.
+- **Motion.** One `AnimationController` driven by `HermezMotion.springFor(weight)` feeds `HermezUnroll`, the single owner of the height.
+  - A tap mid-flight reverses from the current value and velocity.
+  - The spring lands exactly on 0 or 1.
+  - The chevron rotates off the same controller. There is no fade and no row stagger.
+- **Closed content.** Closed content is `IgnorePointer` + `ExcludeSemantics`, and is unmounted once fully closed unless `maintainState`.
+- **Header.** The header is a `HermezMotionSurface` with button and expanded semantics.
+- **Feedback.** `openFeedback` and `closeFeedback` play only on a real tap (`compartmentOpen` / `compartmentClose`: the quietest latch, with a selection haptic).
+- **Reduced motion** changes the layout at once.
+- **Framing.** `framed: false` omits the utility frame when the section sits inside a surface that is already the frame.
+- **In use:**
+  - Bot Detail "SYSTEMS / N": N = `curated.rest.length`, the rows inside
+  - Home TODAY: 0 items shows the empty text, 1 shows the row, 2+ show a real-count summary ("3 scheduled · 1 running")
+  - scheduled agent "RUN HISTORY / N" when there are runs; loading, error and empty stay visible
+- **Inline run surface.** It keeps its `HermezReveal` logic, but its header now carries the same expanded semantics and compartment cues.
+- **Not converted:**
+  - `HermezReveal` itself: `AnimatedSwitcher` restarts rather than reverses, so use the compartment for user-toggled panels
+  - Bot Knowledge: not dense
+  - Kanban task activity and artifact context: not yet
+

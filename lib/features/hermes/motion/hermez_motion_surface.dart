@@ -36,6 +36,7 @@ class HermezMotionSurface extends StatefulWidget {
     this.originBorderColor,
     this.haptic = true,
     this.feedbackCue,
+    this.semanticsExpanded,
   });
 
   final Widget child;
@@ -58,6 +59,10 @@ class HermezMotionSurface extends StatefulWidget {
   /// replaces the default selection tick. Fire and forget: the action never
   /// waits for it.
   final HermezFeedbackCue? feedbackCue;
+
+  /// For a control that opens and closes something in place: whether it is
+  /// open, announced as the button's expanded state.
+  final bool? semanticsExpanded;
 
   @override
   State<HermezMotionSurface> createState() => _HermezMotionSurfaceState();
@@ -189,6 +194,7 @@ class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
       container: true,
       button: true,
       enabled: interactive,
+      expanded: widget.semanticsExpanded,
       label: widget.semanticLabel,
       onTap: interactive ? _activate : null,
       onLongPress: widget.onLongPress,

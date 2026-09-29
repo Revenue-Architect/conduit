@@ -25,6 +25,7 @@ import 'hermes_page_chrome.dart';
 import '../widgets/hermes_home_presence.dart';
 import 'hermes_teams_page.dart' show HermesTeamsSection;
 import '../widgets/hermez_bot_presence.dart';
+import '../widgets/hermez_expandable_section.dart';
 
 final hermesHomeProfileJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
@@ -252,31 +253,37 @@ class HermesHomePage extends ConsumerWidget {
                           style: HermezType.section(palette),
                         ),
                         const SizedBox(height: 8),
-                        if (todayJobs.isEmpty && running.isEmpty)
-                          Text(
-                            'No scheduled runs or running Kanban work today.',
-                            style: HermezType.meta(palette),
-                          ),
-                        for (final (profile, job) in todayJobs.take(4))
-                          _TodayRow(
-                            title: job.displayName,
-                            titleMorphId: hermezMorphPart(
-                              hermezJobMorphId(profile, job.id),
-                              'title',
-                            ),
-                            detail:
-                                'Scheduled · ${hermezRelativeLabel(job.nextRun!)}',
-                            onOpen: (origin) =>
-                                _openJob(context, ref, job, profile, origin),
-                          ),
-                        for (final task in running.take(3))
-                          _TodayRow(
-                            title: task.title,
-                            detail:
-                                'Running${task.assignee == null ? '' : ' · ${task.assignee}'}',
-                            onOpen: (_) =>
-                                context.pushNamed(RouteNames.hermesKanban),
-                          ),
+                        _TodayPanel(
+                          scheduled: todayJobs.length,
+                          running: running.length,
+                          rows: [
+                            for (final (profile, job) in todayJobs.take(4))
+                              _TodayRow(
+                                title: job.displayName,
+                                titleMorphId: hermezMorphPart(
+                                  hermezJobMorphId(profile, job.id),
+                                  'title',
+                                ),
+                                detail:
+                                    'Scheduled · ${hermezRelativeLabel(job.nextRun!)}',
+                                onOpen: (origin) => _openJob(
+                                  context,
+                                  ref,
+                                  job,
+                                  profile,
+                                  origin,
+                                ),
+                              ),
+                            for (final task in running.take(3))
+                              _TodayRow(
+                                title: task.title,
+                                detail:
+                                    'Running${task.assignee == null ? '' : ' · ${task.assignee}'}',
+                                onOpen: (_) =>
+                                    context.pushNamed(RouteNames.hermesKanban),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -561,6 +568,66 @@ class _ActiveWorkCard extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Today's items inside the hero. One item shows as it is; two or more fold
+/// into a compartment whose summary counts what is really there, and opening
+/// it pushes the rest of Home down. Expansion is screen-local and never
+/// opens by itself.
+class _TodayPanel extends StatefulWidget {
+  const _TodayPanel({
+    required this.scheduled,
+    required this.running,
+    required this.rows,
+  });
+
+  final int scheduled;
+  final int running;
+  final List<Widget> rows;
+
+  @override
+  State<_TodayPanel> createState() => _TodayPanelState();
+}
+
+class _TodayPanelState extends State<_TodayPanel> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final rows = widget.rows;
+    if (rows.isEmpty) {
+      return Text(
+        'No scheduled runs or running Kanban work today.',
+        style: HermezType.meta(palette),
+      );
+    }
+    if (rows.length == 1) return rows.single;
+    final summary = [
+      if (widget.scheduled > 0) '${widget.scheduled} scheduled',
+      if (widget.running > 0) '${widget.running} running',
+    ].join(' · ');
+    return HermezExpandableSection(
+      framed: false,
+      expanded: _expanded,
+      onExpansionChanged: (expanded) => setState(() => _expanded = expanded),
+      semanticLabel: 'Today: $summary',
+      openFeedback: HermezFeedbackCue.compartmentOpen,
+      closeFeedback: HermezFeedbackCue.compartmentClose,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      childPadding: const EdgeInsets.only(top: 6),
+      header: Text(
+        summary,
+        style: HermezType.meta(palette).copyWith(color: palette.ink),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: rows,
+      ),
     );
   }
 }
