@@ -160,3 +160,20 @@ Commit `746084ff`. Profile APK SHA-256 `fc103e0d27a61e50a3c668386c30d78ff4adfc46
 - **Tests:** new `hermes_run_summary_test.dart`, a finished-surface test, visibility, and Hermes router cases. The wide suites show the 8 known baseline failures. `test/core` has 5 more that fail identically without these changes (share and server-version tests), plus an fts timing budget that flakes.
 
 Next (after the user tests): "5" as numbered in the chat summary, which is creating a bot from the phone plus a team view of bots handing work to each other. These are gaps 4 and 6 in `HERMEZ_COMPETITIVE_GAP_ANALYSIS.md`; the document's gap 5 is session search, pin, and export. Confirm which one the user means.
+
+## 2026-09-29: Teams (bots working together)
+
+Commit `5ee28ec3`. Profile APK SHA-256 `2928cb3a8fb8581f605c123d2a86f4a11926ab7638815e12b58d7943a7f42158` (Steel define included), installed on the S25. Not driven on device.
+
+- **What it is.** Teams use Hermes' own Group Chat (hosted rooms, `groups.*`), which ships in the installed 2026.9.14. The methods are registered on the Desktop connection through `methods_bot_relay.register`; this was checked in the tagged source (`tui_gateway/methods_groups.py`, `contracts/groups_bot_relay.py`, `gateway/hosted_room_discussion.py`). A room has 2 to 6 local bot profiles. The user posts (`groups.send`, payload `{text}`); the discussion driver gives up to 3 rounds and 10 replies, bots may pass, and @mentions direct a bot. The app never schedules bot turns.
+- **Where.** Home has a TEAMS section after Recent; it is hidden when `groups.list` errors, which means the server lacks Group Chat or its worker is down. `/profile/hermes/teams` lists all teams and has New team. `/profile/hermes/teams/:roomId` is the room. Both routes are in the Hermes-only allowlist.
+- **Room page** (`hermes_teams_page.dart`, pure logic in `models/hermes_team_timeline.dart`):
+  - Shows user and bot messages, passes, failures, "The team is done" or "reply limit" milestones, and who is thinking now (`turn.started` with no terminal event).
+  - Shows approvals from `driver_status.pending_actions`. Answers are Allow once or Deny only, which is what the room driver accepts.
+  - Offers Retry for an unfinished reply, @mention chips, and a send button that becomes Stop while the team works.
+  - Delete team (`groups.disband`) asks for confirmation. It is permanent on Hermes and does not affect the bots.
+- **Polling, not push.** Hermes does not push room events. The page reads `groups.log` from its cursor only while it is open and the app is in front: every 1.5 s while working or within 20 s of a send, every 6 s otherwise, and every 8 s after an error. Notifications do not cover team replies yet.
+- **Service:** team calls live in `hermes_desktop_teams.dart`, a new part file; no existing calls changed. Ids come from `newHermesTeamId` (Hermes' identifier alphabet with a secure random suffix). Roster rows are `{member_id: m-<profile>, profile, handle: <profile>, display_name}`.
+- **Tests:** `hermes_teams_test.dart` covers parsing, the timeline rules, merging, and the room page against a fake gateway answering `groups.state`, `groups.log`, and `groups.send`. The wide suites show only the 8 known baseline failures.
+
+Check first on device: does Home show TEAMS (if not, the Group Chat worker is not running on the Umbrel), create a team with two bots, send a message, and watch replies and the thinking row.
