@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../feedback/hermez_feedback.dart';
 import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -285,6 +288,36 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
               onTap: () => _setHermesEnabled(!config.enabled),
             ),
           ],
+        ),
+        SizedBox(height: PlatformInfo.isIOS ? Spacing.md : Spacing.lg),
+        // Local only: never synced, and changing it touches no connection.
+        ValueListenableBuilder<bool>(
+          valueListenable: HermezFeedback.instance.soundsEnabled,
+          builder: (context, sounds, _) => InsetGroupedList(
+            footer: PlatformInfo.isIOS
+                ? 'Short mechanical sounds for taps, the side navigation, '
+                      'and runs. Haptics stay on.'
+                : null,
+            children: [
+              UtilityRow(
+                title: 'Interface sounds',
+                subtitle: PlatformInfo.isIOS
+                    ? null
+                    : 'Short mechanical sounds for taps, the side '
+                          'navigation, and runs. Haptics stay on.',
+                titleFontWeight: PlatformInfo.isIOS ? FontWeight.w400 : null,
+                trailing: AdaptiveSwitch(
+                  value: sounds,
+                  onChanged: (value) => unawaited(
+                    HermezFeedback.instance.setSoundsEnabled(value),
+                  ),
+                ),
+                onTap: () => unawaited(
+                  HermezFeedback.instance.setSoundsEnabled(!sounds),
+                ),
+              ),
+            ],
+          ),
         ),
         if (config.enabled && capabilities.jobs) ...[
           SizedBox(height: PlatformInfo.isIOS ? Spacing.md : Spacing.lg),

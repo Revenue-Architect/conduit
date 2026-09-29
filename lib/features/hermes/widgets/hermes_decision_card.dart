@@ -7,6 +7,7 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/composer_prompt_surface.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../models/hermes_run_event.dart';
+import '../feedback/hermez_feedback.dart';
 
 final class HermesDecisionCard extends StatefulWidget {
   const HermesDecisionCard({
@@ -52,7 +53,14 @@ final class _HermesDecisionCardState extends State<HermesDecisionCard> {
     final value = override ?? _controller.text;
     if (value.trim().isEmpty || _submitting) return;
     setState(() => _submitting = true);
+    // Sensory cues are presentation only: sent, then the backend's answer.
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
     final resolved = await widget.onSubmit(value);
+    HermezFeedback.play(
+      resolved
+          ? HermezFeedbackCue.approvalAccepted
+          : HermezFeedbackCue.runFailed,
+    );
     if (!mounted) return;
     if (resolved) _controller.clear();
     setState(() {

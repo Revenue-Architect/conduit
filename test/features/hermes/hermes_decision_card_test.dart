@@ -2,6 +2,7 @@ import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/core/models/conversation.dart';
 import 'package:conduit/core/providers/app_providers.dart';
 import 'package:conduit/features/chat/providers/chat_providers.dart';
+import 'package:conduit/features/hermes/feedback/hermez_feedback.dart';
 import 'package:conduit/features/hermes/models/hermes_run_event.dart';
 import 'package:conduit/features/hermes/services/hermes_run_transport.dart';
 import 'package:conduit/features/hermes/widgets/hermes_decision_card.dart';
@@ -418,4 +419,49 @@ void main() {
     await tester.pump();
     expect(answer, '["alpha","beta"]');
   });
+
+  testWidgets('a decision is sent exactly once, even when feedback throws', (
+    tester,
+  ) async {
+    final previous = HermezFeedback.instance;
+    final failing = HermezFeedback.forTesting(
+      backend: _ThrowingSound(),
+      haptic: (_) => throw StateError('no vibrator'),
+    );
+    await failing.startForTesting();
+    HermezFeedback.instance = failing;
+    addTearDown(() => HermezFeedback.instance = previous);
+
+    var sends = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: conduitLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Scaffold(
+          body: HermesDecisionCard(
+            kind: HermesDecisionKind.clarification,
+            onSubmit: (_) async {
+              sends++;
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), 'use staging');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(sends, 1);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _ThrowingSound implements HermezSoundBackend {
+  @override
+  Future<void> start(Iterable<String> assets) async {}
+
+  @override
+  void play(String asset, {required double volume, required double speed}) =>
+      throw StateError('engine crashed');
 }

@@ -19,6 +19,7 @@ import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_run_transport.dart';
 import 'hermes_approval_card.dart';
 import 'hermes_decision_card.dart';
+import '../feedback/hermez_feedback.dart';
 
 typedef _HermesApprovalBinding = ({
   HermesRunKey runKey,
@@ -390,6 +391,8 @@ class _HermesComposerPromptOverlayState
     }
 
     update('pending', 'resolving');
+    // Sensory cues are presentation only: sent, then the backend's answer.
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
     try {
       await service.resolveApprovalChoiceForSession(
         storedSessionId,
@@ -397,6 +400,7 @@ class _HermesComposerPromptOverlayState
         choice: choice,
       );
     } catch (_) {
+      HermezFeedback.play(HermezFeedbackCue.runFailed);
       if (_ownsDesktopDecision(
         service: service,
         ownerConversationId: ownerConversationId,
@@ -415,6 +419,11 @@ class _HermesComposerPromptOverlayState
       return;
     }
     update('resolving', choice == 'deny' ? 'denied' : 'approved');
+    HermezFeedback.play(
+      choice == 'deny'
+          ? HermezFeedbackCue.approvalRejected
+          : HermezFeedbackCue.approvalAccepted,
+    );
   }
 
   Future<void> _resolveApproval(
@@ -519,6 +528,8 @@ class _HermesComposerPromptOverlayState
       return;
     }
     if (!setApprovalState('resolving', expectedState: 'pending')) return;
+    // Sensory cues are presentation only: sent, then the backend's answer.
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
     try {
       if (service is HermesDesktopApiService &&
           binding.storedSessionId != null) {
@@ -545,12 +556,18 @@ class _HermesComposerPromptOverlayState
         'approval-resolve-failed',
         scope: 'chat/hermes_approval',
       );
+      HermezFeedback.play(HermezFeedbackCue.runFailed);
       setApprovalState('pending', expectedState: 'resolving');
       return;
     }
     setApprovalState(
       approved ? 'approved' : 'denied',
       expectedState: 'resolving',
+    );
+    HermezFeedback.play(
+      approved
+          ? HermezFeedbackCue.approvalAccepted
+          : HermezFeedbackCue.approvalRejected,
     );
   }
 }
