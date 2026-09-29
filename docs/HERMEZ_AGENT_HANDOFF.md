@@ -245,3 +245,17 @@ Profile APK SHA-256 `f88ba2b8f8606ed919863cdf6dda98b48e49920c2ea113dd2660e5705cd
 
   The extra bottom gap was not re-checked on device: the phone was rotated and in use.
 - **Side navigation, for reference:** Hermez Home is outside the drawer `ShellRoute`, so it has no side navigation. It opens from a chat (hamburger, or a swipe from the left edge). Home's Recent "See all" has always pushed the Conversations page.
+
+## 2026-09-29: side navigation from Hermes Home
+
+Profile APK SHA-256 `c759fba2cec12309d58254b296881f0ca773b697b8f30cac3f64a248e5bedc21`, installed on the S25. It was not checked on device because the phone was in use.
+
+- **Ask:** a way to open the side navigation from Home. The user chose a menu button in Home's top bar.
+- **How:**
+  - On phones (`!usesPersistentTabletSidebar`), the `hermesHome` route builds `DrawerShellPage(mobileRailLabel: HOME, mobileRailSemanticLabel: 'Return to Home', child: HermesHomePage())`. Home is then the physical sheet over the same `SidebarPage` the chat uses.
+  - `HermesPageChrome` gained `leading`. Home puts a menu `IconButton` there (`hermes-home-navigation-toggle`) that toggles `SidebarDrawerControllerScope`.
+  - The left-edge swipe, the HOME rail, and Back work as they do in the chat.
+- **Notes:**
+  - This is a second `DrawerShellPage` instance, separate from the chat `ShellRoute`'s. Home and the chat do not normally coexist, because a session opens with `go(Routes.chat)`. The sidebar's Hermes Home entry pushes Home over the chat shell, so two sidebars can be mounted then. From Home's own sidebar, that entry now just closes the navigation.
+  - Tablets are unchanged.
+- **Tests:** `hermes_destinations_smoke_test.dart` checks that the button slides Home to x = W with the "Return to Home" rail, and that the rail brings it back. Wide suites show only the 8 known baseline failures.
