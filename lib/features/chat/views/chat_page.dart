@@ -4372,7 +4372,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       AnimationDuration.microInteraction,
                     ),
                     switchInCurve: AnimationCurves.microInteraction,
-                    switchOutCurve: AnimationCurves.microInteraction,
+                    // Mirrored: leaving starts at speed and settles instead
+                    // of accelerating into its last frame.
+                    switchOutCurve: AnimationCurves.microInteraction.flipped,
                     transitionBuilder: (child, animation) {
                       final slideAnimation = Tween<Offset>(
                         begin: context.reduceMotion

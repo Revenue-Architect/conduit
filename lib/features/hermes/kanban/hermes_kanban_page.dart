@@ -805,10 +805,11 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
               child: TextButton.icon(
                 onPressed: () =>
                     setState(() => _showEmptyLanes = !_showEmptyLanes),
-                icon: Icon(
-                  _showEmptyLanes
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
+                icon: AnimatedRotation(
+                  turns: _showEmptyLanes ? 0.5 : 0,
+                  duration: HermezMotion.settleFor(HermezMotionWeight.medium),
+                  curve: HermezMotion.curveMedium,
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
                 ),
                 label: Text(
                   _showEmptyLanes
@@ -817,8 +818,17 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                 ),
               ),
             ),
-            if (_showEmptyLanes)
-              for (final lane in otherEmpty) _laneSection(lane, const []),
+            HermezReveal(
+              visible: _showEmptyLanes,
+              weight: HermezMotionWeight.medium,
+              revealKey: const ValueKey('hermes-kanban-empty-lanes'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final lane in otherEmpty) _laneSection(lane, const []),
+                ],
+              ),
+            ),
           ],
         ],
       ),
@@ -842,11 +852,13 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         dense: true,
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         childrenPadding: const EdgeInsets.only(bottom: 2),
-        expansionAnimationStyle: const AnimationStyle(
-          duration: Duration(milliseconds: 170),
-          reverseDuration: Duration(milliseconds: 130),
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeOutCubic,
+        // Collapse runs the mirrored spring: an ease-out curve played in
+        // reverse starts slowly and slams into the closed state.
+        expansionAnimationStyle: AnimationStyle(
+          duration: HermezMotion.settleFor(HermezMotionWeight.medium),
+          reverseDuration: HermezMotion.settleFor(HermezMotionWeight.light),
+          curve: HermezMotion.curveMedium,
+          reverseCurve: HermezMotion.curveLight.flipped,
         ),
         shape: const Border(),
         collapsedShape: const Border(),

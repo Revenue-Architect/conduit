@@ -12,6 +12,9 @@ import '../theme/theme_extensions.dart';
 import 'conduit_components.dart';
 import 'server_version_warning_controller.dart';
 
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
+
 const serverVersionWarningCardKey = ValueKey<String>(
   'server-version-warning-card',
 );
@@ -56,6 +59,8 @@ class ServerVersionWarningCard extends ConsumerWidget {
       duration: motionDuration,
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: HermezSwitch.unroll,
+      layoutBuilder: HermezSwitch.column,
       child: showWarning
           ? _ServerVersionWarningBody(
               key: serverVersionWarningCardKey,

@@ -61,6 +61,12 @@ android {
             // signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
         }
+        // Flutter creates "profile" from debug before this block runs, so it
+        // misses the suffix. Matching it lets a profile build (AOT, the real
+        // frame rate) install over the debug app and keep its sign-in.
+        getByName("profile") {
+            applicationIdSuffix = ".debug"
+        }
     }
 }
 

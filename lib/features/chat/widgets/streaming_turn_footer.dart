@@ -11,6 +11,9 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
 import 'conduit_streaming_orbit.dart';
 
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
+
 class StreamingTurnFooter extends ConsumerStatefulWidget {
   const StreamingTurnFooter({
     super.key,
@@ -97,15 +100,15 @@ class _StreamingTurnFooterState extends ConsumerState<StreamingTurnFooter> {
       reverseDuration: _disableAnimations ? Duration.zero : _switchDuration,
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
+      // The indicator slides out from under the message and back under it
+      // while its space opens and closes; it never fades, and the timeline
+      // never drops by its height at the end.
+      transitionBuilder: HermezSwitch.unroll,
       layoutBuilder: (currentChild, previousChildren) {
-        final children = <Widget>[...previousChildren, ?currentChild];
-        if (children.isEmpty) {
+        if (currentChild == null && previousChildren.isEmpty) {
           return const SizedBox.shrink();
         }
-        return Stack(
-          alignment: AlignmentDirectional.topStart,
-          children: children,
-        );
+        return HermezSwitch.column(currentChild, previousChildren);
       },
       child: shouldShow
           ? KeyedSubtree(

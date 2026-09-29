@@ -121,11 +121,41 @@ void main() {
     await tester.tap(find.text('Hermes is working'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Steer'));
+    await tester.pump();
+    // The pill grows into a field in place; nothing opens over the chat.
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(find.byType(Dialog), findsNothing);
+    expect(tester.takeException(), isNull);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField), 'Focus on the pricing');
-    await tester.tap(find.text('Send'));
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    // Empty field: the trailing control closes.
+    expect(find.byTooltip('Close steer'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Focus on the pricing');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Send to Hermes'));
     await tester.pumpAndSettle();
     expect(submitted, ['session-1:Focus on the pricing']);
+    // Accepted: the field contracts back into the Steer pill.
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Steer'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a rejected steer keeps the field and its text', (tester) async {
+    await mount(tester, steer: (id, text) async => false);
+    await tester.tap(find.text('Hermes is working'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Steer'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Try the other store');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Send to Hermes'));
+    await tester.pumpAndSettle();
+    expect(find.text('This run cannot be steered right now.'), findsOneWidget);
+    expect(find.text('Try the other store'), findsOneWidget);
+    await tester.tap(find.byTooltip('Send to Hermes'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 

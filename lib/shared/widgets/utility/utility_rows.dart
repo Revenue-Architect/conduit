@@ -4,6 +4,9 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../theme/theme_extensions.dart';
 
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
+
 /// Shared utility row with full-row semantics and immediate press feedback.
 class UtilityRow extends StatefulWidget {
   const UtilityRow({
@@ -317,7 +320,8 @@ class UtilitySelectionRow extends StatelessWidget {
                     AnimationDuration.microInteraction,
                   ),
                   switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: HermezSwitch.glyph,
                   child: selected
                       ? Icon(
                           context.usesCupertinoChrome

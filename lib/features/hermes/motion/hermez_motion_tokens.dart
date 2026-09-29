@@ -34,10 +34,14 @@ abstract final class HermezMotion {
     stiffness: 420,
     damping: 32,
   );
+  // Critically damped (response ~0.32 s). A slightly bouncy spring here
+  // overshot by 0.5 %; clamped to [0, 1] that became a dead hold for the
+  // second half of every medium animation, so closes stopped, sat still,
+  // and then snapped when the route or presence finished.
   static const springMedium = NibSpringDescription(
-    mass: 0.9,
-    stiffness: 340,
-    damping: 30,
+    mass: 1,
+    stiffness: 385,
+    damping: 39.3,
   );
   // A growing page or sheet: critically damped, ~0.43 s to rest.
   static const springHeavy = NibSpringDescription(
@@ -106,28 +110,36 @@ abstract final class HermezMotion {
 class HermezSpringCurve extends Curve {
   HermezSpringCurve(this.spring)
     : _simulation = SpringSimulation(spring.toFlutter(), 0, 1, 0),
-      _settleSeconds = _settleTime(spring);
+      _settleSeconds = _settleTime(spring) {
+    _endValue = _simulation.x(_settleSeconds);
+  }
 
   final NibSpringDescription spring;
   final SpringSimulation _simulation;
   final double _settleSeconds;
+  late final double _endValue;
 
   Duration get settleDuration =>
       Duration(microseconds: (_settleSeconds * 1e6).round());
 
-  // Hermez springs are close to critically damped, so any overshoot is a
-  // fraction of a pixel. Clamping keeps Hero flights and intervals, which
-  // require values in [0, 1], safe.
+  // The spring is sampled up to the moment it is visibly at rest and scaled
+  // so that moment is exactly 1. Without the scaling the last frame jumped
+  // the remaining fraction (a pixel or more on a full-screen zoom) when the
+  // controller snapped to its end. Hermez springs are close to critically
+  // damped, so any overshoot is a fraction of a pixel; clamping keeps Hero
+  // flights and intervals, which require values in [0, 1], safe.
   @override
   double transformInternal(double t) =>
-      _simulation.x(t * _settleSeconds).clamp(0.0, 1.0);
+      (_simulation.x(t * _settleSeconds) / _endValue).clamp(0.0, 1.0);
 
   static double _settleTime(NibSpringDescription spring) {
     final simulation = SpringSimulation(spring.toFlutter(), 0, 1, 0);
     const step = 1 / 600;
     for (var time = step; time < 3; time += step) {
-      if ((simulation.x(time) - 1).abs() < 0.0012 &&
-          simulation.dx(time).abs() < 0.08) {
+      // Visibly at rest: within 0.2 % of the target and barely moving. The
+      // curve is rescaled so this moment is exactly 1.
+      if ((simulation.x(time) - 1).abs() < 0.002 &&
+          simulation.dx(time).abs() < 0.1) {
         return time;
       }
     }

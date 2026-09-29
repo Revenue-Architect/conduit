@@ -10,6 +10,9 @@ import '../../../shared/widgets/conduit_components.dart';
 import '../release_notes_banner_controller.dart';
 import '../release_notes_presenter.dart';
 
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
+
 const releaseNotesBannerKey = ValueKey<String>('release-notes-banner');
 const releaseNotesBannerCloseKey = ValueKey<String>(
   'release-notes-banner-close',
@@ -31,6 +34,8 @@ class ReleaseNotesBanner extends ConsumerWidget {
       duration: motionDuration,
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: HermezSwitch.unroll,
+      layoutBuilder: HermezSwitch.column,
       child: data == null
           ? const SizedBox.shrink()
           : Builder(

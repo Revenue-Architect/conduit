@@ -74,41 +74,59 @@ class HermezReveal extends StatelessWidget {
   );
 }
 
-/// A clip that grows from the top edge while the content settles upward.
+/// A section that slides out from under its top edge and back under it.
 /// Used by presence, groups, and expanding panels. No opacity.
+///
+/// The content keeps its shape and travels with the moving edge, like a
+/// drawer, instead of being sliced by a clip that sweeps across it; that
+/// sweep read as the content being cut off at the end of every collapse.
 class HermezUnroll extends StatelessWidget {
-  const HermezUnroll({
-    super.key,
-    required this.animation,
-    required this.child,
-    this.rise = 10,
-  });
+  const HermezUnroll({super.key, required this.animation, required this.child});
 
   final Animation<double> animation;
   final Widget child;
-  final double rise;
 
   @override
   Widget build(BuildContext context) => SizeTransition(
     sizeFactor: animation,
-    alignment: AlignmentDirectional.topStart,
+    alignment: AlignmentDirectional.bottomStart,
     // Keep block content at full width while it unrolls, the way it sits in
     // the column around it.
     child: LayoutBuilder(
-      builder: (context, constraints) {
-        final body = AnimatedBuilder(
-          animation: animation,
-          child: child,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(0, (1 - animation.value.clamp(0.0, 1.0)) * -rise),
-            child: child,
-          ),
-        );
-        return constraints.hasBoundedWidth
-            ? SizedBox(width: constraints.maxWidth, child: body)
-            : body;
-      },
+      builder: (context, constraints) => constraints.hasBoundedWidth
+          ? SizedBox(width: constraints.maxWidth, child: child)
+          : child,
     ),
+  );
+}
+
+/// Fade-free [AnimatedSwitcher] transitions for the rest of the app.
+abstract final class HermezSwitch {
+  /// A glyph that changes meaning in place: the old one turns and shrinks
+  /// away while the new one turns and grows in the same spot.
+  static Widget glyph(Widget child, Animation<double> animation) =>
+      ScaleTransition(
+        scale: animation,
+        child: RotationTransition(
+          turns: animation.drive(Tween<double>(begin: -0.12, end: 0)),
+          child: child,
+        ),
+      );
+
+  /// A block that slides out from under its top edge and back under it,
+  /// keeping its own width (unlike [HermezUnroll], which fills the column).
+  static Widget unroll(Widget child, Animation<double> animation) =>
+      SizeTransition(
+        sizeFactor: animation,
+        alignment: Alignment.bottomCenter,
+        child: child,
+      );
+
+  /// Keeps the leaving block above the arriving one, each at its own
+  /// height, so the space closes smoothly instead of dropping at the end.
+  static Widget column(Widget? current, List<Widget> previous) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [...previous, ?current],
   );
 }
 

@@ -317,17 +317,12 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     Widget child,
   ) {
     final curve = HermezMotion.curveFor(_weight);
-    if (_slideOut) {
-      return HermezPushTransition(
-        animation: CurvedAnimation(
-          parent: animation,
-          curve: HermezMotion.curveMedium,
-          reverseCurve: HermezMotion.curveMedium.flipped,
-        ),
-        child: child,
-      );
-    }
-    Widget result = switch (effectiveMotion) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Every wrapper below is present on every frame, whatever the route is
+    // doing. Swapping one widget type for another (a slide for a scale when
+    // a route was pushed on top, a slide-out when leaving) remounted the
+    // whole page in the middle of the motion and read as a stutter.
+    final Widget moving = switch (effectiveMotion) {
       HermezRouteMotion.none =>
         shape == HermezExpandShape.sheet
             ? _HermezSheetFrame(
@@ -337,39 +332,37 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
               )
             : child,
       HermezRouteMotion.standard => HermezPushTransition(
-        animation: CurvedAnimation(
-          parent: animation,
-          curve: curve,
-          reverseCurve: curve.flipped,
-        ),
+        animation: hermezCurved(animation, curve),
         child: child,
       ),
-      HermezRouteMotion.expand => _HermezSheetFrame(
-        route: this,
-        progress: CurvedAnimation(
-          parent: animation,
-          curve: curve,
-          reverseCurve: curve.flipped,
+      // Leaving for another destination slides the grown page away instead
+      // of contracting it into a card that is disappearing too.
+      HermezRouteMotion.expand => SlideTransition(
+        position: _slideOut
+            ? hermezCurved(animation, HermezMotion.curveMedium).drive(
+                Tween<Offset>(begin: Offset(rtl ? -1 : 1, 0), end: Offset.zero),
+              )
+            : _still,
+        child: _HermezSheetFrame(
+          route: this,
+          progress: hermezCurved(animation, curve),
+          child: child,
         ),
-        child: child,
       ),
     };
-    if (_nextCover != HermezCoverKind.none && !reducedMotion) {
-      final coverCurve = _nextCover == HermezCoverKind.recede
-          ? HermezMotion.curveHeavy
-          : HermezMotion.curveMedium;
-      result = HermezCoveredTransition(
-        kind: _nextCover,
-        animation: CurvedAnimation(
-          parent: secondaryAnimation,
-          curve: coverCurve,
-          reverseCurve: coverCurve.flipped,
-        ),
-        child: result,
-      );
-    }
-    return result;
+    return HermezCoveredTransition(
+      kind: reducedMotion ? HermezCoverKind.none : _nextCover,
+      animation: hermezCurved(
+        secondaryAnimation,
+        _nextCover == HermezCoverKind.recede
+            ? HermezMotion.curveHeavy
+            : HermezMotion.curveMedium,
+      ),
+      child: moving,
+    );
   }
+
+  static const Animation<Offset> _still = AlwaysStoppedAnimation(Offset.zero);
 
   void _handleDragUpdate(DragUpdateDetails details, double extent) {
     _dragSettle?.stop();
@@ -488,30 +481,29 @@ class HermezCoveredTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (kind) {
-      case HermezCoverKind.none:
-        return child;
-      case HermezCoverKind.recede:
-        return ScaleTransition(
-          scale: Tween<double>(
-            begin: 1,
-            end: HermezMotion.sourceBackgroundScale,
-          ).animate(animation),
-          child: child,
-        );
-      case HermezCoverKind.shift:
-        final rtl = Directionality.of(context) == TextDirection.rtl;
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: Offset.zero,
-            end: Offset(
-              rtl ? HermezMotion.pushBackShift : -HermezMotion.pushBackShift,
-              0,
+    // One structure for every kind, so a route pushed on top (which changes
+    // the kind) never remounts the page underneath mid-flight.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final scale = kind == HermezCoverKind.recede
+        ? animation.drive(
+            Tween<double>(begin: 1, end: HermezMotion.sourceBackgroundScale),
+          )
+        : kAlwaysCompleteAnimation;
+    final shift = kind == HermezCoverKind.shift
+        ? animation.drive(
+            Tween<Offset>(
+              begin: Offset.zero,
+              end: Offset(
+                rtl ? HermezMotion.pushBackShift : -HermezMotion.pushBackShift,
+                0,
+              ),
             ),
-          ).animate(animation),
-          child: child,
-        );
-    }
+          )
+        : const AlwaysStoppedAnimation<Offset>(Offset.zero);
+    return ScaleTransition(
+      scale: scale,
+      child: SlideTransition(position: shift, child: child),
+    );
   }
 }
 
@@ -562,7 +554,9 @@ class _HermezSheetFrame<T> extends StatelessWidget {
           animation: Listenable.merge([progress, route._dragOffset]),
           child: content,
           builder: (context, content) {
-            final t = progress.value;
+            // A page sliding away keeps its full size; only a contraction
+            // home runs the aperture backwards.
+            final t = route._slideOut ? 1.0 : progress.value;
             final settledT = t.clamp(0.0, 1.0);
             final drag = route._dragOffset.value;
             final end = target.shift(Offset(0, drag));
@@ -627,7 +621,12 @@ class _HermezSheetFrame<T> extends StatelessWidget {
                 Positioned.fill(
                   child: ClipRRect(
                     clipper: _ApertureClipper(aperture),
-                    clipBehavior: Clip.antiAlias,
+                    // A settled full page needs no clip; keeping one costs a
+                    // clip layer on every scroll frame. Same widget either
+                    // way, so nothing remounts when it changes.
+                    clipBehavior: !sheet && settledT >= 1 && drag == 0
+                        ? Clip.none
+                        : Clip.antiAlias,
                     // One object: the whole destination scales out of the
                     // source and back into it, so text, decoration, and
                     // surfaces all move together on one spring.
@@ -712,36 +711,18 @@ class HermezPushPageTransitionsBuilder extends PageTransitionsBuilder {
   ) {
     final curve = HermezMotion.curveMedium;
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
+    final arriving = hermezCurved(animation, curve);
     return HermezCoveredTransition(
       kind: HermezCoverKind.shift,
-      animation: CurvedAnimation(
-        parent: secondaryAnimation,
-        curve: curve,
-        reverseCurve: curve.flipped,
-      ),
+      animation: hermezCurved(secondaryAnimation, curve),
       child: route.fullscreenDialog
           ? SlideTransition(
-              position:
-                  Tween<Offset>(
-                    begin: const Offset(0, 1),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: curve,
-                      reverseCurve: curve.flipped,
-                    ),
-                  ),
-              child: child,
-            )
-          : HermezPushTransition(
-              animation: CurvedAnimation(
-                parent: animation,
-                curve: curve,
-                reverseCurve: curve.flipped,
+              position: arriving.drive(
+                Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero),
               ),
               child: child,
-            ),
+            )
+          : HermezPushTransition(animation: arriving, child: child),
     );
   }
 }
@@ -761,4 +742,28 @@ abstract final class HermezRouteExits {
     final until = _until;
     return until != null && DateTime.now().isBefore(until);
   }
+}
+
+final Expando<Map<(Curve, Curve?), CurvedAnimation>> _curvedCache = Expando();
+
+/// [parent] on a Hermez spring, rising on [curve] and falling on the mirror
+/// of [reverseOf] (default [curve]) so both directions start at speed and
+/// settle gently.
+///
+/// Route transitions are rebuilt on every animation frame. A new
+/// [CurvedAnimation] per frame adds a status listener to the route's
+/// controller that is never removed, and every one of them runs when the
+/// transition finishes. This returns one shared instance per parent and
+/// curve instead.
+Animation<double> hermezCurved(
+  Animation<double> parent,
+  Curve curve, {
+  Curve? reverseOf,
+}) {
+  final byCurve = _curvedCache[parent] ??= <(Curve, Curve?), CurvedAnimation>{};
+  return byCurve[(curve, reverseOf)] ??= CurvedAnimation(
+    parent: parent,
+    curve: curve,
+    reverseCurve: (reverseOf ?? curve).flipped,
+  );
 }

@@ -15,6 +15,7 @@ import '../sheets/hermes_attention_resolution_sheet.dart';
 import '../sheets/hermes_completed_run_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermes_run_action_dialogs.dart';
+import '../widgets/hermes_run_actions.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_page_chrome.dart';
 
@@ -83,23 +84,25 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     }
   }
 
-  Future<void> _steer(HermesDesktopApiService service) async {
-    final text = await promptHermesSteer(context);
-    if (!mounted || text == null || text.isEmpty) return;
+  Future<bool> _steer(HermesDesktopApiService service, String text) async {
     setState(() => _busy = true);
     try {
       final accepted = await service.steer(widget.sessionId, text);
-      if (mounted && !accepted)
+      if (mounted && !accepted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('This run cannot be steered right now.'),
           ),
         );
+      }
+      return accepted;
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not steer this run.')),
         );
+      }
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -303,26 +306,26 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                               ),
                       ),
                       const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 7,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () =>
+                      HermesRunActions(
+                        showSteer: running,
+                        onSteer: running
+                            ? (text) => _steer(service, text)
+                            : null,
+                        leading: [
+                          HermezRunPill(
+                            label: 'View chat',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            onTap: () =>
                                 openHermesSession(context, ref, current),
-                            icon: const Icon(Icons.chat_bubble_outline_rounded),
-                            label: const Text('View chat'),
                           ),
-                          if (running) ...[
-                            OutlinedButton(
-                              onPressed: _busy ? null : () => _steer(service),
-                              child: const Text('Steer'),
+                        ],
+                        trailing: [
+                          if (running)
+                            HermezRunPill(
+                              label: 'Stop',
+                              icon: Icons.stop_circle_outlined,
+                              onTap: _busy ? null : () => _stop(service),
                             ),
-                            OutlinedButton(
-                              onPressed: _busy ? null : () => _stop(service),
-                              child: const Text('Stop'),
-                            ),
-                          ],
                         ],
                       ),
                       FutureBuilder<List<HermesPendingDesktopDecision>>(

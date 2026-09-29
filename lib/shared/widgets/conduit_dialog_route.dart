@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import '../../features/hermes/motion/hermez_motion_route.dart'
+    show hermezCurved;
 import '../../features/hermes/motion/hermez_motion_tokens.dart';
 
 /// A dialog route with no opacity animation.
@@ -43,23 +45,22 @@ class ConduitDialogRoute<T> extends RawDialogRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final settle = CurvedAnimation(
-      parent: animation,
-      curve: HermezMotion.curveMedium,
-      reverseCurve: HermezMotion.curveLight.flipped,
+    final settle = hermezCurved(
+      animation,
+      HermezMotion.curveMedium,
+      reverseOf: HermezMotion.curveLight,
     );
     return AnimatedBuilder(
       animation: settle,
       child: child,
       builder: (context, child) {
-        final t = settle.value;
-        if (t >= 1) return child!;
+        final t = settle.value.clamp(0.0, 1.0);
+        // The same wrappers at rest as in flight: dropping them when the
+        // unfold finished remounted the dialog (and its focused field).
         return ClipRect(
-          clipper: _CenterBand(t.clamp(0.0, 1.0)),
-          child: Transform.scale(
-            scale: 0.94 + 0.06 * t.clamp(0.0, 1.0),
-            child: child,
-          ),
+          clipper: _CenterBand(t),
+          clipBehavior: t >= 1 ? Clip.none : Clip.hardEdge,
+          child: Transform.scale(scale: 0.94 + 0.06 * t, child: child),
         );
       },
     );

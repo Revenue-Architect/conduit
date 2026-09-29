@@ -8,6 +8,9 @@ import 'adaptive_toolbar_components.dart';
 import 'platform_ui/platform_ui.dart';
 import 'utility_components.dart';
 
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
+
 export '../models/connection_attempt.dart';
 
 class ConnectionMark extends StatelessWidget {
@@ -130,7 +133,10 @@ class ConnectionAttemptBanner extends StatelessWidget {
     return AnimatedSwitcher(
       duration: context.motionDuration(AnimationDuration.microInteraction),
       switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeOutCubic,
+      // Mirrored so the leaving banner starts at speed and settles.
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: HermezSwitch.unroll,
+      layoutBuilder: HermezSwitch.column,
       child: !state.isVisible
           ? const SizedBox.shrink(key: ValueKey<String>('connection-idle'))
           : KeyedSubtree(

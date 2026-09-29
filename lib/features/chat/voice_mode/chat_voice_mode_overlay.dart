@@ -50,20 +50,11 @@ class ChatVoiceModeOverlay extends ConsumerWidget {
             if (context.reduceMotion) {
               return child;
             }
-            final scale = Tween<double>(begin: 0.98, end: 1).animate(
-              CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-                reverseCurve: Curves.easeInCubic,
-              ),
-            );
-            return FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: scale,
-                alignment: Alignment.bottomCenter,
-                child: child,
-              ),
+            // Grows from its bottom edge and shrinks back into it; no fade.
+            return ScaleTransition(
+              scale: animation,
+              alignment: Alignment.bottomCenter,
+              child: child,
             );
           },
           child: snapshot.isCollapsed

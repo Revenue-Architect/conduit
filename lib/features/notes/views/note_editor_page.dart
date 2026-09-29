@@ -1020,8 +1020,13 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         opaque: false,
         barrierDismissible: false,
         pageBuilder: (context, animation, secondaryAnimation) {
-          return FadeTransition(
-            opacity: animation,
+          return SlideTransition(
+            position: animation.drive(
+              Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeOutCubic)),
+            ),
             child: AudioRecordingOverlay(
               onCancel: () => Navigator.pop(context),
               onConfirm: (file) async {

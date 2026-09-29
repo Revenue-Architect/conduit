@@ -32,6 +32,8 @@ import 'package:conduit/core/network/self_signed_image_cache_manager.dart';
 import 'package:conduit/core/network/image_header_utils.dart';
 import 'package:conduit/core/utils/debug_logger.dart';
 import 'package:conduit/core/services/raster_media_policy.dart';
+import 'package:conduit/features/hermes/motion/hermez_presence.dart'
+    show HermezSwitch;
 
 typedef MarkdownLinkTapCallback = void Function(String url, String title);
 
@@ -1553,6 +1555,7 @@ class _CollapseToggle extends StatelessWidget {
           children: [
             AnimatedSwitcher(
               duration: context.motionDuration(AnimationDuration.fast),
+              transitionBuilder: HermezSwitch.glyph,
               child: Icon(
                 isCollapsed
                     ? Icons.expand_more_rounded
@@ -1563,8 +1566,9 @@ class _CollapseToggle extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Spacing.xs),
+            // A label changes in place; it does not fade.
             AnimatedSwitcher(
-              duration: context.motionDuration(AnimationDuration.fast),
+              duration: Duration.zero,
               child: Text(
                 isCollapsed
                     ? AppLocalizations.of(context)!
@@ -1702,6 +1706,7 @@ class _CodeBlockHeaderState extends State<CodeBlockHeader> {
                   children: [
                     AnimatedSwitcher(
                       duration: context.motionDuration(AnimationDuration.fast),
+                      transitionBuilder: HermezSwitch.glyph,
                       child: Icon(
                         _isCopied
                             ? Icons.check_rounded

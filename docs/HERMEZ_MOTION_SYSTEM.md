@@ -10,11 +10,13 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 
 | Weight | Use | Press scale | Spring (mass / stiffness / damping) | Settles in |
 | --- | --- | --- | --- | --- |
-| light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.28 s |
-| medium | cards, sheets, sibling pages | 0.978 | 0.9 / 340 / 30 | ~0.41 s |
-| heavy | a page or sheet growing out of a card | 0.99 | 1 / 300 / 34 | ~0.43 s |
+| light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.30 s |
+| medium | cards, sheets, sibling pages | 0.978 | 1 / 385 / 39.3 | ~0.43 s |
+| heavy | a page or sheet growing out of a card | 0.99 | 1 / 300 / 34 | ~0.46 s |
 
-`HermezSpringCurve` turns a spring into a `Curve` sampled over its own settle time, so route controllers, `AnimatedSize`, Hero flights, and dialogs move with the same physics as NibMotion. Its output is clamped to [0, 1] (Hero and `Interval` assert that range). Reverse motion always uses `curve.flipped`, so Back starts moving immediately. Exits are faster than entries: expanding routes reverse on the medium spring.
+All three are critically damped (damping ratio 0.97 to 1.0). **Do not add a bouncy spring to a duration-driven animation.** The curve is clamped to [0, 1], so any overshoot turns into a dead hold: the old medium spring (0.9 / 340 / 30, ratio 0.86) reached 99 % at 0.24 s and then sat still until 0.41 s, so every medium open and close stopped, waited, and snapped when the route or presence finished. A test (`every Hermez spring keeps moving until it settles`) guards this.
+
+`HermezSpringCurve` turns a spring into a `Curve` sampled over its own settle time (within 0.2 % of the target and barely moving), rescaled so that moment is exactly 1, so the last frame never jumps. Route controllers, `AnimatedSize`, Hero flights, and dialogs move with the same physics as NibMotion. Its output is clamped to [0, 1] (Hero and `Interval` assert that range). Reverse motion always uses `curve.flipped`, so Back starts moving immediately. Exits are faster than entries: expanding routes reverse on the medium spring.
 
 ## Primitives
 
@@ -29,7 +31,8 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
   - The screen under an expanding route recedes to scale 0.988; under a sibling push it shifts back.
   - `HermezPushPageTransitionsBuilder` replaces Android's fading Zoom transition for every Material route in the app.
 - `HermezEntrance(order:)`: currently a pass-through (`HermezEntrance.staggered = false`). Secondary content arrives with the container it belongs to; staggered parts read as separate objects.
-- `HermezPresence` / `HermezReveal` / `HermezUnroll`: real mount and unmount unroll from the top edge and roll away; children keep full width.
+- `HermezPresence` / `HermezReveal` / `HermezUnroll`: real mount and unmount. The section slides out from under its top edge and back under it, keeping its shape (a drawer), instead of being sliced by a clip sweeping across it. Children keep full width.
+- `HermezSwitch.glyph` / `.unroll` / `.column`: fade-free `transitionBuilder`s and `layoutBuilder` for any `AnimatedSwitcher` in the app (code-block copy/collapse icons, the streaming footer, banners, selection checks). An `AnimatedSwitcher` without a `transitionBuilder` fades; always pass one, or `duration: Duration.zero` for text that changes in place.
 - `HermezSize`: `AnimatedSize` on a Hermez spring.
 - `HermezMotionGroup`: short keyed column. Moved children travel (FLIP through NibMotion controllers), new ones unroll, removed ones roll away. Positions are recorded after each frame's layout and never read during a build.
 - `HermezIconSwap`: an icon that changes meaning turns and scales in place.
@@ -49,11 +52,17 @@ On expand routes and origin sheets the whole destination travels as one object. 
 | Kanban task card → task sheet | task title | sheet body |
 | Artifact tile → artifact sheet | thumbnail image, file name | preview actions, related conversation |
 | Inline run surface → attention sheet | the surface grows into the sheet | decision UI |
+| Steer pill → steer field (`HermesRunActions`) | the pill itself stretches across its row; icon and label stay put, the send control grows in at the moving edge | the text field, uncovered by the travelling edge |
 | Inline browser aperture → full-screen Steel | aperture grows; the WebView is created only after the route settles | caption |
 
 Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: spherical white shell, side disc, dark visor turned right, glowing eyes, and profile parts (Kai crest and gem, Strong armour and lit slot, Fast fins and streaks, Local vents and lens, Autopilot antenna).
 
 ## Rules
+
+- **One structure for the whole animation.** A transition must return the same widget types on every frame and at rest. Swapping wrappers (a slide for a scale when a route is pushed on top, dropping a clip when an unfold finishes, a slide-out on leave) remounts the page mid-motion and reads as a stutter; set a neutral value (scale 1, offset zero, `Clip.none`) instead. `HermezCoveredTransition`, `_HermezSheetFrame`, and `ConduitDialogRoute` follow this.
+- **Never create a `CurvedAnimation` in `buildTransitions` or a builder that runs per frame.** Each one adds a status listener to the route controller that is never removed. Use `hermezCurved(parent, curve, reverseOf:)`, which shares one per parent and curve.
+- **Reverse curves are mirrors.** A `reverseCurve` or `switchOutCurve` is played backwards, so an ease-out curve there starts slowly and slams into its last frame. Use `curve.flipped` (or `Curves.easeIn*` for an ease-out exit).
+- **Do not nest size animations.** An `AnimatedSize` around content that already animates its own size (reveals, presence) trails behind every frame and settles late. The inline run surface dropped its outer `HermezSize` for this reason.
 
 - No opacity animation anywhere in Hermez, including chat (streaming content, activity dot, greeting, scroll button, composer icons, loading states, image previews). Message entrance is instant; streaming tokens never animate.
 - Measure positions only after layout. Reading `localToGlobal` during a build can throw when an ancestor is mid-layout and leaves the element tree half-updated (seen on device as `_dependents.isEmpty`).

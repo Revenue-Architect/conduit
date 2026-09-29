@@ -6,6 +6,67 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('every Hermez spring keeps moving until it settles, then ends at 1', () {
+    for (final weight in HermezMotionWeight.values) {
+      final curve = HermezMotion.curveFor(weight);
+      // No dead hold: an overshooting spring clamped to 1 used to sit still
+      // for the second half of its duration and then snap when it ended.
+      expect(curve.transform(0.7), lessThan(0.999), reason: '$weight');
+      expect(curve.transform(0.99), greaterThan(0.99), reason: '$weight');
+      expect(curve.transform(1), 1);
+      var previous = 0.0;
+      for (var i = 1; i <= 200; i++) {
+        final value = curve.transform(i / 200);
+        expect(value, greaterThanOrEqualTo(previous), reason: '$weight');
+        // Continuous: no frame jumps more than a small step near the end.
+        if (i > 150) expect(value - previous, lessThan(0.01));
+        previous = value;
+      }
+    }
+  });
+
+  test('route curves are shared, not created per frame', () {
+    final controller = AnimationController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+    expect(
+      identical(
+        hermezCurved(controller, HermezMotion.curveMedium),
+        hermezCurved(controller, HermezMotion.curveMedium),
+      ),
+      isTrue,
+    );
+    expect(
+      identical(
+        hermezCurved(controller, HermezMotion.curveMedium),
+        hermezCurved(
+          controller,
+          HermezMotion.curveMedium,
+          reverseOf: HermezMotion.curveLight,
+        ),
+      ),
+      isFalse,
+    );
+  });
+
+  testWidgets('the screen under a route keeps one structure for every cover', (
+    tester,
+  ) async {
+    Widget covered(HermezCoverKind kind) => MaterialApp(
+      home: HermezCoveredTransition(
+        kind: kind,
+        animation: kAlwaysDismissedAnimation,
+        child: const Text('Home', key: ValueKey('home')),
+      ),
+    );
+    await tester.pumpWidget(covered(HermezCoverKind.shift));
+    final element = tester.element(find.byKey(const ValueKey('home')));
+    for (final kind in [HermezCoverKind.recede, HermezCoverKind.none]) {
+      await tester.pumpWidget(covered(kind));
+      // Same element: switching the cover did not remount the page.
+      expect(tester.element(find.byKey(const ValueKey('home'))), same(element));
+    }
+  });
+
   test('bot morph ids stay unique to the profile', () {
     expect(hermezBotMorphId('kai'), 'bot:kai');
     expect(hermezBotMorphId('local'), 'bot:local');

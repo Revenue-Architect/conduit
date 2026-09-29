@@ -311,7 +311,8 @@ class _AudioRecordingOverlayState extends State<AudioRecordingOverlay>
 
                         // Status text
                         AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
+                          // Text changes in place; it does not fade.
+                          duration: Duration.zero,
                           child: Text(
                             _hasError
                                 ? l10n.microphonePermissionDenied

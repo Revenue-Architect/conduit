@@ -1032,7 +1032,8 @@ class AppCustomizationPage extends ConsumerWidget {
               ],
               const SizedBox(height: Spacing.sm),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
+                // Text changes in place; it does not fade.
+                duration: Duration.zero,
                 child: Text(
                   description,
                   key: ValueKey<String>(
@@ -1227,7 +1228,8 @@ class AppCustomizationPage extends ConsumerWidget {
               ),
               const SizedBox(height: Spacing.sm),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
+                // Text changes in place; it does not fade.
+                duration: Duration.zero,
                 child: Text(
                   ttsDescription,
                   key: ValueKey<String>('tts-desc-${settings.ttsEngine.name}'),

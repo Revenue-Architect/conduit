@@ -253,7 +253,8 @@ void main() {
           activeServerId: 'B',
         ),
       );
-      await tester.pump();
+      // The card unrolls in; it can be tapped once it has arrived.
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(serverVersionWarningCardCloseKey));
       await tester.pumpAndSettle();
 
