@@ -18,6 +18,7 @@ class HermesPageChrome extends StatelessWidget {
     this.actions = const [],
     this.showHeader = true,
     this.titleMorphId,
+    this.leading,
   });
 
   final String title;
@@ -31,6 +32,9 @@ class HermesPageChrome extends StatelessWidget {
 
   /// Lets the page title arrive as the title of the object that opened it.
   final String? titleMorphId;
+
+  /// The app bar's leading control, such as Home's navigation button.
+  final Widget? leading;
 
   static TextStyle titleStyle(HermezChatPalette palette) => TextStyle(
     color: palette.ink,
@@ -58,6 +62,7 @@ class HermesPageChrome extends StatelessWidget {
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
+              leading: leading,
               actions: actions,
             ),
             body: SafeArea(

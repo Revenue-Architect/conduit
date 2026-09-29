@@ -25,6 +25,7 @@ import '../../features/auth/views/sso_auth_page.dart';
 import '../../features/chat/views/chat_page.dart';
 import '../../features/navigation/views/folder_page.dart';
 import '../../features/navigation/widgets/drawer_shell_page.dart';
+import '../../shared/widgets/sidebar_layout_contract.dart';
 import '../../features/navigation/views/splash_launcher_page.dart';
 import '../../features/notes/views/notes_list_page.dart';
 import '../../shared/widgets/adaptive_route_shell.dart';
@@ -735,7 +736,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       pageBuilder: (context, state) => _buildHermezPage(
         context: context,
         state: state,
-        child: const HermesHomePage(),
+        // On phones Home is a physical sheet over the same side navigation
+        // as the chat: the menu button or an edge swipe slides it aside, and
+        // the HOME rail brings it back. Tablets keep Home as it was.
+        child: Builder(
+          builder: (context) => usesPersistentTabletSidebar(context)
+              ? const HermesHomePage()
+              : const DrawerShellPage(
+                  mobileRailLabel: Text('HOME'),
+                  mobileRailSemanticLabel: 'Return to Home',
+                  child: HermesHomePage(),
+                ),
+        ),
       ),
     ),
     GoRoute(

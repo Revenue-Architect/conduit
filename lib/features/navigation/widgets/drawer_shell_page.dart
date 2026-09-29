@@ -32,7 +32,17 @@ import 'sidebar_tab_registry.dart';
 class DrawerShellPage extends ConsumerStatefulWidget {
   final Widget child;
 
-  const DrawerShellPage({super.key, required this.child});
+  /// The mobile return rail: what it shows and what it announces. The chat
+  /// shell uses the defaults; Hermes Home names itself.
+  final Widget mobileRailLabel;
+  final String mobileRailSemanticLabel;
+
+  const DrawerShellPage({
+    super.key,
+    required this.child,
+    this.mobileRailLabel = const Text('CHAT'),
+    this.mobileRailSemanticLabel = 'Return to chat',
+  });
 
   @override
   ConsumerState<DrawerShellPage> createState() => _DrawerShellPageState();
@@ -122,8 +132,8 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
       },
       // The chat slides away as a sheet; this rail on its leading edge
       // brings it back.
-      mobileRailLabel: const Text('CHAT'),
-      mobileRailSemanticLabel: 'Return to chat',
+      mobileRailLabel: widget.mobileRailLabel,
+      mobileRailSemanticLabel: widget.mobileRailSemanticLabel,
       drawer: const SidebarPage(),
       layoutBuilder: (layout) => MacDesktopShortcuts(child: layout),
       child: widget.child,

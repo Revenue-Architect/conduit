@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../kanban/hermes_kanban_summary_provider.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_config.dart';
@@ -149,9 +150,23 @@ class HermesHomePage extends ConsumerWidget {
         .where((item) => item.$2.enabled)
         .toList();
     final running = kanban?.snapshot.lanes['running'] ?? const [];
+    // On phones Home sits in its own side navigation (see the route); the
+    // button slides Home aside to reveal it. Tablets show no button.
+    final navigation = SidebarDrawerControllerScope.maybeOf(context);
     return HermesPageChrome(
       title: 'Hermes',
       subtitle: 'Y O U R  T H I N K I N G  P A R T N E R',
+      leading: navigation == null || usesPersistentTabletSidebar(context)
+          ? null
+          : IconButton(
+              key: const ValueKey('hermes-home-navigation-toggle'),
+              tooltip: 'Navigation',
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                navigation.toggle();
+              },
+              icon: const Icon(Icons.menu_rounded),
+            ),
       actions: [
         IconButton(
           tooltip: 'New Hermes chat',

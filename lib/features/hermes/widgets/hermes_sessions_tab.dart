@@ -453,7 +453,16 @@ class _HermesHomeEntry extends StatelessWidget {
           ),
           subtitle: const Text('Bots, work, and what needs you'),
           trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => context.pushNamed(RouteNames.hermesHome),
+          onTap: () {
+            // Home's own side navigation: slide back to it instead of
+            // stacking a second Home.
+            if (GoRouter.maybeOf(context)?.state.uri.path ==
+                Routes.hermesHome) {
+              closeSidebarDrawerIfOverlay(context);
+              return;
+            }
+            context.pushNamed(RouteNames.hermesHome);
+          },
         ),
       ),
     );

@@ -12,6 +12,7 @@ import 'package:conduit/features/hermes/views/hermes_attention_page.dart';
 import 'package:conduit/features/hermes/views/hermes_bot_detail_page.dart';
 import 'package:conduit/features/hermes/views/hermes_home_page.dart';
 import 'package:conduit/features/hermes/views/hermes_live_run_page.dart';
+import 'package:conduit/features/navigation/widgets/responsive_drawer_layout.dart';
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,61 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('Home menu button slides Home aside to the side navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final layout = GlobalKey<ResponsiveDrawerLayoutState>();
+    final router = GoRouter(
+      initialLocation: Routes.hermesHome,
+      routes: [
+        GoRoute(
+          path: Routes.hermesHome,
+          // What the Home route builds on phones, with a stand-in sidebar.
+          builder: (context, state) => ResponsiveDrawerLayout(
+            key: layout,
+            mobileRailLabel: const Text('HOME'),
+            mobileRailSemanticLabel: 'Return to Home',
+            drawer: const Material(child: Center(child: Text('Sidebar'))),
+            child: const HermesHomePage(),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesApiServiceProvider.overrideWithValue(null),
+          hermesBotsProvider.overrideWith((ref) async => []),
+          hermesHomeProfileJobsProvider.overrideWith((ref) async => []),
+          hermesSessionsProvider.overrideWith(_EmptySessionsController.new),
+          hermesKanbanSummaryProvider.overrideWith((ref) async => null),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('hermes-home-navigation-toggle'));
+    expect(toggle, findsOneWidget);
+    expect(layout.currentState!.isOpen, isFalse);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(layout.currentState!.isOpen, isTrue);
+    expect(tester.getTopLeft(find.byType(HermesHomePage)).dx, 390);
+    expect(find.bySemanticsLabel('Return to Home'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('side-nav-return-rail')));
+    await tester.pumpAndSettle();
+    expect(layout.currentState!.isOpen, isFalse);
+    expect(tester.getTopLeft(find.byType(HermesHomePage)).dx, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Home Scheduled agents opens the full list when jobs exist', (
     tester,
   ) async {
