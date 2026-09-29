@@ -320,6 +320,9 @@ final class _TeamGateway {
         };
       case 'groups.send':
         final payload = params['payload'] as Map;
+        // Hermes' validate_user_payload: exactly text and thread_id.
+        expect(payload.keys.toSet(), {'text', 'thread_id'});
+        expect(payload['thread_id'], params['room_id']);
         final text = payload['text'] as String;
         sentTexts.add(text);
         _working = true;

@@ -92,12 +92,15 @@ extension _HermesDesktopTeams on HermesDesktopApiService {
     );
   }
 
+  /// Hermes accepts exactly `{text, thread_id}` for a user message and keeps
+  /// one discussion history per thread. The room is one conversation, so its
+  /// own id is the thread: every message continues the same discussion.
   Future<void> _sendToTeam(String roomId, String text) async {
     _requireTeamId(roomId);
     await _teams('groups.send', {
       'room_id': roomId,
       'event_id': newHermesTeamId('u'),
-      'payload': {'text': text},
+      'payload': {'text': text, 'thread_id': roomId},
     });
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1148,75 +1149,101 @@ class _Composer extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  for (final member in team.members)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 6),
-                      child: HermezMotionSurface(
-                        weight: HermezMotionWeight.light,
-                        semanticLabel: 'Mention ${member.label}',
-                        onTap: () => onMention(member),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: palette.canvas,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: palette.border),
-                          ),
-                          child: Text(
-                            '@${member.handle}',
-                            style: TextStyle(
-                              color: palette.ink,
-                              fontWeight: FontWeight.w600,
-                            ),
+    // Clear the gesture bar. Android can report no bottom inset while the
+    // bar is still drawn over the app, so keep at least a handle's height.
+    // While the keyboard is up it covers the bar, so only the gap remains.
+    final media = MediaQuery.of(context);
+    final systemBottom = media.viewInsets.bottom > 0
+        ? 0.0
+        : math.max(media.viewPadding.bottom, 14.0);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 4, 12, 12 + systemBottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final member in team.members)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: HermezMotionSurface(
+                      weight: HermezMotionWeight.light,
+                      semanticLabel: 'Mention ${member.label}',
+                      onTap: () => onMention(member),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: palette.canvas,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: palette.border),
+                        ),
+                        child: Text(
+                          '@${member.handle}',
+                          style: TextStyle(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 6),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: palette.border),
-              ),
+          ),
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: palette.border),
+            ),
+            child: ConstrainedBox(
+              // A roomy field: two lines at rest, growing to eight.
+              constraints: const BoxConstraints(minHeight: 88),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                      padding: const EdgeInsets.fromLTRB(18, 14, 8, 14),
                       child: TextField(
                         controller: controller,
                         focusNode: focus,
-                        minLines: 1,
-                        maxLines: 5,
+                        minLines: 2,
+                        maxLines: 8,
+                        keyboardType: TextInputType.multiline,
                         textInputAction: TextInputAction.newline,
-                        style: TextStyle(color: palette.ink, fontSize: 15),
-                        decoration: InputDecoration.collapsed(
+                        textCapitalization: TextCapitalization.sentences,
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontSize: 16,
+                          height: 1.35,
+                        ),
+                        // The pill is the field's outline; the app theme's
+                        // focused border must not draw a second one inside.
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
                           hintText: 'Message the team',
-                          hintStyle: TextStyle(color: palette.muted),
+                          hintStyle: TextStyle(
+                            color: palette.muted,
+                            fontSize: 16,
+                            height: 1.35,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(8),
                     child: ListenableBuilder(
                       listenable: controller,
                       builder: (context, _) {
@@ -1237,7 +1264,7 @@ class _Composer extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: SizedBox.square(
-                                dimension: 38,
+                                dimension: 44,
                                 child: Center(
                                   child: sending
                                       ? SizedBox.square(
@@ -1254,7 +1281,7 @@ class _Composer extends StatelessWidget {
                                           color: stop || hasText
                                               ? palette.onAccent
                                               : palette.muted,
-                                          size: 20,
+                                          size: 22,
                                         ),
                                 ),
                               ),
@@ -1267,8 +1294,8 @@ class _Composer extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
