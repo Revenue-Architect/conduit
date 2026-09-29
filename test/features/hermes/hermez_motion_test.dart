@@ -501,7 +501,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a sheet pushes the screen it grew from up, and lets it down', (
+  testWidgets('a sheet pushes the screen above it up, and pulls it down', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(400, 900);
@@ -519,6 +519,7 @@ void main() {
                 const SizedBox(height: 40),
                 const Text('Screen top'),
                 const Spacer(),
+                const Text('Above the card'),
                 HermezMotionSurface(
                   onOpen: (origin) => pushHermezSheet<void>(
                     context,
@@ -539,53 +540,64 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final rest = tester.getTopLeft(find.text('Screen top')).dy;
-    final lift = HermezCoveredTransition.liftFor(const Size(400, 900));
+    double top() => tester.getTopLeft(find.text('Screen top')).dy;
+    final rest = top();
+    final card = tester.getRect(find.byType(HermezMotionSurface));
 
     await tester.tap(find.text('Card'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 90));
-    final rising = tester.getTopLeft(find.text('Screen top')).dy;
-    expect(rising, lessThan(rest));
+    // Rising, never falling back, while the sheet grows.
+    var previous = rest;
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(top(), lessThanOrEqualTo(previous + 0.01));
+      previous = top();
+    }
     await tester.pumpAndSettle();
-    final lifted = tester.getTopLeft(find.text('Screen top')).dy;
-    // Pushed up by the lift, less the slight recede toward the centre.
-    final expected =
-        rest -
-        HermezCoveredTransition.liftRect(
-          Rect.fromLTWH(0, rest, 10, 10),
-          screen: const Size(400, 900),
-          value: 1,
-        ).top;
-    expect(rest - lifted, closeTo(expected, 0.5));
-    expect(rest - lifted, greaterThan(lift * 0.8));
-    expect(lifted, lessThan(rising));
+    // Pushed up by exactly as far as the sheet's top edge rose above the
+    // card: the content right above the card stays against the sheet.
+    final sheetTop = tester.getTopLeft(find.text('Sheet body')).dy;
+    expect(rest - top(), closeTo(card.top - sheetTop, 1));
+
+    // Dragging the sheet down pulls the screen down with it.
+    final pushed = top();
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Sheet body')),
+    );
+    await gesture.moveBy(const Offset(0, 60));
+    await gesture.moveBy(const Offset(0, 60));
+    await tester.pump();
+    expect(top() - pushed, closeTo(120, 20));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(top(), closeTo(pushed, 1));
 
     navigator.currentState!.pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 90));
-    final falling = tester.getTopLeft(find.text('Screen top')).dy;
-    expect(falling, greaterThan(lifted));
+    previous = top();
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(top(), greaterThanOrEqualTo(previous - 0.01));
+      previous = top();
+    }
     await tester.pumpAndSettle();
     // Back exactly where it was.
-    expect(tester.getTopLeft(find.text('Screen top')).dy, rest);
+    expect(top(), rest);
     expect(tester.takeException(), isNull);
   });
 
-  test('a lifted card rectangle rises and recedes about the screen', () {
-    const screen = Size(400, 900);
+  test('a card widens first, then its top edge rises to the sheet', () {
     const card = Rect.fromLTWH(100, 700, 200, 80);
-    expect(
-      HermezCoveredTransition.liftRect(card, screen: screen, value: 0),
-      card,
-    );
-    final lifted = HermezCoveredTransition.liftRect(
-      card,
-      screen: screen,
-      value: 1,
-    );
-    expect(lifted.top, lessThan(card.top));
-    expect(lifted.width, lessThan(card.width));
+    const sheet = Rect.fromLTWH(0, 40, 400, 860);
+    expect(hermezSheetAperture(card, sheet, 0), card);
+    final widened = hermezSheetAperture(card, sheet, 0.3);
+    expect(widened.left, 0);
+    expect(widened.right, 400);
+    expect(widened.top, card.top);
+    final rising = hermezSheetAperture(card, sheet, 0.7);
+    expect(rising.top, lessThan(card.top));
+    expect(rising.top, greaterThan(sheet.top));
+    expect(hermezSheetAperture(card, sheet, 1), sheet);
   });
 
   testWidgets('a sheet can be dragged down to close', (tester) async {

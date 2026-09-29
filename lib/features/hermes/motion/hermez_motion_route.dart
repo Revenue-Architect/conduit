@@ -313,25 +313,35 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
         : null;
   }
 
-  @override
-  void didChangePrevious(Route<dynamic>? previousRoute) {
-    super.didChangePrevious(previousRoute);
-    _liftsPrevious = previousRoute is HermezRouteTransitions;
-  }
-
-  /// The sheet on top of this screen, whose drag this screen follows.
+  /// The sheet on top of this screen, whose edge pushes this screen.
   HermezRouteTransitions<dynamic>? _nextSheet;
 
-  /// Whether the screen under this sheet is a Hermez screen that lifts.
-  bool _liftsPrevious = false;
+  /// This sheet's resting rectangle and the screen size, from its last
+  /// layout.
+  Rect? _sheetTarget;
+  Size _screen = Size.zero;
 
-  /// This sheet's height, from its last layout.
-  double _sheetExtent = 0;
-
-  /// How far this sheet has been dragged down, as a fraction of its height.
-  double get _dragRelease => _sheetExtent <= 0
-      ? 0
-      : (_dragOffset.value / _sheetExtent).clamp(0.0, 1.0);
+  /// How far this sheet pushes the screen it grew out of up, in pixels, at
+  /// progress [t]: exactly as far as its top edge has risen above the card
+  /// once it spans the screen, less any drag. The aperture is drawn from the
+  /// same geometry, so the edge and the screen above it stay in contact.
+  double _pushAt(double t) {
+    final target = _sheetTarget;
+    if (target == null) return 0;
+    final card = origin?.resolve();
+    // A sheet with no card to grow from gives the screen a gentle lift.
+    if (card == null) {
+      return HermezCoveredTransition.liftFor(_screen) *
+          t.clamp(0.0, 1.0) *
+          (1 - (_dragOffset.value / target.height).clamp(0.0, 1.0));
+    }
+    final top = hermezSheetAperture(
+      card,
+      target.shift(Offset(0, _dragOffset.value)),
+      t,
+    ).top;
+    return math.max(0, card.top - top);
+  }
 
   @override
   void dispose() {
@@ -391,9 +401,10 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
             ? HermezMotion.curveHeavy
             : HermezMotion.curveMedium,
       ),
-      // A sheet dragged down lets this screen settle back with it.
+      // The sheet's rising edge pushes this screen up, and its drag pulls
+      // it back down.
       follow: sheet?._dragOffset,
-      release: sheet == null ? null : () => sheet._dragRelease,
+      push: sheet?._pushAt,
       child: moving,
     );
   }
@@ -514,7 +525,7 @@ class HermezCoveredTransition extends StatelessWidget {
     required this.animation,
     required this.child,
     this.follow,
-    this.release,
+    this.push,
   });
 
   final HermezCoverKind kind;
@@ -525,27 +536,13 @@ class HermezCoveredTransition extends StatelessWidget {
   /// of the sheet on top of it.
   final Listenable? follow;
 
-  /// How much of the cover to give back, from 0 to 1, read on every frame.
-  final double Function()? release;
+  /// For [HermezCoverKind.lift]: how far up the sheet on top pushes this
+  /// screen at a given progress, in pixels.
+  final double Function(double value)? push;
 
-  /// How far a sheet lifts the screen it grew out of.
+  /// The gentle lift for a sheet that did not grow out of a card.
   static double liftFor(Size screen) =>
       (screen.height * 0.06).clamp(32.0, 64.0);
-
-  /// Where [rect], laid out on a covered screen of [screen] size, is drawn
-  /// when that screen is lifted by [value] (0 to 1). A sheet uses this to
-  /// start from, and return to, the card where it really is on screen.
-  static Rect liftRect(
-    Rect rect, {
-    required Size screen,
-    required double value,
-  }) {
-    final scale = 1 - (1 - HermezMotion.sourceBackgroundScale) * value;
-    final center = screen.center(Offset.zero);
-    final rise = Offset(0, -liftFor(screen) * value);
-    Offset map(Offset point) => center + (point + rise - center) * scale;
-    return Rect.fromPoints(map(rect.topLeft), map(rect.bottomRight));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -565,11 +562,15 @@ class HermezCoveredTransition extends StatelessWidget {
               : Listenable.merge([animation, follow]),
           child: child,
           builder: (context, child) {
-            final value = animation.value * (1 - (release?.call() ?? 0));
-            final scale =
-                kind == HermezCoverKind.recede || kind == HermezCoverKind.lift
+            final value = animation.value;
+            // A pushed screen moves as a solid object: it rises, it does
+            // not also shrink.
+            final scale = kind == HermezCoverKind.recede
                 ? 1 - (1 - HermezMotion.sourceBackgroundScale) * value
                 : 1.0;
+            final rise = kind != HermezCoverKind.lift
+                ? 0.0
+                : push?.call(value) ?? lift * value;
             return Transform.scale(
               scale: scale,
               child: FractionalTranslation(
@@ -580,10 +581,7 @@ class HermezCoveredTransition extends StatelessWidget {
                   0,
                 ),
                 child: Transform.translate(
-                  offset: Offset(
-                    0,
-                    kind == HermezCoverKind.lift ? -lift * value : 0,
-                  ),
+                  offset: Offset(0, -rise),
                   child: child,
                 ),
               ),
@@ -647,22 +645,19 @@ class _HermezSheetFrame<T> extends StatelessWidget {
             final t = route._slideOut ? 1.0 : progress.value;
             final settledT = t.clamp(0.0, 1.0);
             final drag = route._dragOffset.value;
-            if (sheet) route._sheetExtent = target.height;
+            if (sheet) {
+              route
+                .._sheetTarget = target
+                .._screen = size;
+            }
             final end = target.shift(Offset(0, drag));
             final measured = origin?.resolve();
-            // The screen underneath lifts with the sheet; start from and
-            // return to the card where it is actually drawn, so the object
-            // never leaves its card mid-motion.
-            final from = measured == null
-                ? fallback
-                : sheet && route._liftsPrevious
-                ? HermezCoveredTransition.liftRect(
-                    measured,
-                    screen: size,
-                    value: t.clamp(0.0, 1.0) * (1 - route._dragRelease),
-                  )
-                : measured;
-            final rect = Rect.lerp(from, end, t)!;
+            // A card grows into a sheet as one object: it first widens to
+            // the screen's width, then its top edge rises and pushes the
+            // screen above it up (see [HermezRouteTransitions._pushAt]).
+            final rect = sheet && measured != null
+                ? hermezSheetAperture(measured, end, t)
+                : Rect.lerp(measured ?? fallback, end, t)!;
             final originRadius = BorderRadius.circular(
               origin?.radius ?? (sheet ? _sheetRadius : 0),
             );
@@ -911,6 +906,27 @@ abstract final class HermezRouteExits {
     final until = _until;
     return until != null && DateTime.now().isBefore(until);
   }
+}
+
+/// The outline of a card growing into a sheet at progress [t] (0 to 1).
+///
+/// First the card widens to the sheet's width, staying where it is; then
+/// its top edge rises to the sheet's top. The bottom edge travels to the
+/// sheet's bottom throughout. [card] is where the card is laid out on the
+/// screen underneath, which the rising edge pushes up by exactly as much as
+/// the edge has risen, so the two stay in contact.
+Rect hermezSheetAperture(Rect card, Rect end, double t) {
+  const widen = 0.3;
+  final across = Curves.easeOut.transform((t / widen).clamp(0.0, 1.0));
+  final rise = Curves.easeInOut.transform(
+    ((t - widen) / (1 - widen)).clamp(0.0, 1.0),
+  );
+  return Rect.fromLTRB(
+    lerpDouble(card.left, end.left, across)!,
+    lerpDouble(card.top, end.top, rise)!,
+    lerpDouble(card.right, end.right, across)!,
+    lerpDouble(card.bottom, end.bottom, t)!,
+  );
 }
 
 final Expando<Map<(Curve, Curve?), CurvedAnimation>> _curvedCache = Expando();
