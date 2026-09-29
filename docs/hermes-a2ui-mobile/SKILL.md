@@ -1,6 +1,6 @@
 ---
 name: a2ui-mobile
-description: "Use when a compact native visual or interaction would improve a Conduit answer: status, metrics, comparisons, timelines, plans, checklists, files, decisions, workstreams, schedules, budgets, forms, and itineraries across any topic. Users need not say A2UI, GenUI, visual, or name components. Compose A2UI v0.9 when it adds value."
+description: "Use when a compact native visual or interaction would improve a Conduit answer: status, metrics, comparisons, timelines, plans, checklists, files, decisions, workstreams, schedules, budgets, forms, and itineraries across any topic. Users need not say A2UI, GenUI, visual, or name components."
 version: 0.9.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
@@ -15,7 +15,7 @@ metadata:
 
 If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
 
-Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Use it when interaction, scanning, comparison, or a native control materially improves on Markdown. Do not turn ordinary prose into a decorative card.
+Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Reach for A2UI when interaction, scanning, comparison, or a native control materially improves on Markdown. For plain explanations and short answers, Markdown stays the default; ordinary prose does not become a decorative card.
 
 ## Choose the presentation before writing
 
@@ -50,6 +50,33 @@ Avoid Markdown tables in Conduit chat whenever the same information fits native 
 
 One surface per answer is the default. Do not wrap every sentence in a Card or produce SYSTEM / STATUS / METRICS / CHART / BUTTON for every reply. Use hierarchy inside one surface: `Card → Column → title, summary, rows, expandable detail, action`.
 
+
+## When to use
+
+Load this skill when the user says things like:
+
+- "show me my schedule as a checklist"
+- "build a picker so I can choose"
+- "make this a status card"
+- "compare these two options"
+
+## Examples: when A2UI earns its keep
+
+**Example 1: comparing two quotes.**
+Ask: "Compare the Maurice Lacroix quote vs the Omega quote."
+Before: a long paragraph listing both prices, then "which do you prefer?" at the end.
+After: a comparison card with one `MetricTile` per quote (value + CAD unit + source), a short caption stating the basis, and one `Button` per option with its own semantic event (`quote.pick_ml`, `quote.pick_omega`). The tap opens a follow-up turn; it does not place an order.
+
+**Example 2: an actionable checklist.**
+Ask: "Put my Saturday errands in order and let me check them off."
+Before: a Markdown checklist Kamran cannot interact with.
+After: a `Column` of `CheckBox` items plus one confirm `Button` whose event carries the list ID. Checking boxes and tapping starts a normal next turn that answers with progress.
+
+**Example 3: live status with drill-down.**
+Ask: "Is my gateway healthy?"
+Before: a Markdown summary of service states plus "say 'details' for more".
+After: one `StatusBadge` per service with its own details `Button` (`service.hermes_details`), one short intro sentence, and no prose that repeats the card. Unknown states show `state: "unknown"` with "Not checked" detail.
+
 ## Choose the right output
 
 - Use Markdown for ordinary explanations and short answers.
@@ -71,7 +98,7 @@ Infer the user's task and select the smallest useful composition. These are star
 | Review a checklist or sequence | List or Column of short items; CheckBox only if the user must mark items; no fake completion state |
 | Compare items | Equal-weight Row for short MetricTiles, or stacked Cards/List for longer descriptions; state the basis and units |
 | Explore grouped details | Tabs when groups are distinct and each has useful content; otherwise a Column or specific details action |
-| See change over time | MiniChart for one series of 2–60 observed samples; MetricTile for one value; Chart.js for complex visualization |
+| See change over time | MiniChart for one series of 2-60 observed samples; MetricTile for one value; Chart.js for complex visualization |
 | Get a diagram, image, or report | Mermaid, `MEDIA:`, or a document artifact respectively; A2UI may complement but should not replace the actual artifact |
 
 Exact required/optional props for every component are in `references/component-guide.md` (raw catalog JSONs sit beside it).
@@ -80,17 +107,17 @@ Exact required/optional props for every component are in `references/component-g
 
 When A2UI is the main answer:
 
-1. Start with at most one short sentence. Let the native surface carry the details; do not repeat its contents in paragraphs before or after it.
+1. Start with at most one short sentence. Let the native surface carry the details; surrounding prose covers only what the card cannot.
 2. Put the user's requested answer first, then a few scannable facts or controls. Use a short title, concise labels, clear grouping, and actions only where they help.
-3. Put long supporting detail behind a specific “Details” action or in brief surrounding prose. Never hide a warning, failure, limitation, or uncertainty.
-4. Include when a live value was checked and what evidence supports it. Use `unknown` or “Not checked” when there is no evidence. Do not infer full service health from a single reachable endpoint.
-5. Do not fabricate history, trend points, units, timestamps, thresholds, or service state.
+3. Put long supporting detail behind a specific "Details" action or in brief surrounding prose. Put warnings, failures, limitations, and uncertainties where the user can see them, never buried behind a Details action.
+4. Include when a live value was checked and what evidence supports it. Use `unknown` or "Not checked" when there is no evidence. Report only what you actually checked; one reachable endpoint proves one endpoint, not the whole service.
+5. Show only measured, stated, or observed values. Mark unknowns as unknown; do not fabricate history, trend points, units, timestamps, thresholds, or service state.
 
 ## Protocol
 
 - Use A2UI v0.9 only.
 - Use catalog ID `https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json`.
-- Put A2UI messages only inside a fenced `a2ui` block. Send complete JSON messages, one object per line; never stream partial JSON.
+- Put A2UI messages only inside a fenced `a2ui` block. Send complete JSON messages, one object per line; send whole messages, never stream partial JSON.
 - A surface normally has one `createSurface` followed by `updateComponents`.
 - Give each response a unique `surfaceId`. Component IDs must be unique, with exactly one component whose ID is `root`.
 - Keep each surface self-contained. After an action, Hermes receives a normal turn; return an updated surface in the next answer rather than relying on older surfaces changing.
@@ -101,7 +128,7 @@ When A2UI is the main answer:
 
 Built-in components include `Card`, `Column`, `Row`, `Text`, `Icon`, `Divider`, `List`, `Tabs`, `Button`, `ChoicePicker`, `CheckBox`, `TextField`, `Slider`, and `DateTimeInput`.
 
-For `Tabs`, pinned Flutter GenUI 0.10.3 requires entries shaped as `{"label":"Overview","content":"overview-component-id"}`. Do not use the upstream v0.9 `title`/`child` spelling for new Conduit output. Conduit repairs that older spelling at read time for saved messages.
+For `Tabs`, pinned Flutter GenUI 0.10.3 requires entries shaped as `{"label":"Overview","content":"overview-component-id"}`. Use the upstream v0.9 `title`/`child` spelling only when repairing saved messages; author new Conduit output with `label`/`content`.
 
 Conduit also provides these data-only visual components:
 
@@ -118,7 +145,7 @@ Structure components (data-only; they replace most small tables and bullet lists
 - `BotBadge`: which agent owns a workstream. Required `label` and `identity` (`neutral`, `kai`, `local`, `autopilot`, `fast`, `strong`); optional `detail`. Use the identity of the bot that actually did the work.
 - `ExpandableSection`: long supporting detail kept one tap away. Required `title` and `child`; optional `subtitle`, `count`, `initiallyExpanded`. Opening it is local and sends nothing to Hermes. Never hide a warning, failure, or limitation inside it.
 
-Exact props for every component — including forms (`TextField`, `CheckBox`, `ChoicePicker`, `Slider`, `DateTimeInput`) and `Tabs`/`Modal` — are in `references/component-guide.md`; complete worked surfaces in `references/patterns.md`.
+Exact props for every component: including forms (`TextField`, `CheckBox`, `ChoicePicker`, `Slider`, `DateTimeInput`) and `Tabs`/`Modal`: are in `references/component-guide.md`; complete worked surfaces in `references/patterns.md`.
 
 Do not place remote image URLs in `Image`; that component is unavailable for agent-provided network assets. Return image files with `MEDIA:<absolute-path>` so Conduit can fetch them through authenticated Hermes file routes.
 
@@ -127,20 +154,21 @@ Do not place remote image URLs in `Image`; that component is unavailable for age
 - Design for about 300 logical pixels of content width inside the phone chat column. Keep all text and buttons within that width, including at larger text scale.
 - Prefer a `Column` for mixed content and actions. Use a `Row` only when side-by-side reading helps; use `List` for repeated items and `Tabs` for genuinely distinct groups.
 - Every direct `MetricTile`, `MiniChart`, `StatusBadge`, `InfoRow`, `StepRail`, `ActionCallout`, `ArtifactTile`, `BotBadge`, `ExpandableSection`, `Slider`, `TextField`, `ChoicePicker`, `DateTimeInput`, `Card`, `Column`, `Row`, `List`, or `Tabs` child in a `Row` must have a positive integer `weight`. The structure components are designed to be stacked in a Column; put them in a Row only rarely. This applies to overview dashboards as well as comparison cards. For two short comparable metrics, use `weight: 1` on both tiles. Conduit's read-time repair protects saved older messages, but author new output correctly.
-- Use a `Column` when a value or label is long, when a chart or control needs room, or when a weighted interactive row would be cramped or make reading order unclear. Do not force a side-by-side layout just to make a dashboard compact.
-- Never put a long sentence beside a button in a `Row`. If a short row is essential, give the wrapping `Text` child an integer `weight` of 1 and keep the button label short. Conduit repairs the known unweighted Text+Button row by stacking it, but generated output should already be correct.
-- Keep multiple actions vertically stacked, except a two- or three-way decision inside an ActionCallout, which may be a Row of Buttons with `weight: 1` each. Give each a semantic event name identifying intent and target, such as `item.inspect` with a small `context` containing the item ID. Do not reuse one ambiguous action for different targets.
+- Reach for a `Column` when a value or label is long, when a chart or control needs room, or when a weighted interactive row would be cramped or make reading order unclear. Compactness alone is not a reason for a `Row`.
+- Keep text-plus-button rows short. If a short row is essential, give the wrapping `Text` child an integer `weight` of 1 and keep the button label short. Conduit repairs the known unweighted Text+Button row by stacking it, but generated output should already be correct.
+- Keep multiple actions vertically stacked, except a two- or three-way decision inside an ActionCallout, which may be a Row of Buttons with `weight: 1` each. Give each a semantic event name identifying intent and target, such as `item.inspect` with a small `context` containing the item ID. Give every choice its own distinct, descriptive event name; one ambiguous action never serves two targets.
 - Keep titles and labels short. Avoid broad tables, paragraphs inside cards, nested card stacks, and long button labels.
 - Use the supported icons `check`, `warning`, `error`, and `help` with the state word. Color is never the only status signal.
 
 ## Interaction and truth defaults
 
 - There are two kinds of interaction. Conversational actions (Button, ChoicePicker or form submission) send `[A2UI_INTERACTION]` as a turn in the same Hermes conversation. Presentation-only actions (opening an ExpandableSection, switching Tabs) happen only on the phone and never reach Hermes, so never rely on them to trigger work.
-- A tap sends a follow-up turn in the same chat. It is not a direct launch or mutation. Read-only requests must remain read-only, including any checks Hermes performs. For a requested change, show the proposed values and obtain explicit confirmation before an external mutation; do not imply a button alone performed it.
-- One self-contained surface per reply is the default. Use a unique `surfaceId`, one `root`, and one closed `a2ui` fence; don't depend on old chat cards updating.
-- Give actions semantic names and the minimum context needed to identify the selected item. After an action, answer the new question and choose the appropriate next composition; do not force every follow-up into a status card.
+- After an interaction turn, answer in plain text unless a new surface genuinely helps; if you send one, it must be a complete, valid surface with a new `surfaceId` (run the checker). Never send a partial or "updated" fragment of an older surface.
+- A tap sends a follow-up turn in the same chat. It is not a direct launch or mutation. Read-only requests must remain read-only, including any checks Hermes performs. For a requested change, show the proposed values and obtain explicit confirmation before an external mutation; a button tap is a request for the next turn, not a completed change.
+- One self-contained surface per reply is the default. Use a unique `surfaceId`, one `root`, and one closed `a2ui` fence; return an updated surface in the next answer rather than relying on old chat cards updating.
+- Give actions semantic names and the minimum context needed to identify the selected item. After an action, answer the new question and choose the appropriate next composition; match the composition to the follow-up question instead of forcing it back into a status card.
 - For live state, show what was checked, when, and at what scope. For user-provided or illustrative data, say so; do not pretend it was freshly measured. Unknown stays unknown.
-- Around a surface, use at most one short introductory sentence unless essential context or caveats require more. Do not repeat the whole card in prose.
+- Around a surface, use at most one short introductory sentence unless essential context or caveats require more. Let the surface carry the details.
 
 ## Example: visual service overview
 
@@ -171,17 +199,18 @@ Use real ordered samples only. The example's values are illustrative and must no
 
 ## Actions
 
-Use a short, unique action name and only the context needed to understand the user's selection. A tap is a request for Hermes to answer in the same chat, not a promise to launch or alter a service. Do not produce several action payloads for one tap. After the action, respond normally and provide another complete surface only when it helps.
+Use a short, unique action name and only the context needed to understand the user's selection. A tap is a request for Hermes to answer in the same chat, not a promise to launch or alter a service. Send one action payload per tap. After the action, respond normally and provide another complete surface only when it helps.
 
 ## Before sending
 
+- The presentation was chosen first: `plain` answers are plain text, everything else is one compact surface.
+- At most one short sentence surrounds the surface, and it does not duplicate it.
+- No Markdown table where InfoRows, cards, or metrics would fit.
 - The fence is closed; every line is valid JSON; every message uses v0.9, the same surface ID, and the exact catalog ID.
 - The component graph has unique IDs, one `root`, and valid references.
-- The presentation was chosen first: `plain` answers are plain text, everything else is one compact surface.
-- The surface is the main presentation, at most one short sentence surrounds it, and that sentence does not duplicate it.
-- No Markdown table where InfoRows, cards, or metrics would fit.
+- The surface is the main presentation and surrounding prose does not duplicate it.
 - Live state has truthful evidence and freshness; unknown data is marked unknown.
 - Every row fits a phone. Prefer stacked service/action layouts.
 - Charts use two or more actual samples; absent and single-sample data do not become an invented trend.
 - No A2UI component contains a remote asset URL or executable code.
-- Ran `python3 /opt/data/scripts/a2ui_check.py --from-md <file>` (or on the JSONL payload) — prints OK for every payload with zero errors.
+- Ran `python3 /opt/data/scripts/a2ui_check.py --from-md <file>` (or on the JSONL payload): prints OK for every payload with zero errors.

@@ -373,3 +373,18 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
   - EVIDENCE / 2 opened in place and pushed the content below down, with no turn sent.
   - Hold sent exactly one turn ("Qa · Hold"), and Hermes received the interaction.
 - **Not done:** the updated skill is **not deployed** to the Hermes server (`/opt/data/…`); deploying it is the user's call. Until it is, Hermes doesn't know the new components, and prompt QA (spec §42) can't run.
+
+### Deployed to the Hermes server (same day)
+
+- **Why the first reply after Hold failed:** the fast profile had no `a2ui-mobile` skill; only the default profile did. The model replied with a bare `updateComponents` patch for the old surface, with no `createSurface`. Conduit correctly declines that ("could not be displayed safely").
+- **Server SKILL.md had drifted:** the Hermes skill curator had reworded it and cut the description to "Compose A2UI phone surfaces: checklists, pickers, cards."
+  - 0.9.0 was merged on top of the curated text, and the full description was restored.
+  - A new rule was added: after an interaction, reply in plain text or with a complete new surface (new `surfaceId`), never a fragment of an old one.
+  - The repo SKILL.md now equals the deployed file.
+- **Deployed** through the Umbrel MCP (file route plus rename/copy/trash; no SSH):
+  - `data/hermes/skills/software-development/a2ui-mobile/{SKILL.md, references/component-guide.md, references/patterns.md}` and `data/hermes/scripts/a2ui_check.py`.
+  - The originals are kept beside them as `*.bak-20260929`, with a local copy in `work/backups/hermes-server-20260929/`. Uploads were verified byte for byte.
+  - The skill was copied into `profiles/{fast,kai,strong,local}/skills/software-development/`. autopilot was left out on purpose.
+- **Restarted hermes-agent:** the skill index is cached in memory per profile (`.skills_prompt_snapshot.json`), so new skills only appear after a restart. The restart made one user message fail with a 502; it was retried and succeeded.
+- **Rollback:** rename the `.bak-20260929` files back, trash the profile copies, and restart.
+- **Prompt QA (§42) is still to do after the restart.** Before the restart, fast answered a rollout plan in Markdown because the skill was not in its index. That test also led fast to do extensive read-only recon (LAN/port probes) about an NVR that does not exist; the NVR in the test data was invented.
