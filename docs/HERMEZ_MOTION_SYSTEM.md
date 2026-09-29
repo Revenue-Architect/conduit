@@ -98,3 +98,17 @@ Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: sph
   - `runNeedsAttention` once per request.
   - Tools are silent; other sessions are left to notifications.
 - **Decisions and approvals.** A neutral tick when sent, then the backend's answer: accepted, rejected, or failed. Never success on tap.
+- **Sheets.** A drag past the dismiss point (28 % of the sheet) gives one selection detent, with hysteresis, plus a reverse detent if pulled back. A route that returns into its source card plays a soft close latch.
+- **Actions.** Run now, Steer and Stop give a tick when sent, then the result: a positive latch on success (Stop gives a soft close), a failure cue if the action threw. A failed refresh after a successful action does not sound like a failure.
+- **Bot presence** (`HermezBotPresence`, Bot Detail 88 px, Home cards 46 px, empty-chat greeting 64 px). State comes only from the bot session's existing `turnStatesFor` and `activityFor` broadcasts:
+  - idle: marks of 56 px and up float about 1.5 px
+  - running: a slow lift and breathing compression
+  - waiting: still, with one nudge every 3.2 s
+  - a new completion: an upward impulse; a new failure: a recoil
+
+  Only position and scale move. Reduced motion is still. Presence plays no sounds (the coordinator does). Loops are off under `flutter test` (`HermezBotPresence.loopsEnabled`).
+- **Touch light** (`HermezTouchLight`, via `HermezSurface.touchLight`; Home bot cards only). A translucent `Listener` (never in the gesture arena) and a `ValueNotifier` position drive the painter only.
+  - The light radius springs on `springLight` and retracts on release, cancel, or once movement passes the press slop (a scroll).
+  - White shells take a faint warm reflection and a border catch; dark shells a graphite sheen and an orange edge.
+  - It sits inside the pressable surface, so it compresses with it. Off with reduced motion.
+

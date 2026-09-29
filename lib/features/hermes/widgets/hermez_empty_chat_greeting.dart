@@ -4,6 +4,7 @@ import 'hermez_bot_mark.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_surfaces.dart';
 import 'hermez_technical_background.dart';
+import 'hermez_bot_presence.dart';
 
 /// Empty Hermes chat. Decorative once messages exist; this only fills the void.
 class HermezEmptyChatGreeting extends StatelessWidget {
@@ -77,7 +78,7 @@ class HermezEmptyChatGreeting extends StatelessWidget {
                                 .copyWith(fontSize: 36),
                           ),
                         ),
-                        HermezBotMark(
+                        HermezBotPresence(
                           identity: hermezIdentityForName(botName),
                           size: 64,
                           label: botName,

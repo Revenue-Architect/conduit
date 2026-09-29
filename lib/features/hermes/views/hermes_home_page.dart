@@ -24,6 +24,7 @@ import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_home_presence.dart';
 import 'hermes_teams_page.dart' show HermesTeamsSection;
+import '../widgets/hermez_bot_presence.dart';
 
 final hermesHomeProfileJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
@@ -643,6 +644,7 @@ class _BotCard extends ConsumerWidget {
       semanticLabel: bot.title,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
       feedbackCue: HermezFeedbackCue.objectOpen,
+      touchLight: true,
       onOpen: (origin) => context.pushNamed(
         RouteNames.hermesBotDetail,
         pathParameters: {'profile': bot.name},
@@ -657,10 +659,14 @@ class _BotCard extends ConsumerWidget {
               children: [
                 HermezMorph(
                   id: hermezMorphPart(morphId, 'mark'),
-                  child: HermezBotMark(
+                  child: HermezBotPresence(
                     identity: hermezIdentityForBot(bot),
                     size: 46,
                     label: bot.title,
+                    service: service is HermesDesktopApiService
+                        ? service
+                        : null,
+                    sessionId: bot.chatSessionId,
                   ),
                 ),
                 const SizedBox(width: 8),

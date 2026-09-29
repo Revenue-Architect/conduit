@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../feedback/hermez_feedback.dart';
 import '../motion/hermez_motion.dart';
 import 'hermez_chat_palette.dart';
+import 'hermez_touch_light.dart';
 
 enum HermezSurfaceKind { hero, utility, list, technical }
 
@@ -121,6 +122,7 @@ class HermezSurface extends StatelessWidget {
     this.weight = HermezMotionWeight.medium,
     this.semanticLabel,
     this.feedbackCue,
+    this.touchLight = false,
   });
 
   final Widget child;
@@ -128,6 +130,10 @@ class HermezSurface extends StatelessWidget {
 
   /// Sound + haptic on a confirmed tap; see [HermezMotionSurface.feedbackCue].
   final HermezFeedbackCue? feedbackCue;
+
+  /// Light that follows the finger ([HermezTouchLight]). Opt-in, for a few
+  /// focal surfaces only.
+  final bool touchLight;
   final HermezMotif motif;
   final VoidCallback? onTap;
   final ValueChanged<HermezMorphOrigin?>? onOpen;
@@ -213,6 +219,15 @@ class HermezSurface extends StatelessWidget {
       ],
     );
     if (onTap == null && onOpen == null) return surface;
+    // Inside the pressable surface, so the light compresses with it.
+    final lit = touchLight && kind != HermezSurfaceKind.list
+        ? HermezTouchLight(
+            borderRadius: radius,
+            dark: technical,
+            accent: palette.accent,
+            child: surface,
+          )
+        : surface;
     return HermezMotionSurface(
       onTap: onTap,
       onOpen: onOpen,
@@ -224,7 +239,7 @@ class HermezSurface extends StatelessWidget {
       originBorderColor: border is Border
           ? (border! as Border).top.color
           : null,
-      child: surface,
+      child: lit,
     );
   }
 }

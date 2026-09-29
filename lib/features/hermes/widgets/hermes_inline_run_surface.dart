@@ -19,6 +19,7 @@ import 'hermes_run_action_dialogs.dart';
 import 'hermes_run_actions.dart';
 import 'hermes_steel_live_view.dart';
 import 'hermez_chat_palette.dart';
+import '../feedback/hermez_feedback.dart';
 
 /// One session-owned run control surface in the transcript's live footer.
 /// Browser viewing is lazy and watch-only; Hermes owns the active run.
@@ -166,10 +167,17 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     }
     final sessionId = widget.sessionId;
     setState(() => _busy = true);
+    // Sensory cues are presentation only: sent, then Hermes' answer.
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
     try {
       final accepted =
           await (widget.steerRun?.call(sessionId, text) ??
               widget.service.steer(sessionId, text));
+      HermezFeedback.play(
+        accepted
+            ? HermezFeedbackCue.approvalAccepted
+            : HermezFeedbackCue.runFailed,
+      );
       if (!mounted || widget.sessionId != sessionId) return false;
       if (!accepted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +188,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       }
       return accepted;
     } catch (_) {
+      HermezFeedback.play(HermezFeedbackCue.runFailed);
       if (mounted && widget.sessionId == sessionId) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not steer this run.')),
@@ -201,10 +210,13 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       _busy = true;
       _stopping = true;
     });
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
     try {
       await (widget.interruptRun?.call(sessionId) ??
           widget.service.interrupt(sessionId));
+      HermezFeedback.play(HermezFeedbackCue.objectClose);
     } catch (_) {
+      HermezFeedback.play(HermezFeedbackCue.runFailed);
       if (mounted && widget.sessionId == sessionId) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not stop this run.')),

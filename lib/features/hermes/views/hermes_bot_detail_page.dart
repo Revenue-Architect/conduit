@@ -22,6 +22,7 @@ import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_bot_knowledge.dart';
+import '../widgets/hermez_bot_presence.dart';
 
 final class _BotData {
   const _BotData(this.sessions, this.skills, this.tools, this.jobs);
@@ -190,10 +191,17 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                     children: [
                       HermezMorph(
                         id: hermezMorphPart(morphId, 'mark'),
-                        child: HermezBotMark(
+                        child: HermezBotPresence(
                           identity: hermezIdentityForName(bot?.name ?? profile),
                           size: 88,
                           label: title,
+                          service: switch (ref.watch(
+                            hermesApiServiceProvider,
+                          )) {
+                            final HermesDesktopApiService s => s,
+                            _ => null,
+                          },
+                          sessionId: bot?.chatSessionId,
                         ),
                       ),
                       const SizedBox(width: 16),

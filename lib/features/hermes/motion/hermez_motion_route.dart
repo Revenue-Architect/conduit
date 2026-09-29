@@ -4,6 +4,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
+import '../feedback/hermez_feedback.dart';
 import 'hermez_morph_origin.dart';
 import 'hermez_motion_tokens.dart';
 
@@ -262,6 +263,16 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
   final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0);
   AnimationController? _dragSettle;
 
+  /// Whether the current drag is past the dismiss threshold (one detent each
+  /// way per crossing; reset when the drag ends).
+  bool _pastDismiss = false;
+
+  /// Where a sheet drag commits to closing (share of the sheet's height),
+  /// and the slightly lower point it must return above to un-commit, so
+  /// jitter around the line cannot fire repeated detents.
+  static const double _dismissFraction = 0.28;
+  static const double _detentHysteresis = 0.04;
+
   @override
   Duration get transitionDuration => effectiveMotion == HermezRouteMotion.none
       ? Duration.zero
@@ -285,7 +296,15 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     // object came from, so it slides away instead of contracting into a
     // card that is no longer there.
     if (HermezRouteExits.leavingElsewhere) _slideOut = true;
-    return super.didPop(result);
+    final popped = super.didPop(result);
+    // The object returns into the card it came from: a soft closing latch.
+    if (popped &&
+        !_slideOut &&
+        effectiveMotion == HermezRouteMotion.expand &&
+        origin != null) {
+      HermezFeedback.play(HermezFeedbackCue.objectClose);
+    }
+    return popped;
   }
 
   // A page that grows out of an object keeps the source screen painted
@@ -425,13 +444,23 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
 
   void _handleDragUpdate(DragUpdateDetails details, double extent) {
     _dragSettle?.stop();
-    _dragOffset.value = math.max(0, _dragOffset.value + details.delta.dy);
+    final offset = math.max(0.0, _dragOffset.value + details.delta.dy);
+    _dragOffset.value = offset;
+    // A tactile detent where letting go would close the sheet.
+    final past = _pastDismiss
+        ? offset > extent * (_dismissFraction - _detentHysteresis)
+        : offset > extent * _dismissFraction;
+    if (past != _pastDismiss) {
+      _pastDismiss = past;
+      HermezFeedback.play(HermezFeedbackCue.sheetDetent);
+    }
   }
 
   void _handleDragEnd(DragEndDetails details, double extent) {
+    _pastDismiss = false;
     final velocity = details.primaryVelocity ?? 0;
     final offset = _dragOffset.value;
-    if (velocity > 700 || offset > extent * 0.28) {
+    if (velocity > 700 || offset > extent * _dismissFraction) {
       if (isCurrent) navigator?.pop();
       return;
     }

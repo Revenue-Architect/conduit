@@ -294,3 +294,22 @@ Profile APK SHA-256 `6116d9a0a9e26f166a742354a73b512fc469b69228ac860dd2c81577078
   - The nav latch is sound only; the existing no-settle-haptic tests stay unchanged.
   - Bot presence must animate the PNG physically (lift, compression), because the eyes are no longer painted.
 - **Not done yet:** sheet dismiss detent, `objectClose` on returning from Detail, `HermezBotPresence`, `HermezTouchLight`, and the listening QA on the phone speaker (levels).
+
+## 2026-09-29: sensory runbook completed (detents, presence, touch light, action cues)
+
+Profile APK SHA-256 `cf6c01722423730c73ff235058c32a72ea87635e7db8ab853046bf9303894c49`, installed on the S25.
+
+- **Added:**
+  - the sheet dismiss detent
+  - the close latch on returning into a card
+  - Run now, Steer and Stop result cues
+  - `HermezBotPresence` (Detail, Home cards, greeting)
+  - `HermezTouchLight` (Home bot cards)
+
+  Details are in `HERMEZ_MOTION_SYSTEM.md`, "Sensory feedback".
+- **Device:** the touch light shows as a faint warm reflection on the kai card while held.
+  - The first version was invisible, because a white sheen on a white card cannot show; it is now warm-tinted.
+  - Presence was seen on Bot Detail. Running, waiting and completion motion were not exercised on device (no live run was started).
+- **Tests:** presence state mapping, float without opacity, small marks still, reduced motion, and a lit card still taps once and still scrolls. Wide suites: 2654 pass, plus the 8 known baseline failures.
+- **Open:** listening QA of cue levels on the phone speaker; exercising a real run on device for the engage, attention, complete and fail cues and presence.
+

@@ -13,6 +13,7 @@ import '../widgets/hermez_relative_time.dart';
 import '../widgets/hermez_sheet_parts.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
+import '../feedback/hermez_feedback.dart';
 
 /// Returns a real cron-run session when the user selects one. The caller opens
 /// it after the sheet closes, avoiding navigation beneath an active modal.
@@ -73,8 +74,13 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
       _busy = action;
       _error = null;
     });
+    // Sensory cues are presentation only: sent, then Hermes' answer.
+    HermezFeedback.play(HermezFeedbackCue.controlSelect);
+    var done = false;
     try {
       await run(service);
+      done = true;
+      HermezFeedback.play(HermezFeedbackCue.approvalAccepted);
       final jobs = await service.listJobsForProfile(widget.profile);
       final fresh = jobs
           .map(HermesJob.fromJson)
@@ -88,6 +94,7 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
         ref.invalidate(hermesJobsProvider);
       }
     } catch (_) {
+      if (!done) HermezFeedback.play(HermezFeedbackCue.runFailed);
       if (mounted) {
         setState(
           () => _error = 'Hermes could not complete that action. Retry.',
