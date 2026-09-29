@@ -191,6 +191,8 @@ class Routes {
   static const String hermesAttention = '/profile/hermes/attention';
   static const String hermesArtifacts = '/profile/hermes/artifacts';
   static const String hermesMcp = '/profile/hermes/mcp';
+  static const String hermesTeams = '/profile/hermes/teams';
+  static const String hermesTeamRoom = '/profile/hermes/teams/:roomId';
   static const String about = '/profile/about';
   static const String notes = '/notes';
   static const String noteEditor = '/notes/:id';
@@ -237,6 +239,8 @@ class RouteNames {
   static const String hermesAttention = 'hermes-attention';
   static const String hermesArtifacts = 'hermes-artifacts';
   static const String hermesMcp = 'hermes-mcp';
+  static const String hermesTeams = 'hermes-teams';
+  static const String hermesTeamRoom = 'hermes-team-room';
   static const String about = 'about';
   static const String notes = 'notes';
   static const String noteEditor = 'note-editor';

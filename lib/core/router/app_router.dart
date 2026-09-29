@@ -62,6 +62,8 @@ import '../../features/direct_connections/views/direct_connections_page.dart';
 import '../../features/direct_connections/views/direct_mcp_server_editor_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../models/server_config.dart';
+import '../../features/hermes/views/hermes_teams_page.dart';
+import '../../features/hermes/models/hermes_team.dart' show isValidHermesTeamId;
 
 /// App-local destinations that remain meaningful without an OpenWebUI account.
 /// Keep this list explicit so adding an OWUI-only profile route does not expose
@@ -89,6 +91,8 @@ bool _isAccountlessBackendLocation(String location) {
       location == Routes.hermesArtifacts ||
       location.startsWith('/profile/hermes/bots/') ||
       location.startsWith('/profile/hermes/live/') ||
+      location == Routes.hermesTeams ||
+      location.startsWith('/profile/hermes/teams/') ||
       location == Routes.about;
 }
 
@@ -771,6 +775,28 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 state.pathParameters['sessionId'],
               ) ??
               '',
+        ),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesTeams,
+      name: RouteNames.hermesTeams,
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const HermesTeamsPage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesTeamRoom,
+      name: RouteNames.hermesTeamRoom,
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: HermesTeamRoomPage(
+          roomId: isValidHermesTeamId(state.pathParameters['roomId'])
+              ? state.pathParameters['roomId']!
+              : '',
         ),
       ),
     ),

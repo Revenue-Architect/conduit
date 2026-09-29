@@ -18,6 +18,7 @@ import '../models/hermes_config.dart';
 import '../models/hermes_mcp.dart';
 import '../models/hermes_model.dart';
 import '../models/hermes_run_event.dart';
+import '../models/hermes_team.dart';
 import 'hermes_backend_service.dart';
 import 'hermes_http_transport.dart';
 import 'hermes_dashboard_rest_bridge.dart';
@@ -31,6 +32,7 @@ import 'hermes_live_activity.dart';
 part 'hermes_desktop_administration.dart';
 part 'hermes_desktop_auth_rest.dart';
 part 'hermes_desktop_bots.dart';
+part 'hermes_desktop_teams.dart';
 part 'hermes_desktop_event_projection.dart';
 part 'hermes_desktop_live_runtime.dart';
 part 'hermes_desktop_turn_runtime.dart';
@@ -613,6 +615,33 @@ final class HermesDesktopApiService
       _administration.listJobsForProfile(profile);
   Future<Map<String, dynamic>> learningGraph(String profile) =>
       _administration.learningGraph(profile);
+
+  // Teams: Hermes Group Chat rooms (`groups.*`).
+  Future<Map<String, dynamic>> teamCapabilities() => _teamCapabilities();
+  Future<List<HermesTeam>> listTeams() => _listTeams();
+  Future<HermesTeam> createTeam({
+    required String name,
+    required List<Map<String, Object?>> members,
+  }) => _createTeam(name: name, members: members);
+  Future<({HermesTeam team, HermesTeamStatus status})> teamState(
+    String roomId,
+  ) => _teamState(roomId);
+  Future<({List<HermesTeamEvent> events, int cursor, bool hasMore})> teamLog(
+    String roomId, {
+    int sinceSeq = 0,
+    int limit = 200,
+  }) => _teamLog(roomId, sinceSeq: sinceSeq, limit: limit);
+  Future<void> sendToTeam(String roomId, String text) =>
+      _sendToTeam(roomId, text);
+  Future<void> stopTeam(String roomId) => _stopTeam(roomId);
+  Future<void> answerTeamApproval(
+    String roomId,
+    HermesTeamApproval approval, {
+    required bool allow,
+  }) => _answerTeamApproval(roomId, approval, allow: allow);
+  Future<void> retryTeamTask(String roomId, String taskId) =>
+      _retryTeamTask(roomId, taskId);
+  Future<void> disbandTeam(String roomId) => _disbandTeam(roomId);
   Future<List<Map<String, dynamic>>> skillCatalog(String profile) =>
       _administration.skillCatalog(profile);
 

@@ -21,6 +21,7 @@ import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_home_presence.dart';
+import 'hermes_teams_page.dart' show HermesTeamsSection;
 
 final hermesHomeProfileJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
@@ -424,7 +425,10 @@ class HermesHomePage extends ConsumerWidget {
                       ],
                     ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 22),
+            // Bots working together: group conversations, after the one-to-one
+            // ones. The latest teams, or a way to start one.
+            const HermesTeamsSection(),
             // Asks once to let bots reach the user, beside Attention and
             // below everything else so it never pushes content down.
             const HermesNotifyPrompt(),
