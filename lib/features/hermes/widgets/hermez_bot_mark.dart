@@ -1,4 +1,6 @@
+import 'dart:collection';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -35,19 +37,109 @@ class HermezBotMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = HermezChatPalette.forBrightness(
-      Theme.of(context).brightness,
-    );
+    final brightness = Theme.of(context).brightness;
     return Semantics(
       label: label == null ? 'Bot' : 'Bot $label',
       child: SizedBox.square(
         dimension: size,
         child: CustomPaint(
-          painter: _BotMarkPainter(identity: identity, palette: palette),
+          painter: _CachedBotMarkPainter(
+            identity: identity,
+            brightness: brightness,
+            devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+          ),
         ),
       ),
     );
   }
+}
+
+/// Draws a bot mark from an image rendered once per identity, theme, and
+/// pixel size.
+///
+/// The mark is static art built from blurred glows and gradients. Drawn live,
+/// every blurred path is rendered offscreen and blurred again on every frame
+/// the mark is on screen, so a page of marks moving (a scroll, the side
+/// navigation sliding Home away) spent most of its frame on them and dropped
+/// frames. The cached image is drawn like any picture.
+class _CachedBotMarkPainter extends CustomPainter {
+  const _CachedBotMarkPainter({
+    required this.identity,
+    required this.brightness,
+    required this.devicePixelRatio,
+  });
+
+  final HermezBotIdentity identity;
+  final Brightness brightness;
+  final double devicePixelRatio;
+
+  /// Glows reach a little past the square; render with this margin so the
+  /// image holds everything the live painter drew.
+  static const double _margin = 0.25;
+  static const int _capacity = 32;
+  static final LinkedHashMap<(HermezBotIdentity, Brightness, int), ui.Image>
+  _cache = LinkedHashMap();
+
+  static ui.Image _imageFor(
+    HermezBotIdentity identity,
+    Brightness brightness,
+    double logicalSize,
+    double devicePixelRatio,
+  ) {
+    final pixels = math.max(1, (logicalSize * devicePixelRatio).round());
+    final key = (identity, brightness, pixels);
+    final cached = _cache.remove(key);
+    if (cached != null) {
+      _cache[key] = cached; // most recently used last
+      return cached;
+    }
+    final scale = pixels / logicalSize;
+    final pad = (pixels * _margin).ceil();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..translate(pad.toDouble(), pad.toDouble())
+      ..scale(scale);
+    _BotMarkPainter(
+      identity: identity,
+      palette: HermezChatPalette.forBrightness(brightness),
+    ).paint(canvas, Size.square(logicalSize));
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(pixels + pad * 2, pixels + pad * 2);
+    picture.dispose();
+    _cache[key] = image;
+    if (_cache.length > _capacity) {
+      final oldest = _cache.keys.first;
+      _cache.remove(oldest)!.dispose();
+    }
+    return image;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final image = _imageFor(identity, brightness, size.width, devicePixelRatio);
+    // The same integer geometry the image was rendered with.
+    final pixels = math.max(1, (size.width * devicePixelRatio).round());
+    final pad = (pixels * _margin).ceil();
+    final unit = size.width / pixels;
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(
+        -pad * unit,
+        -pad * unit,
+        image.width * unit,
+        image.height * unit,
+      ),
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CachedBotMarkPainter oldDelegate) =>
+      identity != oldDelegate.identity ||
+      brightness != oldDelegate.brightness ||
+      devicePixelRatio != oldDelegate.devicePixelRatio;
 }
 
 /// Draws the Hermez bot family from the reference renders: a white spherical

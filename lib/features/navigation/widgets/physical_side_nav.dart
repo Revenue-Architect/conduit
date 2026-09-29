@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 /// Mobile side navigation as a physical sheet: the app surface slides off to
@@ -119,6 +120,18 @@ double sideNavItemProgress(double progress, int index) {
   return ((p - delay) / (1 - delay)).clamp(0.0, 1.0);
 }
 
+/// Rounds a moving offset to whole device pixels.
+///
+/// Text drawn at a new sub-pixel position needs its glyphs rasterized again
+/// (Impeller keeps per-position glyphs in its atlas), so a surface sliding by
+/// fractional pixels re-uploads the glyph atlas on most frames. Offsets on the
+/// pixel grid keep every glyph at the sub-pixel phase it has at rest, so the
+/// atlas is reused; at phone densities the rounding is invisible.
+double snapToDevicePixels(double value, double devicePixelRatio) =>
+    devicePixelRatio <= 0
+    ? value
+    : (value * devicePixelRatio).roundToDouble() / devicePixelRatio;
+
 /// Publishes the side navigation's progress to [SideNavItem]s underneath.
 class SideNavProgressScope extends InheritedWidget {
   const SideNavProgressScope({
@@ -139,9 +152,15 @@ class SideNavProgressScope extends InheritedWidget {
 }
 
 /// A navigation block that settles into place with the side navigation:
-/// from 14 px to the left and transparent to in place and opaque, [index]
-/// steps behind the first. Outside a [SideNavProgressScope] (for example in
-/// the persistent tablet sidebar) it is just [child].
+/// from 14 px to the left into place, [index] steps behind the first.
+/// Outside a [SideNavProgressScope] (for example in the persistent tablet
+/// sidebar) it is just [child].
+///
+/// Motion only, no fade: an opacity between 0 and 1 renders the block
+/// offscreen every frame (Impeller keeps no raster cache), which is what made
+/// the middle of the motion drop frames when a block was the whole sidebar
+/// list. The block sits in its own [RepaintBoundary], so a frame only moves
+/// its recorded picture instead of repainting it.
 class SideNavItem extends StatelessWidget {
   const SideNavItem({super.key, required this.index, required this.child});
 
@@ -156,15 +175,18 @@ class SideNavItem extends StatelessWidget {
     if (progress == null) return child;
     return AnimatedBuilder(
       animation: progress,
-      child: child,
+      child: RepaintBoundary(child: child),
       builder: (context, child) {
         final local = sideNavItemProgress(progress.value, index);
-        return Opacity(
-          opacity: local,
-          child: Transform.translate(
-            offset: Offset(-shift * (1 - local), 0),
-            child: child,
+        return Transform.translate(
+          offset: Offset(
+            snapToDevicePixels(
+              -shift * (1 - local),
+              MediaQuery.devicePixelRatioOf(context),
+            ),
+            0,
           ),
+          child: child,
         );
       },
     );
@@ -193,6 +215,7 @@ class PhysicalSideNav extends StatelessWidget {
     this.onRailDragUpdate,
     this.onRailDragEnd,
     this.onRailDragCancel,
+    this.navigationOverlayStyle,
   });
 
   /// 0 closed, 1 open. The owner applies timing and easing.
@@ -215,15 +238,25 @@ class PhysicalSideNav extends StatelessWidget {
   final GestureDragEndCallback? onRailDragEnd;
   final GestureDragCancelCallback? onRailDragCancel;
 
+  /// System bar style while the navigation is shown, when it differs from the
+  /// app's (a navigation in the opposite theme). It is applied once the
+  /// navigation has settled open and held until it has settled closed, never
+  /// part-way: Flutter reads the style under the middle of the screen, which
+  /// the moving edge crosses at the halfway point, and switching the system
+  /// bars there made the middle of the motion drop frames.
+  final SystemUiOverlayStyle? navigationOverlayStyle;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = constraints.biggest;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        double snap(double value) => snapToDevicePixels(value, dpr);
         SideNavGeometry geometry() =>
             sideNavGeometryFor(viewport: viewport, progress: progress.value);
         final navigationWidth = geometry().navigationWidth;
-        return Stack(
+        final stack = Stack(
           clipBehavior: Clip.hardEdge,
           children: [
             if (stageColor != null)
@@ -242,7 +275,7 @@ class PhysicalSideNav extends StatelessWidget {
                   builder: (context, navigation) {
                     final g = geometry();
                     return Transform.translate(
-                      offset: Offset(g.navigationOffset, 0),
+                      offset: Offset(snap(g.navigationOffset), 0),
                       child: IgnorePointer(
                         ignoring: !g.navigationInteractive,
                         child: ExcludeSemantics(
@@ -262,22 +295,48 @@ class PhysicalSideNav extends StatelessWidget {
                 child: RepaintBoundary(child: child),
                 builder: (context, surface) {
                   final g = geometry();
-                  return Transform.translate(
-                    offset: Offset(g.chatOffset, 0),
-                    child: ClipRRect(
-                      clipper: _InsetRRect(g.verticalInset, g.cornerRadius),
-                      // No clip layer at rest.
-                      clipBehavior: g.progress > 0 ? Clip.antiAlias : Clip.none,
-                      // Taps reach the surface only when it is fully in
-                      // place; a drag already in progress keeps its pointer.
-                      child: IgnorePointer(
-                        ignoring: !g.chatInteractive,
-                        child: ExcludeSemantics(
-                          excluding: g.progress >= 1,
-                          child: surface,
-                        ),
-                      ),
+                  // Taps reach the surface only when it is fully in place; a
+                  // drag already in progress keeps its pointer.
+                  Widget sheet = IgnorePointer(
+                    ignoring: !g.chatInteractive,
+                    child: ExcludeSemantics(
+                      excluding: g.progress >= 1,
+                      child: surface,
                     ),
+                  );
+                  // The clip widgets are always in the tree, so the surface
+                  // keeps its element (and all its state) through the
+                  // motion; at rest they clip nothing.
+                  final moving = g.progress > 0;
+                  final stage = stageColor;
+                  sheet = stage == null
+                      ? ClipRRect(
+                          clipper: _InsetRRect(g.verticalInset, g.cornerRadius),
+                          clipBehavior: moving ? Clip.antiAlias : Clip.none,
+                          child: sheet,
+                        )
+                      // Over a solid stage the rounding is painted, not
+                      // clipped: a rectangular clip (a scissor) for the
+                      // inset, and the corners covered in the stage color.
+                      // An anti-aliased rounded clip of a full-screen surface
+                      // whose radius changes every frame is the expensive
+                      // way to draw the same pixels.
+                      : ClipRect(
+                          clipper: _InsetRect(g.verticalInset),
+                          clipBehavior: moving ? Clip.hardEdge : Clip.none,
+                          child: CustomPaint(
+                            foregroundPainter: _StageCorners(
+                              inset: g.verticalInset,
+                              radius: g.cornerRadius,
+                              color: stage,
+                            ),
+                            child: sheet,
+                          ),
+                        );
+                  // No clip at rest.
+                  return Transform.translate(
+                    offset: Offset(snap(g.chatOffset), 0),
+                    child: sheet,
                   );
                 },
               ),
@@ -299,7 +358,10 @@ class PhysicalSideNav extends StatelessWidget {
               builder: (context, rail) {
                 final g = geometry();
                 return Positioned.fromRect(
-                  rect: g.railRect,
+                  // Snapped with the surface, so the rail stays glued to it.
+                  rect: g.railRect.shift(
+                    Offset(snap(g.chatOffset) - g.chatOffset, 0),
+                  ),
                   child: IgnorePointer(
                     ignoring: !g.railInteractive,
                     child: ExcludeSemantics(
@@ -312,9 +374,88 @@ class PhysicalSideNav extends StatelessWidget {
             ),
           ],
         );
+        final style = navigationOverlayStyle;
+        return style == null
+            ? stack
+            : _RestingOverlayStyle(
+                progress: progress,
+                style: style,
+                child: stack,
+              );
       },
     );
   }
+}
+
+/// Holds [style] over the system bars from the moment [progress] completes
+/// until it is dismissed again; otherwise the content's own style applies.
+/// The region is always in the tree (zero-sized when inactive), so toggling
+/// it never rebuilds the content.
+class _RestingOverlayStyle extends StatefulWidget {
+  const _RestingOverlayStyle({
+    required this.progress,
+    required this.style,
+    required this.child,
+  });
+
+  final Animation<double> progress;
+  final SystemUiOverlayStyle style;
+  final Widget child;
+
+  @override
+  State<_RestingOverlayStyle> createState() => _RestingOverlayStyleState();
+}
+
+class _RestingOverlayStyleState extends State<_RestingOverlayStyle> {
+  late bool _shown = widget.progress.isCompleted;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.progress.addStatusListener(_onStatus);
+  }
+
+  @override
+  void didUpdateWidget(_RestingOverlayStyle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.progress, widget.progress)) {
+      oldWidget.progress.removeStatusListener(_onStatus);
+      widget.progress.addStatusListener(_onStatus);
+      _shown = widget.progress.isCompleted;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.progress.removeStatusListener(_onStatus);
+    super.dispose();
+  }
+
+  void _onStatus(AnimationStatus status) {
+    final shown = switch (status) {
+      AnimationStatus.completed => true,
+      AnimationStatus.dismissed => false,
+      _ => _shown,
+    };
+    if (shown != _shown) setState(() => _shown = shown);
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      widget.child,
+      IgnorePointer(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: widget.style,
+            child: _shown ? const SizedBox.expand() : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 class _InsetRRect extends CustomClipper<RRect> {
@@ -335,6 +476,69 @@ class _InsetRRect extends CustomClipper<RRect> {
   @override
   bool shouldReclip(_InsetRRect oldClipper) =>
       oldClipper.inset != inset || oldClipper.radius != radius;
+}
+
+class _InsetRect extends CustomClipper<Rect> {
+  const _InsetRect(this.inset);
+
+  final double inset;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, inset, size.width, math.max(inset, size.height - inset));
+
+  @override
+  bool shouldReclip(_InsetRect oldClipper) => oldClipper.inset != inset;
+}
+
+/// Covers the four corners of the inset surface with the stage color, so the
+/// surface reads as rounded by [radius] without a rounded clip.
+class _StageCorners extends CustomPainter {
+  const _StageCorners({
+    required this.inset,
+    required this.radius,
+    required this.color,
+  });
+
+  final double inset;
+  final double radius;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (radius <= 0) return;
+    final rect = Rect.fromLTRB(
+      0,
+      inset,
+      size.width,
+      math.max(inset, size.height - inset),
+    );
+    final r = math.min(radius, math.min(rect.width, rect.height) / 2);
+    final corners = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(rect)
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(r)));
+    // Only the corner slivers differ between the rect and the rounded rect;
+    // confine the fill to them so nothing else is touched.
+    for (final corner in [
+      Rect.fromLTWH(rect.left, rect.top, r, r),
+      Rect.fromLTWH(rect.right - r, rect.top, r, r),
+      Rect.fromLTWH(rect.left, rect.bottom - r, r, r),
+      Rect.fromLTWH(rect.right - r, rect.bottom - r, r, r),
+    ]) {
+      canvas
+        ..save()
+        ..clipRect(corner)
+        ..drawPath(corners, Paint()..color = color)
+        ..restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StageCorners oldDelegate) =>
+      oldDelegate.inset != inset ||
+      oldDelegate.radius != radius ||
+      oldDelegate.color != color;
 }
 
 class _ReturnRail extends StatelessWidget {

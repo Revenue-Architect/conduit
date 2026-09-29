@@ -96,6 +96,13 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
     final isTablet = usesPersistentTabletSidebar(context);
     final tabletWidth = ref.watch(sidebarTabletWidthProvider);
     final localizations = AppLocalizations.of(context)!;
+    // On phones the navigation under the sliding surface is drawn in the
+    // opposite theme: dark under a light app, light under a dark one.
+    final mobileNavigationTheme = isTablet
+        ? null
+        : Theme.of(context).brightness == Brightness.dark
+        ? ref.watch(appLightThemeProvider)
+        : ref.watch(appDarkThemeProvider);
     final scrim = Platform.isIOS
         ? context.colorTokens.scrimMedium
         : context.colorTokens.scrimStrong;
@@ -134,6 +141,7 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
       // brings it back.
       mobileRailLabel: widget.mobileRailLabel,
       mobileRailSemanticLabel: widget.mobileRailSemanticLabel,
+      mobileNavigationTheme: mobileNavigationTheme,
       drawer: const SidebarPage(),
       layoutBuilder: (layout) => MacDesktopShortcuts(child: layout),
       child: widget.child,

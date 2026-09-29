@@ -6,8 +6,10 @@ import 'package:flutter/rendering.dart' show RenderBox, RenderEditable;
 import 'package:flutter/services.dart';
 
 import '../../../core/services/performance_profiler.dart';
+import '../../../core/utils/system_ui_style.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/horizontal_gesture_ownership.dart';
+import '../../../shared/widgets/legacy_design_compatibility.dart';
 import '../../../shared/widgets/drawer_slot.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/sidebar_layout_constants.dart';
@@ -48,6 +50,12 @@ class ResponsiveDrawerLayout extends StatefulWidget {
   final Widget mobileRailLabel;
   final String mobileRailSemanticLabel;
 
+  /// The theme the mobile navigation is drawn in, when it differs from the
+  /// app's (the chat shell inverts it). The stage behind the departing
+  /// surface takes this theme's background, and the system bars follow its
+  /// brightness while the navigation rests open.
+  final ThemeData? mobileNavigationTheme;
+
   // Tablet-specific configuration
   final double tabletDrawerWidth; // Fixed width for tablet drawer
   final double tabletDrawerMinWidth;
@@ -76,6 +84,7 @@ class ResponsiveDrawerLayout extends StatefulWidget {
     this.mobileBottomDragGestureExclusion = 0.0,
     this.mobileRailLabel = const Text('BACK'),
     this.mobileRailSemanticLabel = 'Return',
+    this.mobileNavigationTheme,
     this.tabletDrawerWidth = defaultSidebarTabletWidth,
     this.tabletDrawerMinWidth = minimumSidebarTabletWidth,
     this.tabletDrawerMaxWidth = maximumSidebarTabletWidth,
@@ -807,12 +816,21 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   }
 
   Widget _buildMobileLayout(ConduitThemeExtension theme) {
-    final navigation = _scopeDrawer(
+    final navigationTheme = widget.mobileNavigationTheme;
+    final panelTheme =
+        navigationTheme?.extension<ConduitThemeExtension>() ?? theme;
+    Widget navigation = _scopeDrawer(
       widget.drawer is DrawerSlot
-          ? _buildMobileDrawerSlotPanel(theme, widget.drawer as DrawerSlot)
-          : _buildMobileDrawerPanel(theme),
+          ? _buildMobileDrawerSlotPanel(panelTheme, widget.drawer as DrawerSlot)
+          : _buildMobileDrawerPanel(panelTheme),
       composeNativeChrome: _composeMobileDrawerChrome,
     );
+    if (navigationTheme != null) {
+      navigation = Theme(
+        data: navigationTheme,
+        child: LegacyDesignCompatibility(child: navigation),
+      );
+    }
     return Stack(
       children: [
         // The content is a physical sheet: it slides away to the right and
@@ -822,7 +840,10 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
           child: PhysicalSideNav(
             progress: _controller,
             navigation: navigation,
-            stageColor: theme.surfaceBackground,
+            stageColor: panelTheme.surfaceBackground,
+            navigationOverlayStyle: navigationTheme == null
+                ? null
+                : systemUiOverlayStyleForBrightness(navigationTheme.brightness),
             railColor: theme.buttonPrimary,
             railForegroundColor: theme.buttonPrimaryText,
             railLabel: widget.mobileRailLabel,

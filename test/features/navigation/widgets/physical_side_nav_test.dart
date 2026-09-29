@@ -1,6 +1,7 @@
 import 'package:conduit/features/navigation/widgets/physical_side_nav.dart';
 import 'package:conduit/features/navigation/widgets/responsive_drawer_layout.dart';
 import 'package:conduit/shared/widgets/sidebar_layout_contract.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -188,6 +189,15 @@ void main() {
       );
     });
 
+    test('moving offsets land on whole device pixels', () {
+      for (final value in [0.0, 12.34, 195.13, -62.28, 389.99]) {
+        final snapped = snapToDevicePixels(value, 3.75);
+        expect(snapped * 3.75, closeTo((snapped * 3.75).roundToDouble(), 1e-9));
+        expect((snapped - value).abs(), lessThanOrEqualTo(0.5 / 3.75 + 1e-9));
+      }
+      expect(snapToDevicePixels(195, 1), 195);
+    });
+
     test('labels stagger by 30 ms and finish together, both ways', () {
       expect(sideNavItemProgress(0, 0), 0);
       expect(sideNavItemProgress(1, 5), 1);
@@ -219,11 +229,12 @@ void main() {
       isTrue,
     );
     expect(_layoutKey.currentState!.isOpen, isFalse);
-    final clip = tester.widget<ClipRRect>(
+    // No clip at rest.
+    final clip = tester.widget<ClipRect>(
       find
           .ancestor(
             of: find.byKey(const ValueKey('chat-surface')),
-            matching: find.byType(ClipRRect),
+            matching: find.byType(ClipRect),
           )
           .first,
     );
@@ -243,6 +254,17 @@ void main() {
     expect(_rail(tester).top, 14);
     expect(_ignoring(tester, find.text('Chats')), isFalse);
     expect(find.bySemanticsLabel('Return to chat'), findsOneWidget);
+    // Over the solid stage the surface is inset by a rectangular clip and
+    // rounded by painted corners, never an anti-aliased rounded clip.
+    final surface = find.byKey(const ValueKey('chat-surface'));
+    expect(
+      find.ancestor(of: surface, matching: find.byType(ClipRRect)),
+      findsNothing,
+    );
+    final clip = tester.getRect(
+      find.ancestor(of: surface, matching: find.byType(ClipRect)).first,
+    );
+    expect(clip.left, 390);
   });
 
   testWidgets('the motion runs 520 ms on one curve, halfway geometry', (
@@ -374,22 +396,93 @@ void main() {
     expect(_chatX(tester), 0);
   });
 
-  testWidgets('navigation labels settle in with the motion', (tester) async {
+  testWidgets('navigation labels slide in with the motion, no fade', (
+    tester,
+  ) async {
     await _pumpShell(tester);
-    double opacityOf(String text) => tester
-        .widget<Opacity>(
+    double lagOf(String text) => tester
+        .widget<Transform>(
           find
-              .ancestor(of: find.text(text), matching: find.byType(Opacity))
+              .ancestor(of: find.text(text), matching: find.byType(Transform))
               .first,
         )
-        .opacity;
-    expect(opacityOf('Conduit'), 0);
+        .transform
+        .getTranslation()
+        .x;
+    expect(lagOf('Conduit'), -SideNavItem.shift);
     _layoutKey.currentState!.open();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(opacityOf('Conduit'), greaterThan(opacityOf('Chats')));
+    // The first item is never behind the second, and ahead of it on some
+    // frames: the stagger (offsets are whole pixels, so some frames tie).
+    var led = false;
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 8));
+      expect(lagOf('Conduit'), greaterThanOrEqualTo(lagOf('Chats')));
+      led = led || lagOf('Conduit') > lagOf('Chats');
+    }
+    expect(led, isTrue);
+    // Motion only: nothing in the navigation fades.
+    expect(
+      find.ancestor(of: find.text('Chats'), matching: find.byType(Opacity)),
+      findsNothing,
+    );
     await tester.pumpAndSettle();
-    expect(opacityOf('Conduit'), 1);
-    expect(opacityOf('Chats'), 1);
+    expect(lagOf('Conduit'), 0);
+    expect(lagOf('Chats'), 0);
+  });
+
+  testWidgets('the navigation can be drawn in the opposite theme', (
+    tester,
+  ) async {
+    tester.view.physicalSize = _phone;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final key = GlobalKey<ResponsiveDrawerLayoutState>();
+    Brightness? navigationBrightness;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(brightness: Brightness.light),
+        home: ResponsiveDrawerLayout(
+          key: key,
+          mobileNavigationTheme: ThemeData(brightness: Brightness.dark),
+          drawer: Builder(
+            builder: (context) {
+              navigationBrightness = Theme.of(context).brightness;
+              return const SizedBox.expand();
+            },
+          ),
+          child: const _ChatProbe(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(navigationBrightness, Brightness.dark);
+    expect(
+      Theme.of(tester.element(find.byType(_ChatProbe))).brightness,
+      Brightness.light,
+    );
+    // The system bars follow the navigation's brightness only while it
+    // rests open (and until it has closed), never part-way through.
+    final region = find.byWidgetPredicate(
+      (widget) =>
+          widget is AnnotatedRegion<SystemUiOverlayStyle> &&
+          widget.value.statusBarIconBrightness == Brightness.light,
+    );
+    expect(region, findsOneWidget);
+    Size regionSize() => tester.getSize(region);
+    expect(regionSize(), Size.zero);
+    key.currentState!.open();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(regionSize(), Size.zero);
+    await tester.pumpAndSettle();
+    expect(regionSize(), _phone);
+    key.currentState!.close();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(regionSize(), _phone);
+    await tester.pumpAndSettle();
+    expect(regionSize(), Size.zero);
   });
 }
