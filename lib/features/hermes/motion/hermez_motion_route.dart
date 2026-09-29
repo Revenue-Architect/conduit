@@ -694,9 +694,17 @@ class _HermezSheetFrame<T> extends StatelessWidget {
             rect: Rect.fromLTWH(rect.left, rect.top, rect.width, faceHeight),
             child: RawImage(image: face, fit: BoxFit.fill),
           ),
-        Transform.translate(
-          offset: Offset(0, -(1 - cover) * rect.height),
-          child: destination,
+        // The destination slides down and out through the aperture's bottom
+        // as one piece, uncovering the source's face from the top, where the
+        // face sits. Its top edge travels with it, so no more of the (much
+        // taller) page scrolls into view while it leaves.
+        ClipRect(
+          clipper: _LeavingEdge(rect, cover),
+          clipBehavior: cover >= 1 ? Clip.none : Clip.hardEdge,
+          child: Transform.translate(
+            offset: Offset(0, (1 - cover) * rect.height),
+            child: destination,
+          ),
         ),
       ],
     );
@@ -719,6 +727,26 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     final height = math.min(bottom - top, size.height * factor);
     return Rect.fromLTRB(0, bottom - math.max(height, 0), size.width, bottom);
   }
+}
+
+/// The part of the aperture the leaving destination still covers: the
+/// bottom [cover] of it, below an edge that moves down as it leaves.
+class _LeavingEdge extends CustomClipper<Rect> {
+  const _LeavingEdge(this.aperture, this.cover);
+  final Rect aperture;
+  final double cover;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(
+    aperture.left,
+    aperture.top + aperture.height * (1 - cover),
+    aperture.right,
+    aperture.bottom,
+  );
+
+  @override
+  bool shouldReclip(_LeavingEdge oldClipper) =>
+      oldClipper.aperture != aperture || oldClipper.cover != cover;
 }
 
 class _ApertureClipper extends CustomClipper<RRect> {

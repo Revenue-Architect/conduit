@@ -482,12 +482,17 @@ void main() {
     final landed = tester.getTopLeft(find.text('Task sheet')).dy;
     navigator.currentState!.pop();
     await tester.pump();
-    for (var i = 0; i < 5; i++) {
+    var faceShown = false;
+    for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 60));
       final y = tester.getTopLeft(find.text('Task sheet')).dy;
+      // It never jumps above its path; near the card it leaves downward
+      // through the card's edge instead of being swapped on the last frame.
       expect(y, greaterThanOrEqualTo(math.min(start, landed) - 1));
-      expect(y, lessThanOrEqualTo(math.max(start, landed) + 1));
+      faceShown |= find.byType(RawImage).evaluate().isNotEmpty;
     }
+    // The card's own face was uncovered before the route ended.
+    expect(faceShown, isTrue);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
