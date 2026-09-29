@@ -16,6 +16,10 @@ import '../widgets/hermez_sheet_parts.dart';
 import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 import '../sheets/hermez_modal_sheet.dart';
+import '../widgets/hermez_expandable_section.dart';
+import '../feedback/hermez_feedback.dart';
+import '../widgets/hermez_surfaces.dart';
+import '../widgets/hermez_relative_time.dart';
 
 const _artifactRoot = '/opt/data/artifacts';
 
@@ -386,6 +390,14 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
                                                   'image',
                                                 ),
                                         ),
+                                        if (provenance != null) ...[
+                                          const SizedBox(height: 14),
+                                          _ArtifactContext(
+                                            file: file,
+                                            provenance: provenance,
+                                            related: related,
+                                          ),
+                                        ],
                                         const SizedBox(height: 14),
                                         HermezActionTile(
                                           icon: Icons.forum_outlined,
@@ -550,6 +562,75 @@ class _ArtifactKindTile extends StatelessWidget {
         border: Border.all(color: palette.border.withValues(alpha: 0.7)),
       ),
       child: Icon(icon, color: color, size: 30),
+    );
+  }
+}
+
+/// File context, opened in place: only what this app already knows about the
+/// file (its recorded source conversation, type, path, and when it was first
+/// seen). No request is made for it. Shown only when provenance exists.
+class _ArtifactContext extends StatefulWidget {
+  const _ArtifactContext({
+    required this.file,
+    required this.provenance,
+    required this.related,
+  });
+
+  final HermesRemoteFile file;
+  final HermesArtifactProvenance provenance;
+  final HermesSessionSummary? related;
+
+  @override
+  State<_ArtifactContext> createState() => _ArtifactContextState();
+}
+
+class _ArtifactContextState extends State<_ArtifactContext> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final related = widget.related;
+    final name = widget.file.name;
+    final type = name.contains('.') ? name.split('.').last.toUpperCase() : null;
+    final rows = <(String, String)>[
+      if (related?.profile != null && related!.profile!.isNotEmpty)
+        ('SOURCE', related.profile!),
+      if (related != null) ('CONVERSATION', related.title),
+      if (type != null) ('TYPE', type),
+      ('FIRST SEEN', hermezRelativeLabel(widget.provenance.observedAt)),
+      ('PATH', widget.file.path),
+    ];
+    return HermezExpandableSection(
+      expanded: _expanded,
+      onExpansionChanged: (expanded) => setState(() => _expanded = expanded),
+      semanticLabel: 'File context',
+      openFeedback: HermezFeedbackCue.compartmentOpen,
+      closeFeedback: HermezFeedbackCue.compartmentClose,
+      header: Text('FILE CONTEXT', style: HermezType.technical(palette.muted)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (label, value) in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: HermezType.technical(palette.muted)),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: HermezType.meta(palette)
+                        .copyWith(color: palette.ink),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

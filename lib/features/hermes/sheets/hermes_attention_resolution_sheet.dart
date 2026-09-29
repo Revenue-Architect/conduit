@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_pending_decision_store.dart';
@@ -119,7 +120,23 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
       HermesPendingDesktopDecisionKind.mcpSetup =>
         'Hermes wants to connect a tool server.',
     };
-    final prompt = decision.prompt ?? 'Hermes is waiting for your input.';
+    // Context: which bot asked, in which conversation, and what exactly.
+    final profile = decision.profile;
+    final botName = profile == null || profile.isEmpty ? 'Hermes' : profile;
+    String? conversation;
+    for (final session
+        in ref.watch(hermesSessionsProvider).asData?.value ??
+            const <HermesSessionSummary>[]) {
+      if (session.id == decision.storedSessionId) {
+        conversation = session.title;
+        break;
+      }
+    }
+    final asked = decision.prompt?.trim();
+    final prompt = asked == null || asked.isEmpty
+        ? 'Hermes did not send the question text with this request. Open '
+              'the conversation to see what it asked, then answer here.'
+        : asked;
     final remaining = decision.expiresAt.difference(DateTime.now().toUtc());
     return HermezModalSheet(
       title: title,
@@ -136,18 +153,22 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
           Row(
             children: [
               HermezBotMark(
-                identity: HermezBotIdentity.neutral,
+                identity: hermezIdentityForName(profile),
                 size: 48,
-                label: 'Hermes',
+                label: botName,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hermes', style: HermezType.section(palette)),
+                    Text(botName, style: HermezType.section(palette)),
                     Text(
-                      'Waiting for your response',
+                      conversation == null || conversation.trim().isEmpty
+                          ? 'Waiting for your response'
+                          : 'In “${conversation.trim()}”',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: HermezType.meta(palette),
                     ),
                   ],
@@ -173,13 +194,25 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
             ],
           ),
           const SizedBox(height: 14),
+          Text(switch (kind) {
+            HermesPendingDesktopDecisionKind.approval => 'COMMAND',
+            HermesPendingDesktopDecisionKind.clarification => 'QUESTION',
+            HermesPendingDesktopDecisionKind.mcpSetup => 'REASON',
+            _ => 'REQUEST',
+          }, style: HermezType.technical(palette.muted)),
+          const SizedBox(height: 6),
           if (kind == HermesPendingDesktopDecisionKind.approval)
             _CommandBlock(text: prompt)
           else
             HermezSurface(
               kind: HermezSurfaceKind.utility,
               border: Border.all(color: palette.border.withValues(alpha: 0.75)),
-              child: Text(prompt, style: HermezType.body(palette)),
+              child: Text(
+                prompt,
+                style: asked == null || asked.isEmpty
+                    ? HermezType.meta(palette)
+                    : HermezType.body(palette),
+              ),
             ),
           if (kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
             const SizedBox(height: 12),

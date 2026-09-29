@@ -135,6 +135,20 @@ final class HermesDesktopRpcClient {
   final Map<String, _PendingRpc> _pending = {};
   Map<String, dynamic> _defaultParams = const {};
 
+  /// Server-to-client requests this app answers (Hermes asks, the renderer
+  /// replies with a response frame carrying the same id), by id -> method.
+  /// Tied to the socket that received them.
+  final Map<String, String> _serverRequests = {};
+
+  /// Questions Hermes asks the user as JSON-RPC server requests. They reach
+  /// the decision UI as `<method>.request` events with `request_id` set to
+  /// the frame id, and are answered with [answerServerRequest].
+  static const Set<String> answerableServerRequests = {
+    'clarify',
+    'sudo',
+    'secret',
+  };
+
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
   int _socketGeneration = 0;
@@ -312,6 +326,21 @@ final class HermesDesktopRpcClient {
         final payload = rawPayload is Map
             ? Map<String, dynamic>.from(rawPayload)
             : <String, dynamic>{};
+        // A server request that timed out or was cancelled: tear the card
+        // down through the kind's existing expire path.
+        if (type == 'request.cancel') {
+          final id = payload['id']?.toString();
+          final method = id == null ? null : _serverRequests.remove(id);
+          if (method != null) {
+            _events.add(
+              HermesDesktopEvent(
+                type: '$method.expire',
+                payload: {...payload, 'request_id': id},
+                sessionId: params['session_id']?.toString(),
+              ),
+            );
+          }
+        }
         if (type == 'gateway.ready') {
           _ready = true;
           if (!ready.isCompleted) ready.complete();
@@ -320,6 +349,25 @@ final class HermesDesktopRpcClient {
           HermesDesktopEvent(
             type: type,
             payload: payload,
+            sessionId: params['session_id']?.toString(),
+          ),
+        );
+        return;
+      }
+
+      final method = frame['method'];
+      final requestParams = frame['params'];
+      if (method is String &&
+          frame['id'] is String &&
+          answerableServerRequests.contains(method) &&
+          requestParams is Map) {
+        final id = frame['id'] as String;
+        final params = Map<String, dynamic>.from(requestParams);
+        _serverRequests[id] = method;
+        _events.add(
+          HermesDesktopEvent(
+            type: '$method.request',
+            payload: {...params, 'request_id': id},
             sessionId: params['session_id']?.toString(),
           ),
         );
@@ -355,6 +403,7 @@ final class HermesDesktopRpcClient {
     if (!_owns(channel, generation)) return;
     _ready = false;
     _channel = null;
+    _serverRequests.clear();
     _rejectPending('Hermes gateway disconnected.');
     _disconnects.add(null);
   }
@@ -369,9 +418,22 @@ final class HermesDesktopRpcClient {
     _pending.clear();
   }
 
+  /// Answers an open server request (see [answerableServerRequests]) with
+  /// its JSON-RPC response frame. False when no such request is open on this
+  /// socket (already answered, cancelled, or from an earlier connection).
+  bool answerServerRequest(String id, Map<String, dynamic> result) {
+    final channel = _channel;
+    if (channel == null || _serverRequests.remove(id) == null) return false;
+    channel.sink.add(
+      jsonEncode({'jsonrpc': '2.0', 'id': id, 'result': result}),
+    );
+    return true;
+  }
+
   Future<void> disconnect() async {
     _socketGeneration++;
     _ready = false;
+    _serverRequests.clear();
     final subscription = _subscription;
     final channel = _channel;
     _subscription = null;

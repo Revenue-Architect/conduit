@@ -370,14 +370,15 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       sensitiveValues: config.sensitiveValues,
     );
     if (clarifyId != null) {
+      _noteClarifyQuestions(clarifyId, clarify);
       await HermesPendingDecisionStore.upsert(
         origin: _origin,
         storedSessionId: binding.storedId,
         runtimeId: binding.runtimeId,
         requestId: clarifyId,
         kind: HermesPendingDesktopDecisionKind.clarification,
-        prompt: clarify['question']?.toString(),
-        choices: _desktopDecisionChoices(clarify['choices']),
+        prompt: hermesClarifyPrompt(clarify),
+        choices: _desktopDecisionChoices(hermesClarifyChoices(clarify)),
         multiSelect: clarify['multi_select'] == true,
         sensitiveValues: config.sensitiveValues,
         profile: _sessionProfiles[binding.storedId],

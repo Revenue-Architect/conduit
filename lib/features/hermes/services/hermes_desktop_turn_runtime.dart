@@ -156,8 +156,11 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
               'mcp.setup.request' => HermesDecisionKind.mcpSetup,
               _ => HermesDecisionKind.clarification,
             };
+            if (event.type == 'clarify.request') {
+              _noteClarifyQuestions(requestId, payload);
+            }
             final prompt = switch (event.type) {
-              'clarify.request' => value('question'),
+              'clarify.request' => hermesClarifyPrompt(payload),
               'secret.request' =>
                 value('prompt').isEmpty ? value('env_var') : value('prompt'),
               'mcp.setup.request' =>
@@ -186,7 +189,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
                     ? value('action')
                     : null,
                 choices: kind == HermesDecisionKind.clarification
-                    ? _desktopDecisionChoices(payload['choices'])
+                    ? _desktopDecisionChoices(hermesClarifyChoices(payload))
                     : const <String>[],
                 multiSelect:
                     kind == HermesDecisionKind.clarification &&
@@ -464,6 +467,16 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     return null;
   }
 
+  void _noteClarifyQuestions(String requestId, Map<String, dynamic> payload) {
+    final batch = hermesClarifyBatch(payload);
+    if (batch == null) return;
+    _clarifyQids[requestId] = [for (final q in batch) q.qid];
+    // Bounded: a long-lived connection must not accumulate old requests.
+    while (_clarifyQids.length > 32) {
+      _clarifyQids.remove(_clarifyQids.keys.first);
+    }
+  }
+
   Future<void> _persistPendingDecisionEvent(HermesDesktopEvent event) async {
     final storedId = _storedIdForRuntime(event.sessionId);
     final runtimeId = validateHermesOpaqueIdentifier(event.sessionId);
@@ -484,7 +497,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     final prompt = switch (event.type) {
       'approval.request' =>
         event.payload['command'] ?? event.payload['description'],
-      'clarify.request' => event.payload['question'],
+      'clarify.request' => hermesClarifyPrompt(event.payload),
       'secret.request' => event.payload['prompt'] ?? event.payload['env_var'],
       'mcp.setup.request' => event.payload['reason'] ?? event.payload['server'],
       _ => event.payload['prompt'],
@@ -498,11 +511,18 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
       prompt: prompt?.toString(),
       mcpServer: event.payload['server']?.toString(),
       mcpAction: event.payload['action']?.toString(),
-      choices: _desktopDecisionChoices(event.payload['choices']),
+      choices: _desktopDecisionChoices(
+        kind == HermesPendingDesktopDecisionKind.clarification
+            ? hermesClarifyChoices(event.payload)
+            : event.payload['choices'],
+      ),
       multiSelect: event.payload['multi_select'] == true,
       sensitiveValues: config.sensitiveValues,
       profile: _sessionProfiles[storedId],
     );
+    if (kind == HermesPendingDesktopDecisionKind.clarification) {
+      _noteClarifyQuestions(requestId, event.payload);
+    }
   }
 
   Future<void> _rememberPendingDecision(
@@ -981,6 +1001,30 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     String? mcpServer,
     String? mcpAction,
   }) async {
+    // Current Hermes asks clarify / sudo / secret as a server request on this
+    // socket: the answer is the response frame for that request id (there is
+    // no clarify.respond method any more).
+    final qids = kind == HermesDecisionKind.clarification
+        ? _clarifyQids[requestId]
+        : null;
+    final Map<String, dynamic>? serverResult = switch (kind) {
+      HermesDecisionKind.clarification =>
+        qids == null
+            ? {'answer': value}
+            : {'answers': hermesClarifyBatchAnswers(qids, value)},
+      HermesDecisionKind.sudo || HermesDecisionKind.secret => {'value': value},
+      HermesDecisionKind.mcpSetup => null,
+    };
+    if (serverResult != null &&
+        _rpc.answerServerRequest(requestId, serverResult)) {
+      _clarifyQids.remove(requestId);
+      await HermesPendingDecisionStore.resolve(
+        origin: _origin,
+        runtimeId: runtimeId,
+        requestId: requestId,
+      );
+      return;
+    }
     if (storedSessionId != null) {
       runtimeId = (await _resume(storedSessionId)).runtimeId;
     }
@@ -1007,15 +1051,34 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
       HermesDecisionKind.secret => 'value',
       HermesDecisionKind.mcpSetup => throw StateError('unreachable'),
     };
-    await _rpc.request<Object?>(
-      method,
-      params: {
-        'session_id': runtimeId,
-        'request_id': requestId,
-        valueKey: value,
-        ..._runtimeScope(runtimeId),
-      },
-    );
+    if (qids != null) {
+      // A batch clarify: each question is answered by its id. Without a
+      // question_id Hermes reads the respond as cancel-all (empty answers).
+      final answers = hermesClarifyBatchAnswers(qids, value);
+      for (final qid in qids) {
+        await _rpc.request<Object?>(
+          method,
+          params: {
+            'session_id': runtimeId,
+            'request_id': requestId,
+            'question_id': qid,
+            valueKey: answers[qid] ?? '',
+            ..._runtimeScope(runtimeId),
+          },
+        );
+      }
+      _clarifyQids.remove(requestId);
+    } else {
+      await _rpc.request<Object?>(
+        method,
+        params: {
+          'session_id': runtimeId,
+          'request_id': requestId,
+          valueKey: value,
+          ..._runtimeScope(runtimeId),
+        },
+      );
+    }
     await HermesPendingDecisionStore.resolve(
       origin: _origin,
       runtimeId: runtimeId,

@@ -544,4 +544,124 @@ void main() {
     await client.connect(Uri.parse('ws://127.0.0.1:${server.port}/api/ws'));
     check(client.isReady).isTrue();
   });
+
+  group('server requests (current Hermes asks the renderer directly)', () {
+    Future<(HermesDesktopRpcClient, _SocketHarness)> connected() async {
+      final socket = _SocketHarness();
+      final client = HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => socket.channel,
+      );
+      addTearDown(() async {
+        await client.close();
+        await socket.dispose();
+      });
+      final connecting = client.connect(Uri.parse('wss://hermes.example/ws'));
+      await Future<void>.delayed(Duration.zero);
+      socket.ready();
+      await connecting;
+      return (client, socket);
+    }
+
+    void serverAsks(
+      _SocketHarness socket,
+      String id,
+      String method,
+      Map<String, dynamic> params,
+    ) => socket.incoming.add(
+      jsonEncode({
+        'jsonrpc': '2.0',
+        'id': id,
+        'method': method,
+        'params': {'session_id': 'rt-1', ...params},
+      }),
+    );
+
+    test('a clarify request reaches the decision UI and is answered with a '
+        'response frame', () async {
+      final (client, socket) = await connected();
+      final events = <HermesDesktopEvent>[];
+      final sub = client.events.listen(events.add);
+      addTearDown(sub.cancel);
+
+      serverAsks(socket, 'srq-0123456789ab', 'clarify', {
+        'question': 'Which color?',
+        'choices': ['red', 'blue'],
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      check(events).length.equals(1);
+      check(events.single.type).equals('clarify.request');
+      check(events.single.sessionId).equals('rt-1');
+      check(events.single.payload['request_id']).equals('srq-0123456789ab');
+      check(events.single.payload['question']).equals('Which color?');
+      // Not declined: nothing was sent back yet.
+      check(socket.sent).isEmpty();
+
+      check(client.answerServerRequest('srq-0123456789ab', {'answer': 'blue'}))
+          .isTrue();
+      check(socket.sentFrame(0)).deepEquals({
+        'jsonrpc': '2.0',
+        'id': 'srq-0123456789ab',
+        'result': {'answer': 'blue'},
+      });
+      // Exactly once.
+      check(client.answerServerRequest('srq-0123456789ab', {'answer': 'blue'}))
+          .isFalse();
+      check(socket.sent).length.equals(1);
+    });
+
+    test('a cancelled request expires its card and can no longer be '
+        'answered', () async {
+      final (client, socket) = await connected();
+      final events = <HermesDesktopEvent>[];
+      final sub = client.events.listen(events.add);
+      addTearDown(sub.cancel);
+
+      serverAsks(socket, 'srq-aaaaaaaaaaaa', 'sudo', {});
+      socket.incoming.add(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'method': 'event',
+          'params': {
+            'type': 'request.cancel',
+            'session_id': 'rt-1',
+            'payload': {
+              'id': 'srq-aaaaaaaaaaaa',
+              'method': 'sudo',
+              'reason': 'timeout',
+            },
+          },
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      check(events.map((e) => e.type).toList())
+          .deepEquals(['sudo.request', 'sudo.expire', 'request.cancel']);
+      check(events[1].payload['request_id']).equals('srq-aaaaaaaaaaaa');
+      check(client.answerServerRequest('srq-aaaaaaaaaaaa', {'value': 'x'}))
+          .isFalse();
+    });
+
+    test(
+      'unsupported requests are still declined; batch clarify is not',
+      () async {
+        final (client, socket) = await connected();
+        final events = <HermesDesktopEvent>[];
+        final sub = client.events.listen(events.add);
+        addTearDown(sub.cancel);
+        serverAsks(socket, 'srq-bbbbbbbbbbbb', 'window.read', {});
+        serverAsks(socket, 'srq-cccccccccccc', 'clarify', {
+          'questions': [
+            {'qid': 'q1', 'question': 'A?'},
+          ],
+        });
+        await Future<void>.delayed(Duration.zero);
+        check(socket.sent).length.equals(1);
+        check(socket.sentFrame(0)['id']).equals('srq-bbbbbbbbbbbb');
+        check(socket.sentFrame(0)['error']).isA<Map>();
+        check(events.single.type).equals('clarify.request');
+        check(events.single.payload['request_id']).equals('srq-cccccccccccc');
+      },
+    );
+  });
 }

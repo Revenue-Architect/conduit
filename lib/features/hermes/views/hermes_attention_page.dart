@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../models/hermes_job.dart';
+import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_pending_decision_store.dart';
@@ -63,6 +64,12 @@ class HermesAttentionPage extends ConsumerWidget {
     final pending =
         decisions.asData?.value ?? const <HermesPendingDesktopDecision>[];
     final failed = failedJobs.asData?.value ?? const <(String, HermesJob)>[];
+    final sessionTitles = <String, String>{
+      for (final session
+          in ref.watch(hermesSessionsProvider).asData?.value ??
+              const <HermesSessionSummary>[])
+        session.id: session.title,
+    };
     return HermesPageChrome(
       title: 'Attention',
       subtitle: 'Stay in control of what needs you.',
@@ -137,13 +144,25 @@ class HermesAttentionPage extends ConsumerWidget {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(_icon(kind), color: palette.accent),
+                      // What is asked, by which bot, in which conversation.
                       title: Text(
-                        _title(kind),
+                        (item.prompt?.trim().isNotEmpty ?? false)
+                            ? item.prompt!.trim()
+                            : _title(kind),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        item.prompt ?? 'Open conversation to respond.',
-                        maxLines: 3,
+                        [
+                          if (item.profile?.isNotEmpty ?? false) item.profile!,
+                          switch (sessionTitles[item.storedSessionId]) {
+                            final String title when title.trim().isNotEmpty =>
+                              'In “${title.trim()}”',
+                            _ => 'Open to respond',
+                          },
+                        ].join(' · '),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),

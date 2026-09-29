@@ -23,6 +23,7 @@ import 'hermes_backend_service.dart';
 import 'hermes_http_transport.dart';
 import 'hermes_dashboard_rest_bridge.dart';
 import 'hermes_dashboard_webview_policy.dart';
+import 'hermes_clarify_form.dart';
 import 'hermes_desktop_transport.dart';
 import 'hermes_identifier.dart';
 import 'hermes_json_guard.dart';
@@ -235,6 +236,10 @@ final class HermesDesktopApiService
   final HermesConfig config;
   final Dio _dio;
   final HermesDesktopRpcClient _rpc;
+
+  /// Batch clarify requests seen on this connection: request id -> question
+  /// ids, so an answer can name each question (see hermes_clarify_form.dart).
+  final Map<String, List<String>> _clarifyQids = {};
   late final _HermesDesktopAdministration _administration;
   HermesDashboardRestBridge? _dashboardBridge;
   final HermesDesktopCredentialsWriter? onCredentialsChanged;

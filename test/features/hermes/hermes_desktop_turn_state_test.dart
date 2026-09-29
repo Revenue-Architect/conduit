@@ -628,6 +628,91 @@ void main() {
   );
 
   test(
+    'a batch clarify is answered per question id (not as a cancel-all)',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+      final harness = _GatewayHarness();
+      final rpc = HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      );
+      final service = HermesDesktopApiService(
+        config: HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          mode: HermesBackendMode.desktopGateway,
+          desktopProfile: 'default',
+          desktopCredentials: HermesDesktopCredentials(
+            legacyToken: 'session-token',
+          ),
+        ),
+        dio: _statusDio(),
+        rpc: rpc,
+      );
+      addTearDown(() async {
+        service.close();
+        await harness.dispose();
+      });
+      harness.responder = (method) => switch (method) {
+        'session.resume' => {
+          'session_id': 'runtime-bot',
+          'stored_session_id': 'stored-bot',
+          'info': const {'running': false},
+          'running': false,
+        },
+        'clarify.respond' => {'status': 'ok', 'remaining': const <String>[]},
+        _ => const {},
+      };
+      await service.openBotChat(
+        const HermesBot(
+          name: 'researcher',
+          title: 'Research',
+          chatSessionId: 'stored-bot',
+        ),
+      );
+      // What the installed Hermes sends, even for a single question.
+      harness.incoming.add(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'method': 'event',
+          'params': {
+            'type': 'clarify.request',
+            'session_id': 'runtime-bot',
+            'payload': {
+              'request_id': 'req-9',
+              'questions': [
+                {
+                  'qid': 'q0',
+                  'question': 'Which color?',
+                  'choices': ['red', 'blue'],
+                  'multi_select': false,
+                },
+              ],
+            },
+          },
+        }),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      await service.respondToDecision(
+        storedSessionId: 'stored-bot',
+        runtimeId: 'runtime-bot',
+        requestId: 'req-9',
+        kind: HermesDecisionKind.clarification,
+        value: 'blue',
+      );
+      final responds = harness.sent
+          .where((frame) => frame['method'] == 'clarify.respond')
+          .toList();
+      check(responds).length.equals(1);
+      final params = responds.single['params'] as Map;
+      check(params['request_id']).equals('req-9');
+      check(params['question_id']).equals('q0');
+      check(params['answer']).equals('blue');
+    },
+  );
+
+  test(
     'every bot-chat RPC names the bot profile, never the connection one',
     () async {
       SharedPreferences.setMockInitialValues({});

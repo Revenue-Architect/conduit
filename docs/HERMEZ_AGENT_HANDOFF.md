@@ -332,3 +332,20 @@ Profile APK SHA-256 `c429b68cad64dea277aaf408f3a4793365a7282fa044e1f210e32aa098b
   - Run history with data was not seen on device, because no job has runs and Run now was not pressed (it starts a real job).
 - **Not done:** Phase 6 (Knowledge is not dense, so it stays), Phase 7 (Kanban task activity already has its own show-all toggle), Phase 8 (artifact context).
 
+## 2026-09-29: clarify answers fixed; artifact context; clearer attention cards; live device QA
+
+Profile APK SHA-256 `393b13910cdf05aabfd6227c4fd2ff6ca3bbb7b3bbe8fdcdd2ce4b87bf886e84`, installed on the S25.
+
+- **Clarify bug (pre-existing, found on device).** Every clarify answer reached Hermes empty. The installed Hermes sends `clarify.request` in the batch form `{request_id, questions:[{qid, question, choices}]}`, even for one question, and `_respond` treats a `clarify.respond` without `question_id` as cancel-all.
+  - The app read only a top-level `question`, so the prompt was blank, and it answered without `question_id`.
+  - Fix, in `services/hermes_clarify_form.dart`: the batch is parsed for prompt, choices and qids (`_clarifyQids` per request id), and the answer is sent with one `clarify.respond` per qid. With several questions, the numbered prompt maps one line per question.
+  - Newer Hermes (server requests, per the `tui_gateway/server_requests.py` contract) sends `clarify`/`sudo`/`secret` as server requests. They are now kept open by the transport, surfaced as `<kind>.request`, and answered with the response frame (`{answer}`, `{answers}` or `{value}`); `request.cancel` becomes `<kind>.expire`. Previously every server request was declined with -32601.
+  - Verified on device: "Which color do you prefer?" shows, and answering "blue" gives "You chose blue."
+- **Attention.** The sheet names the bot, the conversation ("In '…'") and the labelled QUESTION or COMMAND. It says plainly when the question text was not sent. Rows lead with the question, then bot and conversation.
+- **Artifact context.** A FILE CONTEXT compartment appears in the artifact preview when this app recorded provenance. It shows source bot, conversation, type, first seen and path, from existing data only; there are no new requests. Verified on device with a file kai created.
+- **Live device QA:**
+  - run engage, complete and attention cues each fire once (AudioFlinger timestamps)
+  - the inline run compartment opens mid-run and after completion
+  - Run now is accepted, with send and success cues
+- **Run history with data could not be shown.** Hermes skips every scheduled job with `drift_skip:silent` (the global model changed from deepseek to custom after the jobs were created), so no run sessions exist and "No runs yet" is truthful. Re-pinning the jobs on the server (`hermes cron edit … --provider … --model …`) is the user's call.
+
