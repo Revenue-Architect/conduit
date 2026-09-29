@@ -120,6 +120,10 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
           ref.read(composerAutofocusEnabledProvider.notifier).set(false);
         } catch (_) {}
       },
+      // The chat slides away as a sheet; this rail on its leading edge
+      // brings it back.
+      mobileRailLabel: const Text('CHAT'),
+      mobileRailSemanticLabel: 'Return to chat',
       drawer: const SidebarPage(),
       layoutBuilder: (layout) => MacDesktopShortcuts(child: layout),
       child: widget.child,

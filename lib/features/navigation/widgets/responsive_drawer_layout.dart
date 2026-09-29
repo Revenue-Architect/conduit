@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart' show RenderBox, RenderEditable;
 import 'package:flutter/services.dart';
 
@@ -13,12 +12,15 @@ import '../../../shared/widgets/drawer_slot.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/sidebar_layout_constants.dart';
 import 'drawer_open_drag_gesture_recognizer.dart';
+import 'physical_side_nav.dart';
 import 'resizable_tablet_sidebar.dart';
 
 enum _DrawerSettleEndpoint { open, closed }
 
 /// A responsive layout that shows a persistent drawer on tablets (side-by-side)
-/// and an overlay drawer on mobile devices.
+/// and a physical side navigation on mobile devices: the content slides away
+/// as a sheet to reveal the drawer underneath, leaving a return rail
+/// ([PhysicalSideNav]).
 ///
 /// When the [drawer] is a [DrawerSlot], horizontal swipe-to-close gestures on
 /// mobile apply only to [DrawerSlot.mainPanel], not [DrawerSlot.footerPanel]
@@ -41,6 +43,10 @@ class ResponsiveDrawerLayout extends StatefulWidget {
   final double contentScaleDelta;
   final VoidCallback? onOpenStart;
   final double mobileBottomDragGestureExclusion;
+
+  /// What the mobile return rail shows, and what it announces.
+  final Widget mobileRailLabel;
+  final String mobileRailSemanticLabel;
 
   // Tablet-specific configuration
   final double tabletDrawerWidth; // Fixed width for tablet drawer
@@ -68,6 +74,8 @@ class ResponsiveDrawerLayout extends StatefulWidget {
     this.contentScaleDelta = 0.02,
     this.onOpenStart,
     this.mobileBottomDragGestureExclusion = 0.0,
+    this.mobileRailLabel = const Text('BACK'),
+    this.mobileRailSemanticLabel = 'Return',
     this.tabletDrawerWidth = defaultSidebarTabletWidth,
     this.tabletDrawerMinWidth = minimumSidebarTabletWidth,
     this.tabletDrawerMaxWidth = maximumSidebarTabletWidth,
@@ -114,12 +122,13 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   bool _edgePointerSuppressedByHorizontalScrollable = false;
   double _edgePointerActivationThreshold = _kEdgeOpenTouchSlop;
 
-  /// Spring description matching iOS navigation drawer physics.
-  static final SpringDescription _spring = SpringDescription(
-    mass: 1.0,
-    stiffness: 600.0,
-    damping: 44.0,
-  );
+  /// Where the mobile navigation is heading: 1 while opening or open, 0 while
+  /// closing or closed. Toggle and Back follow the direction, not whether an
+  /// endpoint has been reached, so a toggle mid-flight reverses from there.
+  double _navTarget = 0;
+
+  /// Whether the mobile navigation is open or on its way there.
+  bool get isOpenOrOpening => !_cachedIsTablet && _navTarget > 0.5;
 
   bool _isTablet(BuildContext context) {
     _cachedIsTablet = usesPersistentTabletSidebar(context);
@@ -207,7 +216,11 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, value: 0.0);
+    _controller = AnimationController(
+      vsync: this,
+      value: 0.0,
+      duration: kSideNavDuration,
+    );
     _lastSettledEndpoint = _settledEndpointForValue(_controller.value);
     _controller.addStatusListener(_onControllerStatusChanged);
   }
@@ -254,22 +267,22 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
     }
   }
 
-  /// Animate to [target] using iOS-style spring physics.
-  ///
-  /// [velocity] is in pixels/sec from the drag gesture, converted to
-  /// the 0..1 animation range.
-  void _springTo(double target, {double velocity = 0.0}) {
-    final panelPx = _panelWidth;
-    // Convert px/s velocity to animation-units/s
-    final unitVelocity = panelPx > 0 ? velocity / panelPx : 0.0;
-
-    final simulation = SpringSimulation(
-      _spring,
-      _controller.value,
+  /// Settle the mobile navigation to [target] along the side-navigation
+  /// curve, starting from wherever it is now. Reversing mid-flight retargets
+  /// from the current frame; nothing snaps to an endpoint first. The time is
+  /// the share of [kSideNavDuration] the remaining distance represents.
+  /// Reduced motion settles at once, through the same status changes.
+  void _settleTo(double target) {
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _controller.value = target;
+      return;
+    }
+    final distance = (target - _controller.value).abs();
+    final ticker = _controller.animateTo(
       target,
-      unitVelocity,
+      duration: kSideNavDuration * distance,
+      curve: kSideNavCurve,
     );
-    final ticker = _controller.animateWith(simulation);
     unawaited(
       ticker.orCancel
           .then((_) {
@@ -330,6 +343,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
       }
       return;
     }
+    _navTarget = 1.0;
     if (_controller.isCompleted) return;
     _pendingSettledEndpoint = _lastSettledEndpoint == _DrawerSettleEndpoint.open
         ? null
@@ -340,7 +354,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
       widget.onOpenStart?.call();
     } catch (_) {}
     _dismissKeyboard();
-    _springTo(1.0, velocity: velocity);
+    _settleTo(1.0);
   }
 
   @override
@@ -352,6 +366,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
       }
       return;
     }
+    _navTarget = 0.0;
     if (_controller.isDismissed) {
       _setComposeMobileDrawerChrome(false);
       return;
@@ -361,7 +376,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
         ? null
         : _DrawerSettleEndpoint.closed;
 
-    _springTo(0.0, velocity: -velocity.abs());
+    _settleTo(0.0);
   }
 
   @override
@@ -372,7 +387,19 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
       return;
     }
 
-    isOpen ? close() : open();
+    // Follow the direction: opening + toggle closes from the current frame,
+    // closing + toggle reopens from it.
+    isOpenOrOpening ? close() : open();
+  }
+
+  /// Android Back closes the mobile navigation before anything else sees it.
+  Future<bool> _handleBackButton() async {
+    if (!mounted || _cachedIsTablet) return false;
+    if (_navTarget > 0.5 || _controller.value > 0.0) {
+      close();
+      return true;
+    }
+    return false;
   }
 
   void _dismissKeyboard() {
@@ -435,6 +462,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
               : _DrawerSettleEndpoint.closed);
 
     _isDragging = false;
+    _navTarget = endpoint == _DrawerSettleEndpoint.open ? 1.0 : 0.0;
     if (_dragTerminalEndpoint == endpoint && _lastSettledEndpoint != endpoint) {
       _pendingSettledEndpoint = endpoint;
       _onControllerStatusChanged(
@@ -720,19 +748,25 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
-    final scrim = widget.scrimColor ?? context.colorTokens.overlayStrong;
     final isTablet = _isTablet(context);
 
     final layout = isTablet
         ? _buildTabletLayout(theme)
-        : _buildMobileLayout(theme, scrim);
+        : _buildMobileLayout(theme);
     final scopedLayout = HorizontalGesturePriorityScope(
       buildPrioritizedGestureArena: _buildPrioritizedDrawerGestureArena,
       child: layout,
     );
-    return SidebarDrawerControllerScope(
+    final scoped = SidebarDrawerControllerScope(
       controller: this,
       child: widget.layoutBuilder?.call(scopedLayout) ?? scopedLayout,
+    );
+    // Back closes the mobile navigation first. The listener sits on the
+    // router's back dispatcher, ahead of the routes' own handlers.
+    if (isTablet || Router.maybeOf(context) == null) return scoped;
+    return BackButtonListener(
+      onBackButtonPressed: _handleBackButton,
+      child: scoped,
     );
   }
 
@@ -772,36 +806,33 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
     );
   }
 
-  Widget _buildMobileLayout(ConduitThemeExtension theme, Color scrim) {
+  Widget _buildMobileLayout(ConduitThemeExtension theme) {
+    final navigation = _scopeDrawer(
+      widget.drawer is DrawerSlot
+          ? _buildMobileDrawerSlotPanel(theme, widget.drawer as DrawerSlot)
+          : _buildMobileDrawerPanel(theme),
+      composeNativeChrome: _composeMobileDrawerChrome,
+    );
     return Stack(
       children: [
-        // Content (optionally pushed by the drawer)
+        // The content is a physical sheet: it slides away to the right and
+        // reveals the drawer underneath. It stays mounted and laid out at
+        // full width the whole time; only transforms and the clip change.
         Positioned.fill(
-          child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                final t = _controller.value;
-                final dx = (widget.pushContent ? _panelWidth * t : 0.0)
-                    .roundToDouble();
-                final scaleDelta = widget.pushContent
-                    ? widget.contentScaleDelta.clamp(0.0, 0.2) * t
-                    : 0.0;
-                final scale = 1.0 - scaleDelta;
-
-                final matrix = Matrix4.identity()
-                  ..setEntry(0, 3, dx)
-                  ..setEntry(0, 0, scale)
-                  ..setEntry(1, 1, scale);
-
-                return Transform(
-                  transform: matrix,
-                  alignment: Alignment.centerLeft,
-                  child: child,
-                );
-              },
-              child: _buildMobileContentGestureArena(widget.child),
-            ),
+          child: PhysicalSideNav(
+            progress: _controller,
+            navigation: navigation,
+            stageColor: theme.surfaceBackground,
+            railColor: theme.buttonPrimary,
+            railForegroundColor: theme.buttonPrimaryText,
+            railLabel: widget.mobileRailLabel,
+            railSemanticLabel: widget.mobileRailSemanticLabel,
+            onReturn: close,
+            onRailDragStart: _onDragStart,
+            onRailDragUpdate: _onDragUpdate,
+            onRailDragEnd: _onDragEnd,
+            onRailDragCancel: _onDragCancel,
+            child: _buildMobileContentGestureArena(widget.child),
           ),
         ),
 
@@ -821,54 +852,6 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
             onPointerUp: _onEdgePointerUp,
             onPointerCancel: _onEdgePointerCancel,
           ),
-        ),
-
-        // Scrim + panel when animating or open
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final t = _controller.value;
-            final ignoring = t == 0.0;
-            return IgnorePointer(
-              ignoring: ignoring,
-              child: Stack(
-                children: [
-                  // Scrim
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: close,
-                      onHorizontalDragStart: _onDragStart,
-                      onHorizontalDragUpdate: _onDragUpdate,
-                      onHorizontalDragEnd: _onDragEnd,
-                      onHorizontalDragCancel: _onDragCancel,
-                      child: ColoredBox(
-                        color: scrim.withValues(alpha: 0.6 * t),
-                      ),
-                    ),
-                  ),
-                  // Panel (capture horizontal drags to close)
-                  Positioned(
-                    left: -_panelWidth * (1.0 - t),
-                    top: 0,
-                    bottom: 0,
-                    width: _panelWidth,
-                    child: _scopeDrawer(
-                      widget.drawer is DrawerSlot
-                          ? RepaintBoundary(
-                              child: _buildMobileDrawerSlotPanel(
-                                theme,
-                                widget.drawer as DrawerSlot,
-                              ),
-                            )
-                          : _buildMobileDrawerPanel(theme),
-                      composeNativeChrome: _composeMobileDrawerChrome,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
         ),
       ],
     );

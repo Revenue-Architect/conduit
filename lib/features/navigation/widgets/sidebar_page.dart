@@ -19,6 +19,7 @@ import '../providers/sidebar_providers.dart';
 import '../providers/sidebar_tab_scroll_registry.dart';
 import 'sidebar_user_pill.dart';
 import 'sidebar_tab_registry.dart';
+import 'physical_side_nav.dart';
 
 /// Compact bottom bar height on Material (default M3 bar is ~80 logical px).
 const double _kSidebarNavigationBarHeight = 56;
@@ -285,11 +286,14 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
           : AdaptiveBottomNavigationRenderer.nativeOverlay,
       selectedItemColor: conduitTheme.buttonPrimary,
       unselectedItemColor: conduitTheme.textSecondary,
-      bottomNavigationBar: _SidebarMaterialBottomNavigationBar(
-        navigationItems: navigationItems,
-        selectedIndex: selectedIndex.clamp(0, navigationItems.length - 1),
-        onTap: onTap,
-        conduitTheme: conduitTheme,
+      bottomNavigationBar: SideNavItem(
+        index: 5,
+        child: _SidebarMaterialBottomNavigationBar(
+          navigationItems: navigationItems,
+          selectedIndex: selectedIndex.clamp(0, navigationItems.length - 1),
+          onTap: onTap,
+          conduitTheme: conduitTheme,
+        ),
       ),
     );
   }
@@ -428,7 +432,10 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
           : 60,
       leading: Padding(
         padding: const EdgeInsets.only(left: Spacing.inputPadding),
-        child: Align(alignment: Alignment.centerLeft, child: leading),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: SideNavItem(index: 0, child: leading),
+        ),
       ),
       actions: [
         for (var index = 0; index < actions.length; index++)
@@ -439,10 +446,13 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
                   : Spacing.sm,
             ),
             child: Center(
-              child: ConduitAdaptiveAppBarIconButton(
-                icon: actions[index].icon ?? Icons.circle,
-                onPressed: actions[index].onPressed,
-                iconColor: context.conduitTheme.textPrimary,
+              child: SideNavItem(
+                index: 1 + index,
+                child: ConduitAdaptiveAppBarIconButton(
+                  icon: actions[index].icon ?? Icons.circle,
+                  onPressed: actions[index].onPressed,
+                  iconColor: context.conduitTheme.textPrimary,
+                ),
               ),
             ),
           ),
@@ -575,10 +585,12 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
               hasBottomNavigationBar: hasBottomNavigationBar,
             ),
           );
+          // The content settles in after the app bar; the tabs settle last.
+          // Outside the mobile side navigation this is the plain content.
           final sidebarBody = SidebarTabLayoutScope(
             parentOwnsHeaderInset: false,
             bottomNavigationVisible: hasBottomNavigationBar,
-            child: tabContent,
+            child: SideNavItem(index: 4, child: tabContent),
           );
 
           if (useNativeIos26Chrome) {
