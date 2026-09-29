@@ -13,7 +13,7 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 | light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.30 s |
 | medium | cards, sheets, sibling pages | 0.978 | 1 / 385 / 39.3 | ~0.43 s |
 | heavy | a page growing out of a card | 0.99 | 1 / 300 / 34 | ~0.46 s |
-| push (`springPush`, not a weight) | a sheet growing out of a card and pushing the screen above it | — | 1.3 / 240 / 35.3 | ~0.6 s both ways |
+| push (`springPush`, not a weight) | a sheet growing out of a card and pushing the screen above it | — | 1.7 / 210 / 37.8 | ~0.75 s both ways |
 
 All three are critically damped (damping ratio 0.97 to 1.0). **Do not add a bouncy spring to a duration-driven animation.** The curve is clamped to [0, 1], so any overshoot turns into a dead hold: the old medium spring (0.9 / 340 / 30, ratio 0.86) reached 99 % at 0.24 s and then sat still until 0.41 s, so every medium open and close stopped, waited, and snapped when the route or presence finished. A test (`every Hermez spring keeps moving until it settles`) guards this.
 

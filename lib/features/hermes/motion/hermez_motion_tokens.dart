@@ -52,11 +52,11 @@ abstract final class HermezMotion {
 
   // A sheet pushing the screen it grew out of: heavier and slower than a
   // page, still critically damped, so the push and the pull read as moving
-  // real weight (~0.5 s to 99 %, ~0.6 s to rest).
+  // real weight (~0.6 s to 99 %, ~0.75 s to rest).
   static const springPush = NibSpringDescription(
-    mass: 1.3,
-    stiffness: 240,
-    damping: 35.3,
+    mass: 1.7,
+    stiffness: 210,
+    damping: 37.8,
   );
 
   static const staggerFast = Duration(milliseconds: 25);
