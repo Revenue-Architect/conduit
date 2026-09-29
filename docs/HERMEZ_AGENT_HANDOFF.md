@@ -198,3 +198,34 @@ Commits `af6ad0c2` (first lift), `418950f5` (contact push), and the weight tunin
 - **Limits:** only Hermez screens move. The chat screen (a no-transition page) stays still under its sheets. Sheets that did not grow from a card keep a gentle 32 to 64 dp lift.
 - **Tests:** the screen rises monotonically while the sheet grows, ends up pushed by exactly the edge's rise, follows a drag down and back, and returns exactly on close. The aperture phases and the push spring's settling are also covered. All 731 tests in `test/features/hermes` pass. Wide suites: only the 8 known baseline failures, re-run after the contact-push change.
 - **Device:** a slowed capture of the first lift (`lift-open`, `lift-close`) confirmed the screen moving with the sheet and the outline following the card. The contact push and weight tuning were not captured on device, at the user's request.
+
+## 2026-09-29: physical mobile side navigation, heavier sheet push
+
+Commits `ac8b54a0` (push weight) and `f461fd67` (side navigation). Profile APK SHA-256 `490d4535810fc7b832621c7811e1a6f2163a645ba305b893adc141614f812e64`, installed on the S25. The user asked for no on-device test this round.
+
+- **Push weight:** `springPush` is now 1.7 / 210 / 37.8 (critically damped), about 0.6 s to 99 % and 0.75 s to rest, both ways. The user had said "still a bit too snappy" at 1.3 / 240 / 35.3.
+- **Side navigation goal:** replicate Calendar-Master's mobile navigation. The chat is a physical sheet that slides off to the right, not a drawer laid over it. A narrow CHAT rail stays on the right edge, and the navigation lives underneath.
+- **Where:** `lib/features/navigation/widgets/physical_side_nav.dart` holds the geometry (`sideNavGeometryFor`), the stagger (`sideNavItemProgress`), `SideNavItem`, and the `PhysicalSideNav` shell. `ResponsiveDrawerLayout._buildMobileLayout` now renders `PhysicalSideNav` instead of the scrim and the panel over the content. `SidebarPage` wraps its app bar leading, actions, content, and bottom tabs in `SideNavItem` (indices 0, 1 to 3, 4, 5). `DrawerShellPage` sets the rail to CHAT / "Return to chat".
+- **Behaviour:**
+  - The controller value is the progress. Settles use `animateTo` over `520 ms * distance` on the curve, from the current value, so a toggle mid-flight reverses without a jump.
+  - `toggle()` follows `_navTarget` (direction), not `isOpen`.
+  - Android Back goes through a `BackButtonListener` on the router's back dispatcher, which runs before route `PopScope`s. It closes the navigation and consumes the event.
+  - Reduced motion sets the value directly.
+- **Preserved:** the edge-swipe and drag-to-close gesture arenas, drag haptics, `SidebarDrawerController` / `closeSidebarDrawerIfOverlay`, native drawer chrome composition, and the tablet persistent sidebar. The chat child stays mounted at full width. A frame changes only its transform, its clip (none at rest), and `IgnorePointer`.
+- **Known limits:**
+  - A drag release now settles on the curve and ignores fling velocity.
+  - The label opacity stagger is the only fade in the app; the spec asked for it.
+  - The iOS 26 native sidebar chrome has no stagger.
+  - `scrimColor` is unused on mobile.
+  - The hamburger has no expanded-state semantics. While open, the chat is excluded from semantics and the rail carries "Return to chat".
+- **Tests:** `test/features/navigation/widgets/physical_side_nav_test.dart` (16 tests) covers:
+  - geometry closed, halfway, and open at 390 px, plus the 2 px rail threshold and the stagger
+  - closed and open states, and halfway timing
+  - reversal both ways
+  - rail and destination close
+  - chat state (same State, composer text, and scroll offset)
+  - Back under GoRouter
+  - viewport change
+  - reduced motion and the label stagger
+
+  All 50 existing drawer tests pass. Wide suites show only the 8 known baseline failures.
