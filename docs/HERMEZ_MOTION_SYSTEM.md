@@ -73,3 +73,28 @@ Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: sph
 - Morph ids come from model ids (`bot:<profile>`, `job:<profile>:<id>`, `kanban:<board>:<task>`, `artifact:<path>`, `session:<id>:browser`), never list positions.
 - Reduced motion (`context.reduceMotion`): no flights, instant routes, no press scale, instant presence.
 - Do not use `NibBounce`, `NibRubberBand`, `NibFloat`, `NibGlass`, or `NibScaffold`.
+
+## Sensory feedback (sound and haptics)
+
+`lib/features/hermes/feedback/` is a presentation-only observer. Backend state decides; feedback describes it after the fact.
+
+- **Cues, not files.** UI code calls `HermezFeedback.play(HermezFeedbackCue.x)`. `hermezFeedbackRecipes` maps each cue to a sound, a level, a playback speed, and a `ConduitHaptics` type.
+- **Fail-open.** `trigger` never throws, never waits, and returns nothing to wait on.
+  - If the engine fails to start or throws, sound is disabled for the process; haptics continue.
+  - Never `await` feedback before a backend call.
+- **Sound is dropped** when:
+  - the app is not resumed
+  - "Interface sounds" (Hermez Settings) is off
+  - voice mode is active (the coordinator's suppressor)
+  - assistant speech is playing (`TtsManager.isPlaying`)
+- **Engine.** `flutter_soloud` 5.1.4 (pinned, `no_xiph_libs`), started after the first frame on a Hermez screen. `just_audio` still owns voice and media.
+  - Cues are original: synthesized by `tool/generate_hermez_sounds.py` into `assets/sounds/hermez/`, as 48 kHz mono PCM, 50 to 320 ms.
+  - Windows host tests need MSVC (Visual Studio 2022 Build Tools, C++ workload), because the plugin's build hook compiles the engine for the host.
+- **Taps.** `HermezMotionSurface.feedbackCue` / `HermezSurface.feedbackCue` is opt-in and fires on a confirmed tap only, never on pointer down, so scrolls stay silent. When set, it replaces the default selection haptic.
+- **Side navigation.** A latch plays once per real settle, open or closed. It is sound only, because the drawer's no-settle-haptic tests are a deliberate rule.
+- **Runs.** `HermezFeedbackCoordinator` reads the existing `turnStates` and `activityEvents` broadcasts for the visible session only.
+  - `runEngage` on a fresh idle -> running transition (not a resume or resync).
+  - `runComplete` and `runFailed` only for a run seen starting.
+  - `runNeedsAttention` once per request.
+  - Tools are silent; other sessions are left to notifications.
+- **Decisions and approvals.** A neutral tick when sent, then the backend's answer: accepted, rejected, or failed. Never success on tap.

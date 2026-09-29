@@ -274,3 +274,23 @@ Profile APK SHA-256 `85818e109b686e2341e94e269d62b07f8b976201577c42bafaf74e63eef
   The rounded clip was also replaced with a scissor and painted corners.
 - **Result over 3 open/close cycles:** dropped frames went from 13 to 0, and max raster from 35 ms to 12 ms.
 - **Rejected:** snapshotting the sheet (`SnapshotWidget`) stalled the raster thread for about 70 ms on the first frame.
+
+## 2026-09-29: bot artwork, and sensory feedback phase 1 (runbook "Not Boring Hermes")
+
+Profile APK SHA-256 `6116d9a0a9e26f166a742354a73b512fc469b69228ac860dd2c81577078ebcfa`, installed on the S25.
+
+- **Bot artwork:** `HermezBotMark` now draws the PNGs in `assets/icons` (Defaultbot, KaiBot, StrongBot, autopilotbot, "fast bot", locabot). Each is fitted (contain) in the same square, so layouts do not move. Pushed to `main` as a fast-forward.
+- **Sensory foundation:** see `HERMEZ_MOTION_SYSTEM.md`, "Sensory feedback". It covers `flutter_soloud` 5.1.4, 12 original cues, `HermezFeedback`, the "Interface sounds" setting, and the run coordinator.
+- **Wired so far:**
+  - the side-nav latch
+  - Home bot, Scheduled and Kanban cards (`objectOpen`)
+  - Bot Detail "Chat with" (`botEngage`, plus failure)
+  - live run engage, attention, complete and fail for the visible session
+  - approval and decision answers
+- **Device check:** the engine initializes, and AudioFlinger shows a 48 kHz track at each side-nav settle.
+- **Tooling:** VS 2022 Build Tools (C++ workload) were installed on this PC, because the soloud build hook compiles for the host during `flutter test`.
+- **Tests:** feedback fail-open and suppression, the coordinator transition rules, and exactly-once for a cue surface and for a decision. Wide suites show only the 8 known baseline failures.
+- **Deviations from the runbook:**
+  - The nav latch is sound only; the existing no-settle-haptic tests stay unchanged.
+  - Bot presence must animate the PNG physically (lift, compression), because the eyes are no longer painted.
+- **Not done yet:** sheet dismiss detent, `objectClose` on returning from Detail, `HermezBotPresence`, `HermezTouchLight`, and the listening QA on the phone speaker (levels).
