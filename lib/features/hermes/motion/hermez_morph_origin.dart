@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 
 /// Where a Hermez object sits on the screen that opened a destination.
@@ -16,6 +18,7 @@ class HermezMorphOrigin {
     required this.radius,
     required this.color,
     this.borderColor,
+    this.snapshot,
     RenderBox? box,
     RenderObject? routeBox,
   }) : _rect = rect,
@@ -44,6 +47,7 @@ class HermezMorphOrigin {
     double radius = 18,
     Color? color,
     Color? borderColor,
+    ui.Image? snapshot,
   }) {
     final box = context.findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return null;
@@ -55,6 +59,7 @@ class HermezMorphOrigin {
       radius: radius,
       color: color,
       borderColor: borderColor,
+      snapshot: snapshot,
       box: box,
       routeBox: routeBox,
     );
@@ -73,6 +78,12 @@ class HermezMorphOrigin {
   /// Outline of the source object, if it has one. The growing aperture
   /// starts with it and thins it away.
   final Color? borderColor;
+
+  /// What the source object looked like when it was opened, at its own
+  /// size. A contracting destination uncovers this as it lands, so the
+  /// object's own content is already in place when the route ends instead
+  /// of appearing on the last frame.
+  final ui.Image? snapshot;
 
   /// The source rectangle now, in the coordinate space of the route that
   /// holds it. Route-level transforms (a receding source screen) are excluded

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:nib_motion/nib_motion.dart';
 
 import '../../../core/services/haptic_service.dart';
@@ -55,6 +57,7 @@ class HermezMotionSurface extends StatefulWidget {
 
 class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
   final NibMotionController _press = NibMotionController();
+  final GlobalKey _face = GlobalKey();
   Offset? _down;
   bool _pressed = false;
 
@@ -98,9 +101,11 @@ class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
 
   void _activate() {
     if (!_interactive) return;
+    final open = widget.onOpen;
+    // Captured before the release so it is the object as it was drawn.
+    final snapshot = open == null ? null : _captureFace();
     _release();
     if (widget.haptic) unawaited(ConduitHaptics.selectionClick());
-    final open = widget.onOpen;
     if (open != null) {
       open(
         HermezMorphOrigin.of(
@@ -108,6 +113,7 @@ class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
           radius: widget.originRadius,
           color: widget.originColor,
           borderColor: widget.originBorderColor,
+          snapshot: snapshot,
         ),
       );
       return;
@@ -115,10 +121,28 @@ class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
     widget.onTap?.call();
   }
 
+  /// The surface's own drawing at its own size, unscaled by the press.
+  ui.Image? _captureFace() {
+    final boundary = _face.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary || !boundary.hasSize) return null;
+    try {
+      return boundary.toImageSync(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final interactive = _interactive;
-    Widget body = NibMotion(controller: _press, child: widget.child);
+    Widget body = NibMotion(
+      controller: _press,
+      child: widget.onOpen == null
+          ? widget.child
+          : RepaintBoundary(key: _face, child: widget.child),
+    );
     if (!interactive && widget.onLongPress == null) return body;
     body = Listener(
       behavior: HitTestBehavior.translucent,

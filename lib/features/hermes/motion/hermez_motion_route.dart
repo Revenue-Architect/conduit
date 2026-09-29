@@ -630,9 +630,14 @@ class _HermezSheetFrame<T> extends StatelessWidget {
                     // One object: the whole destination scales out of the
                     // source and back into it, so text, decoration, and
                     // surfaces all move together on one spring.
-                    child: Transform(
-                      transform: _zoom(rect, end),
-                      child: content,
+                    child: _landing(
+                      origin: origin,
+                      rect: rect,
+                      t: settledT,
+                      destination: Transform(
+                        transform: _zoom(rect, end),
+                        child: content,
+                      ),
                     ),
                   ),
                 ),
@@ -659,6 +664,41 @@ class _HermezSheetFrame<T> extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  /// Near the source, the destination slides up and away inside the
+  /// aperture and uncovers the source object's own face, which rides the
+  /// aperture at its own proportions. Contracting, the card's content is
+  /// already in place when the route ends; opening, the destination slides
+  /// down over it. Nothing fades and nothing is swapped on a single frame.
+  /// Same widgets at every [t], so nothing remounts.
+  static Widget _landing({
+    required HermezMorphOrigin? origin,
+    required Rect rect,
+    required double t,
+    required Widget destination,
+  }) {
+    final face = origin?.snapshot;
+    // 0 while the aperture is near the source, 1 once it has grown clear.
+    final raw = face == null ? 1.0 : ((t - 0.12) / 0.38).clamp(0.0, 1.0);
+    final cover = raw * raw * (3 - 2 * raw);
+    final faceHeight = face == null || face.width == 0
+        ? rect.height
+        : rect.width * face.height / face.width;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (face != null)
+          Positioned.fromRect(
+            rect: Rect.fromLTWH(rect.left, rect.top, rect.width, faceHeight),
+            child: RawImage(image: face, fit: BoxFit.fill),
+          ),
+        Transform.translate(
+          offset: Offset(0, -(1 - cover) * rect.height),
+          child: destination,
+        ),
+      ],
     );
   }
 

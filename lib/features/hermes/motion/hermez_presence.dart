@@ -124,10 +124,8 @@ abstract final class HermezSwitch {
 
   /// Keeps the leaving block above the arriving one, each at its own
   /// height, so the space closes smoothly instead of dropping at the end.
-  static Widget column(Widget? current, List<Widget> previous) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [...previous, ?current],
-  );
+  static Widget column(Widget? current, List<Widget> previous) =>
+      Column(mainAxisSize: MainAxisSize.min, children: [...previous, ?current]);
 }
 
 /// An icon that changes meaning in place: the old glyph turns and shrinks
