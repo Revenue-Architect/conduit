@@ -20,6 +20,7 @@ import '../widgets/hermez_relative_time.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
+import '../widgets/hermes_bot_knowledge.dart';
 
 final class _BotData {
   const _BotData(this.sessions, this.skills, this.tools, this.jobs);
@@ -55,14 +56,20 @@ final _botDataProvider = FutureProvider.autoDispose.family<_BotData, String>((
             .toList(growable: false),
     <HermesSessionSummary>[],
   );
-  final skills = safe(
-    () async =>
-        (await service.listSkillsForProfile(profile))
-            .map((row) => row['name']?.toString() ?? '')
-            .where((name) => name.isNotEmpty)
-            .toList(growable: false),
-    <String>[],
-  );
+  final skills = safe(() async {
+    final listed = (await service.listSkillsForProfile(profile))
+        .map((row) => row['name']?.toString() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
+    if (listed.isNotEmpty) return listed;
+    // Gateways that return nothing for a profile's skills over RPC still
+    // serve the dashboard catalog; count the enabled ones.
+    return (await service.skillCatalog(profile))
+        .where((row) => row['enabled'] != false)
+        .map((row) => row['name']?.toString() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
+  }, <String>[]);
   final tools = safe(
     () async =>
         (await service.listToolsetsForProfile(profile))
@@ -441,6 +448,8 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
             ],
           ),
         ),
+        const SizedBox(height: 22),
+        HermesBotKnowledgeSection(profile: profile, botTitle: profile),
         const SizedBox(height: 12),
         HermezEntrance(
           order: 3,

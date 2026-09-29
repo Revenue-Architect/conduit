@@ -8,6 +8,7 @@ import 'package:conduit/features/hermes/widgets/hermes_inline_run_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
 
 void main() {
   late HermesDesktopApiService service;
@@ -31,6 +32,7 @@ void main() {
     Future<bool> Function(String, String)? steer,
     Future<void> Function(String)? interrupt,
     HermesDesktopTurnState state = HermesDesktopTurnState.running,
+    List<HermesLiveActivityEvent> events = const [],
   }) async {
     tester.view.physicalSize = const Size(320, 820);
     tester.view.devicePixelRatio = 1;
@@ -55,7 +57,9 @@ void main() {
                   service: service,
                   sessionId: 'session-1',
                   turnState: state,
-                  activityStream: const Stream.empty(),
+                  activityStream: events.isEmpty
+                      ? const Stream.empty()
+                      : Stream.value(events),
                   steerRun: steer,
                   interruptRun: interrupt,
                 ),
@@ -201,6 +205,47 @@ void main() {
     await tester.tap(find.text('Hermes is working'));
     await tester.pumpAndSettle();
     expect(find.text('Watch browser'), findsOneWidget);
+  });
+
+  testWidgets('a finished run shrinks to its summary instead of vanishing', (
+    tester,
+  ) async {
+    HermesLiveActivityEvent event(
+      HermesLiveActivityKind kind,
+      int second, [
+      String? detail,
+    ]) => HermesLiveActivityEvent(
+      sessionId: 'session-1',
+      kind: kind,
+      title: kind.name,
+      timestamp: DateTime.utc(2026, 9, 28, 12, 0, second),
+      detail: detail,
+    );
+    await mount(
+      tester,
+      state: HermesDesktopTurnState.idle,
+      events: [
+        event(HermesLiveActivityKind.toolStarted, 0, 'web_search'),
+        event(HermesLiveActivityKind.toolCompleted, 20, 'web_search'),
+        event(HermesLiveActivityKind.completed, 42),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Done'), findsOneWidget);
+    expect(find.textContaining('42s'), findsOneWidget);
+    expect(find.textContaining('1 step'), findsOneWidget);
+    // Collapsed: details wait behind the header.
+    expect(find.text('Recent activity'), findsNothing);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('TIME'), findsOneWidget);
+    expect(find.text('web_search'), findsWidgets);
+    // A finished run cannot be steered or stopped.
+    expect(find.text('Steer'), findsNothing);
+    expect(find.text('Stop'), findsNothing);
+    expect(find.text('Full activity'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 

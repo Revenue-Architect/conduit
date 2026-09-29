@@ -59,6 +59,7 @@ import 'core/providers/app_startup_providers.dart';
 import 'features/notifications/services/local_notification_service.dart';
 import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
+import 'features/hermes/services/hermes_run_notifications.dart';
 
 const bool _enableFlutterDriverExtension = bool.fromEnvironment(
   'ENABLE_FLUTTER_DRIVER_EXTENSION',
@@ -928,6 +929,11 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
   void _initializeAppState() {
     DebugLogger.auth('init', scope: 'app');
     ref.read(appStartupFlowProvider.notifier).start();
+    // Hermes runs reach the user through the notification router (finished,
+    // failed, waiting for an approval), in Hermes-only mode too, where the
+    // Open WebUI post-sign-in startup never runs. Also holds the background
+    // lease while a run works.
+    ref.read(hermesRunNotifierProvider);
   }
 
   @override

@@ -56,6 +56,8 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   bool _showBrowser = false;
   bool _busy = false;
   bool _stopping = false;
+  DateTime? _runStartedAt;
+  Timer? _clock;
   final GlobalKey _surfaceKey = GlobalKey();
   final GlobalKey _apertureKey = GlobalKey();
 
@@ -64,6 +66,16 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _bindActivity();
+    if (widget.turnState == HermesDesktopTurnState.running) _runStarted();
+  }
+
+  /// A run began: time it, and tick the elapsed time once a second.
+  void _runStarted() {
+    _runStartedAt = DateTime.now().toUtc();
+    _clock?.cancel();
+    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _bindActivity() {
@@ -107,6 +119,17 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       _refreshPendingAfterFrame();
     } else if (oldWidget.turnState != widget.turnState) {
       _refreshPendingAfterFrame();
+      final wasRunning = oldWidget.turnState == HermesDesktopTurnState.running;
+      final running = widget.turnState == HermesDesktopTurnState.running;
+      if (running && !wasRunning) {
+        _runStarted();
+      } else if (wasRunning && !running) {
+        // The run ended: shrink to its summary instead of disappearing.
+        _clock?.cancel();
+        _clock = null;
+        _expanded = false;
+        _showBrowser = false;
+      }
     }
   }
 
@@ -129,6 +152,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _clock?.cancel();
     final subscription = _activitySubscription;
     if (subscription != null) unawaited(subscription.cancel());
     super.dispose();
@@ -257,8 +281,15 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     final working = widget.turnState == HermesDesktopTurnState.running;
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
     final browserAvailable = working && parseSteelViewerUrl(viewerUrl) != null;
+    final run = HermesRunSummary.latest(_events, running: working);
+    final finished =
+        !attention &&
+        widget.turnState == HermesDesktopTurnState.idle &&
+        !run.isEmpty;
     final title = attention
         ? 'Input needed'
+        : finished
+        ? (run.failed ? 'Run failed' : 'Done')
         : switch (widget.turnState) {
             HermesDesktopTurnState.running => 'Hermes is working',
             HermesDesktopTurnState.reconnecting => 'Reconnecting to Hermes',
@@ -268,6 +299,19 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
               'Live activity unavailable',
           };
     final latest = _events.isEmpty ? null : _events.last;
+    final elapsed = run.elapsed(
+      startedAt: working || finished ? _runStartedAt : null,
+    );
+    final steps = run.steps;
+    final tools = run.tools;
+    final details = <String>[
+      if (working && latest != null) latest.title,
+      if (finished && elapsed != null) formatHermesRunDuration(elapsed),
+      if (steps > 0) steps == 1 ? '1 step' : '$steps steps',
+      if (working && elapsed != null) formatHermesRunDuration(elapsed),
+      if (finished && tools.isNotEmpty)
+        tools.take(2).map((tool) => tool.name).join(', '),
+    ].join(' · ');
     final reduced = context.reduceMotion;
     final settle = reduced
         ? Duration.zero
@@ -323,9 +367,15 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                         HermezIconSwap(
                           icon: attention
                               ? Icons.priority_high_rounded
+                              : finished
+                              ? (run.failed
+                                    ? Icons.error_outline_rounded
+                                    : Icons.check_circle_rounded)
                               : Icons.radio_button_checked_rounded,
-                          color: attention || working
+                          color: attention || working || run.failed
                               ? palette.accent
+                              : finished
+                              ? palette.ink
                               : palette.muted,
                           size: 22,
                         ),
@@ -343,10 +393,11 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                                 ),
                               ),
                               Text(
-                                latest?.title ??
-                                    (attention
-                                        ? 'Review the request below'
-                                        : 'Live activity'),
+                                attention
+                                    ? 'Review the request below'
+                                    : details.isNotEmpty
+                                    ? details
+                                    : latest?.title ?? 'Live activity',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -357,11 +408,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                             ],
                           ),
                         ),
-                        if (_events.isNotEmpty)
-                          Text(
-                            '${_events.length}',
-                            style: TextStyle(color: palette.muted),
-                          ),
+
                         const SizedBox(width: 6),
                         AnimatedRotation(
                           turns: _expanded ? 0.5 : 0,
@@ -476,6 +523,16 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (!run.isEmpty) ...[
+                        const SizedBox(height: 10),
+                        _RunStats(
+                          palette: palette,
+                          elapsed: elapsed,
+                          steps: steps,
+                          tools: tools,
+                          subagents: run.subagents,
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Text(
                         'Recent activity',
@@ -494,7 +551,9 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                         SizedBox(
                           height: 190,
                           child: HermesLiveActivityTimeline(
-                            events: _events,
+                            // This run only; earlier runs are in the
+                            // transcript.
+                            events: run.isEmpty ? _events : run.events,
                             running: working,
                           ),
                         ),
@@ -504,13 +563,15 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                         // dialog. Sending does not depend on [_busy] so the
                         // field stays open while its own send runs.
                         onSteer: working ? _steer : null,
+                        showSteer: working,
                         trailing: [
-                          HermezRunPill(
-                            label: _stopping ? 'Stopping…' : 'Stop',
-                            icon: Icons.stop_circle_outlined,
-                            busy: _stopping,
-                            onTap: working && !_busy ? _stop : null,
-                          ),
+                          if (working)
+                            HermezRunPill(
+                              label: _stopping ? 'Stopping…' : 'Stop',
+                              icon: Icons.stop_circle_outlined,
+                              busy: _stopping,
+                              onTap: !_busy ? _stop : null,
+                            ),
                           HermezRunPill(
                             label: 'Full activity',
                             icon: Icons.chevron_right_rounded,
@@ -530,6 +591,96 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The run at a glance: how long, how many steps, and which tools.
+class _RunStats extends StatelessWidget {
+  const _RunStats({
+    required this.palette,
+    required this.elapsed,
+    required this.steps,
+    required this.tools,
+    required this.subagents,
+  });
+
+  final HermezChatPalette palette;
+  final Duration? elapsed;
+  final int steps;
+  final List<({String name, int count})> tools;
+  final int subagents;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget stat(String label, String value) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: palette.ink,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: palette.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            stat(
+              'Time',
+              elapsed == null ? '—' : formatHermesRunDuration(elapsed!),
+            ),
+            stat('Steps', '$steps'),
+            stat('Tools', '${tools.length}'),
+            if (subagents > 0) stat('Subagents', '$subagents'),
+          ],
+        ),
+        if (tools.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final tool in tools.take(8))
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.canvas,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: Text(
+                    tool.count > 1 ? '${tool.name} ×${tool.count}' : tool.name,
+                    style: TextStyle(color: palette.ink, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

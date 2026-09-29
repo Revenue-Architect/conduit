@@ -135,16 +135,28 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       HermesLiveActivityKind.failed => 'Run failed',
     };
     final history = _activityHistory.putIfAbsent(storedId, () => []);
-    history.add(
-      HermesLiveActivityEvent(
-        sessionId: storedId,
-        kind: kind,
-        title: title,
-        timestamp: DateTime.now().toUtc(),
-      ),
+    final recorded = HermesLiveActivityEvent(
+      sessionId: storedId,
+      kind: kind,
+      title: title,
+      timestamp: DateTime.now().toUtc(),
+      detail: switch (kind) {
+        HermesLiveActivityKind.toolStarted ||
+        HermesLiveActivityKind.toolProgress ||
+        HermesLiveActivityKind.toolCompleted => safeName,
+        // The request id, so a notification for it is raised once.
+        HermesLiveActivityKind.waitingForInput =>
+          validateHermesOpaqueIdentifier(
+            event.payload['request_id'] ?? event.payload['id'],
+            sensitiveValues: config.sensitiveValues,
+          ),
+        _ => null,
+      },
     );
+    history.add(recorded);
     if (history.length > 100) history.removeRange(0, history.length - 100);
     _activityChanges.add(storedId);
+    if (!_activityEvents.isClosed) _activityEvents.add(recorded);
   }
 
   Future<void> _resolvePendingDecisionEvent(HermesDesktopEvent event) async {

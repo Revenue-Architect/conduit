@@ -76,6 +76,59 @@ void main() {
     onChannelUnread: unreads.add,
   );
 
+  group('hermes', () {
+    AppNotification hermes(NotificationKind kind, {String key = 'k-h'}) =>
+        AppNotification(
+          kind: kind,
+          title: 'kai finished',
+          body: 'Explain the gap',
+          sourceId: 'session-1',
+          dedupKey: key,
+        );
+
+    test('a finished run notifies in the background', () async {
+      final router = build(foreground: false);
+      final surface = await router.route(hermes(NotificationKind.hermesRun));
+      check(surface).equals(NotificationSurface.system);
+    });
+
+    test('nothing is raised for the Hermes chat being viewed', () async {
+      final router = build(
+        view: const ActiveView(chatId: 'local-1', hermesSessionId: 'session-1'),
+      );
+      check(await router.route(hermes(NotificationKind.hermesRun)))
+          .equals(NotificationSurface.suppressed);
+      check(
+        await router.route(
+          hermes(NotificationKind.hermesAttention, key: 'k-a'),
+        ),
+      ).equals(NotificationSurface.suppressed);
+    });
+
+    test('a waiting approval ignores the chat-responses toggle', () async {
+      final router = build(
+        foreground: false,
+        settings: allOn.copyWith(notificationChatEnabled: false),
+      );
+      check(await router.route(hermes(NotificationKind.hermesRun)))
+          .equals(NotificationSurface.suppressed);
+      check(
+        await router.route(
+          hermes(NotificationKind.hermesAttention, key: 'k-a'),
+        ),
+      ).equals(NotificationSurface.system);
+    });
+
+    test('the master toggle still silences Hermes', () async {
+      final router = build(
+        foreground: false,
+        settings: allOn.copyWith(notificationsEnabled: false),
+      );
+      check(await router.route(hermes(NotificationKind.hermesAttention)))
+          .equals(NotificationSurface.suppressed);
+    });
+  });
+
   group('gating', () {
     test('master toggle off suppresses everything', () async {
       final router = build(

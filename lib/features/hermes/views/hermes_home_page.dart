@@ -20,6 +20,7 @@ import '../widgets/hermez_relative_time.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
+import '../widgets/hermes_home_presence.dart';
 
 final hermesHomeProfileJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
@@ -174,6 +175,9 @@ class HermesHomePage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 36),
           children: [
+            // After time away, what happened meanwhile comes first. It is
+            // hidden when nothing did.
+            HermesAwayDigest(jobs: jobs),
             HermezSectionBar(
               label: 'BOTS  ${bots?.length ?? '—'}',
               actionLabel: 'All chats',
@@ -421,6 +425,9 @@ class HermesHomePage extends ConsumerWidget {
                     ),
             ),
             const SizedBox(height: 10),
+            // Asks once to let bots reach the user, beside Attention and
+            // below everything else so it never pushes content down.
+            const HermesNotifyPrompt(),
             Row(
               children: [
                 Expanded(

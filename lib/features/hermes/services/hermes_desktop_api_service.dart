@@ -314,6 +314,12 @@ final class HermesDesktopApiService
   final Map<String, List<HermesLiveActivityEvent>> _activityHistory = {};
   final StreamController<String> _activityChanges =
       StreamController<String>.broadcast();
+  final StreamController<HermesLiveActivityEvent> _activityEvents =
+      StreamController<HermesLiveActivityEvent>.broadcast();
+
+  /// Every activity event as it is recorded, for any session on this
+  /// connection. Used to tell the user when a run finishes or needs them.
+  Stream<HermesLiveActivityEvent> get activityEvents => _activityEvents.stream;
 
   List<HermesLiveActivityEvent> activitySnapshotFor(String storedId) =>
       List.unmodifiable(_activityHistory[storedId] ?? const []);
@@ -605,6 +611,10 @@ final class HermesDesktopApiService
   Future<List<Map<String, dynamic>>> listJobs() => _administration.listJobs();
   Future<List<Map<String, dynamic>>> listJobsForProfile(String profile) =>
       _administration.listJobsForProfile(profile);
+  Future<Map<String, dynamic>> learningGraph(String profile) =>
+      _administration.learningGraph(profile);
+  Future<List<Map<String, dynamic>>> skillCatalog(String profile) =>
+      _administration.skillCatalog(profile);
 
   @override
   Future<Map<String, dynamic>> createJob({
@@ -757,6 +767,7 @@ final class HermesDesktopApiService
     unawaited(_turnStates.close());
     unawaited(_sessionTurnStateChanges.close());
     unawaited(_activityChanges.close());
+    unawaited(_activityEvents.close());
     unawaited(_transcriptChanges.close());
     unawaited(_desktopContractChanges.close());
     _eventBuffer.clear();

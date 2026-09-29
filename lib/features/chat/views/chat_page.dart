@@ -2969,6 +2969,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       desktopService: desktopService is HermesDesktopApiService,
       turnState: activeHermesTurn,
       hasPendingDecision: hasPendingHermesDecision,
+      // A run this app watched stays as a compact summary after it ends.
+      hasRecentActivity:
+          exactHermesSession &&
+          desktopService.activitySnapshotFor(activeHermesSessionId).isNotEmpty,
     );
     _scheduleMarkdownPrewarm(messages, layoutMetadata: layoutMetadata);
     _syncLayoutBottomAnchor();

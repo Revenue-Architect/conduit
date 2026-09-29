@@ -5,8 +5,10 @@ import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_live_activity.dart';
 import 'hermez_chat_palette.dart';
 
-/// Show the disclosure only for the selected Desktop session while a turn is
-/// active or being recovered. Historical activity remains in the transcript.
+/// Show the run surface only for the selected Desktop session: while a turn
+/// is active or being recovered, while a decision is pending, and after a
+/// run this app watched has ended ([hasRecentActivity]), when it stays as a
+/// compact summary instead of disappearing.
 bool shouldShowHermesLiveActivity({
   required bool nativeConversation,
   required String? conversationSessionId,
@@ -14,12 +16,14 @@ bool shouldShowHermesLiveActivity({
   required bool desktopService,
   required HermesDesktopTurnState? turnState,
   bool hasPendingDecision = false,
+  bool hasRecentActivity = false,
 }) =>
     nativeConversation &&
     conversationSessionId != null &&
     conversationSessionId == activeSessionId &&
     desktopService &&
     (hasPendingDecision ||
+        hasRecentActivity ||
         turnState == HermesDesktopTurnState.running ||
         turnState == HermesDesktopTurnState.synchronizing ||
         turnState == HermesDesktopTurnState.reconnecting);

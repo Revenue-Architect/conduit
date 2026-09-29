@@ -121,6 +121,11 @@ class NotificationRouter {
         return settings.notificationChatEnabled;
       case NotificationKind.channelMessage:
         return settings.notificationChannelEnabled;
+      // A bot waiting on the user is gated by the master toggle alone.
+      case NotificationKind.hermesAttention:
+        return true;
+      case NotificationKind.hermesRun:
+        return settings.notificationChatEnabled;
     }
   }
 
@@ -131,6 +136,9 @@ class NotificationRouter {
         return view.isViewingChat(notification.sourceId);
       case NotificationKind.channelMessage:
         return view.isViewingChannel(notification.sourceId);
+      case NotificationKind.hermesAttention:
+      case NotificationKind.hermesRun:
+        return view.isViewingHermesSession(notification.sourceId);
     }
   }
 

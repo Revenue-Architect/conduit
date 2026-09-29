@@ -27,6 +27,16 @@ enum NotificationKind {
   /// upstream channel event with `type == 'message'`.
   @JsonValue('channel_message')
   channelMessage,
+
+  /// A Hermes bot is waiting on the user: an approval, a question, a secret.
+  /// [AppNotification.sourceId] is the Hermes stored session id.
+  @JsonValue('hermes_attention')
+  hermesAttention,
+
+  /// A Hermes run the app was watching finished or failed.
+  /// [AppNotification.sourceId] is the Hermes stored session id.
+  @JsonValue('hermes_run')
+  hermesRun,
 }
 
 /// An immutable, transport-agnostic description of a notification to surface.

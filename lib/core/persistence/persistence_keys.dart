@@ -91,6 +91,10 @@ final class PreferenceKeys {
   static const String hermesArtifactProvenance =
       'hermes_artifact_provenance_v1';
   static const String hermesSteelViewerUrl = 'hermes_steel_viewer_url_v1';
+  // When the app was last in use; Home summarizes what changed since.
+  static const String hermesLastActiveAt = 'hermes_last_active_at_v1';
+  static const String hermesNotifyPromptDismissed =
+      'hermes_notify_prompt_dismissed_v1';
   static const String hermesDashboardCookieIdentities =
       'hermes_dashboard_cookie_identities_v1';
 

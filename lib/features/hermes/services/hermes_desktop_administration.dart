@@ -422,6 +422,37 @@ final class _HermesDesktopAdministration {
   Future<List<Map<String, dynamic>>> listJobs() async =>
       _owner._objects(await _owner._requestJson('GET', '/api/cron/jobs'));
 
+  /// What one bot has learned: memory cards (MEMORY.md notes and USER.md
+  /// facts about the user) and the skills it wrote or used
+  /// (`GET /api/learning/graph`). Read-only.
+  Future<Map<String, dynamic>> learningGraph(String profile) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    return _owner._object(
+      await _owner._requestJson(
+        'GET',
+        '/api/learning/graph',
+        query: {'profile': profile},
+      ),
+    );
+  }
+
+  /// Installed skills for one bot with enabled state, usage, and whether the
+  /// bot wrote them itself (`GET /api/skills`). Read-only.
+  Future<List<Map<String, dynamic>>> skillCatalog(String profile) async {
+    if (!HermesConfig.isValidDesktopProfile(profile)) {
+      throw ArgumentError.value(profile, 'profile');
+    }
+    return _owner._objects(
+      await _owner._requestJson(
+        'GET',
+        '/api/skills',
+        query: {'profile': profile},
+      ),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> listJobsForProfile(String profile) async {
     if (!HermesConfig.isValidDesktopProfile(profile)) {
       throw ArgumentError.value(profile, 'profile');
