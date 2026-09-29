@@ -1,6 +1,6 @@
 # Hermez / Conduit: agent handoff
 
-Updated 2026-09-28 (late), after the physical-motion rewrite and a second device feedback pass. This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
+Updated 2026-09-28 (night), after the physical-motion rewrite, two device feedback passes, and a micro-motion pass (see the last section). This is the shortest safe entry point for a new coding session with no chat history. It describes the `Revenue-Architect/conduit` fork, not stock Conduit. Read code before changing behavior; this document is a map, not an override of current source.
 
 ## Start here
 
@@ -128,3 +128,22 @@ The 2026-09-28 inline-run/Steel pass: focused Hermes/decision/chat ownership sui
 4. Inspect at narrow width and large text; preserve the Hermez visual grammar and backend behavior.
 5. Build/install/verify if wireless ADB is available; otherwise report the unverified device step honestly.
 6. Commit/push only scoped changes, then provide the APK provenance and a direct authenticated tailnet download URL if requested.
+
+## 2026-09-28 night pass: micro-motion, Steer, profile builds
+
+Commits: `f8fbfea3` (end-of-motion holds, Steer, fades) and `22bf016a` (card landing), then this handoff.
+
+- **Root cause of the "jump or stutter at the end".** The medium spring overshot by 0.5 %; clamped to [0, 1] that became a dead hold for the second half of every medium animation, then a snap when the controller ended. Medium is now critically damped (1 / 385 / 39.3) and every spring curve is rescaled so its settle point is exactly 1. A test (`every Hermez spring keeps moving until it settles`) guards it. Do not add a bouncy spring to a duration-driven animation.
+- **Remounts mid-motion.** Route, cover, and dialog transitions now return the same widget structure on every frame and at rest (neutral scale/offset/`Clip.none` instead of swapping wrappers). Route and dialog curves come from `hermezCurved`, which shares one `CurvedAnimation` per parent instead of creating one per frame (each leaked a status listener).
+- **Mirrored reverse curves.** Ease-out reverse curves slammed into the last frame (Kanban lanes, several switchers). Reverse now uses the flipped spring or an ease-in.
+- **Sections collapse as one piece.** `HermezUnroll` slides under its top edge (a drawer) instead of being sliced by a sweeping clip. Kanban lanes use the spring; "Show empty stages" unrolls and its chevron turns. The inline run surface lost its outer `HermezSize`, which trailed behind its own reveals.
+- **Card content no longer pops in when a screen shrinks.** A `HermezMotionSurface` with `onOpen` captures its face (`HermezMorphOrigin.snapshot`, `toImageSync` of a `RepaintBoundary`) before it opens. `_HermezSheetFrame._landing` slides the destination up inside the aperture near the source and uncovers that image, which lands on the real card. Same widgets at every progress value. Applies to Home Schedule/Board/bot cards, Today rows, and Kanban tasks.
+- **Steer is not a dialog.** `HermesRunActions` (`hermes_run_actions.dart`): the Steer pill stretches across its row into a text field. Icon and label stay put, the send control grows in at the moving edge (close while empty, send when there is text), and the field contracts when Hermes accepts. A rejected steer keeps the text and shows the snackbar. Used by the inline run surface and the Live Run page; `promptHermesSteer` was removed.
+- **Remaining fades gone.** Code-block copy/collapse icons, streaming footer, banners, selection checks, voice pill, note recorder route, and text swaps. New `HermezSwitch` (`glyph`, `unroll`, `column`) for `AnimatedSwitcher`s; an `AnimatedSwitcher` with no `transitionBuilder` fades, so always pass one.
+- **Profile builds.** `android/app/build.gradle.kts` gives the `profile` build type the `.debug` application id, so an AOT build installs over the debug app and keeps the sign-in. It is much closer to real frame rate than a debug build. **The profile build shows the stock Conduit name and icon** (the Hermez label and icon live in `src/debug`); the user chose to leave that as is. A first profile build takes about 13 minutes, later ones about 3.5.
+- **APK:** `build/app/outputs/flutter-apk/app-profile.apk`, SHA-256 `3d9e0bdd3eb6f2709e878635b8ec84567ddd8be73a877a69a676a53082ba5230`, built with the Steel define (`HERMES_STEEL_VIEWER_URL`, value in `work/private-build-defines.txt`, never committed). Installed on the S25.
+- **Tests:** `test/features/hermes` all pass (717). Across hermes/chat/navigation/shared the failures are the same 8 baseline ones. `test/features/notes/services/note_audio_upload_service_test.dart` also fails here (13 tests, Windows path-length errors in a service this work did not touch; not part of the earlier baseline). The server-version card tests now wait for the banner to unroll before tapping.
+
+Not verified on device this pass: the card landing, the Steer field, and the profile build's feel. The phone was in use, so nothing was driven on screen after the install. Check these first: Kanban/Scheduled agents close, a Kanban task close, Steer during a live run (needs an active turn), and the collapse of Kanban lanes.
+
+Product analysis against Muse and Grok Bot: `docs/HERMEZ_COMPETITIVE_GAP_ANALYSIS.md`. Top gaps: the app never notifies you when a bot needs approval, voice and wake word through Hermes, memory and skills are invisible, session search/pin/export unused, bots cannot be created from the phone.
