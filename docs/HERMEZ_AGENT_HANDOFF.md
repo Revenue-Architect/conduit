@@ -229,3 +229,19 @@ Commits `ac8b54a0` (push weight) and `f461fd67` (side navigation). Profile APK S
   - reduced motion and the label stagger
 
   All 50 existing drawer tests pass. Wide suites show only the 8 known baseline failures.
+
+## 2026-09-29: team send fixed, bigger team composer
+
+Profile APK SHA-256 `f88ba2b8f8606ed919863cdf6dda98b48e49920c2ea113dd2660e5705cdbe103`, installed on the S25.
+
+- **Symptom:** in a team room, Send did nothing.
+- **Cause:** `groups.send` was rejected with "user payload is missing fields: thread_id". Hermes' `validate_user_payload` (`gateway/hosted_room_discussion.py`) requires exactly `{text, thread_id}`. Temporary `debugPrint`s in the profile build showed the tap working and the RPC failing. The error snackbar was not noticed on device.
+- **Fix:** `_sendToTeam` sends `thread_id: roomId`, so the room is one discussion thread. The room test's fake gateway now asserts the exact payload keys.
+- **Verified on device:** a message sent to OP Team, strong replied, and the button turned to Stop while the team worked.
+- **Composer:**
+  - 2 to 8 lines, 16 pt text, and a 44 dp send button
+  - theme focus borders switched off inside the pill
+  - bottom gap of at least 14 dp over the gesture bar; this S25 reports `viewPadding.bottom == 0` while drawing the bar over the app
+
+  The extra bottom gap was not re-checked on device: the phone was rotated and in use.
+- **Side navigation, for reference:** Hermez Home is outside the drawer `ShellRoute`, so it has no side navigation. It opens from a chat (hamburger, or a swipe from the left edge). Home's Recent "See all" has always pushed the Conversations page.
