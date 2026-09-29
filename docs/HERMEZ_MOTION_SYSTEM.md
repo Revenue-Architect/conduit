@@ -12,7 +12,8 @@ Screens pick a `HermezMotionWeight`, never raw spring values.
 | --- | --- | --- | --- | --- |
 | light | icons, chips, rows, small controls | 0.955 | 0.65 / 420 / 32 | ~0.30 s |
 | medium | cards, sheets, sibling pages | 0.978 | 1 / 385 / 39.3 | ~0.43 s |
-| heavy | a page or sheet growing out of a card | 0.99 | 1 / 300 / 34 | ~0.46 s |
+| heavy | a page growing out of a card | 0.99 | 1 / 300 / 34 | ~0.46 s |
+| push (`springPush`, not a weight) | a sheet growing out of a card and pushing the screen above it | — | 1.3 / 240 / 35.3 | ~0.6 s both ways |
 
 All three are critically damped (damping ratio 0.97 to 1.0). **Do not add a bouncy spring to a duration-driven animation.** The curve is clamped to [0, 1], so any overshoot turns into a dead hold: the old medium spring (0.9 / 340 / 30, ratio 0.86) reached 99 % at 0.24 s and then sat still until 0.41 s, so every medium open and close stopped, waited, and snapped when the route or presence finished. A test (`every Hermez spring keeps moving until it settles`) guards this.
 
@@ -28,7 +29,8 @@ All three are critically damped (damping ratio 0.97 to 1.0). **Do not add a boun
   - `HermezRouteExits.leaveForAnotherDestination()`: call before `router.go` to somewhere else (Bot Detail → new chat). The popping expand page then slides out instead of contracting into a card that is about to disappear.
   - `HermezRouteMotion.standard`: sibling push, slides in from the trailing edge; the page underneath shifts back 14 %. A leading-edge shadow is painted only while moving.
   - `pushHermezSheet` / `pushHermezSheetRoute`: a sheet that grows out of the tapped row or card (or rises from the bottom edge), drag-down to close, tap-outside or Back to close, lifts above the keyboard. The route page stays full screen at the navigator origin and the sheet is placed inside it; Hero flights measure against the page, so this matters. The returned future completes after the sheet has contracted home, so follow-up navigation never starts under a sheet in flight.
-  - The screen under an expanding route recedes to scale 0.988; under a sibling push it shifts back.
+  - The screen under an expanding page recedes to scale 0.988; under a sibling push it shifts back.
+  - **A sheet pushes the screen it grew out of** (`HermezCoverKind.lift`). `hermezSheetAperture` is the one geometry for both sides: the card first widens to the screen's width where it is, then its top edge rises to the sheet's top (ease-in-out cubic, so the push starts with resistance). The Hermez screen underneath is pushed up by exactly as far as that edge has risen above the card (`HermezRouteTransitions._pushAt`), so the content right above the card stays against the sheet. Closing runs it backwards and pulls the screen down, taking as long as the push (no fast exit for sheets). Dragging the sheet down pulls the screen with the finger. The pushed screen only translates; it does not recede. Sheets with no card keep a gentle lift (`liftFor`, 6 % of the height, 32 to 64 dp). The chat screen is a no-transition page and stays still.
   - `HermezPushPageTransitionsBuilder` replaces Android's fading Zoom transition for every Material route in the app.
 - `HermezEntrance(order:)`: currently a pass-through (`HermezEntrance.staggered = false`). Secondary content arrives with the container it belongs to; staggered parts read as separate objects.
 - `HermezPresence` / `HermezReveal` / `HermezUnroll`: real mount and unmount. The section slides out from under its top edge and back under it, keeping its shape (a drawer), instead of being sliced by a clip sweeping across it. Children keep full width.

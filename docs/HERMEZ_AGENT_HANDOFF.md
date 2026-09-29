@@ -188,3 +188,13 @@ Profile APK SHA-256 `86627682d3cb150c0690c0eb4f8d80f29614e8444c63f5be426f4268fb1
 - **Verified:** captures after the fix (`kanban-close3`, `task-close2`) show the face uncovered mid-contraction and landing exactly on the card, with no swap.
 - **Test:** the motion test for sheet contraction now checks that the title never jumps above its path and that the card's face (`RawImage`) is drawn before the route ends. It no longer checks that the title stays between its start and end positions, since the title now leaves downward. All 729 tests in `test/features/hermes` pass.
 - **Time dilation:** reset to 1 on the device after capture.
+
+## 2026-09-29: sheets push the screen they grew out of
+
+Commits `af6ad0c2` (first lift), `418950f5` (contact push), and the weight tuning after them. Profile APK SHA-256 `4511e2b86adb99feb166fa5d00bbc5a7592789b9734f08856d3fc07f92c3a110`, installed on the S25. The user asked for no on-device test this round.
+
+- **Goal (the user's words):** "a physical interconnected object." A card that grows into a sheet should push the screen above it up while it grows, and pull it down while it shrinks. It should have some weight or resistance, and not snap.
+- **How:** `hermezSheetAperture(card, end, t)` is the single geometry. The card widens to full width first (t 0 to 0.3), then its top edge rises (ease-in-out cubic). The covered Hermez screen (`HermezCoverKind.lift`) is translated up by `_pushAt(t)`, which is exactly how far that edge has risen above the card, less any drag. Both sides evaluate the same function on the same controller and curve (`curvePush`, 1.3 / 240 / 35.3, critically damped, about 0.6 s), so edge and screen stay in contact. The reverse takes as long as the forward, and the pushed screen does not recede.
+- **Limits:** only Hermez screens move. The chat screen (a no-transition page) stays still under its sheets. Sheets that did not grow from a card keep a gentle 32 to 64 dp lift.
+- **Tests:** the screen rises monotonically while the sheet grows, ends up pushed by exactly the edge's rise, follows a drag down and back, and returns exactly on close. The aperture phases and the push spring's settling are also covered. All 731 tests in `test/features/hermes` pass. Wide suites: only the 8 known baseline failures, re-run after the contact-push change.
+- **Device:** a slowed capture of the first lift (`lift-open`, `lift-close`) confirmed the screen moving with the sheet and the outline following the card. The contact push and weight tuning were not captured on device, at the user's request.
