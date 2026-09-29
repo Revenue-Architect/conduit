@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
+import '../feedback/hermez_feedback.dart';
 import '../kanban/hermes_kanban_summary_provider.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_config.dart';
@@ -315,6 +316,7 @@ class HermesHomePage extends ConsumerWidget {
                       'motif',
                     ),
                     semanticLabel: 'Scheduled agents',
+                    feedbackCue: HermezFeedbackCue.objectOpen,
                     onOpen: (origin) =>
                         context.pushNamed(RouteNames.hermesJobs, extra: origin),
                     padding: const EdgeInsets.all(14),
@@ -358,6 +360,7 @@ class HermesHomePage extends ConsumerWidget {
                     motif: HermezMotif.arc,
                     motifMorphId: hermezMorphPart(hermezBoardMorphId, 'motif'),
                     semanticLabel: 'Kanban',
+                    feedbackCue: HermezFeedbackCue.objectOpen,
                     onOpen: (origin) => context.pushNamed(
                       RouteNames.hermesKanban,
                       extra: origin,
@@ -639,6 +642,7 @@ class _BotCard extends ConsumerWidget {
       border: Border.all(color: palette.border.withValues(alpha: 0.8)),
       semanticLabel: bot.title,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+      feedbackCue: HermezFeedbackCue.objectOpen,
       onOpen: (origin) => context.pushNamed(
         RouteNames.hermesBotDetail,
         pathParameters: {'profile': bot.name},

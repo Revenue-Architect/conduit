@@ -7,6 +7,7 @@ import 'package:nib_motion/nib_motion.dart';
 
 import '../../../core/services/haptic_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../feedback/hermez_feedback.dart';
 import 'hermez_morph_origin.dart';
 import 'hermez_motion_tokens.dart';
 
@@ -34,6 +35,7 @@ class HermezMotionSurface extends StatefulWidget {
     this.originColor,
     this.originBorderColor,
     this.haptic = true,
+    this.feedbackCue,
   });
 
   final Widget child;
@@ -50,6 +52,12 @@ class HermezMotionSurface extends StatefulWidget {
   final Color? originColor;
   final Color? originBorderColor;
   final bool haptic;
+
+  /// Optional sound + haptic for a confirmed tap (never on pointer down, so a
+  /// scroll that starts on the surface stays silent). When set, its haptic
+  /// replaces the default selection tick. Fire and forget: the action never
+  /// waits for it.
+  final HermezFeedbackCue? feedbackCue;
 
   @override
   State<HermezMotionSurface> createState() => _HermezMotionSurfaceState();
@@ -105,7 +113,12 @@ class _HermezMotionSurfaceState extends State<HermezMotionSurface> {
     // Captured before the release so it is the object as it was drawn.
     final snapshot = open == null ? null : _captureFace();
     _release();
-    if (widget.haptic) unawaited(ConduitHaptics.selectionClick());
+    final cue = widget.feedbackCue;
+    if (cue != null) {
+      HermezFeedback.play(cue);
+    } else if (widget.haptic) {
+      unawaited(ConduitHaptics.selectionClick());
+    }
     if (open != null) {
       open(
         HermezMorphOrigin.of(

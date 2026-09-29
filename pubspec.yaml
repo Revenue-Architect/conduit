@@ -104,6 +104,9 @@ dependencies:
   home_widget: ^0.9.3
   flutter_highlight: ^0.7.0
   just_audio: ^0.10.5
+  # Short Hermez interface cues only (voice/media stay on just_audio).
+  # Pinned: the sensory layer is tuned against this engine version.
+  flutter_soloud: 5.1.4
   cupertino_native_better: ^1.5.4
   flutter_tex: ^5.2.6
   xterm: ^4.0.0
@@ -166,6 +169,7 @@ flutter:
   assets:
     - THIRD_PARTY_NOTICES.md
     - assets/icons/
+    - assets/sounds/hermez/
     - assets/release_notes/
     - assets/chartjs.min.js
     - assets/flutter_tex.js
@@ -188,3 +192,9 @@ flutter_native_splash:
   # Web specific settings
   web: false
     
+
+# Hermez interface cues are bundled WAV; no Ogg/Vorbis/Opus/FLAC needed.
+hooks:
+  user_defines:
+    flutter_soloud:
+      no_xiph_libs: true

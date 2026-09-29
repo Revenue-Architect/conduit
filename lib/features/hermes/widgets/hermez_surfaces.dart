@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../feedback/hermez_feedback.dart';
 import '../motion/hermez_motion.dart';
 import 'hermez_chat_palette.dart';
 
@@ -119,10 +120,14 @@ class HermezSurface extends StatelessWidget {
     this.border,
     this.weight = HermezMotionWeight.medium,
     this.semanticLabel,
+    this.feedbackCue,
   });
 
   final Widget child;
   final HermezSurfaceKind kind;
+
+  /// Sound + haptic on a confirmed tap; see [HermezMotionSurface.feedbackCue].
+  final HermezFeedbackCue? feedbackCue;
   final HermezMotif motif;
   final VoidCallback? onTap;
   final ValueChanged<HermezMorphOrigin?>? onOpen;
@@ -211,6 +216,7 @@ class HermezSurface extends StatelessWidget {
     return HermezMotionSurface(
       onTap: onTap,
       onOpen: onOpen,
+      feedbackCue: feedbackCue,
       weight: weight,
       semanticLabel: semanticLabel,
       originRadius: radius,

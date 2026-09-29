@@ -59,6 +59,7 @@ import 'core/providers/app_startup_providers.dart';
 import 'features/notifications/services/local_notification_service.dart';
 import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
+import 'features/hermes/feedback/hermez_feedback_coordinator.dart';
 import 'features/hermes/services/hermes_run_notifications.dart';
 
 const bool _enableFlutterDriverExtension = bool.fromEnvironment(
@@ -934,6 +935,7 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     // Open WebUI post-sign-in startup never runs. Also holds the background
     // lease while a run works.
     ref.read(hermesRunNotifierProvider);
+    ref.read(hermezFeedbackCoordinatorProvider);
   }
 
   @override

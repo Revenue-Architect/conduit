@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nib_motion/nib_motion.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
+import '../feedback/hermez_feedback.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_technical_background.dart';
@@ -49,6 +50,8 @@ class HermesPageChrome extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
+    // Hermez is on screen: start interface audio in the background (once).
+    HermezFeedback.instance.warmUp();
     return NibMotionConfig(
       reducedMotion: context.reduceMotion,
       entranceWarmup: Duration.zero,

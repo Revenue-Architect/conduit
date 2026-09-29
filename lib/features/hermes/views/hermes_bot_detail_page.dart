@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../feedback/hermez_feedback.dart';
 import '../../../core/services/navigation_service.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_config.dart';
@@ -127,6 +128,8 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
             : null,
       );
     } catch (_) {
+      // Presentation only, alongside the existing error.
+      HermezFeedback.play(HermezFeedbackCue.runFailed);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open this bot chat.')),
@@ -249,6 +252,7 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                       kind: HermezSurfaceKind.technical,
                       motif: HermezMotif.slash,
                       semanticLabel: 'Chat with $title',
+                      feedbackCue: HermezFeedbackCue.botEngage,
                       onTap: bot == null || _opening
                           ? null
                           : () => _openChat(bot!),

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/services/performance_profiler.dart';
 import '../../../core/utils/system_ui_style.dart';
+import '../../hermes/feedback/hermez_feedback.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/horizontal_gesture_ownership.dart';
 import '../../../shared/widgets/legacy_design_compatibility.dart';
@@ -337,6 +338,13 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
 
     _pendingSettledEndpoint = null;
     _lastSettledEndpoint = endpoint;
+    // The sheet seats against its stop: one latch per real arrival, never
+    // while dragging (presentation only; the settle already happened).
+    HermezFeedback.play(
+      endpoint == _DrawerSettleEndpoint.open
+          ? HermezFeedbackCue.navLatchOpen
+          : HermezFeedbackCue.navLatchClose,
+    );
   }
 
   @override
