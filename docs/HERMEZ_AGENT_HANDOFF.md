@@ -177,3 +177,14 @@ Commit `5ee28ec3`. Profile APK SHA-256 `2928cb3a8fb8581f605c123d2a86f4a11926ab76
 - **Tests:** `hermes_teams_test.dart` covers parsing, the timeline rules, merging, and the room page against a fake gateway answering `groups.state`, `groups.log`, and `groups.send`. The wide suites show only the 8 known baseline failures.
 
 Check first on device: does Home show TEAMS (if not, the Group Chat worker is not running on the Umbrel), create a team with two bots, send a message, and watch replies and the thinking row.
+
+## 2026-09-29: contraction landing fix (verified on device)
+
+Profile APK SHA-256 `86627682d3cb150c0690c0eb4f8d80f29614e8444c63f5be426f4268fb103711`, installed on the S25.
+
+- **Symptom:** closing Kanban from Home, or a Kanban task sheet, clipped or stuttered at the end.
+- **Cause:** frame captures at 10x time dilation (`diagnostics/hermez-motion-v2-20260928/kanban-close`, `task-close`) showed the problem. Near the card, `_landing` slid the destination up by the aperture's height to uncover the card's face. The scaled page is far taller than the card, so more of the page (lanes, sheet sections) scrolled through the card outline instead. The card's face was only uncovered on the last frame.
+- **Fix:** `_HermezSheetFrame._landing` now slides the destination down and out through the aperture's bottom, clipped by `_LeavingEdge`, a top edge that travels with it. No new page content enters the outline, and the face, anchored at the top, is uncovered from the top while it shrinks onto the real card.
+- **Verified:** captures after the fix (`kanban-close3`, `task-close2`) show the face uncovered mid-contraction and landing exactly on the card, with no swap.
+- **Test:** the motion test for sheet contraction now checks that the title never jumps above its path and that the card's face (`RawImage`) is drawn before the route ends. It no longer checks that the title stays between its start and end positions, since the title now leaves downward. All 729 tests in `test/features/hermes` pass.
+- **Time dilation:** reset to 1 on the device after capture.
