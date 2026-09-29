@@ -259,3 +259,18 @@ Profile APK SHA-256 `c759fba2cec12309d58254b296881f0ca773b697b8f30cac3f64a248e5b
   - This is a second `DrawerShellPage` instance, separate from the chat `ShellRoute`'s. Home and the chat do not normally coexist, because a session opens with `go(Routes.chat)`. The sidebar's Hermes Home entry pushes Home over the chat shell, so two sidebars can be mounted then. From Home's own sidebar, that entry now just closes the navigation.
   - Tablets are unchanged.
 - **Tests:** `hermes_destinations_smoke_test.dart` checks that the button slides Home to x = W with the "Return to Home" rail, and that the rail brings it back. Wide suites show only the 8 known baseline failures.
+
+## 2026-09-29: inverted side navigation, stutter removed (measured on device)
+
+Profile APK SHA-256 `85818e109b686e2341e94e269d62b07f8b976201577c42bafaf74e63eefb0ac9`, installed on the S25.
+
+- **Theme:** `ResponsiveDrawerLayout.mobileNavigationTheme`. `DrawerShellPage` passes the opposite app theme on phones, and the stage takes its background.
+- **Stutter causes:** found with VM-service frame timings and timelines, plus a temporary runtime probe that has since been removed.
+  1. `HermezBotMark` blurred glows were re-rendered offscreen every frame. Marks are now cached as images (`_CachedBotMarkPainter`, LRU of 32).
+  2. Label opacity fades are gone; the stagger is motion only.
+  3. System bar style is held while the navigation rests open or closes back (`_RestingOverlayStyle`), never switched part-way.
+  4. Moving offsets are snapped to device pixels (`snapToDevicePixels`) so the glyph atlas is reused.
+
+  The rounded clip was also replaced with a scissor and painted corners.
+- **Result over 3 open/close cycles:** dropped frames went from 13 to 0, and max raster from 35 ms to 12 ms.
+- **Rejected:** snapshotting the sheet (`SnapshotWidget`) stalled the raster thread for about 70 ms on the first frame.
