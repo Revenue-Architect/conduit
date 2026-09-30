@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../shared/widgets/conduit_dialog_route.dart';
 import '../../../core/services/navigation_service.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
@@ -37,161 +36,302 @@ final class _KanbanLinkedAttachment extends _KanbanLinkedSelection {
   final HermesKanbanArtifactTarget target;
 }
 
-/// The pop Future resolves before Material's dialog exit animation. Wait for
-/// the overlay to be removed before rebuilding Kanban or disposing its fields.
-Future<T?> _settledDialog<T>(
+/// The Hermes profiles a task can be assigned to: Bot Mode's bots, or the
+/// Kanban plugin's roster on gateways without Bot Mode.
+Future<List<KanbanProfile>> _kanbanProfiles(
   BuildContext context,
-  WidgetBuilder builder,
+  HermesKanbanClient client,
 ) async {
-  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
-  final theme = hermezVisualTheme(Theme.of(context)).copyWith(
-    dialogTheme: DialogThemeData(
-      backgroundColor: palette.surface,
-      surfaceTintColor: Colors.transparent,
-    ),
-  );
-  final route = ConduitDialogRoute<T>(
-    context: context,
-    builder: (dialogContext) =>
-        Theme(data: theme, child: builder(dialogContext)),
-  );
-  final result = await Navigator.of(context).push<T>(route);
-  await route.completed;
-  return result;
+  try {
+    final bots = await ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(hermesBotsProvider.future);
+    if (bots.isNotEmpty) {
+      return bots
+          .map((bot) => KanbanProfile(bot.name, bot.description))
+          .toList(growable: false);
+    }
+  } catch (_) {
+    // Older gateways may not advertise Bot Mode; the Kanban plugin remains
+    // a compatible fallback for their profile roster.
+  }
+  return client.profiles();
 }
 
-Future<String?> _kanbanTextDialog(
-  BuildContext context,
-  String title, {
-  String? hint,
-  String? initial,
-  int maxLength = 500,
-}) async {
-  final controller = TextEditingController(text: initial);
-  var closing = false;
-  try {
-    return await _settledDialog<String>(
-      context,
-      (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: maxLength,
-          decoration: hint == null ? null : InputDecoration(hintText: hint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (closing) return;
-              closing = true;
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (closing) return;
-              closing = true;
-              Navigator.pop(dialogContext, controller.text.trim());
-            },
-            child: const Text('Save'),
-          ),
-        ],
+/// The profile choices, drawn in place where they were asked for (they open
+/// under the control and push the rest down). Choosing one reports its name;
+/// "Unassign" reports an empty name, as the old picker did.
+class _ProfileChoices extends StatefulWidget {
+  const _ProfileChoices({
+    required this.client,
+    required this.current,
+    required this.onSelected,
+    this.enabled = true,
+  });
+
+  final HermesKanbanClient client;
+  final String? current;
+  final ValueChanged<String> onSelected;
+  final bool enabled;
+
+  @override
+  State<_ProfileChoices> createState() => _ProfileChoicesState();
+}
+
+class _ProfileChoicesState extends State<_ProfileChoices> {
+  late final Future<List<KanbanProfile>> _profiles = _kanbanProfiles(
+    context,
+    widget.client,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: FutureBuilder<List<KanbanProfile>>(
+        future: _profiles,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData && !snapshot.hasError) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: LinearProgressIndicator(),
+            );
+          }
+          if (snapshot.hasError) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Could not load Hermes profiles. Retry the assignment.',
+              ),
+            );
+          }
+          final roster = snapshot.data!;
+          if (roster.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('No Hermes profiles available.'),
+            );
+          }
+          final current = widget.current;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: palette.border),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                    child: Text(
+                      'ASSIGNEE',
+                      style: HermezType.technical(palette.muted),
+                    ),
+                  ),
+                  for (final profile in roster)
+                    ListTile(
+                      enabled: widget.enabled,
+                      minVerticalPadding: 10,
+                      leading: Icon(
+                        profile.name == current
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        color: profile.name == current
+                            ? palette.accent
+                            : palette.muted,
+                      ),
+                      title: Text(profile.name),
+                      subtitle: profile.description == null
+                          ? null
+                          : Text(
+                              profile.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                      onTap: () => widget.onSelected(profile.name),
+                    ),
+                  if (current != null && current.isNotEmpty)
+                    ListTile(
+                      enabled: widget.enabled,
+                      leading: Icon(
+                        Icons.person_off_outlined,
+                        color: palette.muted,
+                      ),
+                      title: const Text('Unassign'),
+                      subtitle: const Text('This pauses new agent work.'),
+                      onTap: () => widget.onSelected(''),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                    child: Text(
+                      'Ready tasks start automatically once assigned.',
+                      style: HermezType.meta(palette),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
-  } finally {
-    controller.dispose();
   }
 }
 
-Future<String?> _pickKanbanProfile(
-  BuildContext context,
-  HermesKanbanClient client, {
-  String? current,
-}) {
-  final profiles = () async {
-    try {
-      final bots = await ProviderScope.containerOf(
-        context,
-        listen: false,
-      ).read(hermesBotsProvider.future);
-      if (bots.isNotEmpty) {
-        return bots
-            .map((bot) => KanbanProfile(bot.name, bot.description))
-            .toList(growable: false);
-      }
-    } catch (_) {
-      // Older gateways may not advertise Bot Mode; the Kanban plugin remains
-      // a compatible fallback for their profile roster.
-    }
-    return client.profiles();
-  }();
-  return _settledDialog<String>(
-    context,
-    (dialogContext) => AlertDialog(
-      title: const Text('Assign Hermes profile'),
-      content: SizedBox(
-        width: 320,
-        height: MediaQuery.sizeOf(dialogContext).height * 0.5,
-        child: FutureBuilder<List<KanbanProfile>>(
-          future: profiles,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData && !snapshot.hasError) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return const Center(
-                child: Text(
-                  'Could not load Hermes profiles. Retry the assignment.',
-                ),
-              );
-            }
-            final roster = snapshot.data!;
-            if (roster.isEmpty) {
-              return const Center(child: Text('No Hermes profiles available.'));
-            }
-            return ListView(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text('Ready tasks start automatically once assigned.'),
-                ),
-                for (final profile in roster)
-                  ListTile(
-                    title: Text(profile.name),
-                    subtitle: profile.description == null
-                        ? null
-                        : Text(
-                            profile.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                    trailing: profile.name == current
-                        ? const Icon(Icons.check_rounded)
-                        : null,
-                    onTap: () => Navigator.pop(dialogContext, profile.name),
-                  ),
-                if (current != null)
-                  ListTile(
-                    title: const Text('Unassign'),
-                    subtitle: const Text('This pauses new agent work.'),
-                    onTap: () => Navigator.pop(dialogContext, ''),
-                  ),
-              ],
-            );
-          },
+/// A single field edited in place, with Cancel and Save under it.
+class _InlineField extends StatefulWidget {
+  const _InlineField({
+    required this.label,
+    required this.onCancel,
+    required this.onSave,
+    this.initial,
+    this.maxLength = 1000,
+    this.numeric = false,
+    this.multiline = false,
+  });
+
+  final String label;
+  final String? initial;
+  final int maxLength;
+  final bool numeric;
+  final bool multiline;
+  final VoidCallback onCancel;
+  final ValueChanged<String> onSave;
+
+  @override
+  State<_InlineField> createState() => _InlineFieldState();
+}
+
+class _InlineFieldState extends State<_InlineField> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          maxLength: widget.maxLength,
+          minLines: widget.multiline ? 2 : 1,
+          maxLines: widget.multiline ? 6 : 1,
+          keyboardType: widget.numeric ? TextInputType.number : null,
+          decoration: InputDecoration(labelText: widget.label),
+          onSubmitted: widget.multiline
+              ? null
+              : (_) => widget.onSave(_controller.text.trim()),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
+        OverflowBar(
+          alignment: MainAxisAlignment.end,
+          spacing: 8,
+          children: [
+            TextButton(
+              style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
+              onPressed: widget.onCancel,
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+              onPressed: () => widget.onSave(_controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
         ),
       ],
     ),
   );
 }
+
+/// A consequential choice held open for one more decision, drawn where it
+/// was made.
+class _GuardPanel extends StatelessWidget {
+  const _GuardPanel({
+    required this.title,
+    required this.message,
+    required this.keepLabel,
+    required this.confirmLabel,
+    required this.onKeep,
+    required this.onConfirm,
+  });
+
+  final String title;
+  final String message;
+  final String keepLabel;
+  final String confirmLabel;
+  final VoidCallback onKeep;
+  final VoidCallback? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final edge = palette.accent;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title $message',
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: edge.withValues(alpha: 0.6)),
+          color: edge.withValues(alpha: 0.06),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Text(title, style: HermezType.technical(edge)),
+            ),
+            const SizedBox(height: 4),
+            ExcludeSemantics(
+              child: Text(message, style: HermezType.meta(palette)),
+            ),
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 8,
+              children: [
+                TextButton(
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
+                  onPressed: onKeep,
+                  child: Text(keepLabel),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(64, 44),
+                  ),
+                  onPressed: onConfirm,
+                  child: Text(confirmLabel),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Which task field is being edited in place.
+enum _TaskEdit { title, assignee, priority, comment }
 
 /// The secondary choices of the new-task form as one physical compartment.
 ///
@@ -210,6 +350,8 @@ class _NewTaskOptions extends StatelessWidget {
     required this.onTriageChanged,
     required this.onPickAssignee,
     required this.onPriorityChanged,
+    this.choosingBot = false,
+    this.botChoices,
   });
 
   final bool expanded;
@@ -221,6 +363,10 @@ class _NewTaskOptions extends StatelessWidget {
   final ValueChanged<bool> onTriageChanged;
   final VoidCallback onPickAssignee;
   final ValueChanged<int> onPriorityChanged;
+
+  /// The bot list is open inside the options, under the assign control.
+  final bool choosingBot;
+  final Widget? botChoices;
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +426,11 @@ class _NewTaskOptions extends StatelessWidget {
                     ? 'Assign a Hermes bot (optional)'
                     : 'Assigned to $bot',
               ),
+            ),
+            HermezReveal(
+              visible: choosingBot && botChoices != null,
+              revealKey: const ValueKey('new-task-bot-choices'),
+              child: botChoices ?? const SizedBox.shrink(),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<int>(
@@ -628,6 +779,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     String? assignee;
     var saving = false;
     var optionsOpen = false;
+    var choosingBot = false;
     String? errorText;
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
@@ -713,16 +865,18 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                           },
                           onTriageChanged: (value) =>
                               setModalState(() => selectedTriage = value),
-                          onPickAssignee: () async {
-                            final picked = await _pickKanbanProfile(
-                              panelContext,
-                              _api(),
-                              current: assignee,
-                            );
-                            if (panelContext.mounted && picked != null) {
-                              setModalState(() => assignee = picked);
-                            }
-                          },
+                          onPickAssignee: () =>
+                              setModalState(() => choosingBot = !choosingBot),
+                          choosingBot: choosingBot,
+                          botChoices: _ProfileChoices(
+                            client: _api(),
+                            current: assignee,
+                            enabled: !saving,
+                            onSelected: (picked) => setModalState(() {
+                              assignee = picked;
+                              choosingBot = false;
+                            }),
+                          ),
                           onPriorityChanged: (value) =>
                               setModalState(() => priority = value),
                         ),
@@ -1460,6 +1614,12 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
   bool _depsExpanded = false;
   bool _diagnosticsExpanded = false;
   bool _descriptionExpanded = false;
+
+  /// The field being edited in place, if any.
+  _TaskEdit? _editing;
+
+  /// A status change held open for confirmation, if any.
+  String? _pendingStatus;
   bool _foreground = true;
   bool _pollInFlight = false;
   Timer? _refreshTimer;
@@ -1531,54 +1691,34 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
     }
   }
 
-  Future<String?> _input(String title, {String? initial}) =>
-      _kanbanTextDialog(context, title, initial: initial, maxLength: 1000);
+  void _toggleEdit(_TaskEdit edit) => setState(() {
+    _editing = _editing == edit ? null : edit;
+    _pendingStatus = null;
+  });
+
+  Future<void> _saveEdit(Future<void> Function() action) async {
+    setState(() => _editing = null);
+    await _write(action);
+  }
+
+  /// A status control holds its choice open for one more decision, drawn
+  /// under the controls.
+  void _askStatus(String status) {
+    if (status == 'running') return;
+    setState(() {
+      _pendingStatus = _pendingStatus == status ? null : status;
+      _editing = null;
+    });
+  }
 
   Future<void> _changeStatus(String status) async {
     if (status == 'running') return;
-    var closing = false;
-    final currentStatus = _detail?.task.status ?? widget.task.status;
-    final consequential =
-        status == 'done' ||
-        status == 'blocked' ||
-        status == 'archived' ||
-        currentStatus == 'running';
-    final confirmed = await _settledDialog<bool>(
-      context,
-      (dialogContext) => AlertDialog(
-        title: Text('Move to ${_label(status)}?'),
-        content: Text(
-          consequential
-              ? 'This may stop active work, hide the task, or affect dependencies. Hermes will validate the transition.'
-              : 'Hermes will validate this transition.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (closing) return;
-              closing = true;
-              Navigator.pop(dialogContext, false);
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (closing) return;
-              closing = true;
-              Navigator.pop(dialogContext, true);
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+    setState(() => _pendingStatus = null);
+    await _write(
+      () => widget.client.patchTask(widget.board, widget.task.id, {
+        'status': status,
+      }),
     );
-    if (mounted && confirmed == true) {
-      await _write(
-        () => widget.client.patchTask(widget.board, widget.task.id, {
-          'status': status,
-        }),
-      );
-    }
   }
 
   Widget _compartment({
@@ -1813,22 +1953,7 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                           ),
                           onPressed: _busy
                               ? null
-                              : () async {
-                                  final value = await _input(
-                                    'Edit title',
-                                    initial: task.title,
-                                  );
-                                  if (!mounted) return;
-                                  if (value != null && value.isNotEmpty) {
-                                    await _write(
-                                      () => widget.client.patchTask(
-                                        widget.board,
-                                        task.id,
-                                        {'title': value},
-                                      ),
-                                    );
-                                  }
-                                },
+                              : () => _toggleEdit(_TaskEdit.title),
                           icon: const Icon(Icons.edit_outlined, size: 17),
                           label: const Text('Edit title'),
                         ),
@@ -1842,23 +1967,7 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                           ),
                           onPressed: _busy
                               ? null
-                              : () async {
-                                  final value = await _pickKanbanProfile(
-                                    context,
-                                    widget.client,
-                                    current: task.assignee,
-                                  );
-                                  if (!mounted) return;
-                                  if (value != null) {
-                                    await _write(
-                                      () => widget.client.patchTask(
-                                        widget.board,
-                                        task.id,
-                                        {'assignee': value},
-                                      ),
-                                    );
-                                  }
-                                },
+                              : () => _toggleEdit(_TaskEdit.assignee),
                           icon: const Icon(Icons.person_outline, size: 17),
                           label: const Text('Assignee'),
                         ),
@@ -1872,29 +1981,66 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                           ),
                           onPressed: _busy
                               ? null
-                              : () async {
-                                  final value = await _input(
-                                    'Priority',
-                                    initial: task.priority?.toString(),
-                                  );
-                                  if (!mounted) return;
-                                  final priority = int.tryParse(value ?? '');
-                                  if (priority != null) {
-                                    await _write(
-                                      () => widget.client.patchTask(
-                                        widget.board,
-                                        task.id,
-                                        {'priority': priority},
-                                      ),
-                                    );
-                                  }
-                                },
+                              : () => _toggleEdit(_TaskEdit.priority),
                           icon: const Icon(Icons.flag_outlined, size: 17),
                           label: const Text('Priority'),
                         ),
                       ),
                     ],
                   );
+                },
+              ),
+              // The chosen field opens here, under its control, and pushes
+              // the rest of the task down.
+              HermezReveal(
+                visible:
+                    _editing == _TaskEdit.title ||
+                    _editing == _TaskEdit.assignee ||
+                    _editing == _TaskEdit.priority,
+                weight: HermezMotionWeight.medium,
+                revealKey: ValueKey('task-edit-$_editing'),
+                child: switch (_editing) {
+                  _TaskEdit.title => _InlineField(
+                    label: 'Title',
+                    initial: task.title,
+                    maxLength: 1000,
+                    onCancel: () => setState(() => _editing = null),
+                    onSave: (value) {
+                      if (value.isEmpty) return;
+                      _saveEdit(
+                        () => widget.client.patchTask(widget.board, task.id, {
+                          'title': value,
+                        }),
+                      );
+                    },
+                  ),
+                  _TaskEdit.priority => _InlineField(
+                    label: 'Priority',
+                    initial: task.priority?.toString(),
+                    maxLength: 4,
+                    numeric: true,
+                    onCancel: () => setState(() => _editing = null),
+                    onSave: (value) {
+                      final priority = int.tryParse(value);
+                      if (priority == null) return;
+                      _saveEdit(
+                        () => widget.client.patchTask(widget.board, task.id, {
+                          'priority': priority,
+                        }),
+                      );
+                    },
+                  ),
+                  _TaskEdit.assignee => _ProfileChoices(
+                    client: widget.client,
+                    current: task.assignee,
+                    enabled: !_busy,
+                    onSelected: (value) => _saveEdit(
+                      () => widget.client.patchTask(widget.board, task.id, {
+                        'assignee': value,
+                      }),
+                    ),
+                  ),
+                  _ => const SizedBox.shrink(),
                 },
               ),
             ],
@@ -1930,9 +2076,15 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              onPressed: _busy
-                                  ? null
-                                  : () => _changeStatus(lane),
+                              side: _pendingStatus == lane
+                                  ? BorderSide(
+                                      color: HermezChatPalette.forBrightness(
+                                        Theme.of(context).brightness,
+                                      ).accent,
+                                      width: 2,
+                                    )
+                                  : null,
+                              onPressed: _busy ? null : () => _askStatus(lane),
                             ),
                           ),
                       if (task.status != 'archived')
@@ -1946,14 +2098,46 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                                 textAlign: TextAlign.center,
                               ),
                             ),
+                            side: _pendingStatus == 'archived'
+                                ? BorderSide(
+                                    color: HermezChatPalette.forBrightness(
+                                      Theme.of(context).brightness,
+                                    ).accent,
+                                    width: 2,
+                                  )
+                                : null,
                             onPressed: _busy
                                 ? null
-                                : () => _changeStatus('archived'),
+                                : () => _askStatus('archived'),
                           ),
                         ),
                     ],
                   );
                 },
+              ),
+              HermezReveal(
+                visible: _pendingStatus != null,
+                weight: HermezMotionWeight.medium,
+                revealKey: ValueKey('task-status-$_pendingStatus'),
+                child: _pendingStatus == null
+                    ? const SizedBox.shrink()
+                    : _GuardPanel(
+                        title:
+                            'MOVE TO ${_label(_pendingStatus!).toUpperCase()}?',
+                        message:
+                            _pendingStatus == 'done' ||
+                                _pendingStatus == 'blocked' ||
+                                _pendingStatus == 'archived' ||
+                                task.status == 'running'
+                            ? 'This may stop active work, hide the task, or affect dependencies. Hermes will validate the transition.'
+                            : 'Hermes will validate this transition.',
+                        keepLabel: 'Keep current',
+                        confirmLabel: 'Move',
+                        onKeep: () => setState(() => _pendingStatus = null),
+                        onConfirm: _busy
+                            ? null
+                            : () => _changeStatus(_pendingStatus!),
+                      ),
               ),
             ],
           ),
@@ -2196,23 +2380,25 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                   borderRadius: BorderRadius.circular(28),
                 ),
               ),
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      final value = await _input('Add comment');
-                      if (!mounted) return;
-                      if (value != null && value.isNotEmpty) {
-                        await _write(
-                          () => widget.client.comment(
-                            widget.board,
-                            task.id,
-                            value,
-                          ),
-                        );
-                      }
-                    },
+              onPressed: _busy ? null : () => _toggleEdit(_TaskEdit.comment),
               icon: const Icon(Icons.comment_outlined),
               label: const Text('Add comment'),
+            ),
+            HermezReveal(
+              visible: _editing == _TaskEdit.comment,
+              weight: HermezMotionWeight.medium,
+              revealKey: const ValueKey('task-comment'),
+              child: _InlineField(
+                label: 'Comment',
+                multiline: true,
+                onCancel: () => setState(() => _editing = null),
+                onSave: (value) {
+                  if (value.isEmpty) return;
+                  _saveEdit(
+                    () => widget.client.comment(widget.board, task.id, value),
+                  );
+                },
+              ),
             ),
           ],
           if (task.body != null || task.summary != null) ...[

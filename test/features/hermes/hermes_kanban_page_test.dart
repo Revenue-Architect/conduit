@@ -456,7 +456,10 @@ void main() {
     );
     await tester.tap(find.text('Add comment'));
     await tester.pumpAndSettle();
+    // The comment field opens in place under its button.
     await tester.enterText(find.byType(TextField).last, 'Reviewed in QA');
+    await tester.ensureVisible(find.text('Save'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(writes, ['create', 'patch', 'comment']);
@@ -481,9 +484,24 @@ void main() {
     );
     await tester.tap(find.widgetWithText(ActionChip, 'Todo'));
     await tester.pumpAndSettle();
-    expect(find.text('Move to Todo?'), findsOneWidget);
+    // The move is held open in a guard under the status controls.
+    expect(find.text('MOVE TO TODO?'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(writes.length, 3);
-    await tester.tap(find.text('Confirm'));
+    // Keep current closes the guard and changes nothing.
+    await tester.ensureVisible(find.text('Keep current'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep current'));
+    await tester.pumpAndSettle();
+    expect(find.text('MOVE TO TODO?'), findsNothing);
+    expect(writes.length, 3);
+    // Running is never offered as a manual move.
+    expect(find.widgetWithText(ActionChip, 'Running'), findsNothing);
+    await tester.tap(find.widgetWithText(ActionChip, 'Todo'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Move'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move'));
     await tester.pumpAndSettle();
     expect(writes, ['create', 'patch', 'comment', 'patch']);
     expect(status, 'todo');
