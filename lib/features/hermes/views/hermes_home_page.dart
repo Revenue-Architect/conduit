@@ -14,6 +14,7 @@ import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
+import '../sheets/hermez_modal_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermez_bot_identity.dart';
 import '../widgets/hermez_bot_mark.dart';
@@ -74,23 +75,32 @@ class HermesHomePage extends ConsumerWidget {
     }
   }
 
-  Future<void> _chooseNewChat(BuildContext context, WidgetRef ref) async {
+  Future<void> _chooseNewChat(
+    BuildContext context,
+    WidgetRef ref, [
+    HermezMorphOrigin? origin,
+  ]) async {
     final bots =
         ref.read(hermesBotsProvider).asData?.value ?? const <HermesBot>[];
     if (bots.isEmpty) return;
-    final bot = await showModalBottomSheet<HermesBot>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
+    // The + grows into the picker and the picker contracts back into it.
+    final bot = await pushHermezSheetRoute<HermesBot>(
+      context,
+      origin: origin,
+      heightFactor: 0.8,
+      builder: (sheetContext) => HermezModalSheet(
+        eyebrow: 'New conversation',
+        title: 'Choose a bot',
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const ListTile(title: Text('Start a new conversation')),
             for (final candidate in bots)
-              ListTile(
-                title: Text(candidate.title),
-                subtitle: Text(candidate.description ?? candidate.name),
-                onTap: () => Navigator.pop(sheetContext, candidate),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _BotChoice(
+                  bot: candidate,
+                  onTap: () => Navigator.pop(sheetContext, candidate),
+                ),
               ),
           ],
         ),
@@ -171,10 +181,20 @@ class HermesHomePage extends ConsumerWidget {
               icon: const Icon(Icons.menu_rounded),
             ),
       actions: [
-        IconButton(
-          tooltip: 'New Hermes chat',
-          onPressed: () => _chooseNewChat(context, ref),
-          icon: const Icon(Icons.add_rounded),
+        Builder(
+          builder: (plusContext) => IconButton(
+            tooltip: 'New Hermes chat',
+            onPressed: () => _chooseNewChat(
+              context,
+              ref,
+              HermezMorphOrigin.of(
+                plusContext,
+                radius: 24,
+                color: palette.canvas,
+              ),
+            ),
+            icon: const Icon(Icons.add_rounded),
+          ),
         ),
         IconButton(
           tooltip: 'Profile',
@@ -515,6 +535,54 @@ class HermesHomePage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// One bot in the New conversation picker.
+class _BotChoice extends StatelessWidget {
+  const _BotChoice({required this.bot, required this.onTap});
+
+  final HermesBot bot;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return HermezSurface(
+      kind: HermezSurfaceKind.utility,
+      border: Border.all(color: palette.border.withValues(alpha: 0.8)),
+      semanticLabel: 'Start a conversation with ${bot.title}',
+      feedbackCue: HermezFeedbackCue.objectOpen,
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      child: Row(
+        children: [
+          HermezBotMark(
+            identity: hermezIdentityForBot(bot),
+            size: 40,
+            label: bot.title,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(bot.title, style: HermezType.section(palette)),
+                Text(
+                  bot.description ?? bot.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: HermezType.meta(palette),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: palette.muted),
+        ],
       ),
     );
   }

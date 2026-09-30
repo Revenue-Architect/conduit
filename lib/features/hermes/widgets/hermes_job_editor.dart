@@ -4,8 +4,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../l10n/app_localizations_en.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/conduit_components.dart';
-import '../../../shared/widgets/themed_dialogs.dart';
 import '../models/hermes_job.dart';
+import '../motion/hermez_morph_origin.dart';
+import '../sheets/hermez_modal_sheet.dart';
 
 final RegExp _hermesDurationPattern = RegExp(
   r'^\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$',
@@ -114,18 +115,22 @@ bool _isValidHermesIsoDateTime(String value) {
   return offsetHour <= 23 && offsetMinute <= 59;
 }
 
-/// Shows the create/edit dialog for a scheduled Hermes job and returns the
+/// Shows the create/edit editor for a scheduled Hermes job and returns the
 /// entered name, prompt, and schedule, or null if cancelled.
+///
+/// One editor for both: it grows out of [origin] (the New button, or the
+/// scheduled agent's own card when editing) as a Hermez sheet, and closing it
+/// contracts it back there.
 Future<({String name, String prompt, String schedule})?> showHermesJobEditor(
   BuildContext context, {
+  HermezMorphOrigin? origin,
   String? initialName,
   String? initialPrompt,
   String? initialSchedule,
 }) {
-  return ThemedDialogs.showCustom<
-    ({String name, String prompt, String schedule})
-  >(
-    context: context,
+  return pushHermezSheetRoute<({String name, String prompt, String schedule})>(
+    context,
+    origin: origin,
     builder: (context) => _HermesJobEditorDialog(
       initialName: initialName,
       initialPrompt: initialPrompt,
@@ -194,10 +199,13 @@ class _HermesJobEditorDialogState extends State<_HermesJobEditorDialog> {
     final isEditing = widget.initialPrompt != null;
     final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
 
-    return ThemedDialogs.buildBase(
-      context: context,
+    return HermezModalSheet(
+      eyebrow: 'Scheduled agent',
       title: isEditing ? l10n.hermesJobEditorEditTitle : l10n.hermesJobNew,
-      content: SingleChildScrollView(
+      // These fields and buttons come from material_ui, whose Material is
+      // not the Flutter one the Hermez sheet provides: give them their own.
+      body: Material(
+        type: MaterialType.transparency,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -261,13 +269,24 @@ class _HermesJobEditorDialogState extends State<_HermesJobEditorDialog> {
           ],
         ),
       ),
-      actions: [
-        ConduitTextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          text: l10n.cancel,
+      footer: Material(
+        type: MaterialType.transparency,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            ConduitTextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              text: l10n.cancel,
+            ),
+            const SizedBox(width: Spacing.sm),
+            ConduitTextButton(
+              text: l10n.save,
+              onPressed: _save,
+              isPrimary: true,
+            ),
+          ],
         ),
-        ConduitTextButton(text: l10n.save, onPressed: _save, isPrimary: true),
-      ],
+      ),
     );
   }
 }

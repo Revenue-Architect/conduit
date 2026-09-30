@@ -7,7 +7,6 @@ import '../../../l10n/app_localizations_en.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/conduit_components.dart';
-import '../../../shared/widgets/themed_dialogs.dart';
 import '../models/hermes_job.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
@@ -132,12 +131,24 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
         // padded background here read as a decoration cut off mid-screen.
         child: Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 16),
-          child: ConduitButton(
-            text: l10n.hermesJobNew,
-            icon: Icons.add,
-            isFullWidth: true,
-            isLoading: _creating,
-            onPressed: writable && !_creating ? _createJob : null,
+          child: Builder(
+            builder: (buttonContext) => ConduitButton(
+              text: l10n.hermesJobNew,
+              icon: Icons.add,
+              isFullWidth: true,
+              isLoading: _creating,
+              onPressed: writable && !_creating
+                  ? () => _createJob(
+                      HermezMorphOrigin.of(
+                        buttonContext,
+                        radius: 16,
+                        color: HermezChatPalette.forBrightness(
+                          Theme.of(buttonContext).brightness,
+                        ).accent,
+                      ),
+                    )
+                  : null,
+            ),
           ),
         ),
       ),
@@ -205,9 +216,9 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     ];
   }
 
-  Future<void> _createJob() async {
+  Future<void> _createJob([HermezMorphOrigin? origin]) async {
     final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
-    final result = await showHermesJobEditor(context);
+    final result = await showHermesJobEditor(context, origin: origin);
     if (result == null || !mounted || _creating) return;
     if (ref.read(hermesApiServiceProvider) == null) {
       UiUtils.showMessage(context, l10n.hermesJobCreateFailed, isError: true);
@@ -245,6 +256,9 @@ class _JobCard extends ConsumerStatefulWidget {
 class _JobCardState extends ConsumerState<_JobCard> {
   _JobMutation? _mutation;
   bool _historyExpanded = false;
+
+  /// The guarded delete is open inside this card.
+  bool _confirmingDelete = false;
 
   HermesJob get job => widget.job;
   bool get writable => widget.writable;
@@ -440,11 +454,31 @@ class _JobCardState extends ConsumerState<_JobCard> {
                   icon: Icons.delete_outline,
                   iconColor: theme.error,
                   tooltip: l10n.hermesJobDelete,
-                  onPressed: _busy ? null : _deleteJob,
+                  onPressed: _busy
+                      ? null
+                      : () => setState(
+                          () => _confirmingDelete = !_confirmingDelete,
+                        ),
                   isCompact: true,
                 ),
               ],
             ),
+          // The guarded delete opens inside the card, under the control
+          // that asked for it, and pushes the rest down.
+          HermezReveal(
+            visible: writable && _confirmingDelete,
+            weight: HermezMotionWeight.medium,
+            revealKey: ValueKey<String>('hermes-job-delete-${job.id}'),
+            child: _DeleteGuard(
+              title: l10n.hermesJobDeleteTitle,
+              message: l10n.hermesJobDeleteMessage,
+              confirmText: l10n.delete,
+              cancelText: l10n.cancel,
+              busy: _mutation == _JobMutation.delete,
+              onCancel: () => setState(() => _confirmingDelete = false),
+              onConfirm: _busy ? null : _deleteJob,
+            ),
+          ),
         ],
       ),
     );
@@ -539,6 +573,12 @@ class _JobCardState extends ConsumerState<_JobCard> {
   Future<void> _editJob() async {
     final result = await showHermesJobEditor(
       context,
+      origin: HermezMorphOrigin.of(
+        context,
+        radius: 18,
+        color: HermezChatPalette.forBrightness(Theme.of(context).brightness)
+            .surface,
+      ),
       initialName: job.name ?? job.displayName,
       initialPrompt: job.prompt,
       initialSchedule: job.schedule,
@@ -560,19 +600,104 @@ class _JobCardState extends ConsumerState<_JobCard> {
   }
 
   Future<void> _deleteJob() async {
-    final confirmed = await ThemedDialogs.confirm(
-      context,
-      title: _l10n(context).hermesJobDeleteTitle,
-      message: _l10n(context).hermesJobDeleteMessage,
-      confirmText: _l10n(context).delete,
-      isDestructive: true,
-    );
-    if (!confirmed || !mounted) return;
     await _runMutation(
       mutation: _JobMutation.delete,
       action: () => ref.read(hermesJobsProvider.notifier).delete(job.id),
       failureMessage: _l10n(context).hermesJobDeleteFailed,
       successMessage: _l10n(context).hermesJobDeleted,
+    );
+    if (mounted) setState(() => _confirmingDelete = false);
+  }
+}
+
+/// A destructive action held open for one more decision, drawn inside the
+/// object it would remove.
+class _DeleteGuard extends StatelessWidget {
+  const _DeleteGuard({
+    required this.title,
+    required this.message,
+    required this.confirmText,
+    required this.cancelText,
+    required this.busy,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  final String title;
+  final String message;
+  final String confirmText;
+  final String cancelText;
+  final bool busy;
+  final VoidCallback onCancel;
+  final VoidCallback? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final danger = Theme.of(context).colorScheme.error;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title $message',
+      child: Container(
+        margin: const EdgeInsets.only(top: Spacing.sm),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: danger.withValues(alpha: 0.55)),
+          color: danger.withValues(alpha: 0.06),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Text(
+                title.toUpperCase(),
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: danger,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            ExcludeSemantics(
+              child: Text(
+                message,
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: palette.ink,
+                ),
+              ),
+            ),
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 4,
+              children: [
+                TextButton(
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
+                  onPressed: busy ? null : onCancel,
+                  child: Text(cancelText),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: danger,
+                    minimumSize: const Size(64, 44),
+                  ),
+                  onPressed: busy ? null : onConfirm,
+                  child: busy
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(confirmText),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

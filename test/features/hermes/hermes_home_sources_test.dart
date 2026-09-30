@@ -5,6 +5,7 @@ import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/hermes/motion/hermez_morph_origin.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_session_totals_provider.dart';
+import 'package:conduit/features/hermes/sheets/hermez_modal_sheet.dart';
 import 'package:conduit/features/hermes/views/hermes_conversations_page.dart';
 import 'package:conduit/features/hermes/views/hermes_home_page.dart';
 import 'package:conduit/features/hermes/views/hermes_teams_page.dart';
@@ -118,6 +119,34 @@ void main() {
     await tester.tap(find.text('ARTIFACTS'));
     await tester.pumpAndSettle();
     expect(_opened[RouteNames.hermesArtifacts], isA<HermezMorphOrigin>());
+  });
+
+  testWidgets('the + grows into a Hermez bot picker; choosing closes it', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await _pumpHome(tester);
+    await tester.tap(find.byTooltip('New Hermes chat'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HermezModalSheet), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Choose a bot'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('^Start a conversation with Local')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(HermezModalSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+    handle.dispose();
   });
 
   group('Conversations page', () {
