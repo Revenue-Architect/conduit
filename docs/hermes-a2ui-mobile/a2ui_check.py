@@ -39,6 +39,8 @@ KNOWN = {
     "StatusBadge", "MetricTile", "MiniChart",
     "InfoRow", "StepRail", "ActionCallout", "ArtifactTile", "BotBadge",
     "ExpandableSection",
+    "ProgressMeter", "ActivityFeed", "ScheduleTile", "MessagePreview",
+    "CommandBlock", "TaskTile", "KeyValueGrid", "ComparisonCard",
 }
 
 # Structural Hermez components: every prop is declared (anything else is
@@ -58,6 +60,31 @@ STRUCTURE_PROPS = {
     "BotBadge": {"label": 40, "identity": None, "detail": 80},
     "ExpandableSection": {"title": 60, "subtitle": 120, "count": None,
                           "child": 128, "initiallyExpanded": None},
+    "ProgressMeter": {"label": 80, "current": None, "total": None, "unit": 24,
+                      "detail": 120, "state": None, "segmented": None},
+    "ActivityFeed": {"items": None, "compact": None},
+    "ScheduleTile": {"title": 80, "start": 40, "end": 40, "date": 40,
+                     "location": 100, "detail": 120, "owner": 60,
+                     "state": None, "icon": None},
+    "MessagePreview": {"sender": 80, "title": 100, "preview": 240,
+                       "timestamp": 40, "channel": None, "unread": None,
+                       "importance": None},
+    "CommandBlock": {"content": 4000, "label": 40, "language": None,
+                     "copyable": None},
+    "TaskTile": {"title": 100, "status": None, "assignee": 60, "due": 40,
+                 "priority": None, "detail": 160, "countLabel": 40},
+    "KeyValueGrid": {"title": 60, "items": None, "compact": None},
+    "ComparisonCard": {"title": 80, "subtitle": 120, "badge": 40,
+                       "facts": None, "detail": 160},
+}
+_STATES = {"ok", "warning", "error", "unknown"}
+BOOL_PROPS = {"compact", "initiallyExpanded", "segmented", "copyable", "unread"}
+
+# Rich full-width objects: never direct Row children, weighted or not (the
+# client stacks them; author them in a Column).
+ROW_NEVER = {
+    "ProgressMeter", "ActivityFeed", "ScheduleTile", "MessagePreview",
+    "CommandBlock", "TaskTile", "KeyValueGrid", "ComparisonCard",
 }
 STEP_STATES = {"done", "current", "upcoming", "warning", "error"}
 
@@ -84,6 +111,10 @@ REQUIRED = {
     "InfoRow": ["title"], "StepRail": ["steps"], "ActionCallout": ["title"],
     "ArtifactTile": ["name", "kind"], "BotBadge": ["label", "identity"],
     "ExpandableSection": ["title", "child"],
+    "ProgressMeter": ["label", "current", "total"], "ActivityFeed": ["items"],
+    "ScheduleTile": ["title", "start"], "MessagePreview": ["sender", "preview"],
+    "CommandBlock": ["content"], "TaskTile": ["title", "status"],
+    "KeyValueGrid": ["items"], "ComparisonCard": ["title", "facts"],
 }
 
 ENUMS = {
@@ -96,6 +127,17 @@ ENUMS = {
                               "video", "file"}},
     "BotBadge": {"identity": {"neutral", "kai", "local", "autopilot", "fast",
                               "strong"}},
+    "ProgressMeter": {"state": _STATES},
+    "ScheduleTile": {"state": _STATES, "icon": _ICONS},
+    "MessagePreview": {
+        "channel": {"email", "teams", "agentmail", "message", "unknown"},
+        "importance": {"normal", "important"},
+    },
+    "CommandBlock": {"language": {"shell", "sql", "json", "yaml", "text"}},
+    "TaskTile": {
+        "status": {"todo", "in_progress", "blocked", "done", "unknown"},
+        "priority": {"low", "normal", "high", "urgent"},
+    },
     "Text": {"variant": {"h1", "h2", "h3", "h4", "h5", "caption", "body"}},
     "Button": {"variant": {"default", "primary", "borderless"}},
     "TextField": {"variant": {"longText", "number", "shortText", "obscured"}},
@@ -211,9 +253,47 @@ def check_components(name, comps, errors, warnings):
                     errors.append(
                         f"{name}: {ctype} {cid!r} {prop} must be a non-empty string of at most {limit} chars"
                     )
-            for flag in ("compact", "initiallyExpanded"):
+            for flag in BOOL_PROPS:
                 if flag in c and flag in spec and not isinstance(c[flag], bool):
                     errors.append(f"{name}: {ctype} {cid!r} {flag} must be a boolean")
+            if ctype == "ProgressMeter":
+                cur, tot = c.get("current"), c.get("total")
+                if not _num(cur) or cur < 0:
+                    errors.append(f"{name}: ProgressMeter {cid!r} current must be a finite number >= 0")
+                if not _num(tot) or tot <= 0:
+                    errors.append(f"{name}: ProgressMeter {cid!r} total must be a finite number > 0")
+            for list_prop, lo, hi, allowed, required, limits in (
+                ("items", 1, 20, {"title", "detail", "time", "icon", "state"}, {"title"},
+                 {"title": 80, "detail": 140, "time": 40}) if ctype == "ActivityFeed" else
+                ("items", 1, 8, {"label", "value"}, {"label", "value"},
+                 {"label": 40, "value": 120}) if ctype == "KeyValueGrid" else
+                ("facts", 1, 8, {"label", "value", "state"}, {"label", "value"},
+                 {"label": 40, "value": 100}) if ctype == "ComparisonCard" else
+                (None, 0, 0, set(), set(), {}),
+            ):
+                if list_prop is None:
+                    continue
+                entries = c.get(list_prop)
+                if not isinstance(entries, list) or not lo <= len(entries) <= hi:
+                    errors.append(f"{name}: {ctype} {cid!r} {list_prop} needs {lo}-{hi} entries")
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict) or set(entry) - allowed or required - set(entry):
+                        errors.append(
+                            f"{name}: {ctype} {cid!r} {list_prop} entries accept only "
+                            f"{sorted(allowed)} and need {sorted(required)}"
+                        )
+                        break
+                    if any(k in entry and (not isinstance(entry[k], str) or not entry[k].strip()
+                                           or len(entry[k]) > lim) for k, lim in limits.items()):
+                        errors.append(f"{name}: {ctype} {cid!r} {list_prop} text missing or too long")
+                        break
+                    if "state" in entry and entry["state"] not in _STATES:
+                        errors.append(f"{name}: {ctype} {cid!r} state must be one of {sorted(_STATES)}")
+                        break
+                    if "icon" in entry and entry["icon"] not in _ICONS:
+                        errors.append(f"{name}: {ctype} {cid!r} icon must be one of {sorted(_ICONS)}")
+                        break
             if ctype == "ExpandableSection" and "count" in c:
                 n = c["count"]
                 if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n <= 9999:
@@ -303,7 +383,7 @@ def check_components(name, comps, errors, warnings):
                     if isinstance(t, dict) and isinstance(t.get("content"), str):
                         stack.append(t["content"])
             for k in ("trigger", "content"):
-                if isinstance(c.get(k), str):
+                if c.get("component") == "Modal" and isinstance(c.get(k), str):
                     stack.append(c[k])
         orphans = sorted(i for i in by_id if i not in seen)
         if orphans:
@@ -316,6 +396,12 @@ def check_components(name, comps, errors, warnings):
             types = [k.get("component") for k in kids]
             for child in kids:
                 child_type = child.get("component")
+                if child_type in ROW_NEVER:
+                    errors.append(
+                        f"{name}: Row {c.get('id')!r} has {child_type} {child.get('id')!r}; "
+                        "it is a full-width object, put it in a Column"
+                    )
+                    continue
                 if child_type in ROW_WIDTH_DEPENDENT and not _has_positive_weight(child):
                     errors.append(
                         f"{name}: Row {c.get('id')!r} has width-dependent child "

@@ -131,3 +131,97 @@ The conclusion and the open question stay visible; supporting evidence sits one 
 ```
 
 A rollout or plan is a StepRail; the single next step is an ActionCallout with one Button.
+
+## Personal and work patterns
+
+These use the personal and work components. Each surface is one Column; none of these objects goes in a Row.
+
+## 15. Progress / migration
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"migration-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"migration-01","components":[{"id":"root","component":"Column","children":["progress","rail"]},{"id":"progress","component":"ProgressMeter","label":"Migration","current":412,"total":600,"unit":"products","detail":"Variants validated as they move"},{"id":"rail","component":"StepRail","steps":[{"label":"Export","state":"done"},{"label":"Import","state":"current","detail":"412 of 600"},{"label":"Verify","state":"upcoming"}]}]}}
+```
+
+Real counts only. The percent comes from current and total.
+
+## 16. Recent activity
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"activity-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"activity-01","components":[{"id":"root","component":"Column","children":["feed"]},{"id":"feed","component":"ActivityFeed","items":[{"time":"11:42","title":"Browser opened Shopify"},{"time":"11:43","title":"Inventory export loaded"},{"time":"11:44","title":"412 products validated","state":"ok"},{"time":"11:45","title":"3 records need review","state":"warning"}]}]}}
+```
+
+Only events that happened. Leave `time` out when it is not known.
+
+## 17. Daily schedule
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"day-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"day-01","components":[{"id":"root","component":"Column","children":["a","b"]},{"id":"a","component":"ScheduleTile","title":"Dentist","start":"14:30","end":"15:15","location":"Downtown"},{"id":"b","component":"ScheduleTile","title":"Morning brief","start":"09:00","date":"Daily","owner":"Kai","icon":"bot"}]}}
+```
+
+One ScheduleTile per timed item, stacked.
+
+## 18. Inbox summary
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"inbox-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"inbox-01","components":[{"id":"root","component":"Column","children":["m1","m2","next"]},{"id":"m1","component":"MessagePreview","channel":"email","sender":"Georgia","title":"Trail Together follow-up","preview":"Just have a few follow-up questions about the rollout.","timestamp":"10:42 AM","unread":true,"importance":"important"},{"id":"m2","component":"MessagePreview","channel":"teams","sender":"Mahedi","preview":"Replied to your thread about the SOW.","timestamp":"12:59 PM"},{"id":"next","component":"ActionCallout","eyebrow":"Needs you","title":"Reply to Georgia today","tone":"attention"}]}}
+```
+
+An excerpt per message, never the full email.
+
+## 19. Task status
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"tasks-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"tasks-01","components":[{"id":"root","component":"Column","children":["t1","t2"]},{"id":"t1","component":"TaskTile","title":"Trail certificates","status":"in_progress","assignee":"Kai","due":"Nov 11","detail":"Generate and email donor certificates"},{"id":"t2","component":"TaskTile","title":"Donor list","status":"blocked","assignee":"Finance","detail":"Waiting on the final export"}]}}
+```
+
+Only blocked tasks outline themselves; the rest stay neutral.
+
+## 20. Technical command
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"command-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"command-01","components":[{"id":"root","component":"Column","children":["why","cmd"]},{"id":"why","component":"InfoRow","title":"NVR stopped recording","detail":"The container exited after the disk filled","state":"error"},{"id":"cmd","component":"CommandBlock","label":"Command","language":"shell","content":"docker compose restart nvr"}]}}
+```
+
+Never executed. Copy is local and sends nothing to Hermes.
+
+## 21. Metadata / details
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"server-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"server-01","components":[{"id":"root","component":"Column","children":["state","facts"]},{"id":"state","component":"StatusBadge","label":"Local model","state":"ok"},{"id":"facts","component":"KeyValueGrid","title":"Server","items":[{"label":"Model","value":"Qwen 27B"},{"label":"Profile","value":"Local"},{"label":"Uptime","value":"14h 22m"}]}]}}
+```
+
+Facts about one object. Conduit decides columns or stacking.
+
+## 22. Comparison
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"compare-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"compare-01","components":[{"id":"root","component":"Column","children":["a","b"]},{"id":"a","component":"ComparisonCard","title":"Option A","badge":"Local","facts":[{"label":"Cost","value":"$12 / month"},{"label":"Runs locally","value":"Yes","state":"ok"},{"label":"Memory","value":"17 GB"}]},{"id":"b","component":"ComparisonCard","title":"Option B","badge":"Hosted","facts":[{"label":"Cost","value":"$20 / month"},{"label":"Runs locally","value":"No","state":"warning"},{"label":"Memory","value":"—"}]}]}}
+```
+
+Facts only, one card per option, stacked. No winner or score.
+
+## 23. Agent run summary
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"run-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"run-01","components":[{"id":"root","component":"Column","children":["bot","progress","feed","details"]},{"id":"bot","component":"BotBadge","label":"Kai","identity":"kai","detail":"Inventory migration"},{"id":"progress","component":"ProgressMeter","label":"Products","current":412,"total":600,"segmented":true},{"id":"feed","component":"ActivityFeed","compact":true,"items":[{"title":"Exported inventory","state":"ok"},{"title":"Validating variants"}]},{"id":"details","component":"ExpandableSection","title":"Details","child":"notes"},{"id":"notes","component":"InfoRow","title":"3 SKUs skipped","detail":"Missing barcodes","state":"warning"}]}}
+```
+
+Who, how far, what happened, and the rest one tap away.
+
+## 24. Personal morning brief
+
+```a2ui
+{"version":"v0.9","createSurface":{"surfaceId":"brief-01","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"brief-01","components":[{"id":"root","component":"Column","children":["s1","m1","t1"]},{"id":"s1","component":"ScheduleTile","title":"Shopify & Ironman demo","start":"12:00","end":"13:00"},{"id":"m1","component":"MessagePreview","channel":"agentmail","sender":"Jarvis","preview":"Quick one: Mahedi asked about timing in the Kaizen thread.","unread":true},{"id":"t1","component":"TaskTile","title":"Send the SOW revision","status":"todo","due":"Today","priority":"high"}]}}
+```
+
+One sentence before the surface at most.

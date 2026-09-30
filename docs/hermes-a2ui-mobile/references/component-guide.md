@@ -38,6 +38,14 @@ Source of truth: `catalog-v0_9-basic.json` and `common-types-v0_9.json` in this 
 | ArtifactTile | name (≤80), kind: document image spreadsheet audio video file | sizeLabel (≤24), detail (≤120), actionChild (id) | Names a file; never opens or fetches it |
 | BotBadge | label (≤40), identity: neutral kai local autopilot fast strong | detail (≤80) | Who owns a workstream |
 | ExpandableSection | title (≤60), child (id) | subtitle (≤120), count (0–9999), initiallyExpanded (bool) | Local disclosure; sends no turn |
+| ProgressMeter | label (≤80), current (number ≥0), total (number >0) | unit (≤24), detail (≤120), state, segmented (bool) | Real counts only; percent is derived; over-total shown as is |
+| ActivityFeed | items: 1–20 × {"title" (≤80)} | per item: detail (≤140), time (≤40), icon, state | Observed events in order; omit unknown times |
+| ScheduleTile | title (≤80), start (≤40) | end, date (≤40), location (≤100), detail (≤120), owner (≤60), state, icon | Any timed item |
+| MessagePreview | sender (≤80), preview (≤240) | title (≤100), timestamp (≤40), channel: email teams agentmail message unknown, unread (bool), importance: normal important | An excerpt, never the full message |
+| CommandBlock | content (≤4000) | label (≤40), language: shell sql json yaml text, copyable (bool) | Never executed; Copy is local |
+| TaskTile | title (≤100), status: todo in_progress blocked done unknown | assignee (≤60), due (≤40), priority: low normal high urgent, detail (≤160), countLabel (≤40) | Presentation only |
+| KeyValueGrid | items: 1–8 × {"label" (≤40), "value" (≤120)} | title (≤60), compact (bool) | Renderer picks columns or stacking |
+| ComparisonCard | title (≤80), facts: 1–8 × {"label" (≤40), "value" (≤100)} | per fact: state; subtitle (≤120), badge (≤40), detail (≤160) | Facts only; stack 2+ in a Column |
 
 ## Structure components (Conduit)
 
@@ -50,7 +58,14 @@ Data-only components rendered natively by Conduit. They make no network or file 
 - **BotBadge** — `{"id":"b1","component":"BotBadge","label":"Kai","identity":"kai","detail":"Inventory migration"}`. Pair each badge with the InfoRow(s) describing that bot's work.
 - **ExpandableSection** — `{"id":"ev","component":"ExpandableSection","title":"Evidence","subtitle":"6 sources reviewed","count":3,"child":"ev-list"}`. The header shows `TITLE / count`; the child is usually a Column of InfoRows. Opening and closing happen on the phone only and never send `[A2UI_INTERACTION]`, even on a read-only or busy message. A Button inside still sends exactly one turn when tapped. Keep warnings, failures, and limitations outside it.
 
-In a Row, every structure component needs a positive integer `weight`; they are designed for Columns.
+In a Row, every structure component needs a positive integer `weight`; they are designed for Columns. `ProgressMeter`, `ActivityFeed`, `ScheduleTile`, `MessagePreview`, `CommandBlock`, `TaskTile`, `KeyValueGrid`, and `ComparisonCard` are never Row children at all.
+
+## Visual language
+
+- Cards, callouts, tiles, buttons and bordered containers use a complete perimeter border. Do not render decorative accent strips or colored side edges. Semantic state may affect the entire outline, icon and technical label.
+- Vertical lines remain allowed where they encode sequence, connection, hierarchy or progress (StepRail, timelines).
+- State is never color alone: every state also has a word or glyph.
+- Button variants: `primary` is the filled signal object (one per decision at most), default is an outlined surface object, `borderless` is a bare text action. Destructive intent is expressed by an `ActionCallout` with `tone: "error"` around an ordinary Button, not by inventing props or event names.
 
 ## Icons
 

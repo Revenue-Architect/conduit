@@ -33,8 +33,15 @@ This is the principal presentation rule. Before drafting, classify the answer as
 | Service or system states | InfoRow with `state`, or StatusBadge |
 | 2–4 important numbers | MetricTile (weighted Row when values are short) |
 | Historical numeric samples | MiniChart |
-| Alternatives | Stacked comparison Cards or InfoRows |
+| Alternatives with several dimensions | ComparisonCard × 2+ in a Column |
 | Chronological stages, a plan, a rollout | StepRail |
+| Real counted progress (412 of 600 migrated) | ProgressMeter |
+| What just happened, in order (observed events) | ActivityFeed |
+| A calendar event, appointment, reminder, or timed agent | ScheduleTile |
+| An email, Teams, or AgentMail message to surface | MessagePreview |
+| One short command, SQL, JSON, or config value | CommandBlock |
+| A task or action item and its status | TaskTile |
+| A few facts about one object (model, profile, uptime) | KeyValueGrid |
 | Checklist the user marks | CheckBox |
 | Ownership or workstreams | BotBadge + InfoRow |
 | Files produced or referenced | ArtifactTile |
@@ -147,6 +154,29 @@ Structure components (data-only; they replace most small tables and bullet lists
 - `BotBadge`: which agent owns a workstream. Required `label` and `identity` (`neutral`, `kai`, `local`, `autopilot`, `fast`, `strong`); optional `detail`. Use the identity of the bot that actually did the work.
 - `ExpandableSection`: long supporting detail kept one tap away. Required `title` and `child`; optional `subtitle`, `count`, `initiallyExpanded`. Opening it is local and sends nothing to Hermes. Never hide a warning, failure, or limitation inside it.
 
+Personal and work components (data-only; Hermes retrieves the data first, these only show it):
+
+- `ProgressMeter`: real counted progress. Required `label`, `current` (≥ 0), `total` (> 0); optional `unit`, `detail`, `state`, `segmented`. Conduit derives the percent from the two numbers and shows over-total truthfully. Never use it for "almost done".
+- `ActivityFeed`: events that actually happened, in order. Required `items` (1–20), each `{title, detail?, time?, icon?, state?}`. Only events Hermes observed; omit `time` when unknown; never invent timestamps.
+- `ScheduleTile`: one timed item. Required `title`, `start`; optional `end`, `date`, `location`, `detail`, `owner`, `state`, `icon`. Works for calendar events, appointments, reminders, and scheduled agents.
+- `MessagePreview`: one message to surface. Required `sender`, `preview` (≤ 240, an excerpt, never the full message); optional `title` (subject), `timestamp`, `channel` (`email`, `teams`, `agentmail`, `message`, `unknown`), `unread`, `importance` (`normal`, `important`).
+- `CommandBlock`: one short command or snippet to review. Required `content`; optional `label`, `language` (`shell`, `sql`, `json`, `yaml`, `text`), `copyable` (default true). It is never executed; Copy is local and sends nothing. Long programs and multi-file code stay in Markdown code blocks.
+- `TaskTile`: a task as it stands. Required `title`, `status` (`todo`, `in_progress`, `blocked`, `done`, `unknown`); optional `assignee`, `due`, `priority` (`low`, `normal`, `high`, `urgent`), `detail`, `countLabel`.
+- `KeyValueGrid`: up to 8 facts about one object. Required `items` (1–8) of `{label, value}`; optional `title`, `compact`. Conduit chooses columns or stacking from the width; do not.
+- `ComparisonCard`: the facts of one option. Required `title`, `facts` (1–8) of `{label, value, state?}`; optional `subtitle`, `badge`, `detail`. Put two or more in a Column. It states facts only: no winner, rank, score, or "recommended".
+
+Telling similar components apart:
+
+- `86% disk used` → MetricTile. `412 / 600 products migrated` → ProgressMeter.
+- `Discovery → Build → UAT → Launch` → StepRail. `11:42 searched · 11:43 fetched · 11:44 generated` → ActivityFeed.
+- A list of services and their states → InfoRow. Metadata about one object → KeyValueGrid.
+- A task exists → TaskTile. The user must do something now → ActionCallout.
+- One short command → CommandBlock. Large code, program source, multi-file code → Markdown.
+- Mail and chat summaries, recent important messages → MessagePreview (sender, subject, a short excerpt, time), then detail in prose or an ExpandableSection if needed.
+- Compare only when the user needs to inspect several options across several dimensions. "A costs $12 and B costs $20" is a sentence, not two cards.
+
+Compositions that work: homelab (MetricTile, MetricTile, ProgressMeter, ActivityFeed, ActionCallout); morning inbox (MessagePreview × 3, ActionCallout); day plan (ScheduleTile × 2, TaskTile); autonomous run (BotBadge, ProgressMeter, ActivityFeed, ExpandableSection); project status (ProgressMeter, StepRail, TaskTile, ActionCallout); server detail (StatusBadge, KeyValueGrid, MiniChart, ActivityFeed); technical instruction (InfoRow, CommandBlock, ActionCallout).
+
 Exact props for every component: including forms (`TextField`, `CheckBox`, `ChoicePicker`, `Slider`, `DateTimeInput`) and `Tabs`/`Modal`: are in `references/component-guide.md`; complete worked surfaces in `references/patterns.md`.
 
 Do not place remote image URLs in `Image`; that component is unavailable for agent-provided network assets. Return image files with `MEDIA:<absolute-path>` so Conduit can fetch them through authenticated Hermes file routes.
@@ -155,6 +185,7 @@ Do not place remote image URLs in `Image`; that component is unavailable for age
 
 - Design for about 300 logical pixels of content width inside the phone chat column. Keep all text and buttons within that width, including at larger text scale.
 - Prefer a `Column` for mixed content and actions. Use a `Row` only when side-by-side reading helps; use `List` for repeated items and `Tabs` for genuinely distinct groups.
+- Never put `ProgressMeter`, `ActivityFeed`, `ScheduleTile`, `MessagePreview`, `CommandBlock`, `TaskTile`, `KeyValueGrid`, or `ComparisonCard` directly in a `Row`, weighted or not: they are full-width objects. Stack them in a `Column`.
 - Every direct `MetricTile`, `MiniChart`, `StatusBadge`, `InfoRow`, `StepRail`, `ActionCallout`, `ArtifactTile`, `BotBadge`, `ExpandableSection`, `Slider`, `TextField`, `ChoicePicker`, `DateTimeInput`, `Card`, `Column`, `Row`, `List`, or `Tabs` child in a `Row` must have a positive integer `weight`. The structure components are designed to be stacked in a Column; put them in a Row only rarely. This applies to overview dashboards as well as comparison cards. For two short comparable metrics, use `weight: 1` on both tiles. Conduit's read-time repair protects saved older messages, but author new output correctly.
 - Reach for a `Column` when a value or label is long, when a chart or control needs room, or when a weighted interactive row would be cramped or make reading order unclear. Compactness alone is not a reason for a `Row`.
 - Keep text-plus-button rows short. If a short row is essential, give the wrapping `Text` child an integer `weight` of 1 and keep the button label short. Conduit repairs the known unweighted Text+Button row by stacking it, but generated output should already be correct.
