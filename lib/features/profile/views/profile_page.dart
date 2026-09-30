@@ -287,17 +287,17 @@ class ProfilePage extends ConsumerWidget {
         subtitle: l10n.audioSettingsSubtitle,
         onTap: () => context.pushNamed(RouteNames.audioSettings),
       ),
-      if (hasOpenWebUiAccount)
-        _buildAccountOption(
-          context,
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.bell,
-            android: Icons.notifications_outlined,
-          ),
-          title: l10n.notificationsTitle,
-          subtitle: l10n.notificationsSubtitle,
-          onTap: () => context.pushNamed(RouteNames.notificationSettings),
+      // Hermes runs notify too, so this is not an Open WebUI-only setting.
+      _buildAccountOption(
+        context,
+        icon: UiUtils.platformIcon(
+          ios: CupertinoIcons.bell,
+          android: Icons.notifications_outlined,
         ),
+        title: l10n.notificationsTitle,
+        subtitle: l10n.notificationsSubtitle,
+        onTap: () => context.pushNamed(RouteNames.notificationSettings),
+      ),
       if (hasOpenWebUiAccount || directPrimary)
         _buildAccountOption(
           context,

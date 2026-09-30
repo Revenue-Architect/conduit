@@ -19,6 +19,8 @@ void main() {
         Routes.directConnections,
         Routes.directConnectionEditorPath('profile_1'),
         Routes.hermesSettings,
+        // Hermes runs notify, so notifications are not Open WebUI-only.
+        Routes.notificationSettings,
         Routes.hermesJobs,
         Routes.about,
       ]) {
@@ -29,7 +31,6 @@ void main() {
     test('does not expose Open WebUI-only surfaces', () {
       for (final location in <String>[
         Routes.accountSettings,
-        Routes.notificationSettings,
         Routes.notes,
         Routes.channel,
       ]) {

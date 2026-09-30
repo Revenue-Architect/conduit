@@ -1320,85 +1320,95 @@ class HermesTeamsSection extends ConsumerWidget {
       // The Teams block is one object: All teams grows it into the Teams
       // page, and Back returns it here.
       child: Builder(
-        builder: (blockContext) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            HermezSectionBar(
-              label: 'TEAMS  ${list?.length ?? '—'}',
-              actionLabel: 'All teams',
-              onAction: () => context.pushNamed(
-                RouteNames.hermesTeams,
-                extra: HermezMorphOrigin.of(
-                  blockContext,
-                  radius: 18,
-                  color: palette.canvas,
+        builder: (blockContext) => RepaintBoundary(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              HermezSectionBar(
+                label: 'TEAMS  ${list?.length ?? '—'}',
+                actionLabel: 'All teams',
+                onAction: () => context.pushNamed(
+                  RouteNames.hermesTeams,
+                  extra: HermezMorphOrigin.of(
+                    blockContext,
+                    radius: 18,
+                    color: palette.canvas,
+                    snapshot: HermezMorphOrigin.capture(blockContext),
+                  ),
                 ),
               ),
-            ),
-            HermezSurface(
-              kind: HermezSurfaceKind.list,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-              child: list == null
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: LinearProgressIndicator(),
-                    )
-                  : list.isEmpty
-                  ? HermezMotionSurface(
-                      weight: HermezMotionWeight.light,
-                      semanticLabel: 'Start a team',
-                      originRadius: 18,
-                      originColor: palette.surface,
-                      onOpen: (origin) => startHermesTeam(context, ref, origin),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Row(
-                          children: [
-                            Icon(Icons.group_add_outlined, color: palette.ink),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Start a team',
-                                    style: HermezType.section(palette)
-                                        .copyWith(fontSize: 15),
-                                  ),
-                                  Text(
-                                    'Put 2 to 6 bots in one room to work '
-                                    'something out together.',
-                                    style: HermezType.meta(palette),
-                                  ),
-                                ],
+              HermezSurface(
+                kind: HermezSurfaceKind.list,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 2,
+                ),
+                child: list == null
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: LinearProgressIndicator(),
+                      )
+                    : list.isEmpty
+                    ? HermezMotionSurface(
+                        weight: HermezMotionWeight.light,
+                        semanticLabel: 'Start a team',
+                        originRadius: 18,
+                        originColor: palette.surface,
+                        onOpen: (origin) =>
+                            startHermesTeam(context, ref, origin),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.group_add_outlined,
+                                color: palette.ink,
                               ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: palette.muted,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Start a team',
+                                      style: HermezType.section(palette)
+                                          .copyWith(fontSize: 15),
+                                    ),
+                                    Text(
+                                      'Put 2 to 6 bots in one room to work '
+                                      'something out together.',
+                                      style: HermezType.meta(palette),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: palette.muted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          for (var i = 0; i < list.take(3).length; i++) ...[
+                            if (i > 0)
+                              Divider(
+                                height: 1,
+                                color: palette.border.withValues(alpha: 0.7),
+                              ),
+                            HermesTeamTile(
+                              team: list[i],
+                              onOpen: (origin) =>
+                                  openHermesTeam(context, list[i], origin),
                             ),
                           ],
-                        ),
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (var i = 0; i < list.take(3).length; i++) ...[
-                          if (i > 0)
-                            Divider(
-                              height: 1,
-                              color: palette.border.withValues(alpha: 0.7),
-                            ),
-                          HermesTeamTile(
-                            team: list[i],
-                            onOpen: (origin) =>
-                                openHermesTeam(context, list[i], origin),
-                          ),
                         ],
-                      ],
-                    ),
-            ),
-          ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

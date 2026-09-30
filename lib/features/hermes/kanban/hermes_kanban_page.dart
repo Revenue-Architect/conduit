@@ -62,6 +62,76 @@ Future<List<KanbanProfile>> _kanbanProfiles(
 /// The profile choices, drawn in place where they were asked for (they open
 /// under the control and push the rest down). Choosing one reports its name;
 /// "Unassign" reports an empty name, as the old picker did.
+/// One choice in the assignee list: the same physical row as the other
+/// Hermez choices (it compresses under the finger), at least 48 dp tall.
+class _ProfileRow extends StatelessWidget {
+  const _ProfileRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.detail,
+    this.selected = false,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? detail;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return HermezMotionSurface(
+      weight: HermezMotionWeight.light,
+      enabled: enabled,
+      semanticLabel: detail == null ? title : '$title. $detail',
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: selected ? palette.accent : palette.muted,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (detail != null)
+                      Text(
+                        detail!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: HermezType.meta(palette),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileChoices extends StatefulWidget {
   const _ProfileChoices({
     required this.client,
@@ -135,36 +205,22 @@ class _ProfileChoicesState extends State<_ProfileChoices> {
                     ),
                   ),
                   for (final profile in roster)
-                    ListTile(
+                    _ProfileRow(
                       enabled: widget.enabled,
-                      minVerticalPadding: 10,
-                      leading: Icon(
-                        profile.name == current
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_off_rounded,
-                        color: profile.name == current
-                            ? palette.accent
-                            : palette.muted,
-                      ),
-                      title: Text(profile.name),
-                      subtitle: profile.description == null
-                          ? null
-                          : Text(
-                              profile.description!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      icon: profile.name == current
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_off_rounded,
+                      selected: profile.name == current,
+                      title: profile.name,
+                      detail: profile.description,
                       onTap: () => widget.onSelected(profile.name),
                     ),
                   if (current != null && current.isNotEmpty)
-                    ListTile(
+                    _ProfileRow(
                       enabled: widget.enabled,
-                      leading: Icon(
-                        Icons.person_off_outlined,
-                        color: palette.muted,
-                      ),
-                      title: const Text('Unassign'),
-                      subtitle: const Text('This pauses new agent work.'),
+                      icon: Icons.person_off_outlined,
+                      title: 'Unassign',
+                      detail: 'This pauses new agent work.',
                       onTap: () => widget.onSelected(''),
                     ),
                   Padding(
@@ -422,9 +478,7 @@ class _NewTaskOptions extends StatelessWidget {
               onPressed: enabled ? onPickAssignee : null,
               icon: const Icon(Icons.person_outline_rounded),
               label: Text(
-                bot == null
-                    ? 'Assign a Hermes bot (optional)'
-                    : 'Assigned to $bot',
+                bot == null ? 'Assign a bot (optional)' : 'Assigned to $bot',
               ),
             ),
             HermezReveal(
@@ -509,6 +563,10 @@ class _MorphTrigger extends StatelessWidget {
 
 /// The plus, turning into a cross as the panel opens ([turn] 0 to 1): the
 /// reference's `scale(0.97) rotate(45deg)`.
+/// Server event words ("done", "commented") as labels: "Done", "Commented".
+String _sentenceCase(String text) =>
+    text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+
 Widget _turningPlus(IconData icon, Color color, double turn) =>
     Transform.rotate(
       angle: turn * HermezPanelMotion.rotate,
@@ -2176,7 +2234,9 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                     ListTile(
                       leading: const Icon(Icons.play_circle_outline),
                       title: Text(
-                        run['status']?.toString() ?? 'Run state unknown',
+                        _sentenceCase(
+                          run['status']?.toString() ?? 'Run state unknown',
+                        ),
                       ),
                       subtitle: Text(
                         run['summary']?.toString() ??
@@ -2198,9 +2258,9 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                     ListTile(
                       leading: const Icon(Icons.history),
                       title: Text(
-                        (event['kind']?.toString() ?? 'Task event').replaceAll(
-                          '_',
-                          ' ',
+                        _sentenceCase(
+                          (event['kind']?.toString() ?? 'Task event')
+                              .replaceAll('_', ' '),
                         ),
                       ),
                       subtitle: Text(_kanbanTime(event['created_at'])),

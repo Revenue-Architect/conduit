@@ -166,7 +166,24 @@ class _HermezSheetPlacement<T> extends StatelessWidget {
                 route._handleDragUpdate(details, target.height),
             onVerticalDragEnd: (details) =>
                 route._handleDragEnd(details, target.height),
-            child: child,
+            // Scrolling content wins the vertical drag, so the sheet also
+            // follows a pull past the top of its content: the same drag keeps
+            // going, moving the sheet instead of the list.
+            child: NotificationListener<OverscrollIndicatorNotification>(
+              onNotification: (notification) {
+                if (notification.leading && route._dragOffset.value > 0) {
+                  notification.disallowIndicator();
+                }
+                return false;
+              },
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  route._handleContentScroll(notification, target.height);
+                  return false;
+                },
+                child: child,
+              ),
+            ),
           ),
         );
         return ValueListenableBuilder<double>(
@@ -453,6 +470,45 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     if (past != _pastDismiss) {
       _pastDismiss = past;
       HermezFeedback.play(HermezFeedbackCue.sheetDetent);
+    }
+  }
+
+  /// A vertical pull past the top of the sheet's content moves the sheet.
+  void _handleContentScroll(ScrollNotification notification, double extent) {
+    if (notification.metrics.axis != Axis.vertical) return;
+    switch (notification) {
+      case OverscrollNotification(:final dragDetails?, :final overscroll)
+          when overscroll < 0 || _dragOffset.value > 0:
+        _handleDragUpdate(
+          DragUpdateDetails(
+            globalPosition: dragDetails.globalPosition,
+            delta: Offset(0, -overscroll),
+            primaryDelta: -overscroll,
+          ),
+          extent,
+        );
+      case ScrollUpdateNotification(:final dragDetails?, :final scrollDelta?)
+          when _dragOffset.value > 0 && scrollDelta > 0:
+        // Pushing back up takes the sheet up first.
+        _handleDragUpdate(
+          DragUpdateDetails(
+            globalPosition: dragDetails.globalPosition,
+            delta: Offset(0, -scrollDelta),
+            primaryDelta: -scrollDelta,
+          ),
+          extent,
+        );
+      case ScrollEndNotification(:final dragDetails) when _dragOffset.value > 0:
+        final velocity = dragDetails?.primaryVelocity ?? 0;
+        _handleDragEnd(
+          DragEndDetails(
+            velocity: Velocity(pixelsPerSecond: Offset(0, velocity)),
+            primaryVelocity: velocity,
+          ),
+          extent,
+        );
+      default:
+        break;
     }
   }
 

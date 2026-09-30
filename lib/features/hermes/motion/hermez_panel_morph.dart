@@ -631,31 +631,33 @@ class RenderHermezPanelMorph extends RenderBox
     final width = math.max(0.0, math.min(free.width, _maxWidth));
     // The anchored edge lines up with the button's, kept on screen and above
     // the keyboard; the panel extends from it toward the rest of the screen.
+    // When the content grows past that (a compartment opening), the panel
+    // slides off the anchor to use the whole clear height before it scrolls.
     final edge = _anchorBottom
         ? math.min(_origin.bottom, free.bottom)
         : math.max(_origin.top, free.top);
-    final maxHeight = math.max(
-      0.0,
-      _anchorBottom ? edge - free.top : free.bottom - edge,
-    );
     final content = _content;
     var height = 0.0;
     if (content != null) {
       content.layout(
-        BoxConstraints(minWidth: width, maxWidth: width, maxHeight: maxHeight),
+        BoxConstraints(
+          minWidth: width,
+          maxWidth: width,
+          maxHeight: math.max(0.0, free.height),
+        ),
         parentUsesSize: true,
       );
       height = content.size.height;
     }
+    final preferredTop = _anchorBottom ? edge - height : edge;
+    final top = math.max(
+      free.top,
+      math.min(preferredTop, free.bottom - height),
+    );
     final left = _anchorRight
         ? math.max(free.left, math.min(_origin.right, free.right) - width)
         : math.min(math.max(_origin.left, free.left), free.right - width);
-    _panel = Rect.fromLTWH(
-      left,
-      _anchorBottom ? edge - height : edge,
-      width,
-      height,
-    );
+    _panel = Rect.fromLTWH(left, top, width, height);
     final face = _face;
     if (face != null) face.layout(BoxConstraints.tight(_origin.size));
   }

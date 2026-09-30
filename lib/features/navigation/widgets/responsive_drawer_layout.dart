@@ -412,6 +412,10 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   /// Android Back closes the mobile navigation before anything else sees it.
   Future<bool> _handleBackButton() async {
     if (!mounted || _cachedIsTablet) return false;
+    // A page opened from the drawer (Kanban, Settings) sits above it. Back
+    // belongs to that page: the covered drawer cannot animate closed (its
+    // tickers are off), so claiming Back here swallowed it on every press.
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
     if (_navTarget > 0.5 || _controller.value > 0.0) {
       close();
       return true;

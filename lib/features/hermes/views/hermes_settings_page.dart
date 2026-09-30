@@ -316,6 +316,15 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
                   HermezFeedback.instance.setSoundsEnabled(!sounds),
                 ),
               ),
+              UtilityRow(
+                title: 'Notifications',
+                subtitle: PlatformInfo.isIOS
+                    ? null
+                    : 'When runs finish or need you, and a health check.',
+                titleFontWeight: PlatformInfo.isIOS ? FontWeight.w400 : null,
+                showChevron: true,
+                onTap: () => context.pushNamed(RouteNames.notificationSettings),
+              ),
             ],
           ),
         ),

@@ -243,6 +243,77 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
 
 enum _JobMutation { toggle, run, edit, delete }
 
+/// A run error, two lines by default: a long server message (a stack of
+/// instructions, a config drift notice) otherwise buries the card's actions.
+/// Tapping it opens the rest in place, on the same spring as other
+/// compartments.
+class HermesJobError extends StatefulWidget {
+  const HermesJobError({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  State<HermesJobError> createState() => _HermesJobErrorState();
+}
+
+class _HermesJobErrorState extends State<HermesJobError> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.bodySmallStyle.copyWith(color: widget.color);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: 2,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final long = painter.didExceedMaxLines;
+        painter.dispose();
+        final text = HermezSize(
+          child: Text(
+            widget.text,
+            maxLines: _open || !long ? null : 2,
+            overflow: _open || !long ? null : TextOverflow.ellipsis,
+            style: style,
+          ),
+        );
+        if (!long) return text;
+        return Semantics(
+          button: true,
+          expanded: _open,
+          onTapHint: _open ? 'Show less' : 'Show the full error',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _open = !_open),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  text,
+                  const SizedBox(height: 2),
+                  Text(
+                    _open ? 'Show less' : 'Show full error',
+                    style: style.copyWith(
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
+                      decorationColor: widget.color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _JobCard extends ConsumerStatefulWidget {
   const _JobCard({super.key, required this.job, this.writable = true});
 
@@ -402,12 +473,7 @@ class _JobCardState extends ConsumerState<_JobCard> {
                 ),
               ),
             if (job.lastError?.isNotEmpty == true)
-              Text(
-                job.lastError!,
-                style: AppTypography.bodySmallStyle.copyWith(
-                  color: theme.error,
-                ),
-              ),
+              HermesJobError(text: job.lastError!, color: theme.error),
             if (job.lastDeliveryError?.isNotEmpty == true)
               Text(
                 'Delivery: ${job.lastDeliveryError}',

@@ -242,7 +242,7 @@ void main() {
     expect(find.text('Triage · No bot · Priority 0'), findsOneWidget);
     // The controls are not built while the compartment is closed.
     expect(find.byType(SegmentedButton<bool>), findsNothing);
-    expect(find.text('Assign a Hermes bot (optional)'), findsNothing);
+    expect(find.text('Assign a bot (optional)'), findsNothing);
     expect(find.byType(DropdownButtonFormField<int>), findsNothing);
   });
 
@@ -270,7 +270,7 @@ void main() {
     expect(midGap, greaterThan(closedGap));
     expect(openGap, greaterThan(midGap));
     expect(find.byType(SegmentedButton<bool>), findsOneWidget);
-    expect(find.text('Assign a Hermes bot (optional)'), findsOneWidget);
+    expect(find.text('Assign a bot (optional)'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<int>), findsOneWidget);
     expect(tester.testTextInput.isVisible, isFalse);
 
@@ -297,7 +297,7 @@ void main() {
     // Ready with no bot: no warning yet.
     expect(find.text(_notice), findsNothing);
 
-    await tester.tap(find.text('Assign a Hermes bot (optional)'));
+    await tester.tap(find.text('Assign a bot (optional)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('kai'));
     await tester.pumpAndSettle();

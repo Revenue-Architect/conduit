@@ -77,6 +77,7 @@ bool _isAccountlessBackendLocation(String location) {
   return location == Routes.chat ||
       location == Routes.profile ||
       location == Routes.audioSettings ||
+      location == Routes.notificationSettings ||
       location == Routes.appearanceSettings ||
       location == Routes.chatSettings ||
       location == Routes.dataConnectionSettings ||

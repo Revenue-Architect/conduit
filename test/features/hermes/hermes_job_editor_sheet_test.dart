@@ -11,6 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 final _calls = <String>[];
 
+const _longError =
+    'RuntimeError: Skipped to prevent unintended spend: global inference '
+    'config drifted since this job was created, and this job is unpinned. '
+    'No inference call was made. To run on the new config, pin it '
+    'explicitly on the host. This alert is sent once.';
+
 class _Service extends HermesApiService {
   _Service()
     : super(
@@ -155,5 +161,46 @@ void main() {
     await tester.tap(find.descendant(of: guard, matching: find.text('Delete')));
     await tester.pumpAndSettle();
     expect(_calls, ['delete:job-1']);
+  });
+
+  testWidgets('a long run error shows two lines and opens in place', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            child: HermesJobError(text: _longError, color: Colors.red),
+          ),
+        ),
+      ),
+    );
+    Text error() => tester.widget<Text>(find.text(_longError));
+    expect(error().maxLines, 2);
+    expect(find.text('Show full error'), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(HermesJobError)).height,
+      greaterThanOrEqualTo(44),
+    );
+
+    await tester.tap(find.text('Show full error'));
+    await tester.pumpAndSettle();
+    expect(error().maxLines, isNull);
+    expect(find.text('Show less'), findsOneWidget);
+  });
+
+  testWidgets('a short run error is shown whole, with no toggle', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: HermesJobError(text: 'Timed out', color: Colors.red),
+        ),
+      ),
+    );
+    expect(find.text('Timed out'), findsOneWidget);
+    expect(find.text('Show full error'), findsNothing);
   });
 }

@@ -325,6 +325,30 @@ void main() {
     expect(morph.apertureRect, morph.panelRect);
   });
 
+  testWidgets('content taller than the room past the anchor slides the '
+      'panel back instead of clipping it', (tester) async {
+    await pumpHarness(tester, topLeft: true);
+    // The grown content fits on screen, but not below the button.
+    tester.view.viewInsets = FakeViewPadding(
+      bottom: 300 * tester.view.devicePixelRatio,
+    );
+    addTearDown(tester.view.resetViewInsets);
+    final morph = await _open(tester);
+    await tester.pumpAndSettle();
+    final natural = morph.panelRect.height;
+
+    await tester.tap(find.byKey(_growKey));
+    await tester.pump();
+    await tester.pump();
+    // Whole content shown (nothing clipped), still inside the clear area.
+    expect(morph.panelRect.height, natural + 240);
+    expect(morph.panelRect.top, greaterThanOrEqualTo(0));
+    expect(morph.panelRect.top, lessThan(100));
+    expect(morph.panelRect.bottom, lessThanOrEqualTo(800 - 300 + 0.01));
+    expect(morph.apertureRect, morph.panelRect);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('with the keyboard up the whole panel sits above it', (
     tester,
   ) async {

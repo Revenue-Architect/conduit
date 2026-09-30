@@ -504,3 +504,39 @@ Source: the user's "Hermez Physical Interaction + Navigation + Approval + Notifi
   - **Phase H** (moving notification tap and init ownership out of the Open WebUI listener): the spec gates it on notifications being proven on device first.
   - **Killed-app delivery:** needs a server-to-device push transport; out of scope by design.
   - **Device QA** of each flow, and the §34 notification tests, are pending on the S25.
+
+## 2026-09-30: Device QA round (motion and interaction polish)
+
+This round covers the user's reports and a QA pass on the S25 (profile build, 120 Hz).
+- **Frame timing method:**
+  - Run `dumpsys SurfaceFlinger --latency '<SurfaceView layer>'` around an `input tap` (script kept in the session scratchpad).
+  - Every measured transition held 8.3 ms frames: See all, New task, the + menu, Options, the drawer, Home, and Jobs warm.
+  - Jobs cold open drops about 7 frames on first build.
+- **Fixes from user reports:**
+  - **New Chat +:** now the plus-to-menu panel morph (`pushHermezPanel`) instead of a bottom sheet. With a tiny top-right origin, the sheet aperture's widen-then-rise path stalled mid-flight. No origin falls back to the sheet.
+  - **See all / All teams close:**
+    - The block is a `RepaintBoundary`, and its drawing is passed as the origin snapshot via `HermezMorphOrigin.capture`.
+    - Contracting now lands on the block's own face. Before, a shrunken, clipped Conversations page showed and then swapped.
+  - **New task Options clipped:**
+    - `RenderHermezPanelMorph` used to cap the content at the room between the anchor and the screen edge.
+    - Now the content may use the whole clear height, and the panel slides off its anchor before anything scrolls.
+  - **Notifications missing in Hermes-only mode:**
+    - `/profile/notifications` is added to the accountless allowlist.
+    - The Profile entry is no longer gated on an Open WebUI account.
+    - Hermes settings links to it.
+    - The Channels toggle shows only when an Open WebUI API is present.
+- **Found in QA and fixed:**
+  - **Back swallowed on every page opened from the side navigation.**
+    - `ResponsiveDrawerLayout._handleBackButton` claimed Back while the covered drawer was "open".
+    - Its tickers are off while covered, so it could never close, and every Back was eaten. This affected Kanban, bot detail, the New task panel and others.
+    - Now it returns false unless its own route is current.
+  - **Hermez sheets with scrolling content could not be dragged down.**
+    - The scroll view won the drag.
+    - `_HermezSheetPlacement` now turns overscroll past the content's top into sheet drag, and ScrollEnd into the dismiss/settle decision. The stretch indicator is suppressed while the sheet moves.
+  - Assignee rows (Kanban) are Hermez physical rows instead of stock ListTiles, and the label is shortened to "Assign a bot".
+  - Bot detail Capabilities (a second data pass) grows in on `HermezSize` instead of jumping the page.
+  - Long scheduled-job errors are two lines with Show full error (`HermesJobError`).
+  - Live activity labels are sentence case.
+  - The Notification health settings link shows only when the permission or channel is off.
+- **Open, not motion:**
+  - Scheduled-agent counts disagree. Home shows 4 active / 5 total across profiles, while the side navigation and the Jobs page show the main profile only (0 active / 1).

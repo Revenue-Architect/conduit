@@ -162,6 +162,8 @@ void main() {
         Routes.directConnections,
         Routes.directConnectionEditorPath('new'),
         Routes.hermesSettings,
+        // Hermes runs notify, so notifications are not Open WebUI-only.
+        Routes.notificationSettings,
         Routes.hermesMcp,
         Routes.hermesHome,
         Routes.hermesJobs,
@@ -174,7 +176,6 @@ void main() {
     test('does not expose OpenWebUI-only surfaces', () {
       for (final location in <String>[
         Routes.accountSettings,
-        Routes.notificationSettings,
         Routes.notes,
         Routes.channel,
       ]) {

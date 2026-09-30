@@ -3,6 +3,7 @@ import 'package:conduit/features/hermes/kanban/hermes_kanban_summary_provider.da
 import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/hermes/motion/hermez_morph_origin.dart';
+import 'package:conduit/features/hermes/motion/hermez_panel_morph.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_session_totals_provider.dart';
 import 'package:conduit/features/hermes/sheets/hermez_modal_sheet.dart';
@@ -121,16 +122,18 @@ void main() {
     expect(_opened[RouteNames.hermesArtifacts], isA<HermezMorphOrigin>());
   });
 
-  testWidgets('the + grows into a Hermez bot picker; choosing closes it', (
+  testWidgets('the + turns into a bot menu; choosing closes it', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
     await _pumpHome(tester);
     await tester.tap(find.byTooltip('New Hermes chat'));
     await tester.pumpAndSettle();
-    expect(find.byType(HermezModalSheet), findsOneWidget);
+    // The plus-to-menu morph, not a sheet from the bottom edge.
+    expect(find.byType(HermezPanelMorph), findsOneWidget);
+    expect(find.byType(HermezModalSheet), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.text('Choose a bot'), findsOneWidget);
+    expect(find.text('NEW CONVERSATION'), findsOneWidget);
     expect(
       find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
       findsOneWidget,
@@ -144,7 +147,7 @@ void main() {
       find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(HermezModalSheet), findsNothing);
+    expect(find.byType(HermezPanelMorph), findsNothing);
     expect(tester.takeException(), isNull);
     handle.dispose();
   });

@@ -430,7 +430,7 @@ void main() {
     await tester.tap(find.text('OPTIONS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ready').last);
-    await tester.tap(find.text('Assign a Hermes bot (optional)'));
+    await tester.tap(find.text('Assign a bot (optional)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('kai'));
     await tester.pumpAndSettle();
@@ -590,7 +590,7 @@ void main() {
     );
     await tester.tap(find.text('OPTIONS'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Assign a Hermes bot (optional)'));
+    await tester.tap(find.text('Assign a bot (optional)'));
     await tester.pumpAndSettle();
     expect(find.text('kai'), findsOneWidget);
     expect(find.text('strong'), findsOneWidget);

@@ -110,12 +110,14 @@ class NotificationSettingsPage extends ConsumerWidget {
               value: settings.notificationChatEnabled,
               onChanged: notifier.setNotificationChatEnabled,
             ),
-            tile(
-              title: l10n.notificationChannelTitle,
-              subtitle: l10n.notificationChannelDescription,
-              value: settings.notificationChannelEnabled,
-              onChanged: notifier.setNotificationChannelEnabled,
-            ),
+            // Channels are Open WebUI only.
+            if (ref.watch(apiServiceProvider) != null)
+              tile(
+                title: l10n.notificationChannelTitle,
+                subtitle: l10n.notificationChannelDescription,
+                value: settings.notificationChannelEnabled,
+                onChanged: notifier.setNotificationChannelEnabled,
+              ),
           ],
         ),
       ],
@@ -335,23 +337,29 @@ class _NotificationHealthSectionState
           showChevron: true,
           onTap: _sending ? null : () => unawaited(_sendTest()),
         ),
-        UtilityRow(
-          title: l10n.notificationSystemSettingsTitle,
-          subtitle: 'Open Android settings',
-          showChevron: true,
-          onTap: () async {
-            final opened = await ref
-                .read(localNotificationServiceProvider)
-                .openSystemSettings();
-            if (!opened && context.mounted) {
-              AdaptiveSnackBar.show(
-                context,
-                message: l10n.notificationSystemSettingsOpenFailed,
-                type: AdaptiveSnackBarType.warning,
-              );
-            }
-          },
-        ),
+        // The page's first group already links to Android settings; here
+        // the link appears only as the fix for a problem shown above.
+        if (health != null &&
+            (health.allowed == false ||
+                !health.channelExists ||
+                !health.channelEnabled))
+          UtilityRow(
+            title: l10n.notificationSystemSettingsTitle,
+            subtitle: 'Open Android settings to turn notifications back on',
+            showChevron: true,
+            onTap: () async {
+              final opened = await ref
+                  .read(localNotificationServiceProvider)
+                  .openSystemSettings();
+              if (!opened && context.mounted) {
+                AdaptiveSnackBar.show(
+                  context,
+                  message: l10n.notificationSystemSettingsOpenFailed,
+                  type: AdaptiveSnackBarType.warning,
+                );
+              }
+            },
+          ),
         const UtilityRow(
           title: 'Where notifications appear',
           subtitle:

@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// Where a Hermez object sits on the screen that opened a destination.
@@ -63,6 +64,25 @@ class HermezMorphOrigin {
       box: box,
       routeBox: routeBox,
     );
+  }
+
+  /// The drawing of [context]'s object at its own size, for [snapshot], when
+  /// that object is a [RepaintBoundary]. Null otherwise.
+  static ui.Image? capture(BuildContext context) {
+    final boundary = context.findRenderObject();
+    if (boundary is! RenderRepaintBoundary ||
+        !boundary.attached ||
+        !boundary.hasSize ||
+        boundary.debugNeedsPaint) {
+      return null;
+    }
+    try {
+      return boundary.toImageSync(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   final Rect _rect;

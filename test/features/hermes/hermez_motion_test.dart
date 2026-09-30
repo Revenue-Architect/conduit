@@ -623,4 +623,84 @@ void main() {
     expect(find.text('Sheet'), findsNothing);
     expect(closed, isTrue);
   });
+
+  testWidgets('a sheet whose content scrolls closes when pulled down from '
+      'the top of that content', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: ThemeData(platform: TargetPlatform.android),
+        home: const Scaffold(),
+      ),
+    );
+    var closed = false;
+    pushHermezSheet<void>(
+      navigator.currentContext!,
+      builder: (_) => ColoredBox(
+        color: Colors.white,
+        child: ListView(
+          children: [
+            for (var i = 0; i < 40; i++)
+              SizedBox(height: 60, child: Text('Row $i')),
+          ],
+        ),
+      ),
+    ).then((_) => closed = true);
+    await tester.pumpAndSettle();
+
+    // Scrolled down, a pull first returns the list to its top.
+    await tester.drag(find.text('Row 3'), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.drag(find.text('Row 8'), const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(find.text('Row 0'), findsOneWidget);
+    expect(closed, isFalse);
+
+    // At the top, the same pull moves the sheet and a flick closes it.
+    await tester.fling(find.text('Row 2'), const Offset(0, 400), 1500);
+    await tester.pumpAndSettle();
+    expect(find.text('Row 0'), findsNothing);
+    expect(closed, isTrue);
+  });
+
+  testWidgets('a short pull past the top springs the sheet back', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(navigatorKey: navigator, home: const Scaffold()),
+    );
+    var closed = false;
+    pushHermezSheet<void>(
+      navigator.currentContext!,
+      builder: (_) => ColoredBox(
+        color: Colors.white,
+        child: ListView(
+          children: [
+            for (var i = 0; i < 40; i++)
+              SizedBox(height: 60, child: Text('Row $i')),
+          ],
+        ),
+      ),
+    ).then((_) => closed = true);
+    await tester.pumpAndSettle();
+    final resting = tester.getTopLeft(find.text('Row 0')).dy;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Row 2')),
+    );
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(const Offset(0, 10));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.getTopLeft(find.text('Row 0')).dy, greaterThan(resting));
+    await tester.pump(const Duration(milliseconds: 400));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(closed, isFalse);
+    expect(
+      tester.getTopLeft(find.text('Row 0')).dy,
+      moreOrLessEquals(resting, epsilon: 0.01),
+    );
+  });
 }

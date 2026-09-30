@@ -22,6 +22,7 @@ import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_relative_time.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
+import '../widgets/hermez_visual_theme.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_home_presence.dart';
 import 'hermes_teams_page.dart' show HermesTeamsSection;
@@ -83,29 +84,69 @@ class HermesHomePage extends ConsumerWidget {
     final bots =
         ref.read(hermesBotsProvider).asData?.value ?? const <HermesBot>[];
     if (bots.isEmpty) return;
-    // The + grows into the picker and the picker contracts back into it.
-    final bot = await pushHermezSheetRoute<HermesBot>(
-      context,
-      origin: origin,
-      heightFactor: 0.8,
-      builder: (sheetContext) => HermezModalSheet(
-        eyebrow: 'New conversation',
-        title: 'Choose a bot',
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final candidate in bots)
+    // The + turns into the bot menu, the same plus-to-menu morph as New task:
+    // the button's own surface grows from its corner into the menu and folds
+    // back into it. A sheet that rises from the bottom edge does not read as
+    // coming out of a small control at the top of the screen.
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final HermesBot? bot;
+    if (origin == null) {
+      bot = await pushHermezSheetRoute<HermesBot>(
+        context,
+        heightFactor: 0.8,
+        builder: (sheetContext) => HermezModalSheet(
+          eyebrow: 'New conversation',
+          title: 'Choose a bot',
+          body: _BotChoices(
+            bots: bots,
+            onChoose: (choice) => Navigator.pop(sheetContext, choice),
+          ),
+        ),
+      );
+    } else {
+      bot = await pushHermezPanel<HermesBot>(
+        context,
+        origin: origin,
+        surfaceColor: palette.surface,
+        maxWidth: 380,
+        semanticLabel: 'Choose a bot',
+        theme: hermezVisualTheme(Theme.of(context)),
+        faceBuilder: (faceContext, turn) => SizedBox.expand(
+          child: Center(
+            child: Transform.rotate(
+              angle: turn * HermezPanelMotion.rotate,
+              child: Icon(Icons.add_rounded, color: palette.ink),
+            ),
+          ),
+        ),
+        builder: (panelContext) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _BotChoice(
-                  bot: candidate,
-                  onTap: () => Navigator.pop(sheetContext, candidate),
+                padding: const EdgeInsets.fromLTRB(4, 0, 48, 12),
+                child: Text(
+                  'NEW CONVERSATION',
+                  style: HermezType.technical(palette.muted),
                 ),
               ),
-          ],
+              Flexible(
+                child: SingleChildScrollView(
+                  child: _BotChoices(
+                    bots: bots,
+                    onChoose: (choice) => Navigator.pop(panelContext, choice),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
     if (bot == null || !context.mounted) return;
     final service = ref.read(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return;
@@ -432,65 +473,70 @@ class HermesHomePage extends ConsumerWidget {
             const SizedBox(height: 22),
             // The Recent block is one object: See all grows the whole block
             // into Conversations, and Back returns it here.
+            // Its drawing rides the aperture, so Back lands on the block's
+            // own face instead of a shrunken Conversations page.
             Builder(
-              builder: (recentContext) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  HermezSectionBar(
-                    label: 'RECENT',
-                    onAction: () => context.pushNamed(
-                      RouteNames.hermesConversations,
-                      extra: HermezMorphOrigin.of(
-                        recentContext,
-                        radius: 18,
-                        color: palette.canvas,
+              builder: (recentContext) => RepaintBoundary(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    HermezSectionBar(
+                      label: 'RECENT',
+                      onAction: () => context.pushNamed(
+                        RouteNames.hermesConversations,
+                        extra: HermezMorphOrigin.of(
+                          recentContext,
+                          radius: 18,
+                          color: palette.canvas,
+                          snapshot: HermezMorphOrigin.capture(recentContext),
+                        ),
                       ),
                     ),
-                  ),
-                  HermezSurface(
-                    kind: HermezSurfaceKind.list,
-                    padding: EdgeInsets.zero,
-                    child: sessions == null
-                        ? Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: sessionsAsync.hasError
-                                ? Text(
-                                    'Recent conversations are unavailable right now.',
-                                    style: HermezType.meta(palette),
-                                  )
-                                : const LinearProgressIndicator(),
-                          )
-                        : sessions.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'No recent conversations.',
-                              style: HermezType.meta(palette),
-                            ),
-                          )
-                        : Column(
-                            children: [
-                              for (
-                                var i = 0;
-                                i < sessions.take(4).length;
-                                i++
-                              ) ...[
-                                if (i > 0)
-                                  Divider(
-                                    height: 1,
-                                    color: palette.border.withValues(
-                                      alpha: 0.7,
+                    HermezSurface(
+                      kind: HermezSurfaceKind.list,
+                      padding: EdgeInsets.zero,
+                      child: sessions == null
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: sessionsAsync.hasError
+                                  ? Text(
+                                      'Recent conversations are unavailable right now.',
+                                      style: HermezType.meta(palette),
+                                    )
+                                  : const LinearProgressIndicator(),
+                            )
+                          : sessions.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No recent conversations.',
+                                style: HermezType.meta(palette),
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                for (
+                                  var i = 0;
+                                  i < sessions.take(4).length;
+                                  i++
+                                ) ...[
+                                  if (i > 0)
+                                    Divider(
+                                      height: 1,
+                                      color: palette.border.withValues(
+                                        alpha: 0.7,
+                                      ),
                                     ),
+                                  HermesSessionTile(
+                                    session: sessions[i],
+                                    compact: true,
                                   ),
-                                HermesSessionTile(
-                                  session: sessions[i],
-                                  compact: true,
-                                ),
+                                ],
                               ],
-                            ],
-                          ),
-                  ),
-                ],
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 22),
@@ -541,6 +587,27 @@ class HermesHomePage extends ConsumerWidget {
 }
 
 /// One bot in the New conversation picker.
+/// The bots a new conversation can start with.
+class _BotChoices extends StatelessWidget {
+  const _BotChoices({required this.bots, required this.onChoose});
+
+  final List<HermesBot> bots;
+  final ValueChanged<HermesBot> onChoose;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final candidate in bots)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _BotChoice(bot: candidate, onTap: () => onChoose(candidate)),
+        ),
+    ],
+  );
+}
+
 class _BotChoice extends StatelessWidget {
   const _BotChoice({required this.bot, required this.onTap});
 
