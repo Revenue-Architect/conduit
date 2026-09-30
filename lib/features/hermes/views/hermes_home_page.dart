@@ -410,46 +410,68 @@ class HermesHomePage extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 22),
-            HermezSectionBar(
-              label: 'RECENT',
-              onAction: () => context.pushNamed(RouteNames.hermesConversations),
-            ),
-            HermezSurface(
-              kind: HermezSurfaceKind.list,
-              padding: EdgeInsets.zero,
-              child: sessions == null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: sessionsAsync.hasError
-                          ? Text(
-                              'Recent conversations are unavailable right now.',
-                              style: HermezType.meta(palette),
-                            )
-                          : const LinearProgressIndicator(),
-                    )
-                  : sessions.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        'No recent conversations.',
-                        style: HermezType.meta(palette),
+            // The Recent block is one object: See all grows the whole block
+            // into Conversations, and Back returns it here.
+            Builder(
+              builder: (recentContext) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  HermezSectionBar(
+                    label: 'RECENT',
+                    onAction: () => context.pushNamed(
+                      RouteNames.hermesConversations,
+                      extra: HermezMorphOrigin.of(
+                        recentContext,
+                        radius: 18,
+                        color: palette.canvas,
                       ),
-                    )
-                  : Column(
-                      children: [
-                        for (var i = 0; i < sessions.take(4).length; i++) ...[
-                          if (i > 0)
-                            Divider(
-                              height: 1,
-                              color: palette.border.withValues(alpha: 0.7),
-                            ),
-                          HermesSessionTile(
-                            session: sessions[i],
-                            compact: true,
-                          ),
-                        ],
-                      ],
                     ),
+                  ),
+                  HermezSurface(
+                    kind: HermezSurfaceKind.list,
+                    padding: EdgeInsets.zero,
+                    child: sessions == null
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: sessionsAsync.hasError
+                                ? Text(
+                                    'Recent conversations are unavailable right now.',
+                                    style: HermezType.meta(palette),
+                                  )
+                                : const LinearProgressIndicator(),
+                          )
+                        : sessions.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              'No recent conversations.',
+                              style: HermezType.meta(palette),
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              for (
+                                var i = 0;
+                                i < sessions.take(4).length;
+                                i++
+                              ) ...[
+                                if (i > 0)
+                                  Divider(
+                                    height: 1,
+                                    color: palette.border.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                  ),
+                                HermesSessionTile(
+                                  session: sessions[i],
+                                  compact: true,
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 22),
             // Bots working together: group conversations, after the one-to-one
@@ -459,25 +481,95 @@ class HermesHomePage extends ConsumerWidget {
             // below everything else so it never pushes content down.
             const HermesNotifyPrompt(),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        context.pushNamed(RouteNames.hermesAttention),
-                    icon: const Icon(Icons.notifications_none_rounded),
-                    label: const Text('Attention'),
+                  child: _UtilityObject(
+                    label: 'ATTENTION',
+                    count: ref
+                        .watch(hermesHomePendingDecisionsProvider)
+                        .asData
+                        ?.value
+                        .length,
+                    description: 'Needs your input',
+                    semanticLabel: 'Attention',
+                    onOpen: (origin) => context.pushNamed(
+                      RouteNames.hermesAttention,
+                      extra: origin,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        context.pushNamed(RouteNames.hermesArtifacts),
-                    icon: const Icon(Icons.folder_outlined),
-                    label: const Text('Artifacts'),
+                  child: _UtilityObject(
+                    label: 'ARTIFACTS',
+                    description: 'Files Hermes made',
+                    semanticLabel: 'Artifacts',
+                    onOpen: (origin) => context.pushNamed(
+                      RouteNames.hermesArtifacts,
+                      extra: origin,
+                    ),
                   ),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact Home object that opens a destination growing out of it. A count
+/// is shown only when real data backs it.
+class _UtilityObject extends StatelessWidget {
+  const _UtilityObject({
+    required this.label,
+    required this.description,
+    required this.semanticLabel,
+    required this.onOpen,
+    this.count,
+  });
+
+  final String label;
+  final String description;
+  final String semanticLabel;
+  final int? count;
+  final ValueChanged<HermezMorphOrigin?> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final count = this.count;
+    return HermezSurface(
+      kind: HermezSurfaceKind.utility,
+      semanticLabel: count == null || count == 0
+          ? semanticLabel
+          : '$semanticLabel, $count',
+      feedbackCue: HermezFeedbackCue.objectOpen,
+      onOpen: onOpen,
+      padding: const EdgeInsets.all(14),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: HermezType.technical(palette.muted),
+                  ),
+                ),
+                if (count != null && count > 0)
+                  Text('$count', style: HermezType.technical(palette.accent)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(description, style: HermezType.meta(palette)),
           ],
         ),
       ),

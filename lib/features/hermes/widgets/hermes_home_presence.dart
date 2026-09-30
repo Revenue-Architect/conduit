@@ -49,7 +49,9 @@ class HermesAwaySince extends Notifier<DateTime?> {
   }
 }
 
-final _homePendingDecisionsProvider =
+/// Decisions Hermes is waiting on, across bots. Refreshes when one is
+/// added or resolved.
+final hermesHomePendingDecisionsProvider =
     FutureProvider.autoDispose<List<HermesPendingDesktopDecision>>((ref) async {
       ref.watch(_pendingChangesProvider);
       final service = ref.watch(hermesApiServiceProvider);
@@ -83,7 +85,7 @@ class HermesAwayDigest extends ConsumerWidget {
     final since = ref.watch(hermesAwaySinceProvider);
     final sessions = ref.watch(hermesSessionsProvider).asData?.value;
     final pending =
-        ref.watch(_homePendingDecisionsProvider).asData?.value ?? const [];
+        ref.watch(hermesHomePendingDecisionsProvider).asData?.value ?? const [];
     final moved = since == null || sessions == null
         ? const <HermesSessionSummary>[]
         : ([
