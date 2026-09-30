@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -65,6 +66,7 @@ class HermesRunNotifier with WidgetsBindingObserver {
   /// never notifies twice.
   final Set<String> _armed = {};
   bool _leased = false;
+  AppLifecycleState? _lifecycle;
   Timer? _leaseCap;
 
   void bind(HermesBackendService? service) {
@@ -93,6 +95,7 @@ class HermesRunNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
     if (state == AppLifecycleState.resumed) {
       _ref.read(hermesAwaySinceProvider.notifier).returned();
     }
@@ -106,6 +109,10 @@ class HermesRunNotifier with WidgetsBindingObserver {
       );
     }
   }
+
+  /// Feeds one activity event as the Desktop connection would. For tests.
+  @visibleForTesting
+  void debugActivity(HermesLiveActivityEvent event) => _onActivity(event);
 
   void _onTurnState(HermesDesktopTurnState state) {
     switch (state) {
@@ -127,6 +134,7 @@ class HermesRunNotifier with WidgetsBindingObserver {
     final sessionId = event.sessionId;
     switch (event.kind) {
       case HermesLiveActivityKind.waitingForInput:
+        _trace('waiting', sessionId);
         final bot = _botLabel(sessionId);
         _route(
           AppNotification(
@@ -141,7 +149,15 @@ class HermesRunNotifier with WidgetsBindingObserver {
         );
       case HermesLiveActivityKind.completed:
       case HermesLiveActivityKind.failed:
-        if (!_armed.remove(sessionId)) return;
+        final kindName = event.kind == HermesLiveActivityKind.failed
+            ? 'failed'
+            : 'completed';
+        _trace(kindName, sessionId);
+        if (!_armed.remove(sessionId)) {
+          // A replayed or unseen completion: suppressed on purpose.
+          _trace('$kindName-suppressed-unarmed', sessionId);
+          return;
+        }
         final bot = _botLabel(sessionId);
         final failed = event.kind == HermesLiveActivityKind.failed;
         _route(
@@ -159,6 +175,25 @@ class HermesRunNotifier with WidgetsBindingObserver {
       default:
         _armed.add(sessionId);
     }
+  }
+
+  /// One line per notification-relevant event, for device debugging. Never
+  /// includes prompts, answers, secrets, or payloads. Off in release builds.
+  void _trace(String event, String sessionId, [Map<String, Object?>? more]) {
+    if (kReleaseMode) return;
+    final fields = <String, Object?>{
+      'event': event,
+      'session': sessionId.length > 8 ? sessionId.substring(0, 8) : sessionId,
+      'profile': _session(sessionId)?.profile ?? '?',
+      'armed': _armed.contains(sessionId),
+      'lifecycle':
+          (_lifecycle ?? WidgetsBinding.instance.lifecycleState)?.name ??
+          'unknown',
+      ...?more,
+    };
+    debugPrint(
+      'hermes/notifications ${fields.entries.map((e) => '${e.key}=${e.value}').join(' ')}',
+    );
   }
 
   HermesSessionSummary? _session(String id) {
@@ -184,18 +219,26 @@ class HermesRunNotifier with WidgetsBindingObserver {
 
   void _route(AppNotification notification) {
     unawaited(
-      _ref.read(notificationRouterProvider).route(notification).catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        DebugLogger.error(
-          'hermes notification routing failed',
-          error: error,
-          stackTrace: stackTrace,
-          scope: 'hermes/notifications',
-        );
-        return NotificationSurface.suppressed;
-      }),
+      _ref
+          .read(notificationRouterProvider)
+          .route(notification)
+          .then((surface) {
+            _trace('routed', notification.sourceId, {
+              'kind': notification.kind.name,
+              'surface': surface.name,
+              'system_attempted': surface == NotificationSurface.system,
+            });
+            return surface;
+          })
+          .catchError((Object error, StackTrace stackTrace) {
+            DebugLogger.error(
+              'hermes notification routing failed',
+              error: error,
+              stackTrace: stackTrace,
+              scope: 'hermes/notifications',
+            );
+            return NotificationSurface.suppressed;
+          }),
     );
   }
 

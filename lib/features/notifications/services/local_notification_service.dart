@@ -44,6 +44,45 @@ class NotificationTap {
   });
 }
 
+/// What Android reports about this app's notifications. Only values the
+/// platform actually returns; null where it did not answer.
+class AndroidNotificationHealth {
+  const AndroidNotificationHealth({
+    required this.allowed,
+    required this.channelExists,
+    this.channelImportance,
+  });
+
+  /// Android's own answer: the notification permission (Android 13+) and the
+  /// app-level switch together. Null when Android did not answer.
+  final bool? allowed;
+
+  /// Whether the Conduit messages channel has been created.
+  final bool channelExists;
+
+  /// The channel's importance as the user left it. [Importance.none] means
+  /// the user turned the channel off in Android settings.
+  final Importance? channelImportance;
+
+  bool get channelEnabled =>
+      channelExists && channelImportance != Importance.none;
+}
+
+/// The outcome of [LocalNotificationService.sendDiagnosticNotification].
+enum DiagnosticNotificationResult {
+  /// Handed to Android without error.
+  submitted,
+
+  /// Android reports notifications are not allowed for this app.
+  notAllowed,
+
+  /// Posting threw; see the debug log.
+  failed,
+
+  /// This platform has no system notifications here.
+  unsupported,
+}
+
 /// Wraps a single [FlutterLocalNotificationsPlugin] instance for OS-level
 /// message notifications. Deliberately separate from
 /// `VoiceCallNotificationService` for now (that refactor is a follow-up); this
@@ -193,6 +232,98 @@ class LocalNotificationService {
         data: {'error': error.toString()},
       );
       return false;
+    }
+  }
+
+  AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  /// Whether the platform currently lets this app post notifications. Null
+  /// when it cannot say (unsupported platform, or no answer).
+  Future<bool?> areNotificationsAllowed() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _android?.areNotificationsEnabled();
+    } catch (error) {
+      DebugLogger.warning(
+        'notifications-allowed-check-failed',
+        scope: 'notifications/local',
+        data: {'errorType': error.runtimeType.toString()},
+      );
+      return null;
+    }
+  }
+
+  /// Android's view of this app's notifications and of the messages channel.
+  /// Null off Android.
+  Future<AndroidNotificationHealth?> androidHealth() async {
+    if (!Platform.isAndroid) return null;
+    if (!_initialized) await initialize();
+    final allowed = await areNotificationsAllowed();
+    List<AndroidNotificationChannel>? channels;
+    try {
+      channels = await _android?.getNotificationChannels();
+    } catch (error) {
+      DebugLogger.warning(
+        'notification-channels-check-failed',
+        scope: 'notifications/local',
+        data: {'errorType': error.runtimeType.toString()},
+      );
+    }
+    final channel = channels
+        ?.where((candidate) => candidate.id == _channelId)
+        .firstOrNull;
+    return AndroidNotificationHealth(
+      allowed: allowed,
+      channelExists: channel != null,
+      channelImportance: channel?.importance,
+    );
+  }
+
+  /// Posts a test notification straight to the OS, bypassing Hermes events
+  /// and the router (so it appears even with the app open). Separates an
+  /// Android / permission / channel problem from a Hermes event problem.
+  Future<DiagnosticNotificationResult> sendDiagnosticNotification() async {
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return DiagnosticNotificationResult.unsupported;
+    }
+    if (!_initialized) await initialize();
+    if (await areNotificationsAllowed() == false) {
+      return DiagnosticNotificationResult.notAllowed;
+    }
+    final l10n = currentAppLocalizations();
+    try {
+      await _plugin.show(
+        id: _nextNotificationId(),
+        title: 'Test notification',
+        body: 'Notifications from Hermez reach this device.',
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            l10n.notificationChannelMessagesName,
+            channelDescription: l10n.notificationChannelMessagesDescription,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: false,
+            presentSound: true,
+          ),
+        ),
+      );
+      return DiagnosticNotificationResult.submitted;
+    } catch (e, st) {
+      DebugLogger.error(
+        'failed to show diagnostic notification',
+        error: e,
+        stackTrace: st,
+        scope: 'notifications/system',
+      );
+      return DiagnosticNotificationResult.failed;
     }
   }
 
