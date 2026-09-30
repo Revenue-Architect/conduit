@@ -91,8 +91,10 @@ void main() {
       final button = tester.widget<ElevatedButton>(
         find.byType(ElevatedButton).first,
       );
-      expect(button.style?.backgroundColor?.resolve({}), palette.accent);
-      expect(button.style?.foregroundColor?.resolve({}), palette.onAccent);
+      // A default (no-variant) button is a surface object with a full
+      // outline and ink label; only `primary` takes the accent fill.
+      expect(button.style?.backgroundColor?.resolve({}), palette.surface);
+      expect(button.style?.foregroundColor?.resolve({}), palette.ink);
       expect(tester.takeException(), isNull);
     });
   }

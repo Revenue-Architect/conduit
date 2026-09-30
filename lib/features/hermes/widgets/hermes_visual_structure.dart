@@ -11,6 +11,7 @@ import 'hermez_bot_mark.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_expandable_section.dart';
 import 'hermez_surfaces.dart';
+import 'hermez_visual_theme.dart';
 
 /// Structural Hermez components for visual answers: rows, a step rail, a
 /// next-action callout, file and bot identity, and an in-place compartment.
@@ -501,81 +502,79 @@ Widget _buildActionCallout(CatalogItemContext context) {
   final detail = _text(data['detail'], 200);
   final action = _text(data['actionChild'], 128);
   final icon = _iconFor(data['icon']);
-  final palette = _palette(context.buildContext);
+  final build = context.buildContext;
+  final palette = _palette(build);
+  final status = hermezStatusColorsOf(build);
   final tone = data['tone'] as String? ?? 'neutral';
-  final edge = switch (tone) {
+  // The state belongs to the whole object: its full outline, its eyebrow and
+  // its icon. No decorative edge strip, and body copy keeps its own color.
+  final semantic = switch (tone) {
     'attention' => palette.accent,
-    'success' => const Color(0xFF2F855A),
-    'error' => const Color(0xFFC53030),
-    _ => palette.ink,
+    'success' => status.success,
+    'error' => status.danger,
+    _ => null,
   };
-  return DecoratedBox(
-    decoration: BoxDecoration(
-      color: palette.surface,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: palette.border),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  final signal = semantic ?? palette.ink;
+  return Semantics(
+    container: true,
+    label: [?eyebrow, title, ?detail].join('. '),
+    child: DecoratedBox(
+      key: const ValueKey('hermez-action-callout'),
+      decoration: hermezOutline(palette, semantic),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // The tone is a signal edge plus the eyebrow word, not color alone.
-            Container(width: 4, color: edge),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (eyebrow != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          eyebrow.toUpperCase(),
-                          style: HermezType.technical(edge),
-                        ),
-                      ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (icon != null) ...[
-                          Icon(icon, size: 18, color: edge),
-                          const SizedBox(width: 8),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              color: palette.ink,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              height: 1.25,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (detail != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          detail,
-                          style: TextStyle(color: palette.muted, fontSize: 13),
-                        ),
-                      ),
-                    if (action != null) ...[
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: context.buildChild(action),
-                      ),
-                    ],
-                  ],
+            if (eyebrow != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: ExcludeSemantics(
+                  child: Text(
+                    eyebrow.toUpperCase(),
+                    style: HermezType.technical(semantic ?? palette.muted),
+                  ),
                 ),
               ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: signal),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: ExcludeSemantics(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: palette.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            if (detail != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: ExcludeSemantics(
+                  child: Text(
+                    detail,
+                    style: TextStyle(color: palette.muted, fontSize: 13),
+                  ),
+                ),
+              ),
+            if (action != null) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: context.buildChild(action),
+              ),
+            ],
           ],
         ),
       ),
@@ -889,6 +888,32 @@ IconData? _iconFor(Object? name) => switch (name) {
 
 HermezChatPalette _palette(BuildContext context) =>
     HermezChatPalette.forBrightness(Theme.of(context).brightness);
+
+/// Status colors from the active Hermez theme. Success, warning and danger
+/// are never the accent: Hermez Red must not turn "done" red.
+HermezStatusColors hermezStatusColorsOf(BuildContext context) =>
+    Theme.of(context).extension<HermezStatusColors>() ??
+    const HermezStatusColors(
+      success: Color(0xFF2F855A),
+      warning: Color(0xFFB7791F),
+      danger: Color(0xFFC53030),
+    );
+
+/// The Hermez object outline: a complete perimeter, never an edge strip.
+/// Neutral objects use the quiet border; a semantic state recolors the whole
+/// outline, slightly heavier.
+BoxDecoration hermezOutline(
+  HermezChatPalette palette,
+  Color? semantic, {
+  double radius = 14,
+}) => BoxDecoration(
+  color: palette.surface,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(
+    color: semantic ?? palette.border,
+    width: semantic == null ? 1.0 : 1.4,
+  ),
+);
 
 Map<String, Object?> _props(CatalogItemContext context) =>
     context.data is Map<String, Object?>

@@ -8,6 +8,7 @@ import 'package:genui/genui.dart';
 import 'package:json_schema_builder/json_schema_builder.dart';
 
 import 'hermes_visual_structure.dart';
+import 'hermez_chat_palette.dart';
 import 'hermez_visual_theme.dart';
 
 /// Extends GenUI's safe, no-asset basic catalog with app-owned data widgets.
@@ -26,7 +27,7 @@ Catalog createHermesVisualCatalog() {
 }
 
 /// Keep the v0.9 basic catalog schema while rendering its common containers
-/// with the same spacing as the rest of Hermez.
+/// as Hermez objects: a full quiet outline, no elevation.
 final _hermezCard = CatalogItem(
   name: 'Card',
   dataSchema: BasicCatalogItems.card.dataSchema,
@@ -36,10 +37,20 @@ final _hermezCard = CatalogItem(
     if (child is! String) {
       return BasicCatalogItems.card.widgetBuilder(itemContext);
     }
-    final scheme = Theme.of(itemContext.buildContext).colorScheme;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(itemContext.buildContext).brightness,
+    );
+    // A Material (not a plain box) so form controls inside keep their ink.
     return Card(
-      color: scheme.surface,
+      color: palette.surface,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: palette.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: itemContext.buildChild(child),
@@ -49,50 +60,80 @@ final _hermezCard = CatalogItem(
   exampleData: BasicCatalogItems.card.exampleData,
 );
 
-/// GenUI's default Button explicitly paints itself surface-colored, bypassing
-/// the app's button theme. Reuse its action and validation implementation with
-/// a local color scheme for the default variant; primary/borderless keep their
-/// documented behavior. No agent-provided color or executable UI is accepted.
+/// The A2UI Button, drawn as a Hermez object.
+///
+/// Action dispatch, `checks` validation and function calls stay GenUI's own
+/// (the basic builder runs unchanged, so an action is dispatched exactly as
+/// before, once per press); this owns only the look, through a theme scoped
+/// to the one button:
+/// - `primary`: filled with the signal accent, `onAccent` label (white on
+///   Hermez Red).
+/// - default: surface fill with a complete quiet outline and ink label.
+/// - `borderless`: no container, still a 48dp target.
+/// No elevation, no edge strip, and a label that wraps at large text.
 final _hermezButton = CatalogItem(
   name: 'Button',
   dataSchema: BasicCatalogItems.button.dataSchema,
-  widgetBuilder: (itemContext) {
-    final data = itemContext.data;
-    if (data is Map && data['variant'] != null) {
-      return BasicCatalogItems.button.widgetBuilder(itemContext);
-    }
-    return Builder(
-      builder: (context) {
-        final base = Theme.of(context);
-        final scheme = base.colorScheme;
-        return Theme(
-          data: base.copyWith(
-            colorScheme: scheme.copyWith(
-              surface: scheme.primary,
-              onSurface: scheme.onPrimary,
-            ),
-          ),
-          child: Builder(
-            builder: (innerContext) => BasicCatalogItems.button.widgetBuilder(
-              CatalogItemContext(
-                data: itemContext.data,
-                id: itemContext.id,
-                type: itemContext.type,
-                buildChild: itemContext.buildChild,
-                dispatchEvent: itemContext.dispatchEvent,
-                buildContext: innerContext,
-                dataContext: itemContext.dataContext,
-                getComponent: itemContext.getComponent,
-                getCatalogItem: itemContext.getCatalogItem,
-                surfaceId: itemContext.surfaceId,
-                reportError: itemContext.reportError,
+  widgetBuilder: (itemContext) => Builder(
+    builder: (context) {
+      final data = itemContext.data;
+      final variant = data is Map ? data['variant'] : null;
+      final base = Theme.of(context);
+      final palette = HermezChatPalette.forBrightness(base.brightness);
+      final primary = variant == 'primary';
+      final borderless = variant == 'borderless';
+      final shape = RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(13),
+        side: borderless
+            ? BorderSide.none
+            : BorderSide(
+                color: primary ? palette.accent : palette.border,
+                width: 1.2,
               ),
+      );
+      final geometry = ButtonStyle(
+        elevation: const WidgetStatePropertyAll(0),
+        shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        ),
+        shape: WidgetStatePropertyAll(shape),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      );
+      return Theme(
+        key: ValueKey('hermez-a2ui-button-${variant ?? 'default'}'),
+        data: base.copyWith(
+          colorScheme: base.colorScheme.copyWith(
+            primary: palette.accent,
+            onPrimary: palette.onAccent,
+            surface: palette.surface,
+            onSurface: palette.ink,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(style: geometry),
+          textButtonTheme: TextButtonThemeData(style: geometry),
+        ),
+        child: Builder(
+          builder: (innerContext) => BasicCatalogItems.button.widgetBuilder(
+            CatalogItemContext(
+              data: itemContext.data,
+              id: itemContext.id,
+              type: itemContext.type,
+              buildChild: itemContext.buildChild,
+              dispatchEvent: itemContext.dispatchEvent,
+              buildContext: innerContext,
+              dataContext: itemContext.dataContext,
+              getComponent: itemContext.getComponent,
+              getCatalogItem: itemContext.getCatalogItem,
+              surfaceId: itemContext.surfaceId,
+              reportError: itemContext.reportError,
             ),
           ),
-        );
-      },
-    );
-  },
+        ),
+      );
+    },
+  ),
   exampleData: BasicCatalogItems.button.exampleData,
 );
 
