@@ -596,3 +596,33 @@ Commits `88744f03` and `94128ed7`, plus a round of visible-view fixes.
   - MCP: actions tray, and the Add sheet (cancelled).
   - Toolset compartment.
   - No data was changed.
+
+## 2026-09-30: A2UI catalog expansion and visual-language cleanup
+
+Spec: `docs/HERMEZ_A2UI_CATALOG_EXPANSION_SPEC.md`. Phases 1–5 are in commits `6dd8973e`, `5410a5d9`, `98c1d778` and `b0f467e1`. The notification path was not touched.
+
+- **Visual language:**
+  - `ActionCallout` has no 4px edge. Tone recolors the complete outline, eyebrow and icon; body copy is unchanged.
+  - Shared helpers in `hermes_visual_structure.dart`: `hermezOutline(palette, semantic)` (neutral border 1.0, semantic 1.4) and `hermezStatusColorsOf(context)`. Success, warning and danger are never the accent.
+  - `Card` is a zero-elevation Material with a full outline. It stays a Material so ListTile ink inside forms keeps working.
+- **Button:**
+  - GenUI's own builder still runs, so actions, `checks` and function calls behave exactly as before, one dispatch per press.
+  - Hermez owns the look through a Theme scoped to the one button: primary is the accent fill with `onAccent` (white on Red); default is a surface with a full border; borderless is bare. Minimum 48dp, no elevation, labels wrap.
+  - The old test that pinned default to the accent fill was updated to the spec.
+- **New components** (bounded schemas, data-only, invalid input shows a fallback):
+  - `hermes_visual_personal.dart`: ProgressMeter, ActivityFeed, ScheduleTile, MessagePreview.
+  - `hermes_visual_technical.dart`: CommandBlock, TaskTile, KeyValueGrid, ComparisonCard.
+  - CommandBlock's Copy is a `HermesA2uiLocalControl`: clipboard only, no event, and it works on a locked surface.
+- **Normalizer:**
+  - The eight new types are in `_stackInRowComponentTypes` and also in `_alwaysStackComponentTypes`: a Row holding any of them becomes a Column even when weighted. MetricTile and Button rows are unchanged.
+  - The graph walk treats `content` as a reference only for non-CommandBlock types, i.e. Modal.
+- **Authoring:**
+  - SKILL.md: mapping, telling similar components apart, usage rules, compositions.
+  - Component guide: props plus the visual-language rule.
+  - patterns.md: patterns 15–24.
+  - `a2ui_check.py`: new props, bounds and enums, and an error when a new object is a direct Row child.
+  - All 24 patterns validate, and the smoke test renders every one at 320px and 200% text.
+- **Tests:** `hermes_a2ui_visual_language_test`, `hermes_visual_personal_test`, `hermes_visual_technical_test` and `hermes_a2ui_catalog_smoke_test`. They cover Orange and Red in light and dark.
+- **Not done:**
+  - **Server deployment of the updated skill:** 4 files into `data/hermes/skills/software-development/a2ui-mobile/` plus the four profile copies, then a hermes-agent restart. It needs the user's go-ahead; follow the procedure above and keep `.bak` copies.
+  - **Real-Hermes prompt QA (spec §66):** waits on that deployment.
