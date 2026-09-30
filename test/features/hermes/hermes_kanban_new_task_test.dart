@@ -179,6 +179,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a keyboard does not move the New task button', (tester) async {
+    await _pumpBoard(tester, _Board());
+    final before = tester.getRect(fabSurface());
+    tester.view.viewInsets = FakeViewPadding(
+      bottom: 300 * tester.view.devicePixelRatio,
+    );
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump();
+    expect(tester.getRect(fabSurface()), before);
+  });
+
   testWidgets('a lane plus opens the same panel from its own position', (
     tester,
   ) async {
@@ -239,7 +250,10 @@ void main() {
       'closing brings them back', (tester) async {
     await _pumpBoard(tester, _Board());
     await _openNewTask(tester);
-    // The title field is focused as the dialog opens.
+    // Opening the panel does not raise the keyboard; typing a title does.
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
     expect(tester.testTextInput.isVisible, isTrue);
 
     double gap() =>

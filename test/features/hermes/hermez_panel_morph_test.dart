@@ -20,12 +20,14 @@ class _Sound implements HermezSoundBackend {
 const _triggerKey = ValueKey('trigger');
 const _insideKey = ValueKey('inside');
 const _growKey = ValueKey('grow');
+const _screen = Size(400, 800);
 
-/// A button at the bottom-right that turns into a panel when tapped.
+/// A button that turns into a panel when tapped, bottom-right by default.
 class _Harness extends StatefulWidget {
-  const _Harness({this.reduceMotion = false});
+  const _Harness({this.reduceMotion = false, this.topLeft = false});
 
   final bool reduceMotion;
+  final bool topLeft;
 
   @override
   State<_Harness> createState() => _HarnessState();
@@ -35,6 +37,7 @@ class _HarnessState extends State<_Harness> {
   int taps = 0;
   bool grown = false;
   bool? closedWith;
+  final turns = <double>[];
 
   Future<void> _open(BuildContext context) async {
     final origin = HermezMorphOrigin.of(
@@ -49,9 +52,12 @@ class _HarnessState extends State<_Harness> {
       originElevation: 2,
       surfaceColor: const Color(0xFFFFFFFF),
       semanticLabel: 'Test panel',
-      faceBuilder: (context, progress) => const Center(
-        child: Text('face', style: TextStyle(color: Colors.white)),
-      ),
+      faceBuilder: (context, turn) {
+        turns.add(turn);
+        return const Center(
+          child: Text('face', style: TextStyle(color: Colors.white)),
+        );
+      },
       builder: (panelContext) => StatefulBuilder(
         builder: (context, setPanel) => Padding(
           padding: const EdgeInsets.all(20),
@@ -93,8 +99,10 @@ class _HarnessState extends State<_Harness> {
       body: Stack(
         children: [
           Positioned(
-            right: 16,
-            bottom: 16,
+            right: widget.topLeft ? null : 16,
+            bottom: widget.topLeft ? null : 16,
+            left: widget.topLeft ? 16 : null,
+            top: widget.topLeft ? 100 : null,
             child: Builder(
               builder: (context) => GestureDetector(
                 key: _triggerKey,
@@ -118,12 +126,18 @@ class _HarnessState extends State<_Harness> {
   );
 }
 
+RenderHermezPanelMorph _morph(WidgetTester tester) =>
+    tester.renderObject<RenderHermezPanelMorph>(find.byType(HermezPanelMorph));
+
 Future<RenderHermezPanelMorph> _open(WidgetTester tester) async {
   await tester.tap(find.byKey(_triggerKey));
   await tester.pump();
-  return tester.renderObject<RenderHermezPanelMorph>(
-    find.byType(HermezPanelMorph),
-  );
+  return _morph(tester);
+}
+
+double _opacityAbove(WidgetTester tester, Finder finder) {
+  final opacity = find.ancestor(of: finder, matching: find.byType(Opacity));
+  return tester.widget<Opacity>(opacity.first).opacity;
 }
 
 void main() {
@@ -145,117 +159,122 @@ void main() {
   Future<void> pumpHarness(
     WidgetTester tester, {
     bool reduceMotion = false,
-    Size size = const Size(400, 800),
+    bool topLeft = false,
   }) async {
-    await tester.binding.setSurfaceSize(size);
+    await tester.binding.setSurfaceSize(_screen);
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(_Harness(reduceMotion: reduceMotion));
+    await tester.pumpWidget(
+      _Harness(reduceMotion: reduceMotion, topLeft: topLeft),
+    );
   }
 
-  test('the open curve bounces lightly and settles in about 0.4 s', () {
-    final curve = HermezPanelMotion.open;
-    expect(curve.peak, greaterThan(1.005));
-    expect(curve.peak, lessThan(1.05));
-    expect(curve.settleDuration.inMilliseconds, inInclusiveRange(300, 500));
-    expect(curve.transform(0), 0);
-    expect(curve.transform(1), 1);
+  test('the motion tokens are those of the Dropdown menu morph', () {
+    expect(HermezPanelMotion.openDuration, const Duration(milliseconds: 350));
+    expect(HermezPanelMotion.closeDuration, const Duration(milliseconds: 250));
+    expect(HermezPanelMotion.fadeDuration, const Duration(milliseconds: 200));
+    expect(HermezPanelMotion.openEase, const Cubic(0.34, 1.25, 0.64, 1));
+    expect(HermezPanelMotion.closeEase, const Cubic(0.22, 1, 0.36, 1));
+    expect(HermezPanelMotion.openRadius, 20);
+    expect(HermezPanelMotion.slide, 40);
+    expect(HermezPanelMotion.scale, 0.97);
+    expect(HermezPanelMotion.blur, 2);
   });
 
-  testWidgets('starts as the button and ends as the panel', (tester) async {
+  test('each property keeps its own timing, both ways', () {
+    // Opening, at the end of the 200 ms fade the content is fully in while
+    // the size (350 ms, overshooting ease) is still travelling.
+    final fadeDone = HermezMorphFrame.of(200 / 350, opening: true);
+    expect(fadeDone.fade, closeTo(1, 0.001));
+    expect(fadeDone.size, lessThan(1.1));
+    expect(fadeDone.move, lessThan(1));
+    // The open size overshoots past the panel before settling.
+    var peak = 0.0;
+    for (var i = 0; i <= 350; i++) {
+      final f = HermezMorphFrame.of(i / 350, opening: true);
+      if (f.size > peak) peak = f.size;
+    }
+    expect(peak, greaterThan(1.01));
+    // Closing, 200 ms of the 250 ms in, the content is fully out and the
+    // surface is nearly home.
+    final closing = HermezMorphFrame.of(1 - 200 / 250, opening: false);
+    expect(closing.fade, closeTo(0, 0.001));
+    expect(closing.size, lessThan(0.1));
+    expect(HermezMorphFrame.of(0, opening: false).size, closeTo(0, 1e-9));
+  });
+
+  testWidgets('the button itself expands in place: anchored at its corner, '
+      'growing toward the screen', (tester) async {
     await pumpHarness(tester);
     final button = tester.getRect(find.byKey(_triggerKey));
-    final render = await _open(tester);
+    final morph = await _open(tester);
 
-    // First frame: the surface is exactly where the button was.
+    // First frame: the surface is exactly the button.
     await tester.pump();
-    expect(render.originRect, button);
-    expect(render.apertureRect.center.dx, closeTo(button.center.dx, 1));
-    expect(render.apertureRect.center.dy, closeTo(button.center.dy, 1));
-    expect(render.apertureRect.width, closeTo(button.width, 4));
-    expect(find.text('face'), findsOneWidget);
+    expect(morph.originRect, button);
+    expect(morph.apertureRect.left, closeTo(button.left, 1));
+    expect(morph.apertureRect.bottom, closeTo(button.bottom, 1));
+
+    // Mid-flight it is still attached to the button's bottom-right corner.
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(morph.apertureRect.right, closeTo(button.right, 3));
+    expect(morph.apertureRect.bottom, closeTo(button.bottom, 3));
+    expect(morph.apertureRect.width, greaterThan(button.width));
+    expect(morph.apertureRect.height, greaterThan(button.height));
 
     await tester.pumpAndSettle();
-    // Settled: the surface is the panel, content-sized, top-anchored,
-    // centred, 16 dp clear of each side.
-    expect(render.apertureRect, render.panelRect);
-    expect(render.panelRect.width, 368);
-    expect(render.panelRect.left, 16);
-    expect(render.panelRect.top, 12);
-    expect(render.panelRect.height, greaterThan(100));
+    // Open: the panel shares the button's corner and grew up and left.
+    expect(morph.anchoredBottom, isTrue);
+    expect(morph.apertureRect, morph.panelRect);
+    expect(morph.panelRect.right, button.right);
+    expect(morph.panelRect.bottom, button.bottom);
+    expect(morph.panelRect.width, 368);
     expect(find.text('face'), findsNothing);
     expect(find.text('Panel title'), findsOneWidget);
   });
 
-  testWidgets('grows through in-between shapes and bounces once', (
+  testWidgets('a button near the top grows downward from its top corner', (
     tester,
   ) async {
-    await pumpHarness(tester);
-    final render = await _open(tester);
-    final heights = <double>[];
-    final tops = <double>[];
-    for (var i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 16));
-      heights.add(render.apertureRect.height);
-      tops.add(render.apertureRect.top);
-    }
+    await pumpHarness(tester, topLeft: true);
+    final button = tester.getRect(find.byKey(_triggerKey));
+    final morph = await _open(tester);
     await tester.pumpAndSettle();
-    final finalHeight = render.panelRect.height;
-    final peak = heights.reduce((a, b) => a > b ? a : b);
-
-    // It really is in between, not a jump.
-    expect(heights.any((h) => h > 60 && h < finalHeight - 20), isTrue);
-    // A light bounce past the panel: over, but by a few percent at most.
-    expect(peak, greaterThan(finalHeight));
-    expect(peak, lessThan(finalHeight * 1.08));
-    // The top edge travels up from the button to the top of the screen.
-    expect(tops.first, greaterThan(tops.last));
-    expect(render.apertureRect, render.panelRect);
+    expect(morph.anchoredBottom, isFalse);
+    expect(morph.panelRect.top, button.top);
+    expect(morph.panelRect.left, button.left);
   });
 
-  testWidgets('nothing in the morph changes opacity', (tester) async {
+  testWidgets('the plus fades, blurs, slides and turns; the content fades '
+      'and sharpens in', (tester) async {
     await pumpHarness(tester);
     await _open(tester);
-    final fade = find.descendant(
-      of: find.byType(HermezPanelMorph),
-      matching: find.byWidgetPredicate(
-        (w) =>
-            w is Opacity ||
-            w is FadeTransition ||
-            w is AnimatedOpacity ||
-            w is FadeInImage,
-      ),
-    );
-    for (var i = 0; i < 30; i++) {
-      await tester.pump(const Duration(milliseconds: 16));
-      expect(fade, findsNothing);
-    }
-    await tester.pumpAndSettle();
-    expect(fade, findsNothing);
-  });
+    await tester.pump(const Duration(milliseconds: 60));
 
-  testWidgets('the face is shown only while the panel is not fully open', (
-    tester,
-  ) async {
-    await pumpHarness(tester);
-    await _open(tester);
-    expect(find.text('face'), findsOneWidget);
+    final faceOpacity = _opacityAbove(tester, find.text('face'));
+    final contentOpacity = _opacityAbove(tester, find.text('Panel title'));
+    expect(faceOpacity, inExclusiveRange(0, 1));
+    expect(contentOpacity, inExclusiveRange(0, 1));
+    expect(faceOpacity + contentOpacity, closeTo(1, 0.001));
+    final blurs = tester.widgetList<ImageFiltered>(find.byType(ImageFiltered));
+    expect(blurs.where((b) => b.enabled), hasLength(2));
+    final state = tester.state<_HarnessState>(find.byType(_Harness));
+    expect(state.turns.last, inExclusiveRange(0, 1));
+
     await tester.pumpAndSettle();
     expect(find.text('face'), findsNothing);
-
-    // Closing brings it back before the surface has reached the button.
-    await tester.tapAt(const Offset(200, 780));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 120));
-    expect(find.text('face'), findsOneWidget);
-    await tester.pumpAndSettle();
-    expect(find.byType(HermezPanelMorph), findsNothing);
+    expect(_opacityAbove(tester, find.text('Panel title')), 1);
+    expect(
+      tester
+          .widgetList<ImageFiltered>(find.byType(ImageFiltered))
+          .where((b) => b.enabled),
+      isEmpty,
+    );
   });
 
   testWidgets('input waits until the panel is at rest', (tester) async {
     await pumpHarness(tester);
     await _open(tester);
     await tester.pump(const Duration(milliseconds: 100));
-    // Mid-flight the content is on screen but does not take taps.
     final state = tester.state<_HarnessState>(find.byType(_Harness));
     await tester.tap(find.byKey(_insideKey), warnIfMissed: false);
     await tester.pump();
@@ -267,73 +286,74 @@ void main() {
     expect(state.taps, 1);
   });
 
-  testWidgets('tapping outside runs it home into the button and reports '
-      'the result only afterwards', (tester) async {
+  testWidgets('tapping outside runs it home into the button in 250 ms and '
+      'reports the result only afterwards', (tester) async {
     await pumpHarness(tester);
     final button = tester.getRect(find.byKey(_triggerKey));
-    final render = await _open(tester);
+    final morph = await _open(tester);
     await tester.pumpAndSettle();
     final state = tester.state<_HarnessState>(find.byType(_Harness));
-    expect(state.closedWith, isNull);
 
-    await tester.tapAt(const Offset(200, 780));
+    await tester.tapAt(const Offset(200, 60));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 80));
-    // On its way home: smaller than the panel, larger than the button.
-    expect(render.apertureRect.height, lessThan(render.panelRect.height));
-    expect(render.apertureRect.height, greaterThan(button.height));
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(morph.apertureRect.height, lessThan(morph.panelRect.height));
+    expect(morph.apertureRect.height, greaterThan(button.height));
+    expect(find.text('face'), findsOneWidget);
     expect(state.closedWith, isNull);
 
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
     expect(find.byType(HermezPanelMorph), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the panel follows its content, top edge fixed', (tester) async {
+  testWidgets('the panel follows its content, anchored edge fixed', (
+    tester,
+  ) async {
     await pumpHarness(tester);
-    final render = await _open(tester);
+    final morph = await _open(tester);
     await tester.pumpAndSettle();
-    final top = render.panelRect.top;
-    final height = render.panelRect.height;
+    final bottom = morph.panelRect.bottom;
+    final height = morph.panelRect.height;
 
     await tester.tap(find.byKey(_growKey));
     await tester.pump();
     await tester.pump();
-    expect(render.panelRect.top, top);
-    expect(render.panelRect.height, height + 240);
-    // At rest the surface is the panel on the same frame: it does not lag.
-    expect(render.apertureRect, render.panelRect);
+    expect(morph.panelRect.bottom, bottom);
+    expect(morph.panelRect.height, height + 240);
+    expect(morph.apertureRect, morph.panelRect);
+  });
 
-    await tester.tap(find.byKey(_growKey));
+  testWidgets('with the keyboard up the whole panel sits above it', (
+    tester,
+  ) async {
+    await pumpHarness(tester);
+    final morph = await _open(tester);
+    await tester.pumpAndSettle();
+    final restingBottom = morph.panelRect.bottom;
+
+    tester.view.viewInsets = FakeViewPadding(
+      bottom: 300 * tester.view.devicePixelRatio,
+    );
+    addTearDown(tester.view.resetViewInsets);
     await tester.pump();
-    await tester.pump();
-    expect(render.panelRect.height, height);
-    expect(render.apertureRect, render.panelRect);
+    expect(morph.panelRect.bottom, lessThanOrEqualTo(800 - 300 - 12 + 0.01));
+    expect(morph.panelRect.bottom, lessThan(restingBottom));
+    expect(morph.apertureRect, morph.panelRect);
   });
 
   testWidgets('reduced motion opens and closes at once', (tester) async {
     await pumpHarness(tester, reduceMotion: true);
-    final render = await _open(tester);
-    expect(render.apertureRect, render.panelRect);
+    final morph = await _open(tester);
+    expect(morph.apertureRect, morph.panelRect);
     expect(find.text('face'), findsNothing);
     expect(tester.hasRunningAnimations, isFalse);
 
-    await tester.tapAt(const Offset(200, 780));
+    await tester.tapAt(const Offset(200, 60));
     await tester.pump();
     await tester.pump();
     expect(find.byType(HermezPanelMorph), findsNothing);
-  });
-
-  testWidgets('the panel stays above the keyboard and scrolls its own '
-      'content', (tester) async {
-    await pumpHarness(tester);
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    addTearDown(tester.view.resetViewInsets);
-    final render = await _open(tester);
-    await tester.pumpAndSettle();
-    expect(render.panelRect.bottom, lessThanOrEqualTo(800 - 300 - 12 + 0.01));
-    expect(render.apertureRect, render.panelRect);
   });
 
   testWidgets('accessibility: the panel names the route; the face is not '
@@ -349,13 +369,12 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('a soft latch plays when it goes home, not at reduced '
-      'motion', (tester) async {
+  testWidgets('a soft latch plays when it goes home', (tester) async {
     await pumpHarness(tester);
     await _open(tester);
     await tester.pumpAndSettle();
     final before = sound.played.length;
-    await tester.tapAt(const Offset(200, 780));
+    await tester.tapAt(const Offset(200, 60));
     await tester.pumpAndSettle();
     expect(sound.played.length, before + 1);
   });
@@ -368,9 +387,6 @@ void main() {
       'hermes_desktop',
       'providers/',
       'services/',
-      'Opacity',
-      'FadeTransition',
-      'AnimatedOpacity',
     ]) {
       expect(source.contains(banned), isFalse, reason: banned);
     }

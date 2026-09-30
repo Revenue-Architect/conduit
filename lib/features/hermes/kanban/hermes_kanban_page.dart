@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -357,25 +356,24 @@ class _MorphTrigger extends StatelessWidget {
   );
 }
 
-/// Turns the plus into a cross as the panel opens: [turn] is 0 to 1.
+/// The plus, turning into a cross as the panel opens ([turn] 0 to 1): the
+/// reference's `scale(0.97) rotate(45deg)`.
 Widget _turningPlus(IconData icon, Color color, double turn) =>
     Transform.rotate(
-      angle: turn * math.pi / 4,
-      child: Icon(icon, size: 24, color: color),
+      angle: turn * HermezPanelMotion.rotate,
+      child: Transform.scale(
+        scale: 1 - (1 - HermezPanelMotion.scale) * turn,
+        child: Icon(icon, size: 24, color: color),
+      ),
     );
-
-/// How far the plus has turned at morph progress [progress]: done by half way.
-double _plusTurn(Animation<double>? progress) => progress == null
-    ? 0
-    : Curves.easeOut.transform((progress.value / 0.5).clamp(0.0, 1.0));
 
 /// The content of the New task button: a plus and its label. Used for the
 /// resting button and for the face the panel grows out of, so the two are the
 /// same picture.
 class _NewTaskFaceBody extends StatelessWidget {
-  const _NewTaskFaceBody({this.progress});
+  const _NewTaskFaceBody({this.turn = 0});
 
-  final Animation<double>? progress;
+  final double turn;
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +385,7 @@ class _NewTaskFaceBody extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _turningPlus(Icons.add, palette.onAccent, _plusTurn(progress)),
+          _turningPlus(Icons.add, palette.onAccent, turn),
           const SizedBox(width: 8),
           Text(
             'New task',
@@ -403,14 +401,14 @@ class _NewTaskFaceBody extends StatelessWidget {
 /// The face the New task panel grows out of when there is no button to
 /// measure: the same picture as the button.
 class _NewTaskFace extends StatelessWidget {
-  const _NewTaskFace({required this.progress});
+  const _NewTaskFace({required this.turn});
 
-  final Animation<double> progress;
+  final double turn;
 
   @override
   Widget build(BuildContext context) => Align(
     alignment: AlignmentDirectional.centerStart,
-    child: _NewTaskFaceBody(progress: progress),
+    child: _NewTaskFaceBody(turn: turn),
   );
 }
 
@@ -435,9 +433,9 @@ class _NewTaskPill extends StatelessWidget {
 /// The plus on a lane header, and the face the panel grows out of when it is
 /// the button that was tapped.
 class _LanePlus extends StatelessWidget {
-  const _LanePlus({this.progress});
+  const _LanePlus({this.turn = 0});
 
-  final Animation<double>? progress;
+  final double turn;
 
   @override
   Widget build(BuildContext context) {
@@ -447,11 +445,7 @@ class _LanePlus extends StatelessWidget {
     return SizedBox.square(
       dimension: 48,
       child: Center(
-        child: _turningPlus(
-          Icons.add_rounded,
-          palette.accent,
-          _plusTurn(progress),
-        ),
+        child: _turningPlus(Icons.add_rounded, palette.accent, turn),
       ),
     );
   }
@@ -667,8 +661,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         surfaceColor: palette.surface,
         semanticLabel: 'New task',
         theme: _kanbanPanelTheme(context),
-        faceBuilder:
-            face ?? (context, progress) => _NewTaskFace(progress: progress),
+        faceBuilder: face ?? (context, turn) => _NewTaskFace(turn: turn),
         builder: (panelContext) => StatefulBuilder(
           builder: (panelContext, setModalState) => Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -689,7 +682,6 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                       children: [
                         TextField(
                           controller: title,
-                          autofocus: true,
                           maxLength: 240,
                           decoration: const InputDecoration(
                             labelText: 'Title *',
@@ -904,6 +896,9 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         color: palette.canvas,
         child: Scaffold(
           backgroundColor: Colors.transparent,
+          // The board does not move for the keyboard: the floating button
+          // would ride up on its own. The new-task panel lifts itself.
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
@@ -1237,7 +1232,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                   origin: origin,
                   source: 'lane:$lane',
                   originRadius: 24,
-                  face: (context, progress) => _LanePlus(progress: progress),
+                  face: (context, turn) => _LanePlus(turn: turn),
                 ),
                 child: Tooltip(
                   message: 'New ${_label(lane)} task',

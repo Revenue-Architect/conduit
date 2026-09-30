@@ -448,3 +448,21 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
 - **The created task is unchanged:** same client call and fields. No new requests.
 - **Tests:** `hermez_panel_morph_test.dart` (13) and `hermes_kanban_new_task_test.dart` (15); existing Kanban tests updated to open OPTIONS. The wide suites fail only the 13 known pre-existing tests.
 - **Device:** installed on the S25; the user is testing it themselves.
+
+### New task, second pass: Transitions.dev "Dropdown menu morph", replicated faithfully
+
+- **User feedback on the first pass:** it did not match the reference, and the New task button rode up alone when the keyboard opened.
+- **Source:** the reference was read from its public repo (`Jakubantalik/transitions.dev`, `transitions/dropdown-menu-morph`). The `npx` installer was not run.
+- **One object:** the button's own surface expands in place into the panel.
+  - It is anchored to the button's nearest corner and grows toward the screen: a bottom button grows up, a top one grows down. The corner radius relaxes to 20.
+  - This follows the user's rule: "the object expands as one shared element geometry into the menu".
+- **Tokens (`HermezPanelMotion`), exactly as in the CSS:**
+  - Open 350 ms, `cubic-bezier(.34,1.25,.64,1)` (overshoot); close 250 ms, `cubic-bezier(.22,1,.36,1)`.
+  - Fades 200 ms, slide 40 px, scale 0.97, blur 2 px, plus rotates 45°.
+  - Each property keeps its own duration and easing, derived per frame (`HermezMorphFrame`).
+- **This control deliberately cross-fades and blurs,** at the user's request: the one exception to the Hermez no-fade rule.
+- **Keyboard:**
+  - The Kanban Scaffold no longer resizes for the keyboard, so the floating button never moves.
+  - The title no longer autofocuses.
+  - When the keyboard shows, the whole panel's anchored edge moves above it.
+- **Tests:** morph tests are rewritten around the reference; there is a Kanban test that the keyboard does not move the button. The wide suites show only the 13 known pre-existing failures.

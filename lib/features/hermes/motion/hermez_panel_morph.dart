@@ -1,101 +1,132 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui show ImageFilter;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 
 import '../feedback/hermez_feedback.dart';
 import 'hermez_morph_origin.dart';
-import 'hermez_motion_route.dart' show hermezCurved;
-import 'hermez_motion_tokens.dart';
 
-/// Builds the face of the object a panel grew out of: what the button looked
-/// like. [progress] runs from 0 (the button) to 1 (the open panel) and may
-/// overshoot 1 slightly on the way open, so a caller can turn a glyph with it.
+/// Builds the face of the button a panel grew out of. [turn] runs 0 to 1 as
+/// the button becomes the panel: a caller turns its plus into a cross with it.
 typedef HermezPanelFaceBuilder = Widget Function(
   BuildContext context,
-  Animation<double> progress,
+  double turn,
 );
 
-/// Motion for a button that becomes a panel.
+/// The motion tokens of Transitions.dev's "Dropdown menu morph" (also named
+/// "Plus to menu morph"), which this control reproduces.
 ///
-/// Opening is a spring with a light bounce (about 3 %); closing is Hermez's
-/// critically damped medium spring, so the panel goes home decisively and
-/// without a wobble. The two settle in roughly 0.39 s and 0.32 s.
+/// This is the one Hermez control that deliberately cross-fades and blurs:
+/// the reference design calls for it.
 abstract final class HermezPanelMotion {
-  static final HermezBounceCurve open = HermezBounceCurve();
+  /// `--morph-open-dur`: surface size and corner, content slide and scale.
+  static const openDuration = Duration(milliseconds: 350);
 
-  /// How far the face of the source slides toward the panel's inside, and
-  /// how far the panel's content starts from, while it wipes across.
-  static const faceSlide = 40.0;
+  /// `--morph-close-dur`: surface size and corner on the way home.
+  static const closeDuration = Duration(milliseconds: 250);
+
+  /// `--morph-fade-dur`: the plus and the content cross-fade.
+  static const fadeDuration = Duration(milliseconds: 200);
+
+  /// `--morph-ease`: the surface opens with a slight overshoot.
+  static const openEase = Cubic(0.34, 1.25, 0.64, 1);
+
+  /// `--morph-close-ease`: everything else, and the close.
+  static const closeEase = Cubic(0.22, 1, 0.36, 1);
+
+  /// `--morph-r-open`: the open panel's corner radius.
+  static const openRadius = 20.0;
+
+  /// `--morph-slide`: the plus leaves this far, the content arrives from it.
+  static const slide = 40.0;
+
+  /// `--morph-rotate`: the plus turns into a cross.
+  static const rotate = math.pi / 4;
+
+  /// `--morph-scale`.
+  static const scale = 0.97;
+
+  /// `--morph-blur` (2px).
+  static const blur = 2.0;
 }
 
-/// A spring that is allowed to overshoot 1, unlike `HermezSpringCurve`, which
-/// clamps. Route geometry may pass its target a little; nothing that needs
-/// [0, 1] (opacity, intervals) should be driven by this.
-class HermezBounceCurve extends Curve {
-  HermezBounceCurve({
-    double mass = 1,
-    double stiffness = 520,
-    double damping = 34,
-  }) : _simulation = SpringSimulation(
-         SpringDescription(mass: mass, stiffness: stiffness, damping: damping),
-         0,
-         1,
-         0,
-       ) {
-    _settleSeconds = _settleTime(_simulation);
-    _endValue = _simulation.x(_settleSeconds);
-  }
+/// Where each part of the morph is at one moment. Each CSS property of the
+/// reference has its own duration and easing; these are the same values,
+/// derived from the one route animation.
+@immutable
+class HermezMorphFrame {
+  const HermezMorphFrame({
+    required this.size,
+    required this.fade,
+    required this.move,
+  });
 
-  final SpringSimulation _simulation;
-  late final double _settleSeconds;
-  late final double _endValue;
+  /// The whole morph at rest, open (1) or closed (0).
+  const HermezMorphFrame.at(double value)
+    : size = value,
+      fade = value,
+      move = value;
 
-  /// How long the spring takes to be visibly at rest.
-  Duration get settleDuration =>
-      Duration(microseconds: (_settleSeconds * 1e6).round());
+  /// Surface size and corner: 0 the button, 1 the panel. Opening overshoots.
+  final double size;
 
-  /// The highest value the curve reaches, as a multiple of the target.
-  double get peak {
-    var best = 0.0;
-    for (var i = 0; i <= 200; i++) {
-      best = math.max(best, transformInternal(i / 200));
+  /// Opacity and blur of the content (the plus is the inverse): 0 to 1.
+  final double fade;
+
+  /// Slide, scale, and the plus's turn: 0 to 1.
+  final double move;
+
+  /// [value] is the route animation (0 closed, 1 open, linear in time);
+  /// [opening] is its direction.
+  factory HermezMorphFrame.of(double value, {required bool opening}) {
+    const open = HermezPanelMotion.openDuration;
+    const close = HermezPanelMotion.closeDuration;
+    const fade = HermezPanelMotion.fadeDuration;
+    final ms = opening
+        ? value * open.inMilliseconds
+        : (1 - value) * close.inMilliseconds;
+    double eased(Curve curve, Duration over) =>
+        curve.transform((ms / over.inMilliseconds).clamp(0.0, 1.0));
+    if (opening) {
+      return HermezMorphFrame(
+        size: eased(HermezPanelMotion.openEase, open),
+        fade: eased(HermezPanelMotion.closeEase, fade),
+        move: eased(HermezPanelMotion.closeEase, open),
+      );
     }
-    return best;
+    return HermezMorphFrame(
+      size: 1 - eased(HermezPanelMotion.closeEase, close),
+      fade: 1 - eased(HermezPanelMotion.closeEase, fade),
+      move: 1 - eased(HermezPanelMotion.closeEase, open),
+    );
   }
 
   @override
-  double transformInternal(double t) =>
-      _simulation.x(t * _settleSeconds) / _endValue;
+  bool operator ==(Object other) =>
+      other is HermezMorphFrame &&
+      other.size == size &&
+      other.fade == fade &&
+      other.move == move;
 
-  /// The last moment the spring is outside 0.2 % of its target or still
-  /// moving, so an oscillation cannot be mistaken for rest at a crossing.
-  static double _settleTime(SpringSimulation simulation) {
-    const step = 1 / 600;
-    var last = 0.0;
-    for (var time = step; time < 3; time += step) {
-      if ((simulation.x(time) - 1).abs() >= 0.002 ||
-          simulation.dx(time).abs() >= 0.1) {
-        last = time;
-      }
-    }
-    return last + step;
-  }
+  @override
+  int get hashCode => Object.hash(size, fade, move);
 }
 
 /// Pushes a panel that a button turns into.
 ///
-/// The button's rectangle and corner radius grow into a content-sized panel
-/// (top-anchored, centred, clear of the status bar and the keyboard). The
-/// button's [faceBuilder] rides the growing surface, turns and shrinks away
-/// while [builder]'s content slides across it from the side the button sits
-/// on. Nothing changes opacity. Closing runs it home into the button.
+/// One object: the button's own surface expands in place into the panel,
+/// the way the reference grows a menu out of its plus. It stays anchored to
+/// the button's nearest corner and grows toward the rest of the screen; its
+/// corner radius relaxes to 20. The plus slides, blurs, fades and turns into
+/// a cross while the panel's content slides in from the same side,
+/// sharpening and fading in. Closing reverses it back into the button.
 ///
-/// The caller hides the real button while this is up (the face stands in for
-/// it) and shows it again when the returned future completes, which is only
-/// after the panel has finished contracting.
+/// With the keyboard up the anchored edge moves above it, so the whole panel
+/// rises as one object. The caller hides the real button while this is up
+/// and shows it again when the returned future completes, which is only after
+/// the panel has gone home.
 Future<T?> pushHermezPanel<T>(
   BuildContext context, {
   required HermezMorphOrigin origin,
@@ -103,7 +134,6 @@ Future<T?> pushHermezPanel<T>(
   required WidgetBuilder builder,
   ThemeData? theme,
   Color? surfaceColor,
-  double radius = 28,
   double maxWidth = 440,
   double originElevation = 0,
   String? semanticLabel,
@@ -119,7 +149,6 @@ Future<T?> pushHermezPanel<T>(
     ),
     theme: theme,
     surfaceColor: surfaceColor,
-    radius: radius,
     maxWidth: maxWidth,
     originElevation: originElevation,
     semanticLabel: semanticLabel,
@@ -140,7 +169,6 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
     required this.capturedThemes,
     this.theme,
     this.surfaceColor,
-    this.radius = 28,
     this.maxWidth = 440,
     this.originElevation = 0,
     this.semanticLabel,
@@ -154,7 +182,6 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
   final CapturedThemes capturedThemes;
   final ThemeData? theme;
   final Color? surfaceColor;
-  final double radius;
   final double maxWidth;
   final double originElevation;
   final String? semanticLabel;
@@ -162,19 +189,17 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
 
   @override
   Duration get transitionDuration =>
-      reducedMotion ? Duration.zero : HermezPanelMotion.open.settleDuration;
+      reducedMotion ? Duration.zero : HermezPanelMotion.openDuration;
 
-  // Leaving is quicker than arriving: the object returns home decisively.
   @override
-  Duration get reverseTransitionDuration => reducedMotion
-      ? Duration.zero
-      : HermezMotion.settleFor(HermezMotionWeight.medium);
+  Duration get reverseTransitionDuration =>
+      reducedMotion ? Duration.zero : HermezPanelMotion.closeDuration;
 
   @override
   bool get barrierDismissible => true;
 
   @override
-  Color? get barrierColor => const Color(0x8A000000);
+  Color? get barrierColor => const Color(0x52000000);
 
   @override
   String? get barrierLabel => 'Dismiss';
@@ -182,7 +207,7 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
   @override
   bool didPop(T? result) {
     final popped = super.didPop(result);
-    // The object returns into the button it came from: a soft closing latch.
+    // The panel returns into the button it came from: a soft closing latch.
     if (popped && !reducedMotion) {
       HermezFeedback.play(HermezFeedbackCue.objectClose);
     }
@@ -195,16 +220,7 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    final progress = hermezCurved(
-      animation,
-      HermezPanelMotion.open,
-      reverseOf: HermezMotion.curveMedium,
-    );
-    Widget page = _HermezPanelPage<T>(
-      route: this,
-      animation: animation,
-      progress: progress,
-    );
+    Widget page = _HermezPanelPage<T>(route: this, animation: animation);
     final theme = this.theme;
     if (theme != null) page = Theme(data: theme, child: page);
     return capturedThemes.wrap(page);
@@ -212,15 +228,10 @@ class HermezPanelRoute<T> extends PopupRoute<T> {
 }
 
 class _HermezPanelPage<T> extends StatefulWidget {
-  const _HermezPanelPage({
-    required this.route,
-    required this.animation,
-    required this.progress,
-  });
+  const _HermezPanelPage({required this.route, required this.animation});
 
   final HermezPanelRoute<T> route;
   final Animation<double> animation;
-  final Animation<double> progress;
 
   @override
   State<_HermezPanelPage<T>> createState() => _HermezPanelPageState<T>();
@@ -229,7 +240,6 @@ class _HermezPanelPage<T> extends StatefulWidget {
 class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
   HermezPanelRoute<T> get route => widget.route;
   Animation<double> get animation => widget.animation;
-  Animation<double> get progress => widget.progress;
 
   @override
   void initState() {
@@ -252,27 +262,23 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
   @override
   Widget build(BuildContext context) {
     final surface = route.surfaceColor ?? Theme.of(context).colorScheme.surface;
-    // Built once: only the morph's geometry changes while it opens, so the
-    // panel's own widgets are not rebuilt on every animation frame.
+    // Built once: only the morph moves while it opens, so the panel's own
+    // widgets are not rebuilt on every animation frame.
     final content = RepaintBoundary(
-      child: ColoredBox(
-        color: surface,
-        child: Material(
-          type: MaterialType.transparency,
-          child: Builder(
-            builder: (context) => MediaQuery.removePadding(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Builder(
+          builder: (context) => MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            removeBottom: true,
+            child: MediaQuery.removeViewInsets(
               context: context,
-              removeTop: true,
               removeBottom: true,
-              child: MediaQuery.removeViewInsets(
-                context: context,
-                removeBottom: true,
-                child: DefaultTextStyle(
-                  style:
-                      Theme.of(context).textTheme.bodyMedium ??
-                      const TextStyle(),
-                  child: route.builder(context),
-                ),
+              child: DefaultTextStyle(
+                style:
+                    Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+                child: route.builder(context),
               ),
             ),
           ),
@@ -285,31 +291,30 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
       explicitChildNodes: true,
       label: route.semanticLabel,
       child: AnimatedBuilder(
-        animation: progress,
+        animation: animation,
         child: content,
         builder: (context, content) {
           final media = MediaQuery.of(context);
-          // Input waits for the panel to be at rest: a moving target cannot
+          final status = animation.status;
+          final frame = switch (status) {
+            AnimationStatus.completed => const HermezMorphFrame.at(1),
+            AnimationStatus.dismissed => const HermezMorphFrame.at(0),
+            _ => HermezMorphFrame.of(
+              animation.value,
+              opening: status == AnimationStatus.forward,
+            ),
+          };
+          // Input waits for the panel to be open: a moving target cannot
           // be aimed at. A tap on it meanwhile is swallowed, not read as a
           // tap outside; tapping outside still closes it at any moment.
-          final interactive = animation.status == AnimationStatus.completed;
-          // Gone by half way open: mounted only while it can be seen.
-          final face = progress.value >= 0.6
-              ? null
-              : ExcludeSemantics(
-                  child: RepaintBoundary(
-                    child: route.faceBuilder(context, progress),
-                  ),
-                );
+          final interactive = status == AnimationStatus.completed;
           return HermezPanelMorph(
-            progress: progress,
+            frame: frame,
             resolveOrigin: route.origin.resolve,
             originRadius: route.origin.radius,
-            originColor:
-                route.origin.color ?? route.surfaceColor ?? Colors.grey,
+            originColor: route.origin.color ?? surface,
             originElevation: route.originElevation,
             surfaceColor: surface,
-            radius: route.radius,
             maxWidth: route.maxWidth,
             padding: EdgeInsets.fromLTRB(
               math.max(16, media.padding.left),
@@ -319,9 +324,18 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
                   ? media.viewInsets.bottom + 12
                   : math.max(12, media.padding.bottom),
             ),
-            textDirection: Directionality.of(context),
-            face: face,
-            content: AbsorbPointer(absorbing: !interactive, child: content!),
+            face: frame.fade >= 1
+                ? null
+                : ExcludeSemantics(
+                    child: _PlusFace(
+                      frame: frame,
+                      child: route.faceBuilder(context, frame.move),
+                    ),
+                  ),
+            content: AbsorbPointer(
+              absorbing: !interactive,
+              child: _MenuContent(frame: frame, child: content!),
+            ),
           );
         },
       ),
@@ -329,53 +343,117 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
   }
 }
 
-/// The two things a [HermezPanelMorph] paints: the panel and the button's
+double _towardInside(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl ? -1 : 1;
+
+/// `.t-morph-plus` leaving: fades and blurs over the fade duration, slides
+/// away over the open duration. Its glyph turns via the face builder.
+class _PlusFace extends StatelessWidget {
+  const _PlusFace({required this.frame, required this.child});
+
+  final HermezMorphFrame frame;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final sigma = HermezPanelMotion.blur * frame.fade;
+    return Opacity(
+      opacity: (1 - frame.fade).clamp(0.0, 1.0),
+      child: Transform.translate(
+        offset: Offset(
+          -HermezPanelMotion.slide * frame.move * _towardInside(context),
+          0,
+        ),
+        child: ImageFiltered(
+          enabled: sigma > 0.01,
+          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// `.t-morph-menu` arriving: fades and sharpens over the fade duration,
+/// slides in and scales up over the open duration.
+class _MenuContent extends StatelessWidget {
+  const _MenuContent({required this.frame, required this.child});
+
+  final HermezMorphFrame frame;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final sigma = HermezPanelMotion.blur * (1 - frame.fade);
+    final scale = lerpDouble(HermezPanelMotion.scale, 1, frame.move)!;
+    return Opacity(
+      opacity: frame.fade.clamp(0.0, 1.0),
+      child: Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..translateByDouble(
+            HermezPanelMotion.slide * (1 - frame.move) * _towardInside(context),
+            0,
+            0,
+            1,
+          )
+          ..scaleByDouble(scale, scale, 1, 1),
+        child: ImageFiltered(
+          enabled: sigma > 0.01,
+          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The two things a [HermezPanelMorph] lays out: the panel and the button's
 /// face.
 enum HermezPanelSlot { content, face }
 
-/// Lays out a content-sized panel and paints it grown out of a button.
+/// Lays out a content-sized panel anchored to the corner of the button it
+/// grows out of, and paints the one surface that travels between the two.
 ///
-/// The panel is laid out once, at its final size. What the user sees is a
-/// rounded aperture that travels from the button's rectangle to the panel's,
-/// carrying the panel's own colour, with the button's face and the panel's
-/// content revealed through it. When the panel's content changes size (a
-/// section opening, an error appearing) the panel follows it every frame with
-/// its top edge fixed, so it behaves like any other Hermez section.
+/// The panel is laid out once, at its final size, aligned to the button's
+/// nearest corner and kept on screen and above the keyboard. The surface
+/// (`.t-morph`) expands from the button's rectangle to the panel's; its
+/// corner radius goes from the button's to 20. The content sits at the
+/// panel's final place and is revealed as the surface grows over it; the
+/// button's face rides the anchored corner. When the content changes size (a
+/// section opening, an error appearing) the panel follows it with its
+/// anchored edge fixed.
 class HermezPanelMorph
     extends SlottedMultiChildRenderObjectWidget<HermezPanelSlot, RenderBox> {
   const HermezPanelMorph({
     super.key,
-    required this.progress,
+    required this.frame,
     required this.resolveOrigin,
     required this.originRadius,
     required this.originColor,
     required this.originElevation,
     required this.surfaceColor,
-    required this.radius,
     required this.maxWidth,
     required this.padding,
-    required this.textDirection,
     required this.content,
     this.face,
   });
 
-  final Animation<double> progress;
+  final HermezMorphFrame frame;
 
-  /// Where the button is now, in this widget's coordinate space.
+  /// Where the button is, in this widget's coordinate space.
   final Rect Function() resolveOrigin;
   final double originRadius;
   final Color originColor;
   final double originElevation;
   final Color surfaceColor;
-  final double radius;
   final double maxWidth;
 
   /// Clear space around the panel: the safe area, the keyboard and margins.
   final EdgeInsets padding;
-  final TextDirection textDirection;
   final Widget content;
 
-  /// The button's face while the panel is not fully open; null once it is.
+  /// The button's face while it is still visible; null once it has gone.
   final Widget? face;
 
   @override
@@ -390,16 +468,14 @@ class HermezPanelMorph
   @override
   RenderHermezPanelMorph createRenderObject(BuildContext context) =>
       RenderHermezPanelMorph(
-        progress: progress,
+        frame: frame,
         resolveOrigin: resolveOrigin,
         originRadius: originRadius,
         originColor: originColor,
         originElevation: originElevation,
         surfaceColor: surfaceColor,
-        radius: radius,
         maxWidth: maxWidth,
         padding: padding,
-        textDirection: textDirection,
       );
 
   @override
@@ -408,49 +484,41 @@ class HermezPanelMorph
     RenderHermezPanelMorph renderObject,
   ) {
     renderObject
-      ..progress = progress
+      ..frame = frame
       ..resolveOrigin = resolveOrigin
       ..originRadius = originRadius
       ..originColor = originColor
       ..originElevation = originElevation
       ..surfaceColor = surfaceColor
-      ..radius = radius
       ..maxWidth = maxWidth
-      ..padding = padding
-      ..textDirection = textDirection;
+      ..padding = padding;
   }
 }
 
 class RenderHermezPanelMorph extends RenderBox
     with SlottedContainerRenderObjectMixin<HermezPanelSlot, RenderBox> {
   RenderHermezPanelMorph({
-    required Animation<double> progress,
+    required HermezMorphFrame frame,
     required Rect Function() resolveOrigin,
     required double originRadius,
     required Color originColor,
     required double originElevation,
     required Color surfaceColor,
-    required double radius,
     required double maxWidth,
     required EdgeInsets padding,
-    required TextDirection textDirection,
-  }) : _progress = progress,
+  }) : _frame = frame,
        _resolveOrigin = resolveOrigin,
        _originRadius = originRadius,
        _originColor = originColor,
        _originElevation = originElevation,
        _surfaceColor = surfaceColor,
-       _radius = radius,
        _maxWidth = maxWidth,
-       _padding = padding,
-       _textDirection = textDirection;
+       _padding = padding;
 
-  Animation<double> _progress;
-  set progress(Animation<double> value) {
-    if (identical(_progress, value)) return;
-    if (attached) _progress.removeListener(_onProgress);
-    _progress = value;
-    if (attached) _progress.addListener(_onProgress);
+  HermezMorphFrame _frame;
+  set frame(HermezMorphFrame value) {
+    if (_frame == value) return;
+    _frame = value;
     markNeedsPaint();
   }
 
@@ -489,13 +557,6 @@ class RenderHermezPanelMorph extends RenderBox
     markNeedsPaint();
   }
 
-  double _radius;
-  set radius(double value) {
-    if (_radius == value) return;
-    _radius = value;
-    markNeedsPaint();
-  }
-
   double _maxWidth;
   set maxWidth(double value) {
     if (_maxWidth == value) return;
@@ -510,27 +571,15 @@ class RenderHermezPanelMorph extends RenderBox
     markNeedsLayout();
   }
 
-  TextDirection _textDirection;
-  set textDirection(TextDirection value) {
-    if (_textDirection == value) return;
-    _textDirection = value;
-    markNeedsLayout();
-  }
-
   // Geometry from the last layout.
   Rect _origin = Rect.zero;
   Rect _panel = Rect.zero;
-  bool _anchorEnd = true;
+  bool _anchorRight = true;
   bool _anchorBottom = true;
-
-  // Geometry from the last paint, for hit testing and transforms.
-  Rect _aperture = Rect.zero;
-  Offset _contentOffset = Offset.zero;
-  Offset _faceOrigin = Offset.zero;
 
   /// The travelling surface as painted last frame. For tests.
   @visibleForTesting
-  Rect get apertureRect => _aperture;
+  Rect get apertureRect => _apertureAt(_frame.size);
 
   /// Where the panel rests once fully open. For tests.
   @visibleForTesting
@@ -540,25 +589,29 @@ class RenderHermezPanelMorph extends RenderBox
   @visibleForTesting
   Rect get originRect => _origin;
 
+  /// Whether the panel grows upward from the button (anchored at its
+  /// bottom edge).
+  @visibleForTesting
+  bool get anchoredBottom => _anchorBottom;
+
   RenderBox? get _content => childForSlot(HermezPanelSlot.content);
   RenderBox? get _face => childForSlot(HermezPanelSlot.face);
 
-  @override
-  void attach(PipelineOwner owner) {
-    super.attach(owner);
-    _progress.addListener(_onProgress);
-  }
+  Rect _apertureAt(double t) => Rect.fromLTRB(
+    lerpDouble(_origin.left, _panel.left, t)!,
+    lerpDouble(_origin.top, _panel.top, t)!,
+    lerpDouble(_origin.right, _panel.right, t)!,
+    lerpDouble(_origin.bottom, _panel.bottom, t)!,
+  );
 
-  @override
-  void detach() {
-    _progress.removeListener(_onProgress);
-    super.detach();
-  }
-
-  void _onProgress() {
-    markNeedsPaint();
-    // The content's place is final once the panel is open.
-    if (_progress.value >= 1) markNeedsSemanticsUpdate();
+  /// The face rides the surface's anchored corner (the plus sits at the
+  /// morph's corner in the reference).
+  Offset get _faceOffset {
+    final aperture = apertureRect;
+    return Offset(
+      _anchorRight ? aperture.right - _origin.width : aperture.left,
+      _anchorBottom ? aperture.bottom - _origin.height : aperture.top,
+    );
   }
 
   @override
@@ -570,72 +623,64 @@ class RenderHermezPanelMorph extends RenderBox
   @override
   void performLayout() {
     size = constraints.biggest;
-    final content = _content;
-    final available = math.max(
+    _origin = _resolveOrigin();
+    final free = _padding.deflateRect(Offset.zero & size);
+    _anchorRight = _origin.center.dx >= size.width / 2;
+    _anchorBottom = _origin.center.dy >= size.height / 2;
+
+    final width = math.max(0.0, math.min(free.width, _maxWidth));
+    // The anchored edge lines up with the button's, kept on screen and above
+    // the keyboard; the panel extends from it toward the rest of the screen.
+    final edge = _anchorBottom
+        ? math.min(_origin.bottom, free.bottom)
+        : math.max(_origin.top, free.top);
+    final maxHeight = math.max(
       0.0,
-      math.min(size.width - _padding.horizontal, _maxWidth),
+      _anchorBottom ? edge - free.top : free.bottom - edge,
     );
-    final maxHeight = math.max(0.0, size.height - _padding.vertical);
+    final content = _content;
+    var height = 0.0;
     if (content != null) {
       content.layout(
-        BoxConstraints(
-          minWidth: available,
-          maxWidth: available,
-          maxHeight: maxHeight,
-        ),
+        BoxConstraints(minWidth: width, maxWidth: width, maxHeight: maxHeight),
         parentUsesSize: true,
       );
-      _panel = Rect.fromLTWH(
-        (size.width - available) / 2,
-        _padding.top,
-        available,
-        content.size.height,
-      );
-    } else {
-      _panel = Rect.zero;
+      height = content.size.height;
     }
-    _origin = _resolveOrigin();
+    final left = _anchorRight
+        ? math.max(free.left, math.min(_origin.right, free.right) - width)
+        : math.min(math.max(_origin.left, free.left), free.right - width);
+    _panel = Rect.fromLTWH(
+      left,
+      _anchorBottom ? edge - height : edge,
+      width,
+      height,
+    );
     final face = _face;
     if (face != null) face.layout(BoxConstraints.tight(_origin.size));
-    // The button's face rides the corner of the surface nearest the button.
-    _anchorEnd = _origin.center.dx >= _panel.center.dx;
-    _anchorBottom = _origin.center.dy >= _panel.center.dy;
-  }
-
-  static double _smooth(double value, double from, double to) {
-    final x = ((value - from) / (to - from)).clamp(0.0, 1.0);
-    return x * x * (3 - 2 * x);
   }
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    final content = _content;
-    if (content == null) return;
-    final t = _progress.value;
+    final t = _frame.size;
     final settled = t.clamp(0.0, 1.0);
-
-    // The surface travels from the button to the panel. Unclamped, so the
-    // opening bounce carries it a hair past the panel and back.
-    final aperture = Rect.fromLTRB(
-      lerpDouble(_origin.left, _panel.left, t)!,
-      lerpDouble(_origin.top, _panel.top, t)!,
-      lerpDouble(_origin.right, _panel.right, t)!,
-      lerpDouble(_origin.bottom, _panel.bottom, t)!,
-    );
-    _aperture = aperture;
-    final radius = lerpDouble(_originRadius, _radius, settled)!;
+    final aperture = _apertureAt(t);
+    final radius = lerpDouble(
+      _originRadius,
+      HermezPanelMotion.openRadius,
+      settled,
+    )!;
     final rrect = RRect.fromRectAndRadius(
       aperture.shift(offset),
       Radius.circular(radius),
     );
-
-    // The surface is the button's colour until the content has covered it.
+    // The surface is the button's colour until the content has faded in.
     final slab = Color.lerp(
       _originColor,
       _surfaceColor,
-      _smooth(settled, 0.45, 0.85),
+      _frame.fade.clamp(0.0, 1.0),
     )!;
-    final elevation = lerpDouble(_originElevation, 14, settled)!;
+    final elevation = lerpDouble(_originElevation, 12, settled)!;
     if (elevation > 0) {
       context.canvas.drawShadow(
         Path()..addRRect(rrect),
@@ -646,65 +691,23 @@ class RenderHermezPanelMorph extends RenderBox
     }
     context.canvas.drawRRect(rrect, Paint()..color = slab);
 
-    // The content wipes across from the button's side; the face turns and
-    // shrinks away toward the inside as it is covered.
-    final wipe = _smooth(settled, 0.10, 0.72);
-    final side = _anchorEnd ? 1.0 : -1.0;
-    _contentOffset = Offset(
-      aperture.left + (1 - wipe) * aperture.width * side,
-      aperture.top,
-    );
-    final fade = _smooth(settled, 0.0, 0.5);
-    final face = _face;
-
-    context.pushClipRRect(
-      needsCompositing,
-      Offset.zero,
-      offset & size,
-      RRect.fromRectAndRadius(aperture.shift(offset), Radius.circular(radius)),
-      (context, _) {
-        if (face != null && fade < 0.98) {
-          final at = Offset(
-            _anchorEnd ? aperture.right - _origin.width : aperture.left,
-            _anchorBottom ? aperture.bottom - _origin.height : aperture.top,
-          );
-          final center =
-              at +
-              Offset(_origin.width / 2, _origin.height / 2) +
-              Offset(-side * HermezPanelMotion.faceSlide * fade, 0);
-          _faceOrigin = at;
-          final scale = 1 - fade;
-          final transform = Matrix4.identity()
-            ..translateByDouble(
-              center.dx + offset.dx,
-              center.dy + offset.dy,
-              0,
-              1,
-            )
-            ..scaleByDouble(scale, scale, 1, 1)
-            ..translateByDouble(-_origin.width / 2, -_origin.height / 2, 0, 1);
-          context.pushTransform(needsCompositing, Offset.zero, transform, (
-            context,
-            _,
-          ) {
-            context.paintChild(face, Offset.zero);
-          });
-        }
-        // Skipped while it is still wholly outside the aperture.
-        if (wipe > 0) {
-          context.paintChild(content, offset + _contentOffset);
-        }
-      },
-    );
+    context.pushClipRRect(needsCompositing, Offset.zero, offset & size, rrect, (
+      context,
+      _,
+    ) {
+      final content = _content;
+      if (content != null && _frame.fade > 0) {
+        context.paintChild(content, offset + _panel.topLeft);
+      }
+      final face = _face;
+      if (face != null) context.paintChild(face, offset + _faceOffset);
+    });
   }
 
   @override
   void applyPaintTransform(RenderBox child, Matrix4 transform) {
-    if (identical(child, _content)) {
-      transform.translateByDouble(_contentOffset.dx, _contentOffset.dy, 0, 1);
-    } else if (identical(child, _face)) {
-      transform.translateByDouble(_faceOrigin.dx, _faceOrigin.dy, 0, 1);
-    }
+    final at = identical(child, _content) ? _panel.topLeft : _faceOffset;
+    transform.translateByDouble(at.dx, at.dy, 0, 1);
   }
 
   @override
@@ -713,9 +716,9 @@ class RenderHermezPanelMorph extends RenderBox
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
     final content = _content;
-    if (content == null || !_aperture.contains(position)) return false;
+    if (content == null || !apertureRect.contains(position)) return false;
     return result.addWithPaintOffset(
-      offset: _contentOffset,
+      offset: _panel.topLeft,
       position: position,
       hitTest: (result, transformed) =>
           content.hitTest(result, position: transformed),
