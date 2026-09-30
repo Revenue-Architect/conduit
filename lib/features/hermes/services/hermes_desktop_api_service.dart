@@ -475,6 +475,10 @@ final class HermesDesktopApiService
     _sessionProfiles[id] = profile;
   }
 
+  /// The profile a session was started with or bound to in this process, if
+  /// any. Covers a conversation too new to be in the session list yet.
+  String? boundProfileFor(String storedId) => _sessionProfiles[storedId];
+
   /// Authoritative profile counts, independent of the paged recent-session list.
   Future<Map<String, int>> sessionTotalsByProfile() async {
     final response = await _requestJson(

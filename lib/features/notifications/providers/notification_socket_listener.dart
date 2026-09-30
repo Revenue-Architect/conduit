@@ -14,6 +14,7 @@ import '../../../core/utils/debug_logger.dart';
 import '../../channels/providers/channel_providers.dart';
 import '../../chat/providers/chat_providers.dart';
 import '../../hermes/services/hermes_identifier.dart';
+import '../../navigation/widgets/responsive_drawer_layout.dart';
 import '../models/app_notification.dart';
 import '../services/active_view_tracker.dart';
 import '../services/local_notification_service.dart';
@@ -31,12 +32,36 @@ const _classifier = NotificationEventClassifier();
 NotificationRouter notificationRouter(Ref ref) {
   return NotificationRouter(
     readSettings: () => ref.read(appSettingsProvider),
-    readActiveView: () => ref.read(activeViewProvider),
+    readActiveView: () => visibleActiveView(
+      ref.read(activeViewProvider),
+      location: NavigationService.currentRoute,
+      drawerShowing: ResponsiveDrawerLayoutState.mobileDrawerShowing.value,
+    ),
     isAppForeground: _isAppForeground,
     localNotifications: ref.read(localNotificationServiceProvider),
     sound: ref.read(notificationSoundServiceProvider),
     showInAppBanner: (n) => _showInAppBanner(ref, n),
     onChannelUnread: (n) => _bumpChannelUnread(ref, n),
+  );
+}
+
+/// The conversation the user is actually looking at. The active chat stays
+/// set while other pages (Kanban, Settings) are pushed over it or the phone
+/// drawer (Hermes Home) covers it; a run finishing there must still raise a
+/// banner, so the chat only counts while its page is the one on screen.
+@visibleForTesting
+ActiveView visibleActiveView(
+  ActiveView view, {
+  required String? location,
+  required bool drawerShowing,
+}) {
+  final path = location == null ? null : Uri.tryParse(location)?.path;
+  final onChat = path == null || path == Routes.chat;
+  final onChannel = path == null || path.startsWith('/channel');
+  return ActiveView(
+    chatId: onChat && !drawerShowing ? view.chatId : null,
+    hermesSessionId: onChat && !drawerShowing ? view.hermesSessionId : null,
+    channelId: onChannel && !drawerShowing ? view.channelId : null,
   );
 }
 

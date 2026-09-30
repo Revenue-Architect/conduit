@@ -2,6 +2,7 @@ import 'package:conduit/core/services/settings_service.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
+import 'package:conduit/features/hermes/services/hermes_pending_decision_store.dart';
 import 'package:conduit/features/hermes/services/hermes_run_notifications.dart';
 import 'package:conduit/features/notifications/models/app_notification.dart';
 import 'package:conduit/features/notifications/providers/notification_socket_listener.dart'
@@ -188,5 +189,88 @@ void main() {
     await pumpEventQueue();
     expect(system, isEmpty);
     expect(banners.map((n) => n.title), ['kai finished']);
+  });
+
+  test('a finished run says what it did: conversation, tools, time', () async {
+    final hermes = await notifier();
+    hermes
+      ..debugActivity(
+        HermesLiveActivityEvent(
+          sessionId: 'session-1',
+          kind: HermesLiveActivityKind.toolStarted,
+          title: 'tool',
+          detail: 'web_search',
+          timestamp: DateTime.utc(2026, 9, 30, 12),
+        ),
+      )
+      ..debugActivity(_event(HermesLiveActivityKind.completed, at: 42));
+    await pumpEventQueue();
+    expect(system.single.title, 'kai finished');
+    expect(system.single.body, contains('Explain the gap'));
+    expect(system.single.body, contains('Used web search'));
+    expect(system.single.body, contains('42s'));
+  });
+
+  group('notification text', () {
+    test('a reply becomes plain text cut at a word', () {
+      expect(
+        hermesNotificationSnippet('## Title\n\n**Bold** and `code` [link](x)'),
+        'Title Bold and code link',
+      );
+      final long = hermesNotificationSnippet('word ' * 100, max: 50)!;
+      expect(long.length, lessThanOrEqualTo(51));
+      expect(long, endsWith('…'));
+      expect(hermesNotificationSnippet('```\ncode\n```'), isNull);
+    });
+
+    test('facts name up to three tools and the time taken', () {
+      expect(
+        hermesRunFacts(
+          tools: ['web_search', 'web_search', 'terminal'],
+          elapsed: const Duration(seconds: 75),
+        ),
+        'Used web search, terminal · 1m 15s',
+      );
+      expect(hermesRunFacts(tools: ['a', 'b', 'c', 'd']), 'Used a, b +2 more');
+      expect(hermesRunFacts(tools: const []), isNull);
+    });
+
+    test('a waiting bot says what it is asking', () {
+      HermesPendingDesktopDecision decision(
+        HermesPendingDesktopDecisionKind kind, {
+        String? prompt,
+      }) => HermesPendingDesktopDecision(
+        origin: 'o',
+        storedSessionId: 'session-1',
+        runtimeId: 'r',
+        requestId: 'q',
+        kind: kind,
+        expiresAt: DateTime.utc(2030),
+        prompt: prompt,
+        mcpServer: 'github',
+      );
+      expect(
+        hermesDecisionAsk(
+          decision(
+            HermesPendingDesktopDecisionKind.approval,
+            prompt: 'rm -rf build',
+          ),
+        ),
+        'Approve: rm -rf build',
+      );
+      expect(
+        hermesDecisionAsk(
+          decision(
+            HermesPendingDesktopDecisionKind.clarification,
+            prompt: 'Which store?',
+          ),
+        ),
+        'Which store?',
+      );
+      expect(
+        hermesDecisionAsk(decision(HermesPendingDesktopDecisionKind.mcpSetup)),
+        'Set up github to continue.',
+      );
+    });
   });
 }

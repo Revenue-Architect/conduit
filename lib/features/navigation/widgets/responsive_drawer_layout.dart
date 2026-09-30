@@ -108,6 +108,11 @@ class ResponsiveDrawerLayout extends StatefulWidget {
 class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
     with SingleTickerProviderStateMixin
     implements SidebarDrawerController {
+  /// Whether a phone drawer is showing over the page (partly or fully), so
+  /// the page under it is not what the user is looking at. Read by
+  /// notification routing; a persistent tablet sidebar never sets it.
+  static final ValueNotifier<bool> mobileDrawerShowing = ValueNotifier(false);
+
   // Matches Flutter's default Material drawer edge width.
   static const double _kDrawerEdgeDragWidth = 20.0;
   static const double _kEdgeOpenTouchSlop = kTouchSlop;
@@ -146,6 +151,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   }
 
   void _setComposeMobileDrawerChrome(bool value) {
+    mobileDrawerShowing.value = value;
     if (_composeMobileDrawerChrome == value || !mounted) return;
     setState(() => _composeMobileDrawerChrome = value);
     _recordChromeComposition(value);
@@ -892,6 +898,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
 
   @override
   void dispose() {
+    if (_composeMobileDrawerChrome) mobileDrawerShowing.value = false;
     _controller.removeStatusListener(_onControllerStatusChanged);
     _controller.dispose();
     super.dispose();

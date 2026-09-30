@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/persistence/persistence_keys.dart';
 import '../../../core/persistence/preferences_store.dart';
 import '../../../core/services/background_streaming_handler.dart';
+import '../../../core/providers/app_providers.dart'
+    show activeConversationProvider;
 import '../../../core/utils/debug_logger.dart';
+import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
 import '../../notifications/models/app_notification.dart';
 import '../../notifications/providers/notification_socket_listener.dart'
     show notificationRouterProvider;
@@ -18,6 +21,7 @@ import '../providers/hermes_providers.dart';
 import 'hermes_backend_service.dart';
 import 'hermes_desktop_api_service.dart';
 import 'hermes_live_activity.dart';
+import 'hermes_pending_decision_store.dart';
 import '../widgets/hermes_home_presence.dart' show hermesAwaySinceProvider;
 
 /// Lets a Hermes bot reach the user first.
@@ -65,6 +69,11 @@ class HermesRunNotifier with WidgetsBindingObserver {
   /// announced only for these, so a replayed completion after a reconnect
   /// never notifies twice.
   final Set<String> _armed = {};
+
+  /// Per armed run: when it started and the tools it used, for the finished
+  /// notification's facts line.
+  final Map<String, DateTime> _started = {};
+  final Map<String, List<String>> _tools = {};
   bool _leased = false;
   AppLifecycleState? _lifecycle;
   Timer? _leaseCap;
@@ -135,18 +144,7 @@ class HermesRunNotifier with WidgetsBindingObserver {
     switch (event.kind) {
       case HermesLiveActivityKind.waitingForInput:
         _trace('waiting', sessionId);
-        final bot = _botLabel(sessionId);
-        _route(
-          AppNotification(
-            kind: NotificationKind.hermesAttention,
-            title: '$bot needs you',
-            body: _sessionTitle(sessionId) ?? 'Open to review the request.',
-            sourceId: sessionId,
-            dedupKey:
-                'hermes-attention:$sessionId:'
-                '${event.detail ?? event.timestamp.millisecondsSinceEpoch ~/ 60000}',
-          ),
-        );
+        unawaited(_notifyWaiting(event));
       case HermesLiveActivityKind.completed:
       case HermesLiveActivityKind.failed:
         final kindName = event.kind == HermesLiveActivityKind.failed
@@ -158,23 +156,117 @@ class HermesRunNotifier with WidgetsBindingObserver {
           _trace('$kindName-suppressed-unarmed', sessionId);
           return;
         }
-        final bot = _botLabel(sessionId);
-        final failed = event.kind == HermesLiveActivityKind.failed;
-        _route(
-          AppNotification(
-            kind: NotificationKind.hermesRun,
-            title: failed ? '$bot hit a problem' : '$bot finished',
-            body:
-                _sessionTitle(sessionId) ??
-                (failed ? 'The run failed.' : 'Tap to see what it did.'),
-            sourceId: sessionId,
-            dedupKey:
-                'hermes-run:$sessionId:${event.timestamp.millisecondsSinceEpoch}',
+        unawaited(
+          _notifyFinished(
+            event,
+            failed: event.kind == HermesLiveActivityKind.failed,
+            started: _started.remove(sessionId),
+            tools: _tools.remove(sessionId) ?? const <String>[],
           ),
         );
       default:
         _armed.add(sessionId);
+        _started.putIfAbsent(sessionId, () => event.timestamp);
+        final tool = event.detail;
+        if (event.kind == HermesLiveActivityKind.toolStarted &&
+            tool != null &&
+            tool.isNotEmpty) {
+          (_tools[sessionId] ??= <String>[]).add(tool);
+        }
     }
+  }
+
+  /// "kai needs you" with what it is asking: the command waiting for
+  /// approval, the question, or which secret or setup it needs.
+  Future<void> _notifyWaiting(HermesLiveActivityEvent event) async {
+    final sessionId = event.sessionId;
+    final bot = _botLabel(sessionId);
+    HermesPendingDesktopDecision? decision;
+    final service = _ref.read(hermesApiServiceProvider);
+    if (service is HermesDesktopApiService) {
+      try {
+        final pending = await service
+            .pendingStoredDecisionsForSession(sessionId)
+            .timeout(const Duration(seconds: 2));
+        if (pending.isNotEmpty) decision = pending.last;
+      } catch (_) {}
+    }
+    final ask = decision == null ? null : hermesDecisionAsk(decision);
+    final title = _sessionTitle(sessionId);
+    _route(
+      AppNotification(
+        kind: NotificationKind.hermesAttention,
+        title: '$bot needs you',
+        body: [ask ?? 'Open to review the request.', ?title].join('\n'),
+        sourceId: sessionId,
+        dedupKey:
+            'hermes-attention:$sessionId:'
+            '${event.detail ?? event.timestamp.millisecondsSinceEpoch ~/ 60000}',
+      ),
+    );
+  }
+
+  /// "fast finished" with the start of the reply, then the conversation,
+  /// the tools it used, and how long it took.
+  Future<void> _notifyFinished(
+    HermesLiveActivityEvent event, {
+    required bool failed,
+    required DateTime? started,
+    required List<String> tools,
+  }) async {
+    final sessionId = event.sessionId;
+    final bot = _botLabel(sessionId);
+    final reply = failed ? null : await _replySnippet(sessionId);
+    final facts = hermesRunFacts(
+      tools: tools,
+      elapsed: started == null ? null : event.timestamp.difference(started),
+    );
+    final title = _sessionTitle(sessionId);
+    final lead =
+        reply ??
+        (failed ? 'The run stopped with an error.' : title) ??
+        'Tap to see what it did.';
+    final second = [if (title != null && title != lead) title, ?facts];
+    _route(
+      AppNotification(
+        kind: NotificationKind.hermesRun,
+        title: failed ? '$bot hit a problem' : '$bot finished',
+        body: [lead, if (second.isNotEmpty) second.join(' · ')].join('\n'),
+        sourceId: sessionId,
+        dedupKey:
+            'hermes-run:$sessionId:${event.timestamp.millisecondsSinceEpoch}',
+      ),
+    );
+  }
+
+  /// The start of the run's answer: from the open chat when it is this
+  /// session, else the session's stored transcript (bounded wait).
+  Future<String?> _replySnippet(String sessionId) async {
+    final active = _ref.read(activeConversationProvider);
+    if (active?.metadata['hermesSessionId'] == sessionId) {
+      final messages = _ref.read(chatMessagesProvider);
+      for (final message in messages.reversed) {
+        if (message.role == 'assistant' && message.content.trim().isNotEmpty) {
+          return hermesNotificationSnippet(message.content);
+        }
+      }
+    }
+    final service = _ref.read(hermesApiServiceProvider);
+    if (service is! HermesDesktopApiService) return null;
+    try {
+      final messages = await service
+          .getSessionMessages(sessionId)
+          .timeout(const Duration(seconds: 4));
+      for (final message in messages.reversed) {
+        final content = message['content'];
+        if (message['role'] == 'assistant' &&
+            content is String &&
+            content.trim().isNotEmpty) {
+          return hermesNotificationSnippet(content);
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// One line per notification-relevant event, for device debugging. Never
@@ -184,7 +276,7 @@ class HermesRunNotifier with WidgetsBindingObserver {
     final fields = <String, Object?>{
       'event': event,
       'session': sessionId.length > 8 ? sessionId.substring(0, 8) : sessionId,
-      'profile': _session(sessionId)?.profile ?? '?',
+      'profile': _profile(sessionId) ?? '?',
       'armed': _armed.contains(sessionId),
       'lifecycle':
           (_lifecycle ?? WidgetsBinding.instance.lifecycleState)?.name ??
@@ -205,8 +297,20 @@ class HermesRunNotifier with WidgetsBindingObserver {
     return null;
   }
 
+  /// The session's bot: from the session list, else from the binding the
+  /// desktop service made when it started the conversation (a brand-new
+  /// chat is not in the list until the next refresh).
+  String? _profile(String sessionId) {
+    final listed = _session(sessionId)?.profile;
+    if (listed != null && listed.isNotEmpty) return listed;
+    final service = _ref.read(hermesApiServiceProvider);
+    return service is HermesDesktopApiService
+        ? service.boundProfileFor(sessionId)
+        : null;
+  }
+
   String _botLabel(String sessionId) {
-    final profile = _session(sessionId)?.profile;
+    final profile = _profile(sessionId);
     return profile == null || profile.isEmpty || profile == 'default'
         ? 'Hermes'
         : profile;
@@ -272,4 +376,68 @@ class HermesRunNotifier with WidgetsBindingObserver {
       ]),
     );
   }
+}
+
+/// Plain, one-paragraph text for a notification: markdown marks, code
+/// fences and extra whitespace removed, cut at a word near [max].
+@visibleForTesting
+String? hermesNotificationSnippet(String text, {int max = 220}) {
+  var plain = text
+      .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
+      .replaceAllMapped(
+        RegExp(r'!?\[([^\]]*)\]\([^)]*\)'),
+        (match) => match.group(1) ?? '',
+      )
+      .replaceAll(
+        RegExp(r'^\s{0,3}(#{1,6}|[-*+>]|\d+\.)\s+', multiLine: true),
+        '',
+      )
+      .replaceAll(RegExp(r'[*_`~]'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (plain.isEmpty) return null;
+  if (plain.length <= max) return plain;
+  plain = plain.substring(0, max);
+  final space = plain.lastIndexOf(' ');
+  if (space > max * 0.6) plain = plain.substring(0, space);
+  return '${plain.trimRight()}…';
+}
+
+/// "Used web search, terminal · 42s": what a finished run did.
+@visibleForTesting
+String? hermesRunFacts({required List<String> tools, Duration? elapsed}) {
+  final names = {for (final tool in tools) tool.replaceAll('_', ' ')}.toList();
+  final parts = <String>[
+    if (names.isNotEmpty)
+      names.length <= 3
+          ? 'Used ${names.join(', ')}'
+          : 'Used ${names.take(2).join(', ')} +${names.length - 2} more',
+    if (elapsed != null && elapsed.inSeconds > 0)
+      elapsed.inMinutes >= 1
+          ? '${elapsed.inMinutes}m ${elapsed.inSeconds % 60}s'
+          : '${elapsed.inSeconds}s',
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+/// What a waiting bot is asking, in a line.
+@visibleForTesting
+String hermesDecisionAsk(HermesPendingDesktopDecision decision) {
+  final prompt = decision.prompt == null
+      ? null
+      : hermesNotificationSnippet(decision.prompt!, max: 160);
+  return switch (decision.kind) {
+    HermesPendingDesktopDecisionKind.approval =>
+      prompt == null ? 'Approve an action to continue.' : 'Approve: $prompt',
+    HermesPendingDesktopDecisionKind.clarification =>
+      prompt ?? 'Answer a question to continue.',
+    HermesPendingDesktopDecisionKind.sudo =>
+      'Needs an administrator password to continue.',
+    HermesPendingDesktopDecisionKind.secret =>
+      prompt == null
+          ? 'Needs a secret to continue.'
+          : 'Needs a secret: $prompt',
+    HermesPendingDesktopDecisionKind.mcpSetup =>
+      'Set up ${decision.mcpServer ?? 'an MCP server'} to continue.',
+  };
 }

@@ -353,6 +353,11 @@ class LocalNotificationService {
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
       playSound: playSound,
+      // Long bodies (a reply's opening, what a bot is asking) expand in the
+      // shade instead of being cut to one line.
+      styleInformation: notification.body.isEmpty
+          ? null
+          : BigTextStyleInformation(notification.body),
     );
     final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
