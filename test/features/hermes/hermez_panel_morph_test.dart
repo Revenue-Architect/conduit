@@ -170,10 +170,11 @@ void main() {
 
   test('the motion tokens are those of the Dropdown menu morph', () {
     expect(HermezPanelMotion.openDuration, const Duration(milliseconds: 350));
-    expect(HermezPanelMotion.closeDuration, const Duration(milliseconds: 250));
+    // The close is eased and slower than the reference so it settles home.
+    expect(HermezPanelMotion.closeDuration, const Duration(milliseconds: 340));
     expect(HermezPanelMotion.fadeDuration, const Duration(milliseconds: 200));
     expect(HermezPanelMotion.openEase, const Cubic(0.34, 1.25, 0.64, 1));
-    expect(HermezPanelMotion.closeEase, const Cubic(0.22, 1, 0.36, 1));
+    expect(HermezPanelMotion.closeEase, const Cubic(0.4, 0, 0.2, 1));
     expect(HermezPanelMotion.openRadius, 20);
     expect(HermezPanelMotion.slide, 40);
     expect(HermezPanelMotion.scale, 0.97);
@@ -194,9 +195,9 @@ void main() {
       if (f.size > peak) peak = f.size;
     }
     expect(peak, greaterThan(1.01));
-    // Closing, 200 ms of the 250 ms in, the content is fully out and the
+    // Closing, 300 ms of the 340 ms in, the content is fully out and the
     // surface is nearly home.
-    final closing = HermezMorphFrame.of(1 - 200 / 250, opening: false);
+    final closing = HermezMorphFrame.of(1 - 300 / 340, opening: false);
     expect(closing.fade, closeTo(0, 0.001));
     expect(closing.size, lessThan(0.1));
     expect(HermezMorphFrame.of(0, opening: false).size, closeTo(0, 1e-9));
@@ -286,7 +287,7 @@ void main() {
     expect(state.taps, 1);
   });
 
-  testWidgets('tapping outside runs it home into the button in 250 ms and '
+  testWidgets('tapping outside runs it home into the button in 340 ms and '
       'reports the result only afterwards', (tester) async {
     await pumpHarness(tester);
     final button = tester.getRect(find.byKey(_triggerKey));
@@ -302,7 +303,7 @@ void main() {
     expect(find.text('face'), findsOneWidget);
     expect(state.closedWith, isNull);
 
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 290));
     await tester.pump();
     expect(find.byType(HermezPanelMorph), findsNothing);
     expect(tester.takeException(), isNull);

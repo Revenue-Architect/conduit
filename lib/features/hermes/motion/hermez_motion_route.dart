@@ -118,9 +118,10 @@ class HermezRoute<T> extends PageRoute<T> with HermezRouteTransitions<T> {
     Animation<double> secondaryAnimation,
   ) {
     final page = HeroMode(
-      // A destination that grows out of an object moves as that one object;
-      // its parts do not fly on their own paths.
-      enabled: effectiveMotion != HermezRouteMotion.expand,
+      // A destination moves as one object: grown out of its source, or slid
+      // in as a sibling. Its parts never fly on their own paths (a slide-in
+      // from the side navigation must not pull a title up from a Home card).
+      enabled: false,
       child: Semantics(
         scopesRoute: true,
         explicitChildNodes: true,
@@ -226,7 +227,7 @@ class _HermezPageBasedRoute<T> extends PageRoute<T>
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) => HeroMode(
-    enabled: effectiveMotion != HermezRouteMotion.expand,
+    enabled: false,
     child: Semantics(
       scopesRoute: true,
       explicitChildNodes: true,

@@ -25,7 +25,7 @@ abstract final class HermezPanelMotion {
   static const openDuration = Duration(milliseconds: 350);
 
   /// `--morph-close-dur`: surface size and corner on the way home.
-  static const closeDuration = Duration(milliseconds: 250);
+  static const closeDuration = Duration(milliseconds: 340);
 
   /// `--morph-fade-dur`: the plus and the content cross-fade.
   static const fadeDuration = Duration(milliseconds: 200);
@@ -34,7 +34,8 @@ abstract final class HermezPanelMotion {
   static const openEase = Cubic(0.34, 1.25, 0.64, 1);
 
   /// `--morph-close-ease`: everything else, and the close.
-  static const closeEase = Cubic(0.22, 1, 0.36, 1);
+  // Eased both ways so the fold home settles instead of snapping shut.
+  static const closeEase = Cubic(0.4, 0, 0.2, 1);
 
   /// `--morph-r-open`: the open panel's corner radius.
   static const openRadius = 20.0;

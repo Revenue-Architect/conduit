@@ -703,4 +703,53 @@ void main() {
       moreOrLessEquals(resting, epsilon: 0.01),
     );
   });
+
+  testWidgets('a page slid in from the side does not fly a title up from a '
+      'card on the page underneath', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomRight,
+            child: HermezMorphText(
+              'Kanban',
+              id: 'board#title',
+              style: TextStyle(fontSize: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+    navigator.currentState!.push(
+      HermezRoute<void>(
+        builder: (_) => const Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: HermezMorphText(
+              'Kanban',
+              id: 'board#title',
+              style: TextStyle(fontSize: 30),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    // No flight shuttle in the overlay: the title rides its own page.
+    expect(
+      find.descendant(
+        of: find.byType(Overlay),
+        matching: find.byWidgetPredicate(
+          (w) => w.runtimeType.toString().contains('HeroFlight'),
+        ),
+      ),
+      findsNothing,
+    );
+    final title = tester.getTopLeft(find.text('Kanban').last);
+    expect(title.dy, lessThan(100));
+    await tester.pumpAndSettle();
+  });
 }
