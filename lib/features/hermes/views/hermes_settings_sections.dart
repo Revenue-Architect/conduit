@@ -15,7 +15,7 @@ import '../models/hermes_capabilities.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
-import '../../../shared/widgets/conduit_dialog_route.dart';
+import '../motion/hermez_motion.dart';
 
 class HermesCapabilitiesSection extends ConsumerWidget {
   const HermesCapabilitiesSection({super.key});
@@ -91,6 +91,9 @@ class HermesToolsetsSection extends ConsumerStatefulWidget {
 class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
   final Set<String> _pending = {};
 
+  /// Toolsets whose details are open in place.
+  final Set<String> _open = {};
+
   Future<void> _configure(String name, bool enabled) async {
     if (!_pending.add(name)) return;
     setState(() {});
@@ -149,7 +152,7 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                       color: theme.textSecondary,
                     ),
                   ),
-                  for (final toolset in toolsets)
+                  for (final toolset in toolsets) ...[
                     UtilityRow(
                       title: toolset.label,
                       subtitle: [
@@ -160,37 +163,13 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                           toolset.tools.take(3).join(' · '),
                       ].join('\n'),
                       subtitleMaxLines: 5,
-                      onTap: () => showConduitDialog<void>(
-                        context: context,
-                        builder: (dialogContext) => AlertDialog(
-                          title: Text(toolset.label),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (toolset.description?.isNotEmpty == true)
-                                  Text(toolset.description!),
-                                const SizedBox(height: 12),
-                                Text(
-                                  l10n.hermesToolCount(toolset.tools.length),
-                                ),
-                                for (final name in toolset.tools)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 5),
-                                    child: Text('• $name'),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      // More about the same toolset: it opens in place under
+                      // its row.
+                      onTap: () => setState(() {
+                        if (!_open.remove(toolset.name)) {
+                          _open.add(toolset.name);
+                        }
+                      }),
                       trailing: desktop
                           ? AdaptiveSwitch(
                               value: toolset.enabled,
@@ -201,6 +180,37 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                             )
                           : null,
                     ),
+                    HermezReveal(
+                      visible: _open.contains(toolset.name),
+                      weight: HermezMotionWeight.medium,
+                      revealKey: ValueKey('toolset-${toolset.name}'),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (toolset.description?.isNotEmpty == true) ...[
+                              Text(toolset.description!),
+                              const SizedBox(height: 10),
+                            ],
+                            Text(
+                              'TOOLS · ${toolset.tools.length}',
+                              style: AppTypography.bodySmallStyle.copyWith(
+                                color: theme.textSecondary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            for (final name in toolset.tools)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text(name),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               );
             },

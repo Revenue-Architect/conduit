@@ -7,7 +7,8 @@ import '../../../core/utils/debug_logger.dart';
 import '../models/hermes_mcp.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
-import '../../../shared/widgets/conduit_dialog_route.dart';
+import '../motion/hermez_motion.dart';
+import '../sheets/hermez_modal_sheet.dart';
 
 final class HermesMcpPage extends ConsumerStatefulWidget {
   const HermesMcpPage({super.key});
@@ -20,6 +21,12 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
   late Future<List<HermesMcpServer>> _servers;
   final Map<String, HermesMcpTestResult> _testResults = {};
   final Set<String> _oauthPending = {};
+
+  /// The server whose action tray is open under its row.
+  String? _openActions;
+
+  /// The server whose removal is held open in its tray.
+  String? _confirmingRemove;
 
   @override
   void initState() {
@@ -68,17 +75,22 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     }
   }
 
-  Future<void> _add() async {
+  Future<void> _add([HermezMorphOrigin? origin]) async {
     final name = TextEditingController();
     final url = TextEditingController();
     final command = TextEditingController();
     final args = TextEditingController();
     final secret = TextEditingController();
-    final accepted = await showConduitDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add MCP server'),
-        content: SingleChildScrollView(
+    // The + grows into the editor and the editor contracts back into it.
+    final accepted = await pushHermezSheetRoute<bool>(
+      context,
+      origin: origin,
+      builder: (context) => HermezModalSheet(
+        eyebrow: 'MCP',
+        title: 'Add MCP server',
+        // material_ui fields need material_ui's own Material here.
+        body: Material(
+          type: MaterialType.transparency,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -112,16 +124,23 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+        footer: Material(
+          type: MaterialType.transparency,
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Add'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Add'),
-          ),
-        ],
+        ),
       ),
     );
     try {
@@ -164,23 +183,45 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     );
   }
 
-  Future<void> _addPreset() async {
+  Future<void> _addPreset([HermezMorphOrigin? origin]) async {
     final entries = await _service.mcpCatalog();
     if (!mounted) return;
-    final selected = await showConduitDialog<HermesMcpCatalogEntry>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Add catalog server'),
-        children: [
-          for (final entry in entries)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, entry),
-              child: ListTile(
-                title: Text(entry.name),
-                subtitle: Text(entry.description),
-              ),
-            ),
-        ],
+    final selected = await pushHermezSheetRoute<HermesMcpCatalogEntry>(
+      context,
+      origin: origin,
+      builder: (context) => HermezModalSheet(
+        eyebrow: 'MCP catalog',
+        title: 'Add catalog server',
+        body: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final entry in entries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: HermezMotionSurface(
+                    weight: HermezMotionWeight.light,
+                    semanticLabel: 'Add ${entry.name}',
+                    onTap: () => Navigator.pop(context, entry),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: ListTile(
+                        title: Text(entry.name),
+                        subtitle: Text(entry.description),
+                        trailing: const Icon(Icons.add_rounded),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
     if (selected == null) return;
@@ -190,29 +231,43 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     _refresh();
   }
 
-  Future<void> _setApiKey(String name) async {
+  Future<void> _setApiKey(String name, [HermezMorphOrigin? origin]) async {
     final value = TextEditingController();
-    final accepted = await showConduitDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Set API key for $name'),
-        content: TextField(
-          controller: value,
-          obscureText: true,
-          enableSuggestions: false,
-          autocorrect: false,
-          decoration: const InputDecoration(labelText: 'API key'),
+    final accepted = await pushHermezSheetRoute<bool>(
+      context,
+      origin: origin,
+      heightFactor: 0.6,
+      builder: (context) => HermezModalSheet(
+        eyebrow: 'Set API key',
+        title: name,
+        body: Material(
+          type: MaterialType.transparency,
+          child: TextField(
+            controller: value,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            enableIMEPersonalizedLearning: false,
+            decoration: const InputDecoration(labelText: 'API key'),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+        footer: Material(
+          type: MaterialType.transparency,
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
+        ),
       ),
     );
     try {
@@ -244,24 +299,12 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
   }
 
   Future<void> _remove(String name) async {
-    final confirmed = await showConduitDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove $name?'),
-        content: const Text('This removes the server from Hermes.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
+    if (mounted) {
+      setState(() {
+        _confirmingRemove = null;
+        _openActions = null;
+      });
+    }
     await _service.removeMcpServer(name);
     _refresh();
   }
@@ -289,10 +332,22 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
       appBar: AppBar(
         title: const Text('Hermes MCP'),
         actions: [
-          IconButton(
-            tooltip: 'Add from catalog',
-            onPressed: () => unawaited(_run(_addPreset)),
-            icon: const Icon(Icons.auto_awesome_outlined),
+          Builder(
+            builder: (iconContext) => IconButton(
+              tooltip: 'Add from catalog',
+              onPressed: () => unawaited(
+                _run(
+                  () => _addPreset(
+                    HermezMorphOrigin.of(
+                      iconContext,
+                      radius: 24,
+                      color: Theme.of(iconContext).colorScheme.surface,
+                    ),
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined),
+            ),
           ),
         ],
       ),
@@ -310,76 +365,247 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
             return const Center(child: Text('No MCP servers configured.'));
           }
           return ListView(
+            padding: const EdgeInsets.only(bottom: 96),
             children: [
               for (final server in servers)
-                ListTile(
-                  title: Text(server.name),
-                  subtitle: Text(
-                    _serverSubtitle(server),
-                    maxLines: 5,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  isThreeLine: true,
-                  trailing: _oauthPending.contains(server.name)
-                      ? const CircularProgressIndicator.adaptive()
-                      : PopupMenuButton<String>(
-                          onSelected: (action) {
-                            final name = server.name;
-                            if (action == 'test') {
-                              unawaited(_run(() => _test(name)));
-                            }
-                            if (action == 'oauth') {
-                              unawaited(_run(() => _oauth(name)));
-                            }
-                            if (action == 'key') {
-                              unawaited(_run(() => _setApiKey(name)));
-                            }
-                            if (action == 'enable') {
-                              unawaited(_run(() => _setEnabled(server, true)));
-                            }
-                            if (action == 'disable') {
-                              unawaited(_run(() => _setEnabled(server, false)));
-                            }
-                            if (action == 'remove') {
-                              unawaited(_run(() => _remove(name)));
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'test',
-                              child: Text('Test'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'oauth',
-                              child: Text('Authenticate'),
-                            ),
-                            if (supportsCredentialUpdate)
-                              const PopupMenuItem(
-                                value: 'key',
-                                child: Text('Set API key'),
-                              ),
-                            const PopupMenuItem(
-                              value: 'enable',
-                              child: Text('Enable tools'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'disable',
-                              child: Text('Disable tools'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'remove',
-                              child: Text('Remove'),
-                            ),
-                          ],
+                Builder(
+                  builder: (rowContext) {
+                    final name = server.name;
+                    final open = _openActions == name;
+                    HermezMorphOrigin? rowOrigin() => HermezMorphOrigin.of(
+                      rowContext,
+                      radius: 14,
+                      color: Theme.of(rowContext).colorScheme.surface,
+                    );
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ListTile(
+                          title: Text(name),
+                          subtitle: Text(
+                            _serverSubtitle(server),
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          isThreeLine: true,
+                          trailing: _oauthPending.contains(name)
+                              ? const CircularProgressIndicator.adaptive()
+                              : IconButton(
+                                  tooltip: 'Server actions',
+                                  isSelected: open,
+                                  onPressed: () => setState(() {
+                                    _openActions = open ? null : name;
+                                    _confirmingRemove = null;
+                                  }),
+                                  icon: const Icon(Icons.more_horiz_rounded),
+                                ),
                         ),
+                        // Actions open in place under the server's row and
+                        // push the list down.
+                        HermezReveal(
+                          visible: open,
+                          weight: HermezMotionWeight.medium,
+                          revealKey: ValueKey('mcp-actions-$name'),
+                          child: _ActionTray(
+                            children: [
+                              _TrayAction(
+                                icon: Icons.network_check_rounded,
+                                label: 'Test',
+                                onTap: () => unawaited(_run(() => _test(name))),
+                              ),
+                              _TrayAction(
+                                icon: Icons.login_rounded,
+                                label: 'Authenticate',
+                                onTap: () =>
+                                    unawaited(_run(() => _oauth(name))),
+                              ),
+                              if (supportsCredentialUpdate)
+                                _TrayAction(
+                                  icon: Icons.key_rounded,
+                                  label: 'Set API key',
+                                  onTap: () => unawaited(
+                                    _run(() => _setApiKey(name, rowOrigin())),
+                                  ),
+                                ),
+                              _TrayAction(
+                                icon: server.enabled
+                                    ? Icons.toggle_off_outlined
+                                    : Icons.toggle_on_outlined,
+                                label: server.enabled
+                                    ? 'Disable tools'
+                                    : 'Enable tools',
+                                onTap: () => unawaited(
+                                  _run(
+                                    () => _setEnabled(server, !server.enabled),
+                                  ),
+                                ),
+                              ),
+                              _TrayAction(
+                                icon: Icons.delete_outline_rounded,
+                                label: 'Remove',
+                                destructive: true,
+                                onTap: () => setState(
+                                  () => _confirmingRemove =
+                                      _confirmingRemove == name ? null : name,
+                                ),
+                              ),
+                              HermezReveal(
+                                visible: _confirmingRemove == name,
+                                weight: HermezMotionWeight.medium,
+                                revealKey: ValueKey('mcp-remove-$name'),
+                                child: _RemoveGuard(
+                                  name: name,
+                                  onCancel: () =>
+                                      setState(() => _confirmingRemove = null),
+                                  onRemove: () =>
+                                      unawaited(_run(() => _remove(name))),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
             ],
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => unawaited(_run(_add)),
-        child: const Icon(Icons.add),
+      floatingActionButton: Builder(
+        builder: (fabContext) => FloatingActionButton(
+          tooltip: 'Add MCP server',
+          onPressed: () => unawaited(
+            _run(
+              () => _add(
+                HermezMorphOrigin.of(
+                  fabContext,
+                  radius: 16,
+                  color: Theme.of(fabContext).colorScheme.primaryContainer,
+                ),
+              ),
+            ),
+          ),
+          child: const Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+}
+
+/// A server's actions, opened in place under its row.
+class _ActionTray extends StatelessWidget {
+  const _ActionTray({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    ),
+  );
+}
+
+class _TrayAction extends StatelessWidget {
+  const _TrayAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? Theme.of(context).colorScheme.error : null;
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color)),
+      onTap: onTap,
+    );
+  }
+}
+
+/// Remove, held open for one more decision inside the server's tray.
+class _RemoveGuard extends StatelessWidget {
+  const _RemoveGuard({
+    required this.name,
+    required this.onCancel,
+    required this.onRemove,
+  });
+
+  final String name;
+  final VoidCallback onCancel;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = Theme.of(context).colorScheme.error;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Remove $name? This removes the server from Hermes.',
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: danger.withValues(alpha: 0.55)),
+          color: danger.withValues(alpha: 0.06),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Text(
+                'REMOVE ${name.toUpperCase()}?',
+                style: TextStyle(
+                  color: danger,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const ExcludeSemantics(
+              child: Text('This removes the server from Hermes.'),
+            ),
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 8,
+              children: [
+                TextButton(
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
+                  onPressed: onCancel,
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: danger,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                    minimumSize: const Size(64, 44),
+                  ),
+                  onPressed: onRemove,
+                  child: const Text('Remove'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
