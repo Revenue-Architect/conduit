@@ -578,3 +578,21 @@ Commits `88744f03` and `94128ed7`, plus a round of visible-view fixes.
   - Opening an old chat may pop the keyboard; unconfirmed.
   - `hermes_decision_card_test` "wall-clock expiry" fails regardless of these changes: its 50 ms lifetime is shorter than the first frame on this machine.
   - Device QA of Teams, Attention, MCP and live run is still to do.
+
+## 2026-09-30: Open items closed
+
+- **Cold-launch tap:** `HermesLiveRunPage(openChat: true)` waits up to about 6s for `hermesSessionsProvider` and about 10s for the Desktop service, then calls `openHermesSession`. If that fails it falls back to the live page. Verified on the S25: `am kill`, then tap, opens the chat named for its bot. (Force-stop wipes notifications, so use `am kill`.)
+- **No keyboard on existing chats:** `chat_page` skips its startup composer focus for a native Hermes conversation that has messages.
+- **Duplicate request:** `HermesInlineRunSurface.requestShownBelow` is set when `findPendingHermesComposerPrompt` finds the composer card. The inline surface then shows only "Input needed".
+- **Watch browser:** needs Steel configured **and** a run tool whose name matches `browser|steel` (`hermesRunUsedBrowser`).
+- **Schedules:**
+  - `hermesHomeProfileJobsProvider` now lives in `hermes_providers.dart`.
+  - The Jobs page header and the side-nav `_ScheduledAgentsTile` count all bots.
+  - The Jobs page lists the other bots under "OTHER BOTS", opening `showHermesScheduledAgentSheet`.
+- **Device pass:**
+  - Teams: list, room, options tray, and the delete guard (cancelled).
+  - Attention: failed runs open Scheduled agents.
+  - Artifacts: grid.
+  - MCP: actions tray, and the Add sheet (cancelled).
+  - Toolset compartment.
+  - No data was changed.
