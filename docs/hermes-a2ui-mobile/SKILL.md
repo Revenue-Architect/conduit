@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
-description: "Platform tui = Conduit app: load before any status, plan, timeline, comparison, checklist, files, decision, workstream, or dashboard reply; it renders native cards instead of Markdown. Plain one-line answers stay text."
-version: 0.9.0
+description: "Platform tui = Conduit app: load before any status, plan, progress, schedule, messages, tasks, command, timeline, comparison, checklist, files, decision, workstream, or dashboard reply; it renders native cards instead of Markdown. Plain one-line answers stay text."
+version: 0.10.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]

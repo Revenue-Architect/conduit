@@ -626,3 +626,18 @@ Spec: `docs/HERMEZ_A2UI_CATALOG_EXPANSION_SPEC.md`. Phases 1–5 are in commits 
 - **Not done:**
   - **Server deployment of the updated skill:** 4 files into `data/hermes/skills/software-development/a2ui-mobile/` plus the four profile copies, then a hermes-agent restart. It needs the user's go-ahead; follow the procedure above and keep `.bak` copies.
   - **Real-Hermes prompt QA (spec §66):** waits on that deployment.
+
+### Deployed a2ui-mobile 0.10.0 to Hermes (2026-09-30, approved)
+
+- **Access:** key-based SSH as `umbrel` (the `~/.ssh/config` host `umbrel`). App data is at `~/umbrel/app-data/hermes-agent/data/hermes`.
+- **Pre-check:** all 4 server files were byte-identical to the previous repo versions (no curator drift). All four profile copies matched main.
+- **Backups:**
+  - `*.bak-20260930` beside every replaced file, covering main, the fast/kai/strong/local profiles and `scripts/a2ui_check.py`.
+  - A local copy is in `work/backups/hermes-server-20260930/srv/`.
+  - autopilot is still excluded.
+- **Deployed:** SKILL.md (version 0.10.0; description triggers now include progress, schedule, messages, tasks, command), `references/component-guide.md`, `references/patterns.md` and the checker. SHA-256 was verified on all copies. Then `docker restart hermes-agent_web_1`.
+- **Rollback:** restore the `.bak-20260930` files, then restart.
+- **Real-Hermes check:**
+  - The default bot, asked for a restart command, loaded the skill and answered with a CommandBlock (Copy), an InfoRow with state Unknown, and a full-outline ActionCallout. No edge stripe.
+  - The remaining §66 prompts were not run (the user took the phone).
+- **Log note:** after the restart the gateway warns "Skipping secondary profile fast/local/strong: port-binding platforms with multiplex_profiles on". This is profile `config.yaml` state and was not changed here. Chats are served through the default listener's `/p/<profile>/` prefix.
