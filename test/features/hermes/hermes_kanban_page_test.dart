@@ -143,9 +143,11 @@ void main() {
     await tester.tap(find.text('Linked task'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.ensureVisible(find.text('View linked items'));
+    // Linked items live in physical compartments that open in place.
+    expect(find.text('Plan.pdf'), findsNothing);
+    await tester.ensureVisible(find.textContaining('FILES /'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('View linked items'));
+    await tester.tap(find.textContaining('FILES /'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Plan.pdf'));
     await tester.pumpAndSettle();
@@ -161,9 +163,9 @@ void main() {
     await tester.tap(find.text('Linked task'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.ensureVisible(find.text('View linked items'));
+    await tester.ensureVisible(find.textContaining('DEPENDENCIES /'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('View linked items'));
+    await tester.tap(find.textContaining('DEPENDENCIES /'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Parent task · t-parent'));
     await tester.pumpAndSettle();

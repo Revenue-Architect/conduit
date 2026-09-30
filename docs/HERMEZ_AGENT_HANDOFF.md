@@ -401,3 +401,20 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
   - The same payloads render cleanly in widget tests.
 - **Known side effect:** the Hermes desktop/TUI also reports `Platform: tui`, so it may receive A2UI blocks, which it shows as code.
 - **Not yet run:** the §42 plain-text check ("What is 2 + 2?") and the remaining prompts.
+
+## 2026-09-30: Steel preview regression fixed; Kanban compartments (spec Phase 7)
+
+- **Steel "Watch browser" had disappeared.** Its cause was the build, not the code.
+  - `private-build-defines.txt` holds `HERMES_STEEL_VIEWER_URL=<url>  # private; …`, and the build passed the whole line.
+  - The app received `<url>  # private…`. `#` parses as a fragment, so `parseSteelViewerUrl` returned null and `browserAvailable` was false.
+- **Two fixes:**
+  - The build strips the comment: `sed -E 's/[[:space:]]+#.*$//'`, with a guard that fails if `#` or a space remains.
+  - The app keeps only the first token of the define (`sanitizeSteelViewerDefine`), with a test.
+  - Verified on the S25: mid-run, the live view shows the Steel browser with Close browser / Expand.
+  - **Use the stripped define for every future build.**
+- **Kanban task sheet (Phase 7, previously skipped):** "Dependencies & files" now holds DEPENDENCIES / n (parents and child tasks), FILES / n and DIAGNOSTICS / n (only when present), all on `HermezExpandableSection`.
+  - The parent owns each open state; data, tap targets and navigation are unchanged, with no new requests.
+  - Board lanes keep their `ExpansionTile` on purpose (§37: do not collapse lanes).
+  - Compartment content has its own transparent Material, so tile press ink shows above the frame.
+- **Phase 6 (Bot Knowledge)** is still intentionally not wrapped. The spec makes it conditional ("only if dense"), and it is three navigation rows.
+- **Tests:** hermes and chat suites give 1928 passing and the 4 known baseline failures.

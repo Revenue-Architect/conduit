@@ -4,6 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('a build define with a trailing comment still yields the viewer', () {
+    const raw =
+        'http://steel.example:8300/v1/sessions/debug  # private; never commit';
+    final url = sanitizeSteelViewerDefine(raw);
+    expect(url, 'http://steel.example:8300/v1/sessions/debug');
+    expect(parseSteelViewerUrl(url), isNotNull);
+    // Unsanitized, the comment parses as a fragment and hides the viewer.
+    expect(parseSteelViewerUrl(raw), isNull);
+    expect(sanitizeSteelViewerDefine(''), '');
+    expect(sanitizeSteelViewerDefine('  '), '');
+  });
+
   test('watch/control parameter preserves existing query', () {
     const source =
         'http://steel.example/v1/sessions/debug?session=abc&interactive=true';

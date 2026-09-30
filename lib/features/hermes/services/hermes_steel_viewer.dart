@@ -17,6 +17,13 @@ Uri? parseSteelViewerUrl(String source) {
   return uri;
 }
 
+/// The build-time viewer URL without any trailing comment or whitespace.
+String sanitizeSteelViewerDefine(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return '';
+  return trimmed.split(RegExp(r'\s')).first;
+}
+
 Uri steelViewerUri(String source, {required bool interactive}) {
   final base = parseSteelViewerUrl(source);
   if (base == null) throw const FormatException('Invalid Steel viewer URL');
@@ -36,7 +43,16 @@ final hermesSteelViewerUrlProvider =
 class HermesSteelViewerUrlController extends Notifier<String> {
   // Personal builds can supply the installed viewer without baking a private
   // tailnet address into the public source or changing other installations.
-  static const buildDefault = String.fromEnvironment('HERMES_STEEL_VIEWER_URL');
+  static const _rawBuildDefault = String.fromEnvironment(
+    'HERMES_STEEL_VIEWER_URL',
+  );
+
+  /// A define copied from a notes file can carry a trailing comment
+  /// ("http://host/v1/...  # private"). The '#' would parse as a fragment and
+  /// hide the viewer, so only the first token counts: a URL has no spaces.
+  static final String buildDefault = sanitizeSteelViewerDefine(
+    _rawBuildDefault,
+  );
   // A cleared field falls back to the build default rather than hiding the
   // viewer on a build that ships one.
   @override
