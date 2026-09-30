@@ -7,6 +7,7 @@ import 'package:genui/genui.dart';
 // ignore: depend_on_referenced_packages
 import 'package:json_schema_builder/json_schema_builder.dart';
 
+import 'hermes_visual_personal.dart';
 import 'hermes_visual_structure.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_visual_theme.dart';
@@ -22,6 +23,7 @@ Catalog createHermesVisualCatalog() {
       _metricTile,
       _miniChart,
       ...hermesStructureCatalogItems,
+      ...hermesPersonalCatalogItems,
     ],
   );
 }

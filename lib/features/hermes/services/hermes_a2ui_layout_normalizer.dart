@@ -48,6 +48,26 @@ const _stackInRowComponentTypes = {
   'ArtifactTile',
   'BotBadge',
   'ExpandableSection',
+  // Full-width objects: two of them side by side at ~300px are unreadable.
+  'ProgressMeter',
+  'ActivityFeed',
+  'ScheduleTile',
+  'MessagePreview',
+  'CommandBlock',
+  'TaskTile',
+  'KeyValueGrid',
+  'ComparisonCard',
+};
+/// Rich objects that are always full width in a Row, weighted or not.
+const _alwaysStackComponentTypes = {
+  'ProgressMeter',
+  'ActivityFeed',
+  'ScheduleTile',
+  'MessagePreview',
+  'CommandBlock',
+  'TaskTile',
+  'KeyValueGrid',
+  'ComparisonCard',
 };
 final _actionNamePattern = RegExp(
   r'^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$',
@@ -398,7 +418,13 @@ HermesA2uiNormalizationResult normalizeHermesA2uiPayload(
       });
       final mixedMetricRow =
           childTypes.contains('MetricTile') && hasUnweightedMetricTile;
+      // Rich full-width objects stack even when weighted: two task, message
+      // or comparison cards side by side do not fit a phone.
+      final hasFullWidthObject = children.any(
+        (child) => _alwaysStackComponentTypes.contains(child['component']),
+      );
       final mustStack =
+          hasFullWidthObject ||
           (hasButton && unweightedText != null) ||
           hasUnweightedWidthDependentChild ||
           hasLongUnweightedText ||
