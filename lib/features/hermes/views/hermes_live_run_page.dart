@@ -182,6 +182,11 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
         unawaited(openHermesSession(context, ref, current));
       });
     }
+    if (widget.openChat) {
+      // On its way to the conversation: only the page's own background,
+      // until the chat replaces it.
+      return ColoredBox(color: palette.canvas, child: const SizedBox.expand());
+    }
     return HermesPageChrome(
       title: current.title,
       subtitle: 'LIVE ACTIVITY · ${current.profile ?? 'Hermes'}',

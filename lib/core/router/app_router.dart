@@ -779,18 +779,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: Routes.hermesLiveRun,
       name: RouteNames.hermesLiveRun,
-      pageBuilder: (context, state) => _buildHermezPage(
-        context: context,
-        state: state,
-        child: HermesLiveRunPage(
+      pageBuilder: (context, state) {
+        final page = HermesLiveRunPage(
           sessionId:
               validateHermesOpaqueIdentifier(
                 state.pathParameters['sessionId'],
               ) ??
               '',
           openChat: state.uri.queryParameters['open'] == 'chat',
-        ),
-      ),
+        );
+        // A "finished" notification passes through this page on its way to
+        // the conversation: no transition, nothing drawn, so there is no
+        // flash of the live page.
+        return state.uri.queryParameters['open'] == 'chat'
+            ? _buildNoTransitionPage(state: state, child: page)
+            : _buildHermezPage(context: context, state: state, child: page);
+      },
     ),
     GoRoute(
       path: Routes.hermesTeams,
