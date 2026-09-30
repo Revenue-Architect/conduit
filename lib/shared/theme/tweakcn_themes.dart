@@ -111,6 +111,52 @@ Color mix(Color a, Color b, double amount) {
   return a;
 }
 
+/// The Hermez theme with its signal colour swapped. Everything else (canvas,
+/// ink, status colours) stays identical, so the two read as one design.
+TweakcnThemeVariant _hermezWithSignal(
+  TweakcnThemeVariant base, {
+  required Color signal,
+  required Color onSignal,
+  Color? accentTint,
+}) {
+  return TweakcnThemeVariant(
+    background: base.background,
+    foreground: base.foreground,
+    card: base.card,
+    cardForeground: base.cardForeground,
+    popover: base.popover,
+    popoverForeground: base.popoverForeground,
+    primary: signal,
+    primaryForeground: onSignal,
+    secondary: base.secondary,
+    secondaryForeground: base.secondaryForeground,
+    muted: base.muted,
+    mutedForeground: base.mutedForeground,
+    accent: accentTint ?? base.accent,
+    accentForeground: base.accentForeground,
+    destructive: base.destructive,
+    destructiveForeground: base.destructiveForeground,
+    border: base.border,
+    input: base.input,
+    ring: signal,
+    sidebarBackground: base.sidebarBackground,
+    sidebarForeground: base.sidebarForeground,
+    sidebarPrimary: signal,
+    sidebarPrimaryForeground: onSignal,
+    sidebarAccent: accentTint ?? base.sidebarAccent,
+    sidebarAccentForeground: base.sidebarAccentForeground,
+    sidebarBorder: base.sidebarBorder,
+    sidebarRing: signal,
+    success: base.success,
+    successForeground: base.successForeground,
+    warning: base.warning,
+    warningForeground: base.warningForeground,
+    info: base.info,
+    infoForeground: base.infoForeground,
+    radius: base.radius,
+  );
+}
+
 class TweakcnThemes {
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
     background: const Color(0xFFF7F7F7), // neutral light-grey canvas
@@ -523,6 +569,35 @@ class TweakcnThemes {
     ],
   );
 
+  /// Signal red. White text on the red keeps 4.8:1; graphite would be ~3.7:1.
+  static const Color hermezRedSignal = Color(0xFFE3192B);
+
+  static final TweakcnThemeDefinition hermezRed = TweakcnThemeDefinition(
+    id: 'hermez_red',
+    labelBuilder: (_) => 'Hermez Red',
+    descriptionBuilder: (_) => 'White, graphite and signal red',
+    light: _hermezWithSignal(
+      _conduitLight,
+      signal: hermezRedSignal,
+      onSignal: const Color(0xFFFFFFFF),
+    ),
+    dark: _hermezWithSignal(
+      _conduitDark,
+      signal: hermezRedSignal,
+      onSignal: const Color(0xFFFFFFFF),
+      accentTint: const Color(0xFF4B2327),
+    ),
+    preview: const <Color>[
+      hermezRedSignal,
+      Color(0xFF202126),
+      Color(0xFFF7F7F7),
+    ],
+  );
+
+  /// Themes that belong to the Hermez design (allowed in Hermes-only mode).
+  static bool isHermez(TweakcnThemeDefinition theme) =>
+      theme.id == conduit.id || theme.id == hermezRed.id;
+
   static final TweakcnThemeDefinition catppuccin = TweakcnThemeDefinition(
     id: 'catppuccin',
     labelBuilder: (l10n) => l10n.themePaletteCatppuccinLabel,
@@ -551,6 +626,7 @@ class TweakcnThemes {
 
   static List<TweakcnThemeDefinition> all = [
     conduit,
+    hermezRed,
     claude,
     t3Chat,
     catppuccin,

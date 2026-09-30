@@ -594,11 +594,13 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                     letterSpacing: -3,
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(left: 3, top: 13),
+                Padding(
+                  padding: const EdgeInsets.only(left: 3, top: 13),
                   child: CircleAvatar(
                     radius: 4,
-                    backgroundColor: Color(0xFFFF5A26),
+                    backgroundColor: HermezChatPalette.forBrightness(
+                      Theme.of(context).brightness,
+                    ).accent,
                   ),
                 ),
               ],
@@ -994,7 +996,9 @@ class _KanbanTaskCard extends StatelessWidget {
                         radius: 4,
                         backgroundColor: task.status == 'done'
                             ? const Color(0xFF18704B)
-                            : const Color(0xFFFF5A26),
+                            : HermezChatPalette.forBrightness(
+                                Theme.of(context).brightness,
+                              ).accent,
                       ),
                       const SizedBox(width: 7),
                       Expanded(

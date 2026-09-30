@@ -64,6 +64,7 @@ import '../database/mappers/conversation_assembler.dart';
 import '../sync/chat_locks.dart';
 import '../sync/pull_sync.dart';
 import '../sync/sync_engine.dart';
+import '../../features/hermes/widgets/hermez_chat_palette.dart';
 
 export 'storage_providers.dart';
 
@@ -317,9 +318,13 @@ class AppLightTheme extends _$AppLightTheme {
   @override
   ThemeData build() {
     final savedPalette = ref.watch(appThemePaletteProvider);
-    final palette = ref.watch(hermesOnlyModeProvider)
+    // Hermes-only mode keeps the Hermez design, in either signal colour.
+    final palette =
+        ref.watch(hermesOnlyModeProvider) &&
+            !TweakcnThemes.isHermez(savedPalette)
         ? TweakcnThemes.conduit
         : savedPalette;
+    HermezChatPalette.useThemeId(palette.id);
     return AppTheme.light(palette);
   }
 }
@@ -329,9 +334,13 @@ class AppDarkTheme extends _$AppDarkTheme {
   @override
   ThemeData build() {
     final savedPalette = ref.watch(appThemePaletteProvider);
-    final palette = ref.watch(hermesOnlyModeProvider)
+    // Hermes-only mode keeps the Hermez design, in either signal colour.
+    final palette =
+        ref.watch(hermesOnlyModeProvider) &&
+            !TweakcnThemes.isHermez(savedPalette)
         ? TweakcnThemes.conduit
         : savedPalette;
+    HermezChatPalette.useThemeId(palette.id);
     return AppTheme.dark(palette);
   }
 }
@@ -341,7 +350,10 @@ class AppCupertinoLightTheme extends _$AppCupertinoLightTheme {
   @override
   CupertinoThemeData build() {
     final savedPalette = ref.watch(appThemePaletteProvider);
-    final palette = ref.watch(hermesOnlyModeProvider)
+    // Hermes-only mode keeps the Hermez design, in either signal colour.
+    final palette =
+        ref.watch(hermesOnlyModeProvider) &&
+            !TweakcnThemes.isHermez(savedPalette)
         ? TweakcnThemes.conduit
         : savedPalette;
     return AppTheme.cupertinoLight(palette);
@@ -353,7 +365,10 @@ class AppCupertinoDarkTheme extends _$AppCupertinoDarkTheme {
   @override
   CupertinoThemeData build() {
     final savedPalette = ref.watch(appThemePaletteProvider);
-    final palette = ref.watch(hermesOnlyModeProvider)
+    // Hermes-only mode keeps the Hermez design, in either signal colour.
+    final palette =
+        ref.watch(hermesOnlyModeProvider) &&
+            !TweakcnThemes.isHermez(savedPalette)
         ? TweakcnThemes.conduit
         : savedPalette;
     return AppTheme.cupertinoDark(palette);

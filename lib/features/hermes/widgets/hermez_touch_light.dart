@@ -2,10 +2,13 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+
+
 import 'package:flutter/physics.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../motion/hermez_motion_tokens.dart';
+import 'hermez_chat_palette.dart';
 
 /// Light hitting a physical surface where the finger is.
 ///
@@ -110,7 +113,10 @@ class _HermezTouchLightState extends State<HermezTouchLight>
           radius: _radius,
           borderRadius: widget.borderRadius,
           dark: widget.dark,
-          accent: widget.accent ?? const Color(0xFFFF6A2B),
+          accent:
+              widget.accent ??
+              HermezChatPalette.forBrightness(Theme.of(context).brightness)
+                  .accent,
         ),
         child: widget.child,
       ),

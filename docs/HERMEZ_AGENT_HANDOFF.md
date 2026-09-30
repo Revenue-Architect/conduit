@@ -418,3 +418,14 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
   - Compartment content has its own transparent Material, so tile press ink shows above the frame.
 - **Phase 6 (Bot Knowledge)** is still intentionally not wrapped. The spec makes it conditional ("only if dense"), and it is three navigation rows.
 - **Tests:** hermes and chat suites give 1928 passing and the 4 known baseline failures.
+
+## 2026-09-30: Hermez Red accent palette
+
+- **New option:** Appearance → Accent palette → **Hermez Red** (`id: hermez_red`, signal `#E3192B`). It is the Hermez theme with only the signal roles swapped (`primary`, `ring`, `sidebarPrimary`, `sidebarRing`; dark `accent` tint `#4B2327`). Canvas, ink, borders and status colours are identical. Orange Hermez stays the default.
+- **White text on red:** graphite on `#E3192B` would be about 3.7:1, below 4.5:1; white is 4.8:1. Both are enforced by tests.
+- **Hermes-only mode** used to force the orange theme. It now allows either Hermez theme (`TweakcnThemes.isHermez`).
+- **`HermezChatPalette`** follows the active theme via `HermezChatPalette.useThemeId(...)`, set where the light/dark themes are built. Every caller reads the palette through `Theme.of(context)`, so switching palettes rebuilds them.
+- **Stray oranges** now use the palette: Kanban header dot, Kanban task dot, home "LIVE WORK" label, touch-light tint. The PDF file-type red is a file-kind colour and was left alone.
+- **Not recoloured:** the bot artwork PNGs (`assets/icons/*bot.png`) have orange eyes baked in. They need red-eyed artwork if wanted.
+- **Verified on the S25:** the picker shows Hermez Red; the home screen, drawer strip, bot detail and away card turn red. The phone was left on Hermez Red.
+- **Tests:** `hermez_red_palette_test.dart`. The wide suites have 13 failures; all were checked against the stashed baseline code and fail identically there (symlink, timing, server-version and share tests).

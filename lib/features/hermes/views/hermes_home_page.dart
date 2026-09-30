@@ -545,7 +545,11 @@ class _ActiveWorkCard extends ConsumerWidget {
                     children: [
                       Text(
                         'LIVE WORK',
-                        style: HermezType.technical(const Color(0xFFFF5A26)),
+                        style: HermezType.technical(
+                          HermezChatPalette.forBrightness(
+                            Theme.of(context).brightness,
+                          ).accent,
+                        ),
                       ),
                       Text(
                         active.title,
