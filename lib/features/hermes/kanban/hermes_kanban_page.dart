@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -193,6 +194,269 @@ Future<String?> _pickKanbanProfile(
   );
 }
 
+/// The secondary choices of the new-task form as one physical compartment.
+///
+/// Title, details, warnings and the Create button stay in view. Status, bot
+/// and priority sit one tap away, and their real values are on the header, so
+/// nothing is hidden by being closed. Opening it only reveals controls that
+/// already exist: no request is made and the created task is unchanged.
+class _NewTaskOptions extends StatelessWidget {
+  const _NewTaskOptions({
+    required this.expanded,
+    required this.onExpansionChanged,
+    required this.enabled,
+    required this.triage,
+    required this.assignee,
+    required this.priority,
+    required this.onTriageChanged,
+    required this.onPickAssignee,
+    required this.onPriorityChanged,
+  });
+
+  final bool expanded;
+  final ValueChanged<bool> onExpansionChanged;
+  final bool enabled;
+  final bool triage;
+  final String? assignee;
+  final int priority;
+  final ValueChanged<bool> onTriageChanged;
+  final VoidCallback onPickAssignee;
+  final ValueChanged<int> onPriorityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final bot = assignee != null && assignee!.isNotEmpty ? assignee : null;
+    final status = triage ? 'Triage' : 'Ready';
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: HermezExpandableSection(
+        expanded: expanded,
+        onExpansionChanged: onExpansionChanged,
+        semanticLabel:
+            'Task options. $status, '
+            '${bot == null ? 'no bot assigned' : 'assigned to $bot'}, '
+            'priority $priority',
+        openFeedback: HermezFeedbackCue.compartmentOpen,
+        closeFeedback: HermezFeedbackCue.compartmentClose,
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+        childPadding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+        header: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('OPTIONS', style: HermezType.technical(palette.muted)),
+            const SizedBox(height: 2),
+            Text(
+              '$status · ${bot ?? 'No bot'} · Priority $priority',
+              style: TextStyle(
+                color: palette.ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<bool>(
+              expandedInsets: EdgeInsets.zero,
+              segments: const [
+                ButtonSegment(value: true, label: Text('Triage')),
+                ButtonSegment(value: false, label: Text('Ready')),
+              ],
+              selected: {triage},
+              onSelectionChanged: enabled
+                  ? (value) => onTriageChanged(value.first)
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: enabled ? onPickAssignee : null,
+              icon: const Icon(Icons.person_outline_rounded),
+              label: Text(
+                bot == null
+                    ? 'Assign a Hermes bot (optional)'
+                    : 'Assigned to $bot',
+              ),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<int>(
+              initialValue: priority,
+              // Takes the width it is given, so large text cannot push the
+              // arrow out of the compartment.
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Priority'),
+              items: [
+                for (var value = 0; value <= 3; value++)
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text('Priority $value'),
+                  ),
+              ],
+              onChanged: enabled
+                  ? (value) => onPriorityChanged(value ?? 0)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The theme the new-task panel and the pickers opened from it use: the
+/// Hermez theme, with dialogs on the Hermez surface.
+ThemeData _kanbanPanelTheme(BuildContext context) {
+  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+  return hermezVisualTheme(Theme.of(context)).copyWith(
+    dialogTheme: DialogThemeData(
+      backgroundColor: palette.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+  );
+}
+
+/// A button that opens the new-task panel by turning into it. While the panel
+/// is up the panel's own copy of the button's face stands in for it, so the
+/// real one is kept in place (it still takes up its space) but not drawn.
+class _MorphTrigger extends StatelessWidget {
+  const _MorphTrigger({
+    required this.hidden,
+    required this.radius,
+    required this.color,
+    required this.semanticLabel,
+    required this.onOpen,
+    required this.child,
+  });
+
+  final bool hidden;
+  final double radius;
+  final Color color;
+  final String semanticLabel;
+  final ValueChanged<HermezMorphOrigin?> onOpen;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Visibility(
+    visible: !hidden,
+    maintainState: true,
+    maintainAnimation: true,
+    maintainSize: true,
+    child: HermezMotionSurface(
+      weight: HermezMotionWeight.light,
+      originRadius: radius,
+      originColor: color,
+      feedbackCue: HermezFeedbackCue.objectOpen,
+      semanticLabel: semanticLabel,
+      onOpen: onOpen,
+      child: child,
+    ),
+  );
+}
+
+/// Turns the plus into a cross as the panel opens: [turn] is 0 to 1.
+Widget _turningPlus(IconData icon, Color color, double turn) =>
+    Transform.rotate(
+      angle: turn * math.pi / 4,
+      child: Icon(icon, size: 24, color: color),
+    );
+
+/// How far the plus has turned at morph progress [progress]: done by half way.
+double _plusTurn(Animation<double>? progress) => progress == null
+    ? 0
+    : Curves.easeOut.transform((progress.value / 0.5).clamp(0.0, 1.0));
+
+/// The content of the New task button: a plus and its label. Used for the
+/// resting button and for the face the panel grows out of, so the two are the
+/// same picture.
+class _NewTaskFaceBody extends StatelessWidget {
+  const _NewTaskFaceBody({this.progress});
+
+  final Animation<double>? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 16, end: 20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _turningPlus(Icons.add, palette.onAccent, _plusTurn(progress)),
+          const SizedBox(width: 8),
+          Text(
+            'New task',
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: palette.onAccent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The face the New task panel grows out of when there is no button to
+/// measure: the same picture as the button.
+class _NewTaskFace extends StatelessWidget {
+  const _NewTaskFace({required this.progress});
+
+  final Animation<double> progress;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: AlignmentDirectional.centerStart,
+    child: _NewTaskFaceBody(progress: progress),
+  );
+}
+
+/// The floating New task button.
+class _NewTaskPill extends StatelessWidget {
+  const _NewTaskPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Material(
+      color: palette.accent,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: const SizedBox(height: 56, child: _NewTaskFaceBody()),
+    );
+  }
+}
+
+/// The plus on a lane header, and the face the panel grows out of when it is
+/// the button that was tapped.
+class _LanePlus extends StatelessWidget {
+  const _LanePlus({this.progress});
+
+  final Animation<double>? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return SizedBox.square(
+      dimension: 48,
+      child: Center(
+        child: _turningPlus(
+          Icons.add_rounded,
+          palette.accent,
+          _plusTurn(progress),
+        ),
+      ),
+    );
+  }
+}
+
 class HermesKanbanPage extends ConsumerStatefulWidget {
   const HermesKanbanPage({super.key, this.client});
 
@@ -215,6 +479,10 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
   String? _error;
   bool _loading = true;
   final bool _busy = false;
+
+  /// Which button the open new-task panel grew out of ('fab' or
+  /// a lane's plus); that button is not drawn while the panel stands in for it.
+  String? _creatingFrom;
   bool _foreground = true;
   bool _pollInFlight = false;
   Timer? _refreshTimer;
@@ -349,7 +617,14 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     if (mounted) await _loadBoards();
   }
 
-  Future<void> _create({bool triage = true}) async {
+  Future<void> _create({
+    bool triage = true,
+    HermezMorphOrigin? origin,
+    HermezPanelFaceBuilder? face,
+    String source = 'fab',
+    double originRadius = 16,
+    double originElevation = 0,
+  }) async {
     final board = _board;
     if (board == null || _busy) return;
     final title = TextEditingController();
@@ -358,159 +633,205 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
     var priority = 0;
     String? assignee;
     var saving = false;
+    var optionsOpen = false;
     String? errorText;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    // The panel grows out of the button that was tapped, and goes home into
+    // it. The rectangle is taken once, now: this screen makes room for the
+    // keyboard, which lifts the button, and a start and end point that moved
+    // with it would drift while the panel opens and closes. With no measured
+    // button it grows out of a point at the middle of the screen.
+    final from = origin == null
+        ? HermezMorphOrigin.rect(
+            Rect.fromCenter(
+              center: MediaQuery.sizeOf(context).center(Offset.zero),
+              width: 56,
+              height: 56,
+            ),
+            radius: originRadius,
+            color: palette.accent,
+          )
+        : HermezMorphOrigin.rect(
+            origin.resolve(),
+            radius: origin.radius,
+            color: origin.color,
+          );
+    setState(() => _creatingFrom = source);
     try {
-      final created = await _settledDialog<bool>(
+      final created = await pushHermezPanel<bool>(
         context,
-        (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setModalState) => AlertDialog(
-            title: const Text('New task'),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: title,
-                      autofocus: true,
-                      maxLength: 240,
-                      decoration: const InputDecoration(labelText: 'Title *'),
-                    ),
-                    TextField(
-                      controller: body,
-                      minLines: 3,
-                      maxLines: 7,
-                      decoration: const InputDecoration(
-                        labelText: 'Details / instructions',
-                        hintText: 'Describe the outcome and useful context',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(value: true, label: Text('Triage')),
-                        ButtonSegment(value: false, label: Text('Ready')),
-                      ],
-                      selected: {selectedTriage},
-                      onSelectionChanged: saving
-                          ? null
-                          : (value) => setModalState(
-                              () => selectedTriage = value.first,
+        origin: from,
+        originElevation: originElevation,
+        surfaceColor: palette.surface,
+        semanticLabel: 'New task',
+        theme: _kanbanPanelTheme(context),
+        faceBuilder:
+            face ?? (context, progress) => _NewTaskFace(progress: progress),
+        builder: (panelContext) => StatefulBuilder(
+          builder: (panelContext, setModalState) => Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'New task',
+                  style: Theme.of(panelContext).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: title,
+                          autofocus: true,
+                          maxLength: 240,
+                          decoration: const InputDecoration(
+                            labelText: 'Title *',
+                          ),
+                        ),
+                        TextField(
+                          controller: body,
+                          minLines: 3,
+                          maxLines: 7,
+                          decoration: const InputDecoration(
+                            labelText: 'Details / instructions',
+                            hintText: 'Describe the outcome and useful context',
+                          ),
+                        ),
+                        _NewTaskOptions(
+                          expanded: optionsOpen,
+                          enabled: !saving,
+                          triage: selectedTriage,
+                          assignee: assignee,
+                          priority: priority,
+                          onExpansionChanged: (open) {
+                            // Opening the options means the typing is done;
+                            // the keyboard would otherwise sit over what just
+                            // opened.
+                            if (open) {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                            }
+                            setModalState(() => optionsOpen = open);
+                          },
+                          onTriageChanged: (value) =>
+                              setModalState(() => selectedTriage = value),
+                          onPickAssignee: () async {
+                            final picked = await _pickKanbanProfile(
+                              panelContext,
+                              _api(),
+                              current: assignee,
+                            );
+                            if (panelContext.mounted && picked != null) {
+                              setModalState(() => assignee = picked);
+                            }
+                          },
+                          onPriorityChanged: (value) =>
+                              setModalState(() => priority = value),
+                        ),
+                        // Conditional lines unroll in place instead of
+                        // popping in, and stay outside the compartment: a
+                        // warning or an error is never hidden by a closed
+                        // section.
+                        HermezReveal(
+                          visible:
+                              !selectedTriage &&
+                              assignee != null &&
+                              assignee!.isNotEmpty,
+                          revealKey: const ValueKey('new-task-agent-notice'),
+                          child: const Padding(
+                            padding: EdgeInsets.only(top: 12),
+                            child: Text(
+                              'Ready tasks assigned to a bot may start agent work immediately.',
                             ),
+                          ),
+                        ),
+                        HermezReveal(
+                          visible: errorText != null,
+                          revealKey: const ValueKey('new-task-error'),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              errorText ?? '',
+                              style: TextStyle(
+                                color: Theme.of(panelContext).colorScheme.error,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Like a dialog's actions: side by side, stacked when large
+                // text leaves no room for both.
+                OverflowBar(
+                  alignment: MainAxisAlignment.end,
+                  spacing: 8,
+                  overflowSpacing: 4,
+                  overflowAlignment: OverflowBarAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: saving
+                          ? null
+                          : () => Navigator.pop(panelContext, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
                       onPressed: saving
                           ? null
                           : () async {
-                              final picked = await _pickKanbanProfile(
-                                dialogContext,
-                                _api(),
-                                current: assignee,
-                              );
-                              if (dialogContext.mounted && picked != null) {
-                                setModalState(() => assignee = picked);
+                              if (title.text.trim().isEmpty) {
+                                setModalState(
+                                  () => errorText = 'Enter a task title.',
+                                );
+                                return;
+                              }
+                              setModalState(() {
+                                saving = true;
+                                errorText = null;
+                              });
+                              try {
+                                await _api().create(
+                                  board,
+                                  title.text.trim(),
+                                  body: body.text,
+                                  triage: selectedTriage,
+                                  assignee: assignee,
+                                  priority: priority,
+                                );
+                                if (panelContext.mounted) {
+                                  Navigator.pop(panelContext, true);
+                                }
+                              } catch (error) {
+                                if (panelContext.mounted) {
+                                  setModalState(
+                                    () => errorText = _message(error),
+                                  );
+                                }
+                              } finally {
+                                if (panelContext.mounted) {
+                                  setModalState(() => saving = false);
+                                }
                               }
                             },
-                      icon: const Icon(Icons.person_outline_rounded),
-                      label: Text(
-                        assignee == null || assignee!.isEmpty
-                            ? 'Assign a Hermes bot (optional)'
-                            : 'Assigned to $assignee',
-                      ),
+                      child: saving
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Create task'),
                     ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<int>(
-                      initialValue: priority,
-                      decoration: const InputDecoration(labelText: 'Priority'),
-                      items: [
-                        for (var value = 0; value <= 3; value++)
-                          DropdownMenuItem(
-                            value: value,
-                            child: Text('Priority $value'),
-                          ),
-                      ],
-                      onChanged: saving
-                          ? null
-                          : (value) =>
-                                setModalState(() => priority = value ?? 0),
-                    ),
-                    if (!selectedTriage &&
-                        assignee != null &&
-                        assignee!.isNotEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Text(
-                          'Ready tasks assigned to a bot may start agent work immediately.',
-                        ),
-                      ),
-                    if (errorText != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text(
-                          errorText!,
-                          style: TextStyle(
-                            color: Theme.of(dialogContext).colorScheme.error,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
-              ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: saving
-                    ? null
-                    : () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: saving
-                    ? null
-                    : () async {
-                        if (title.text.trim().isEmpty) {
-                          setModalState(
-                            () => errorText = 'Enter a task title.',
-                          );
-                          return;
-                        }
-                        setModalState(() {
-                          saving = true;
-                          errorText = null;
-                        });
-                        try {
-                          await _api().create(
-                            board,
-                            title.text.trim(),
-                            body: body.text,
-                            triage: selectedTriage,
-                            assignee: assignee,
-                            priority: priority,
-                          );
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext, true);
-                          }
-                        } catch (error) {
-                          if (dialogContext.mounted) {
-                            setModalState(() => errorText = _message(error));
-                          }
-                        } finally {
-                          if (dialogContext.mounted) {
-                            setModalState(() => saving = false);
-                          }
-                        }
-                      },
-                child: saving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Create task'),
-              ),
-            ],
           ),
         ),
       );
@@ -518,6 +839,8 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         await _refresh();
       }
     } finally {
+      // Only after the panel has finished contracting into its button.
+      if (mounted) setState(() => _creatingFrom = null);
       title.dispose();
       body.dispose();
     }
@@ -620,10 +943,18 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
           ),
           floatingActionButton: _board == null
               ? null
-              : FloatingActionButton.extended(
-                  onPressed: _busy ? null : () => _create(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('New task'),
+              : _MorphTrigger(
+                  hidden: _creatingFrom == 'fab',
+                  radius: 16,
+                  color: palette.accent,
+                  semanticLabel: 'New task',
+                  onOpen: (origin) => _create(
+                    origin: origin,
+                    source: 'fab',
+                    originRadius: 16,
+                    originElevation: 2,
+                  ),
+                  child: const _NewTaskPill(),
                 ),
           body: Column(
             children: [
@@ -894,12 +1225,24 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
           ],
         ),
         trailing: lane == 'triage' || lane == 'ready'
-            ? IconButton(
-                tooltip: 'New ${_label(lane)} task',
-                onPressed: _busy
-                    ? null
-                    : () => _create(triage: lane == 'triage'),
-                icon: const Icon(Icons.add_rounded),
+            ? _MorphTrigger(
+                hidden: _creatingFrom == 'lane:$lane',
+                radius: 24,
+                color: HermezChatPalette.forBrightness(
+                  Theme.of(context).brightness,
+                ).surface,
+                semanticLabel: 'New ${_label(lane)} task',
+                onOpen: (origin) => _create(
+                  triage: lane == 'triage',
+                  origin: origin,
+                  source: 'lane:$lane',
+                  originRadius: 24,
+                  face: (context, progress) => _LanePlus(progress: progress),
+                ),
+                child: Tooltip(
+                  message: 'New ${_label(lane)} task',
+                  child: const _LanePlus(),
+                ),
               )
             : null,
         children: [

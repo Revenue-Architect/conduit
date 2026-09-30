@@ -429,3 +429,22 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
 - **Not recoloured:** the bot artwork PNGs (`assets/icons/*bot.png`) have orange eyes baked in. They need red-eyed artwork if wanted.
 - **Verified on the S25:** the picker shows Hermez Red; the home screen, drawer strip, bot detail and away card turn red. The phone was left on Hermez Red.
 - **Tests:** `hermez_red_palette_test.dart`. The wide suites have 13 failures; all were checked against the stashed baseline code and fail identically there (symlink, timing, server-version and share tests).
+
+## 2026-09-30: New task — the button becomes the panel; OPTIONS compartment
+
+- **Plus-to-panel morph** (the user's Transitions.dev reference, rebuilt in Hermez terms). New primitive `motion/hermez_panel_morph.dart`: `pushHermezPanel` / `HermezPanelRoute` / `HermezPanelMorph`.
+  - The tapped button's rectangle and corner radius grow into a content-sized panel: top-anchored, centred, above the keyboard.
+  - Opening uses a spring with a light bounce (about 3 %, ~0.39 s). Closing uses the critically damped medium spring (~0.32 s) and goes home into the button.
+  - The button's face (plus and label) rides the growing surface. The plus turns into a × and shrinks away while the panel content wipes across from the button's side.
+  - **No opacity and no blur anywhere** (Hermez rule), unlike the CSS reference, which cross-fades and blurs.
+  - Input unlocks when the panel is at rest; tapping outside or Cancel closes it. The panel follows its own content height every frame (compartments, errors).
+  - The real button stays in place but is not drawn while the panel stands in for it, and reappears only after the panel has contracted. The origin rectangle is captured once, because the keyboard lifts the button.
+- **Kanban:** the floating "New task" button and the Triage / Ready lane "+" buttons both use it. The dialog is gone.
+- **OPTIONS compartment** in the new-task form (`_NewTaskOptions`, on `HermezExpandableSection`).
+  - Status, bot and priority sit one tap away, and their real values are on the header ("Triage · No bot · Priority 0").
+  - Title, details, the agent-work warning, errors and Create stay visible.
+  - Opening the compartment closes the keyboard.
+  - At 200 % text, Cancel / Create stack (`OverflowBar`) and the priority dropdown takes the full width.
+- **The created task is unchanged:** same client call and fields. No new requests.
+- **Tests:** `hermez_panel_morph_test.dart` (13) and `hermes_kanban_new_task_test.dart` (15); existing Kanban tests updated to open OPTIONS. The wide suites fail only the 13 known pre-existing tests.
+- **Device:** installed on the S25; the user is testing it themselves.

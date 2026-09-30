@@ -8,5 +8,6 @@ export 'hermez_morph_origin.dart';
 export 'hermez_motion_route.dart';
 export 'hermez_motion_surface.dart';
 export 'hermez_motion_tokens.dart';
+export 'hermez_panel_morph.dart';
 export 'hermez_presence.dart';
 export 'hermez_shared_element.dart';

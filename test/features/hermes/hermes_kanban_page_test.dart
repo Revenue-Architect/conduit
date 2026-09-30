@@ -426,6 +426,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'QA sprint');
     await tester.enterText(find.byType(TextField).last, 'Research the route');
+    // Status, bot and priority live in the OPTIONS compartment.
+    await tester.tap(find.text('OPTIONS'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ready').last);
     await tester.tap(find.text('Assign a Hermes bot (optional)'));
     await tester.pumpAndSettle();
@@ -567,6 +570,8 @@ void main() {
           .backgroundColor,
       const Color(0xFFFFFFFF),
     );
+    await tester.tap(find.text('OPTIONS'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Assign a Hermes bot (optional)'));
     await tester.pumpAndSettle();
     expect(find.text('kai'), findsOneWidget);
