@@ -199,7 +199,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Hermes needs clarification'), findsOneWidget);
+    expect(find.text('HERMES NEEDS CLARIFICATION'), findsOneWidget);
     expect(find.text('Approve'), findsNothing);
   });
 
@@ -363,7 +363,7 @@ void main() {
     );
 
     expect(find.byType(TextField), findsNothing);
-    expect(find.text('authorize github'), findsOneWidget);
+    expect(find.text('> authorize github'), findsOneWidget);
     await tester.tap(find.text('Set up'));
     await tester.pump();
     expect(answers, ['approve']);

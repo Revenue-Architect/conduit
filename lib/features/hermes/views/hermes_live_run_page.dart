@@ -17,6 +17,7 @@ import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermes_run_action_dialogs.dart';
 import '../widgets/hermes_run_actions.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../motion/hermez_morph_origin.dart';
 import 'hermes_page_chrome.dart';
 
 class HermesLiveRunPage extends ConsumerStatefulWidget {
@@ -356,27 +357,34 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                               child: Column(
                                 children: [
                                   for (final decision in decisions)
-                                    ListTile(
-                                      title: Text(
-                                        decision.prompt ?? 'Hermes needs input',
-                                      ),
-                                      trailing: const Icon(
-                                        Icons.chevron_right_rounded,
-                                      ),
-                                      onTap: () async {
-                                        final resolved =
-                                            await showHermesAttentionResolutionSheet(
-                                              context,
-                                              decision,
+                                    Builder(
+                                      builder: (rowContext) => ListTile(
+                                        title: Text(
+                                          decision.prompt ??
+                                              'Hermes needs input',
+                                        ),
+                                        trailing: const Icon(
+                                          Icons.chevron_right_rounded,
+                                        ),
+                                        onTap: () async {
+                                          final resolved =
+                                              await showHermesAttentionResolutionSheet(
+                                                context,
+                                                decision,
+                                                origin: HermezMorphOrigin.of(
+                                                  rowContext,
+                                                  radius: 18,
+                                                  color: palette.surface,
+                                                ),
+                                              );
+                                          if (resolved == true && mounted) {
+                                            setState(
+                                              () => _pendingFuture =
+                                                  _loadPending(service),
                                             );
-                                        if (resolved == true && mounted) {
-                                          setState(
-                                            () => _pendingFuture = _loadPending(
-                                              service,
-                                            ),
-                                          );
-                                        }
-                                      },
+                                          }
+                                        },
+                                      ),
                                     ),
                                 ],
                               ),
