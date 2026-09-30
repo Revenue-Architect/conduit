@@ -9,6 +9,7 @@ import 'package:json_schema_builder/json_schema_builder.dart';
 
 import 'hermes_visual_personal.dart';
 import 'hermes_visual_structure.dart';
+import 'hermes_visual_technical.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_visual_theme.dart';
 
@@ -24,6 +25,7 @@ Catalog createHermesVisualCatalog() {
       _miniChart,
       ...hermesStructureCatalogItems,
       ...hermesPersonalCatalogItems,
+      ...hermesTechnicalCatalogItems,
     ],
   );
 }

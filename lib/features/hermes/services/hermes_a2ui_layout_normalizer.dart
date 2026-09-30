@@ -523,7 +523,12 @@ bool _hasSafeComponentGraph(Map<String, Map<String, dynamic>> components) {
     visiting.add(id);
     final references = <String>[];
 
-    for (final key in const ['child', 'actionChild', 'content', 'trigger']) {
+    // `content` is a component reference only on Modal (Tabs keep theirs
+    // per tab, below); on CommandBlock it is the command text itself.
+    final referenceKeys = component['component'] == 'CommandBlock'
+        ? const ['child', 'actionChild', 'trigger']
+        : const ['child', 'actionChild', 'content', 'trigger'];
+    for (final key in referenceKeys) {
       final reference = component[key];
       if (reference == null) continue;
       if (reference is! String) return false;
