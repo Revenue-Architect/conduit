@@ -56,6 +56,7 @@ import 'package:conduit/l10n/app_localizations.dart';
 
 import 'core/services/quick_actions_service.dart';
 import 'core/providers/app_startup_providers.dart';
+import 'features/notifications/providers/notification_center.dart';
 import 'features/notifications/services/local_notification_service.dart';
 import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
@@ -936,6 +937,24 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     // lease while a run works.
     ref.read(hermesRunNotifierProvider);
     ref.read(hermezFeedbackCoordinatorProvider);
+    // Notification taps and the local plugin belong to the app, not to an
+    // Open WebUI sign-in: start them here so Hermes-only users get deep links
+    // (foreground taps and the tap that cold-launched the app).
+    ref.read(notificationCenterProvider);
+    unawaited(_drainLaunchTap());
+  }
+
+  /// Opens the notification that launched the app once the router has left
+  /// the splash screen (its redirect would replace a page pushed earlier).
+  Future<void> _drainLaunchTap() async {
+    for (var i = 0; i < 100; i++) {
+      if (!mounted) return;
+      final route = NavigationService.currentRoute;
+      if (route != null && Uri.parse(route).path != Routes.splash) break;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return;
+    await ref.read(notificationCenterProvider.notifier).handleLaunchTap();
   }
 
   @override

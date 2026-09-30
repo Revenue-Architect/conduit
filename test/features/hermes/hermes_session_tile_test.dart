@@ -7,6 +7,7 @@ import 'package:conduit/core/persistence/persistence_keys.dart';
 import 'package:conduit/core/persistence/preferences_store.dart';
 import 'package:conduit/core/providers/app_providers.dart';
 import 'package:conduit/core/services/navigation_service.dart';
+import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/models/hermes_model.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
@@ -138,6 +139,67 @@ void main() {
         forgedOpenWebUiConversation,
       ),
     ).isTrue();
+  });
+
+  testWidgets('a session opened from a list keeps its bot name and mark', (
+    tester,
+  ) async {
+    final service = _FakeHermesApiService();
+    final container = ProviderContainer(
+      retry: (retryCount, error) => null,
+      overrides: [
+        hermesApiServiceProvider.overrideWithValue(service),
+        modelsProvider.overrideWith(_FailingModels.new),
+        hermesBotsProvider.overrideWith(
+          (ref) async => const [
+            HermesBot(name: 'fast', title: 'Fast', avatarColor: '#e3192b'),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(hermesBotsProvider.future);
+
+    late BuildContext actionContext;
+    late WidgetRef widgetRef;
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Scaffold(body: SizedBox.shrink()),
+        ),
+        GoRoute(
+          path: Routes.chat,
+          builder: (context, state) => const Scaffold(body: SizedBox.shrink()),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    NavigationService.attachRouter(router);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, child) {
+            actionContext = context;
+            widgetRef = ref;
+            return MaterialApp.router(routerConfig: router);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openHermesSession(
+      actionContext,
+      widgetRef,
+      const HermesSessionSummary(id: 'fast-1', title: 'Story', profile: 'fast'),
+    );
+    await tester.pumpAndSettle();
+
+    final metadata = container.read(activeConversationProvider)!.metadata;
+    check(metadata[kHermesBotTitleMetadataKey]).equals('Fast');
+    check(metadata[kHermesBotColorMetadataKey]).equals('#e3192b');
   });
 
   testWidgets(

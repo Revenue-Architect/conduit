@@ -10,9 +10,10 @@ import '../../../core/services/background_streaming_handler.dart';
 import '../../../core/providers/app_providers.dart'
     show activeConversationProvider;
 import '../../../core/utils/debug_logger.dart';
-import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
+import '../../chat/providers/chat_providers.dart'
+    show chatMessagesProvider, isChatStreamingProvider;
 import '../../notifications/models/app_notification.dart';
-import '../../notifications/providers/notification_socket_listener.dart'
+import '../../notifications/providers/notification_center.dart'
     show notificationRouterProvider;
 import '../../notifications/services/notification_router.dart';
 import '../models/hermes_config.dart';
@@ -127,7 +128,10 @@ class HermesRunNotifier with WidgetsBindingObserver {
     switch (state) {
       case HermesDesktopTurnState.running:
         final active = _ref.read(hermesActiveSessionProvider);
-        if (active != null) _armed.add(active);
+        if (active != null) {
+          _armed.add(active);
+          _started.putIfAbsent(active, DateTime.now);
+        }
         _hold();
       case HermesDesktopTurnState.idle:
       case HermesDesktopTurnState.unsupportedGateway:
@@ -244,6 +248,11 @@ class HermesRunNotifier with WidgetsBindingObserver {
   Future<String?> _replySnippet(String sessionId) async {
     final active = _ref.read(activeConversationProvider);
     if (active?.metadata['hermesSessionId'] == sessionId) {
+      // The completed event can land before the answer has finished
+      // streaming into the chat; let the stream settle (bounded).
+      for (var i = 0; i < 20 && _ref.read(isChatStreamingProvider); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      }
       final messages = _ref.read(chatMessagesProvider);
       for (final message in messages.reversed) {
         if (message.role == 'assistant' && message.content.trim().isNotEmpty) {
@@ -382,6 +391,25 @@ class HermesRunNotifier with WidgetsBindingObserver {
 /// fences and extra whitespace removed, cut at a word near [max].
 @visibleForTesting
 String? hermesNotificationSnippet(String text, {int max = 220}) {
+  // Lead with the answer: skip a short narration paragraph ("…so let me
+  // check live conditions.") and parenthetical asides ("(Saved to …)").
+  final narration = RegExp(
+    r"\b(let me|i'll|i will|i'm going to|i am going to)\b",
+    caseSensitive: false,
+  );
+  final paragraphs = text
+      .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
+      .split(RegExp(r'\n\s*\n'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  final answer = paragraphs.where(
+    (part) =>
+        !part.startsWith('(') &&
+        !part.startsWith('#') &&
+        !(part.length < 200 && narration.hasMatch(part)),
+  );
+  if (paragraphs.length > 1 && answer.isNotEmpty) text = answer.first;
   var plain = text
       .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
       .replaceAllMapped(

@@ -42,6 +42,7 @@ import '../../features/channels/providers/channel_providers.dart';
 import '../../features/channels/providers/channel_socket_handler.dart';
 import '../../features/direct_connections/direct_connections.dart';
 import '../../features/hermes/models/hermes_model.dart';
+import '../../features/notifications/providers/notification_center.dart';
 import '../../features/notifications/providers/notification_socket_listener.dart';
 import '../../features/notifications/services/local_notification_service.dart';
 
@@ -1697,10 +1698,9 @@ class AppStartupFlow extends _$AppStartupFlow {
     // Activate the notification listener (global chat/channel handlers feeding
     // the NotificationRouter). The router gates on the master toggle, so this is
     // safe to run unconditionally. Then drain any cold-launch notification tap.
+    ref.read(notificationCenterProvider);
     ref.read(notificationSocketListenerProvider);
-    unawaited(
-      ref.read(notificationSocketListenerProvider.notifier).handleLaunchTap(),
-    );
+    unawaited(ref.read(notificationCenterProvider.notifier).handleLaunchTap());
     _scheduleDefaultModelPreload(
       keepDefaultModelAutoSelectionAlive: keepDefaultModelAutoSelectionAlive,
     );

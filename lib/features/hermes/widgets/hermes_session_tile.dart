@@ -476,6 +476,17 @@ Future<void> openHermesSession(
   if (service is HermesDesktopApiService && session.profile != null) {
     service.bindSessionProfile(session.id, session.profile!);
   }
+  // Opened from a list (Recent, a bot's conversations, the digest), the
+  // caller has no bot at hand: find it from the session's profile so the
+  // chat keeps its bot's name and mark instead of "Hermes Agent".
+  final profile = session.profile;
+  if (bot == null && profile != null && profile.isNotEmpty) {
+    final bots = ref.read(hermesBotsProvider).asData?.value;
+    bot = bots?.where((candidate) => candidate.name == profile).firstOrNull;
+  }
+  if (bot != null && botAvatar == null) {
+    botAvatar = ref.read(hermesBotAvatarProvider(bot.name)).asData?.value;
+  }
   final trustPrincipalId = configController.documentTrustPrincipalId();
 
   List<Map<String, dynamic>> raw;

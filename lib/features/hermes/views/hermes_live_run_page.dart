@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,11 +20,20 @@ import '../widgets/hermes_run_action_dialogs.dart';
 import '../widgets/hermes_run_actions.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../motion/hermez_morph_origin.dart';
+import '../motion/hermez_motion_route.dart' show HermezRouteExits;
 import 'hermes_page_chrome.dart';
 
 class HermesLiveRunPage extends ConsumerStatefulWidget {
-  const HermesLiveRunPage({super.key, required this.sessionId});
+  const HermesLiveRunPage({
+    super.key,
+    required this.sessionId,
+    this.openChat = false,
+  });
   final String sessionId;
+
+  /// Opened from a "finished" notification: go straight on to the
+  /// conversation, showing the run's status while its transcript loads.
+  final bool openChat;
 
   @override
   ConsumerState<HermesLiveRunPage> createState() => _HermesLiveRunPageState();
@@ -30,6 +41,7 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
 
 class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   bool _busy = false;
+  bool _chatOpened = false;
 
   /// The Stop guard is open under the run's controls.
   bool _confirmingStop = false;
@@ -151,9 +163,25 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
         break;
       }
     }
+    // A conversation too new for the session list still has its bot from the
+    // desktop service's binding.
     final current =
         session ??
-        HermesSessionSummary(id: widget.sessionId, title: 'Hermes run');
+        HermesSessionSummary(
+          id: widget.sessionId,
+          title: 'Hermes run',
+          profile: service is HermesDesktopApiService
+              ? service.boundProfileFor(widget.sessionId)
+              : null,
+        );
+    if (widget.openChat && !_chatOpened) {
+      _chatOpened = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        HermezRouteExits.leaveForAnotherDestination();
+        unawaited(openHermesSession(context, ref, current));
+      });
+    }
     return HermesPageChrome(
       title: current.title,
       subtitle: 'LIVE ACTIVITY · ${current.profile ?? 'Hermes'}',

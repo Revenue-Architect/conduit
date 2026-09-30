@@ -788,6 +788,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 state.pathParameters['sessionId'],
               ) ??
               '',
+          openChat: state.uri.queryParameters['open'] == 'chat',
         ),
       ),
     ),

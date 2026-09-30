@@ -215,12 +215,27 @@ void main() {
     test('a reply becomes plain text cut at a word', () {
       expect(
         hermesNotificationSnippet('## Title\n\n**Bold** and `code` [link](x)'),
-        'Title Bold and code link',
+        'Bold and code link',
       );
       final long = hermesNotificationSnippet('word ' * 100, max: 50)!;
       expect(long.length, lessThanOrEqualTo(51));
       expect(long, endsWith('…'));
       expect(hermesNotificationSnippet('```\ncode\n```'), isNull);
+      expect(
+        hermesNotificationSnippet(
+          'The results are cached, so let me pull live conditions first.\n\n'
+          'It is 17 degrees and partly cloudy in Toronto right now.',
+        ),
+        'It is 17 degrees and partly cloudy in Toronto right now.',
+      );
+      expect(
+        hermesNotificationSnippet(
+          'Snow fell on the ridge where the fox kept its winter den.\n\n'
+          'It hunted by the river at dusk.\n\n'
+          '(Saved to /opt/data/stories/fox.txt alongside the other one.)',
+        ),
+        'Snow fell on the ridge where the fox kept its winter den.',
+      );
     });
 
     test('facts name up to three tools and the time taken', () {
