@@ -57,6 +57,9 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   bool _showBrowser = false;
   bool _busy = false;
   bool _stopping = false;
+
+  /// The Stop guard is open under the run's controls.
+  bool _confirmingStop = false;
   DateTime? _runStartedAt;
   Timer? _clock;
   final GlobalKey _surfaceKey = GlobalKey();
@@ -204,9 +207,9 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
 
   Future<void> _stop() async {
     if (_busy || widget.turnState != HermesDesktopTurnState.running) return;
-    if (!await confirmHermesStop(context) || !mounted) return;
     final sessionId = widget.sessionId;
     setState(() {
+      _confirmingStop = false;
       _busy = true;
       _stopping = true;
     });
@@ -588,7 +591,11 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                               label: _stopping ? 'Stopping…' : 'Stop',
                               icon: Icons.stop_circle_outlined,
                               busy: _stopping,
-                              onTap: !_busy ? _stop : null,
+                              onTap: !_busy
+                                  ? () => setState(
+                                      () => _confirmingStop = !_confirmingStop,
+                                    )
+                                  : null,
                             ),
                           HermezRunPill(
                             label: 'Full activity',
@@ -600,6 +607,12 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                             ),
                           ),
                         ],
+                      ),
+                      HermesStopGuard(
+                        open: _confirmingStop && working,
+                        onKeepRunning: () =>
+                            setState(() => _confirmingStop = false),
+                        onStop: _stop,
                       ),
                     ],
                   ),

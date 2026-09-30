@@ -29,6 +29,9 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
 
 class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   bool _busy = false;
+
+  /// The Stop guard is open under the run's controls.
+  bool _confirmingStop = false;
   bool _sawRunning = false;
   bool _completionPresented = false;
   DateTime? _startedAt;
@@ -109,9 +112,11 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   }
 
   Future<void> _stop(HermesDesktopApiService service) async {
-    final confirm = await confirmHermesStop(context);
-    if (!confirm || !mounted) return;
-    setState(() => _busy = true);
+    if (_busy) return;
+    setState(() {
+      _confirmingStop = false;
+      _busy = true;
+    });
     try {
       await service.interrupt(widget.sessionId);
     } catch (_) {
@@ -324,9 +329,19 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                             HermezRunPill(
                               label: 'Stop',
                               icon: Icons.stop_circle_outlined,
-                              onTap: _busy ? null : () => _stop(service),
+                              onTap: _busy
+                                  ? null
+                                  : () => setState(
+                                      () => _confirmingStop = !_confirmingStop,
+                                    ),
                             ),
                         ],
+                      ),
+                      HermesStopGuard(
+                        open: _confirmingStop && running,
+                        onKeepRunning: () =>
+                            setState(() => _confirmingStop = false),
+                        onStop: () => _stop(service),
                       ),
                       FutureBuilder<List<HermesPendingDesktopDecision>>(
                         future: _pendingFuture,

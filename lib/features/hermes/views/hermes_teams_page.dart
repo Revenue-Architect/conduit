@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
-import '../../../shared/widgets/conduit_dialog_route.dart';
 import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_team.dart';
@@ -434,6 +433,12 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
   bool _loading = true;
   Object? _error;
   bool _sending = false;
+
+  /// The Team options tray is open under the room header.
+  bool _optionsOpen = false;
+
+  /// Delete team is held open for one more decision inside the tray.
+  bool _confirmingDelete = false;
   DateTime? _sentAt;
   bool _refreshing = false;
   Timer? _poll;
@@ -594,27 +599,7 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
   Future<void> _disband() async {
     final team = _team;
     if (team == null) return;
-    final confirmed = await showConduitDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete this team?'),
-        content: Text(
-          '${team.name} and its discussion are removed from Hermes. This '
-          'cannot be undone. Your bots are not affected.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    setState(() => _confirmingDelete = false);
     final service = _service;
     if (service == null) return;
     try {
@@ -648,19 +633,35 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
       showHeader: false,
       actions: [
         if (team != null)
-          PopupMenuButton<String>(
+          IconButton(
             tooltip: 'Team options',
-            onSelected: (value) {
-              if (value == 'delete') unawaited(_disband());
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'delete', child: Text('Delete team')),
-            ],
+            isSelected: _optionsOpen,
+            onPressed: () => setState(() {
+              _optionsOpen = !_optionsOpen;
+              if (!_optionsOpen) _confirmingDelete = false;
+            }),
+            icon: const Icon(Icons.tune_rounded),
           ),
       ],
       child: Column(
         children: [
           if (team != null) _RoomHeader(team: team, working: working),
+          // Team options open in place under the header and push the room
+          // down; nothing floats over it.
+          if (team != null)
+            HermezReveal(
+              visible: _optionsOpen,
+              weight: HermezMotionWeight.medium,
+              revealKey: const ValueKey('team-options'),
+              child: _TeamOptions(
+                team: team,
+                confirmingDelete: _confirmingDelete,
+                onAskDelete: () =>
+                    setState(() => _confirmingDelete = !_confirmingDelete),
+                onKeep: () => setState(() => _confirmingDelete = false),
+                onDelete: () => unawaited(_disband()),
+              ),
+            ),
           if (_error != null && team != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
@@ -1398,6 +1399,127 @@ class HermesTeamsSection extends ConsumerWidget {
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The Team options tray: its actions, and Delete held open for one more
+/// decision where it was asked for.
+class _TeamOptions extends StatelessWidget {
+  const _TeamOptions({
+    required this.team,
+    required this.confirmingDelete,
+    required this.onAskDelete,
+    required this.onKeep,
+    required this.onDelete,
+  });
+
+  final HermesTeam team;
+  final bool confirmingDelete;
+  final VoidCallback onAskDelete;
+  final VoidCallback onKeep;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final danger = Theme.of(context).colorScheme.error;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: palette.border),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
+                child: Text(
+                  'TEAM OPTIONS',
+                  style: HermezType.technical(palette.muted),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: danger),
+                title: Text('Delete team', style: TextStyle(color: danger)),
+                onTap: onAskDelete,
+              ),
+              HermezReveal(
+                visible: confirmingDelete,
+                weight: HermezMotionWeight.medium,
+                revealKey: const ValueKey('team-delete-guard'),
+                child: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  label:
+                      'Delete this team? ${team.name} and its discussion are '
+                      'removed from Hermes.',
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: danger.withValues(alpha: 0.55)),
+                      color: danger.withValues(alpha: 0.06),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ExcludeSemantics(
+                          child: Text(
+                            'DELETE THIS TEAM?',
+                            style: HermezType.technical(danger),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ExcludeSemantics(
+                          child: Text(
+                            '${team.name} and its discussion are removed '
+                            'from Hermes. This cannot be undone. Your bots '
+                            'are not affected.',
+                            style: HermezType.meta(palette),
+                          ),
+                        ),
+                        OverflowBar(
+                          alignment: MainAxisAlignment.end,
+                          spacing: 8,
+                          children: [
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(64, 44),
+                              ),
+                              onPressed: onKeep,
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: danger,
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onError,
+                                minimumSize: const Size(64, 44),
+                              ),
+                              onPressed: onDelete,
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

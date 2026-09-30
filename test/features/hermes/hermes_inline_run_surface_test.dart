@@ -101,12 +101,22 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Stop'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
+    // The guard opens in place, not as a dialog.
+    expect(find.text('STOP THIS RUN?'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    await tester.ensureVisible(find.text('Keep running'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep running'));
+    await tester.pumpAndSettle();
+    expect(find.text('STOP THIS RUN?'), findsNothing);
     expect(interrupted, isEmpty);
     await tester.tap(find.text('Stop'));
     await tester.pumpAndSettle();
+    // A double tap on the guard's Stop interrupts exactly once.
+    await tester.ensureVisible(find.text('Stop').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Stop').last);
+    await tester.tap(find.text('Stop').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(interrupted, ['session-1']);
   });

@@ -236,6 +236,70 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 10));
   });
+  testWidgets('team options open in place; delete is guarded and sent '
+      'once', (tester) async {
+    final gateway = _TeamGateway();
+    final service = HermesDesktopApiService(
+      config: HermesConfig(
+        enabled: true,
+        baseUrl: 'https://hermes.example',
+        mode: HermesBackendMode.desktopGateway,
+        desktopCredentials: HermesDesktopCredentials(
+          legacyToken: 'session-token',
+        ),
+      ),
+      dio: Dio()..httpClientAdapter = _StatusAdapter(),
+      rpc: HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => gateway.channel,
+      ),
+    );
+    addTearDown(() async {
+      service.close();
+      await gateway.dispose();
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [hermesApiServiceProvider.overrideWithValue(service)],
+        child: const MaterialApp(home: HermesTeamRoomPage(roomId: 'team-1')),
+      ),
+    );
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
+    expect(find.text('TEAM OPTIONS'), findsNothing);
+
+    await tester.tap(find.byTooltip('Team options'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('TEAM OPTIONS'), findsOneWidget);
+    await tester.tap(find.text('Delete team'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('DELETE THIS TEAM?'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('DELETE THIS TEAM?'), findsNothing);
+    expect(gateway.methods, isNot(contains('groups.disband')));
+
+    await tester.tap(find.text('Delete team'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Delete'));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      gateway.methods.where((method) => method == 'groups.disband'),
+      hasLength(1),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 10));
+  });
 }
 
 final class _MockWebSocketChannel extends Mock implements WebSocketChannel {}
@@ -292,7 +356,11 @@ final class _TeamGateway {
     ),
   ];
 
+  /// Every RPC method the room called, in order.
+  final methods = <String>[];
+
   Map<String, Object?> _answer(String method, Map<String, dynamic> params) {
+    methods.add(method);
     switch (method) {
       case 'groups.state':
         return {
