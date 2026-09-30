@@ -466,3 +466,41 @@ Profile APK SHA-256 `f79bcb843a13c5fa94085f1964fa8e59c1cc73fbb383e4fa33703acedfe
   - The title no longer autofocuses.
   - When the keyboard shows, the whole panel's anchored edge moves above it.
 - **Tests:** morph tests are rewritten around the reference; there is a Kanban test that the keyboard does not move the button. The wide suites show only the 13 known pre-existing failures.
+
+## 2026-09-30: Physical interaction, navigation, approvals and notifications spec (phases A–G)
+
+Source: the user's "Hermez Physical Interaction + Navigation + Approval + Notifications Implementation Spec" (baseline `49d733c2`). One commit per phase.
+
+- **A (`924b2032`), Home destinations:**
+  - Recent's See all and All teams grow their whole block, header plus list, into Conversations and Teams. It works through the existing expand route by passing a `HermezMorphOrigin`.
+  - Attention and Artifacts are compact Hermez objects that open with an origin. Attention shows the real pending count (`hermesHomePendingDecisionsProvider`, which was the private away-digest provider); Artifacts has no count because only a network listing backs it.
+  - `HermesConversationsPage` is a real page: a bot filter, and conversations grouped by bot, using the same providers and rows. It carries no side-navigation entries.
+- **B (`d3026d8e`), creation and editing:**
+  - The scheduled-agent editor is one Hermez sheet, grown from the New button or from the agent's own card. Fields, validation and mutations are unchanged.
+  - The scheduled-agent delete guard expands inside the card.
+  - New Chat: the + grows into a Hermez bot picker; creation is unchanged. New Task was done earlier.
+- **C (`95407bde`), Kanban:**
+  - Title, priority, assignee and comment are edited inline under their control.
+  - Assignee is a physical profile list (also in New task OPTIONS), with the same roster and the same Unassign semantics.
+  - Status moves use a Keep current / Move guard under the chips; running is never offered.
+  - The Kanban dialog helpers are removed.
+- **D (`9558aba1`), guarded actions:**
+  - Stop (inline card and Live Run page) expands a STOP THIS RUN? guard. Stop interrupts exactly once.
+  - Team options is a tray under the room header, with a guarded Delete team.
+- **E (`e569527a`), inline decisions:**
+  - The approval card uses the Hermez frame (`hermez_decision_frame.dart`). The action shows as a command line, primary options are physical rows, and any other policies Hermes sent go in a More options compartment. One answer per pending request.
+  - The clarify, sudo, secret and MCP cards use the same frame, with radio or checkbox choices. Submit values and secure fields are unchanged.
+  - Attention rows and Live Run pending rows grow into the resolution sheet.
+- **F (`7e69503b`), admin:**
+  - Toolset details open in place.
+  - MCP: Add and Catalog grow sheets. Server actions are a tray under the row, Set API key is a secure sheet grown from the row, and Remove is guarded in the tray. The service calls are the same.
+- **G (`eb02187d`), notifications:**
+  - `LocalNotificationService` gains `areNotificationsAllowed`, `androidHealth` and `sendDiagnosticNotification`.
+  - Settings gains a NOTIFICATION HEALTH section, Send test notification, and an explanation of foreground versus background delivery.
+  - `HermesRunNotifier` prints one `hermes/notifications …` trace line per relevant event (not in release). The `_armed` logic is unchanged.
+  - The router already covered its cases; the new notifier tests cover arming and routing.
+- **Recurring real bug (fixed three times):** `material_ui` fields and buttons placed inside a Hermez sheet or frame need `material_ui`'s own `Material`, because the Hermez one is Flutter's. It showed up in the job editor, the decision card and the MCP sheets. Wrap them in `Material(type: MaterialType.transparency)` from `material_ui`.
+- **Not done:**
+  - **Phase H** (moving notification tap and init ownership out of the Open WebUI listener): the spec gates it on notifications being proven on device first.
+  - **Killed-app delivery:** needs a server-to-device push transport; out of scope by design.
+  - **Device QA** of each flow, and the §34 notification tests, are pending on the S25.
