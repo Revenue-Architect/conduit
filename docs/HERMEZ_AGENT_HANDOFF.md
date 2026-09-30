@@ -540,3 +540,41 @@ This round covers the user's reports and a QA pass on the S25 (profile build, 12
   - The Notification health settings link shows only when the permission or channel is off.
 - **Open, not motion:**
   - Scheduled-agent counts disagree. Home shows 4 active / 5 total across profiles, while the side navigation and the Jobs page show the main profile only (0 active / 1).
+
+## 2026-09-30: Notification device tests, richer notifications, phase H
+
+Commits `88744f03` and `94128ed7`, plus a round of visible-view fixes.
+- **Device results (S25, Hermes-only, fast bot):**
+
+  | Test | Result |
+  | --- | --- |
+  | 1. Health | Passed. |
+  | 2. Test notification in the background | Passed. |
+  | 3. App open on another page | Initially suppressed, because the stale active chat counted as "viewing". Fixed by `visibleActiveView` (router location plus `ResponsiveDrawerLayoutState.mobileDrawerShowing`). The banner now appears over Kanban. |
+  | 4. Background finish | Passed, with the bot named. |
+  | 5. Clarify ("needs you") in the background | Passed, and shows the question. |
+  | 6. Failed run | Unit tests only; a server failure can't safely be forced. |
+  | 7. Restart and reopen finished chats | No replays. |
+
+- **Taps:**
+  - Warm taps now deep-link.
+  - "finished" opens the conversation, via the live page with `?open=chat`.
+  - "needs you" opens the live page.
+  - The cold-launch drain was added in `main.dart`, but its device check was blocked. Force-stop wipes an app's notifications, so use `am kill`.
+- **Phase H:**
+  - `NotificationCenter` (`providers/notification_center.dart`) owns the plugin, taps, the launch tap (once), `notificationRouterProvider`, the banner and deep links. It is started in `main.dart _initializeAppState`.
+  - Before this, the tap subscription existed only after an Open WebUI sign-in (`_runPostAuthenticationStartup`), so Hermes-only taps were never routed.
+  - `notification_socket_listener.dart` is Open WebUI socket only and re-exports `notificationRouterProvider` and `visibleActiveView`.
+- **Banner:** `HermezInAppBanner` sits in the root overlay (spring slide, swipe up, one at a time) for Hermes kinds. A `ScaffoldMessenger` snackbar only reached the chat's Scaffold, under the covering page.
+- **Content:**
+  - Finished: the answer's opening, skipping narration, headings and "(Saved to …)" asides, after the stream settles. Then conversation · "Used tools" · time.
+  - Needs you: from `pendingStoredDecisionsForSession`.
+  - Android `BigTextStyle`.
+- **Also fixed:** a chat opened from a list resolves its bot from the session profile (it showed "Hermes Agent" before).
+- **Gotcha:** `build_runner --delete-conflicting-outputs --build-filter` deleted unrelated `.g.dart` files. Run a full `build_runner build` after any filtered run.
+- **Open:**
+  - The same pending request shows twice in chat (inline "Input needed" plus the composer clarification card).
+  - "Watch browser" shows on any working run when Steel is configured; left as is to avoid regressing the preview.
+  - Opening an old chat may pop the keyboard; unconfirmed.
+  - `hermes_decision_card_test` "wall-clock expiry" fails regardless of these changes: its 50 ms lifetime is shorter than the first frame on this machine.
+  - Device QA of Teams, Attention, MCP and live run is still to do.
