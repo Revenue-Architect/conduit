@@ -3099,6 +3099,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       sessionId: activeHermesSessionId,
                       turnState:
                           activeHermesTurn ?? HermesDesktopTurnState.idle,
+                      requestShownBelow:
+                          findPendingHermesComposerPrompt(messages) != null,
                     ),
                   ),
               ],
@@ -4264,12 +4266,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final canScroll = _hasScrollableTranscriptContent();
 
     // Focus composer on app startup once (minimal delay for layout to settle)
+    // An existing Hermes conversation (opened from a list, a bot or a
+    // notification) is for reading: it does not raise the keyboard.
     if (!_didStartupFocus) {
       _didStartupFocus = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ref.read(inputFocusTriggerProvider.notifier).increment();
-      });
+      final opensExistingHermesChat =
+          isNativeHermesConversation(activeConversation) &&
+          activeConversation!.messages.isNotEmpty;
+      if (!opensExistingHermesChat) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ref.read(inputFocusTriggerProvider.notifier).increment();
+        });
+      }
     }
 
     Widget page = PopScope(

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +25,12 @@ import '../feedback/hermez_feedback.dart';
 
 /// One session-owned run control surface in the transcript's live footer.
 /// Browser viewing is lazy and watch-only; Hermes owns the active run.
+/// Whether the run has started a browser (Steel) tool.
+@visibleForTesting
+bool hermesRunUsedBrowser(HermesRunSummary run) => run.tools.any(
+  (tool) => RegExp('browser|steel', caseSensitive: false).hasMatch(tool.name),
+);
+
 class HermesInlineRunSurface extends ConsumerStatefulWidget {
   const HermesInlineRunSurface({
     super.key,
@@ -32,7 +40,13 @@ class HermesInlineRunSurface extends ConsumerStatefulWidget {
     this.activityStream,
     this.steerRun,
     this.interruptRun,
+    this.requestShownBelow = false,
   });
+
+  /// The pending request is already on screen as the composer's prompt card.
+  /// The surface then says only that input is needed, and does not repeat the
+  /// request text or a Review button for the same question.
+  final bool requestShownBelow;
 
   final HermesDesktopApiService service;
   final String sessionId;
@@ -295,8 +309,13 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     final attention = decisions.isNotEmpty;
     final working = widget.turnState == HermesDesktopTurnState.running;
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
-    final browserAvailable = working && parseSteelViewerUrl(viewerUrl) != null;
     final run = HermesRunSummary.latest(_events, running: working);
+    // Offered once the run has used a browser tool: a run that only searched
+    // or ran a command has nothing to watch.
+    final browserAvailable =
+        working &&
+        parseSteelViewerUrl(viewerUrl) != null &&
+        hermesRunUsedBrowser(run);
     final finished =
         !attention &&
         widget.turnState == HermesDesktopTurnState.idle &&
@@ -445,7 +464,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                   ),
                 ),
                 HermezReveal(
-                  visible: attention,
+                  visible: attention && !widget.requestShownBelow,
                   weight: HermezMotionWeight.medium,
                   revealKey: const ValueKey('inline-attention'),
                   child: Padding(

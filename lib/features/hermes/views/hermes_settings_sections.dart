@@ -189,10 +189,8 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (toolset.description?.isNotEmpty == true) ...[
-                              Text(toolset.description!),
-                              const SizedBox(height: 10),
-                            ],
+                            // The row above already says what the toolset is for;
+                            // this compartment is the full list of its tools.
                             Text(
                               'TOOLS · ${toolset.tools.length}',
                               style: AppTypography.bodySmallStyle.copyWith(

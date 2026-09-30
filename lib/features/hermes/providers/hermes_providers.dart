@@ -2376,3 +2376,32 @@ class _ActiveRun {
 final hermesRunRegistryProvider = Provider<HermesRunRegistry>(
   (ref) => HermesRunRegistry(),
 );
+
+/// Every bot's scheduled agents as (profile, job), for the counts on Home,
+/// the side navigation and the Scheduled agents page. Empty unless the
+/// Desktop connection is in use; a bot that fails to answer is left out.
+final hermesHomeProfileJobsProvider =
+    FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return const [];
+      final bots = await ref.watch(hermesBotsProvider.future);
+      final profiles = {
+        service.config.desktopProfile,
+        ...bots.map((bot) => bot.name),
+      };
+      final groups = await Future.wait(
+        profiles.map((profile) async {
+          try {
+            final rows = await service.listJobsForProfile(profile);
+            return [
+              for (final job
+                  in rows.map(HermesJob.fromJson).whereType<HermesJob>())
+                (profile, job),
+            ];
+          } catch (_) {
+            return <(String, HermesJob)>[];
+          }
+        }),
+      );
+      return [for (final group in groups) ...group];
+    });

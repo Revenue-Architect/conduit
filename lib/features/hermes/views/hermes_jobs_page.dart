@@ -12,6 +12,9 @@ import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../utils/hermes_schedule_format.dart';
 import '../widgets/hermes_job_editor.dart';
+import '../widgets/hermez_surfaces.dart' show HermezType;
+import '../sheets/hermes_scheduled_agent_sheet.dart';
+import '../services/hermes_desktop_api_service.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_page_chrome.dart';
@@ -61,7 +64,22 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
 
-    final jobs = jobsAsync.asData?.value;
+    final mainJobs = jobsAsync.asData?.value;
+    // Every bot's schedules, as Home counts them; this profile's own jobs are
+    // edited below, the other bots' open their own sheet.
+    final service = ref.watch(hermesApiServiceProvider);
+    final mainProfile = service is HermesDesktopApiService
+        ? service.config.desktopProfile
+        : null;
+    final allJobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
+    final otherBots = <(String, HermesJob)>[
+      if (allJobs != null)
+        for (final entry in allJobs)
+          if (entry.$1 != mainProfile) entry,
+    ];
+    final jobs = mainJobs == null
+        ? null
+        : [...mainJobs, for (final entry in otherBots) entry.$2];
     final active = jobs?.where((job) => job.enabled).length;
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
@@ -96,17 +114,16 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
                 child: RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(hermesJobsProvider);
+                    ref.invalidate(hermesHomeProfileJobsProvider);
                     await ref.read(hermesJobsProvider.future);
                   },
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
-                    children: _content(
-                      context,
-                      jobsAsync,
-                      writable,
-                      theme,
-                      l10n,
-                    ),
+                    children: [
+                      ..._content(context, jobsAsync, writable, theme, l10n),
+                      if (otherBots.isNotEmpty)
+                        _OtherBotsSchedules(entries: otherBots),
+                    ],
                   ),
                 ),
               ),
@@ -242,6 +259,106 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
 }
 
 enum _JobMutation { toggle, run, edit, delete }
+
+/// The scheduled agents that belong to other bots, below this profile's own.
+/// Each opens the same sheet Home opens for it: its schedule, history, run
+/// now and pause.
+class _OtherBotsSchedules extends ConsumerWidget {
+  const _OtherBotsSchedules({required this.entries});
+
+  final List<(String, HermesJob)> entries;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'OTHER BOTS  ${entries.length}',
+            style: HermezType.technical(palette.muted),
+          ),
+          const SizedBox(height: Spacing.sm),
+          for (final (profile, job) in entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.sm),
+              child: Builder(
+                builder: (rowContext) => HermezMotionSurface(
+                  semanticLabel:
+                      '${job.displayName}. $profile. '
+                      '${job.enabled ? 'Active' : 'Paused'}',
+                  onTap: () async {
+                    final run = await showHermesScheduledAgentSheet(
+                      rowContext,
+                      job: job,
+                      profile: profile,
+                      origin: HermezMorphOrigin.of(
+                        rowContext,
+                        radius: 16,
+                        color: palette.surface,
+                      ),
+                    );
+                    if (run != null && rowContext.mounted) {
+                      await openHermesSession(rowContext, ref, run);
+                    }
+                  },
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 56),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: palette.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: palette.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  job.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: HermezType.section(palette),
+                                ),
+                                Text(
+                                  '$profile · ${describeHermesCronSchedule(job.schedule)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: HermezType.meta(palette),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            job.enabled ? 'ACTIVE' : 'PAUSED',
+                            style: HermezType.technical(
+                              job.enabled ? palette.accent : palette.muted,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: palette.muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 /// A run error, two lines by default: a long server message (a stack of
 /// instructions, a config drift notice) otherwise buries the card's actions.

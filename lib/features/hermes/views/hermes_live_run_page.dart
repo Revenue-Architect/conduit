@@ -42,6 +42,7 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
 class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   bool _busy = false;
   bool _chatOpened = false;
+  bool _openChatFailed = false;
 
   /// The Stop guard is open under the run's controls.
   bool _confirmingStop = false;
@@ -142,6 +143,46 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     }
   }
 
+  /// Opens this run's conversation once Hermes is ready. After a cold launch
+  /// from a notification the connection and the session list are still
+  /// loading, and the bot (profile) is only known from that list, so wait for
+  /// both, for a few seconds. If the chat cannot be opened, show the live page
+  /// instead of a blank screen.
+  Future<void> _openChatWhenReady() async {
+    HermesSessionSummary? row;
+    try {
+      final sessions = await ref
+          .read(hermesSessionsProvider.future)
+          .timeout(const Duration(seconds: 6));
+      for (final candidate in sessions) {
+        if (candidate.id == widget.sessionId) row = candidate;
+      }
+    } catch (_) {}
+    for (var i = 0; i < 40 && mounted; i++) {
+      final service = ref.read(hermesApiServiceProvider);
+      if (service is HermesDesktopApiService) {
+        HermezRouteExits.leaveForAnotherDestination();
+        await openHermesSession(
+          context,
+          ref,
+          row ??
+              HermesSessionSummary(
+                id: widget.sessionId,
+                title: 'Hermes run',
+                profile: service.boundProfileFor(widget.sessionId),
+              ),
+        );
+        // Opening replaces this page; if it is still here, it did not open.
+        if (!mounted ||
+            ref.read(hermesActiveSessionProvider) == widget.sessionId) {
+          return;
+        }
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    if (mounted) setState(() => _openChatFailed = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = ref.watch(hermesApiServiceProvider);
@@ -177,12 +218,10 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     if (widget.openChat && !_chatOpened) {
       _chatOpened = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        HermezRouteExits.leaveForAnotherDestination();
-        unawaited(openHermesSession(context, ref, current));
+        if (mounted) unawaited(_openChatWhenReady());
       });
     }
-    if (widget.openChat) {
+    if (widget.openChat && !_openChatFailed) {
       // On its way to the conversation: only the page's own background,
       // until the chat replaces it.
       return ColoredBox(color: palette.canvas, child: const SizedBox.expand());

@@ -10,6 +10,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
 
+HermesLiveActivityEvent _toolEvent(String tool) => HermesLiveActivityEvent(
+  sessionId: 'session-1',
+  kind: HermesLiveActivityKind.toolStarted,
+  title: tool,
+  detail: tool,
+  timestamp: DateTime.utc(2026, 9, 30, 12),
+);
+
 void main() {
   late HermesDesktopApiService service;
 
@@ -33,6 +41,7 @@ void main() {
     Future<void> Function(String)? interrupt,
     HermesDesktopTurnState state = HermesDesktopTurnState.running,
     List<HermesLiveActivityEvent> events = const [],
+    bool requestShownBelow = false,
   }) async {
     tester.view.physicalSize = const Size(320, 820);
     tester.view.devicePixelRatio = 1;
@@ -57,6 +66,7 @@ void main() {
                   service: service,
                   sessionId: 'session-1',
                   turnState: state,
+                  requestShownBelow: requestShownBelow,
                   activityStream: events.isEmpty
                       ? const Stream.empty()
                       : Stream.value(events),
@@ -86,7 +96,11 @@ void main() {
   testWidgets('browser is discoverable before expanding activity', (
     tester,
   ) async {
-    await mount(tester, viewerUrl: 'http://steel.example/v1/sessions/debug');
+    await mount(
+      tester,
+      viewerUrl: 'http://steel.example/v1/sessions/debug',
+      events: [_toolEvent('browser_navigate')],
+    );
     expect(find.text('Watch browser'), findsOneWidget);
     expect(find.text('Recent activity'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -211,10 +225,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Watch browser'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
-    await mount(tester, viewerUrl: 'http://steel.example/v1/sessions/debug');
+    await mount(
+      tester,
+      viewerUrl: 'http://steel.example/v1/sessions/debug',
+      events: [_toolEvent('browser_navigate')],
+    );
     await tester.tap(find.text('Hermes is working'));
     await tester.pumpAndSettle();
     expect(find.text('Watch browser'), findsOneWidget);
+  });
+
+  testWidgets('a run that never used a browser offers nothing to watch', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      viewerUrl: 'http://steel.example/v1/sessions/debug',
+      events: [_toolEvent('web_search'), _toolEvent('terminal')],
+    );
+    await tester.tap(find.text('Hermes is working'));
+    await tester.pumpAndSettle();
+    expect(find.text('Watch browser'), findsNothing);
+  });
+
+  testWidgets('a request shown in the composer is not repeated inline', (
+    tester,
+  ) async {
+    final decision = HermesPendingDesktopDecision(
+      origin: 'origin',
+      storedSessionId: 'session-1',
+      runtimeId: 'runtime',
+      requestId: 'request',
+      kind: HermesPendingDesktopDecisionKind.clarification,
+      expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      prompt: 'Which city do you mean?',
+    );
+    await mount(tester, decisions: [decision], requestShownBelow: true);
+    await tester.pumpAndSettle();
+    expect(find.text('Input needed'), findsOneWidget);
+    expect(find.text('Which city do you mean?'), findsNothing);
+    expect(find.text('Review'), findsNothing);
   });
 
   testWidgets('a finished run shrinks to its summary instead of vanishing', (

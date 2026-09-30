@@ -29,32 +29,6 @@ import 'hermes_teams_page.dart' show HermesTeamsSection;
 import '../widgets/hermez_bot_presence.dart';
 import '../widgets/hermez_expandable_section.dart';
 
-final hermesHomeProfileJobsProvider =
-    FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
-      final service = ref.watch(hermesApiServiceProvider);
-      if (service is! HermesDesktopApiService) return const [];
-      final bots = await ref.watch(hermesBotsProvider.future);
-      final profiles = {
-        service.config.desktopProfile,
-        ...bots.map((bot) => bot.name),
-      };
-      final groups = await Future.wait(
-        profiles.map((profile) async {
-          try {
-            final rows = await service.listJobsForProfile(profile);
-            return [
-              for (final job
-                  in rows.map(HermesJob.fromJson).whereType<HermesJob>())
-                (profile, job),
-            ];
-          } catch (_) {
-            return <(String, HermesJob)>[];
-          }
-        }),
-      );
-      return [for (final group in groups) ...group];
-    });
-
 class HermesHomePage extends ConsumerWidget {
   const HermesHomePage({super.key});
 

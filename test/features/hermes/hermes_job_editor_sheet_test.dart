@@ -203,4 +203,58 @@ void main() {
     expect(find.text('Timed out'), findsOneWidget);
     expect(find.text('Show full error'), findsNothing);
   });
+
+  testWidgets('the page counts every bot and lists the schedules of the '
+      'other bots', (tester) async {
+    _calls.clear();
+    await tester.binding.setSurfaceSize(const Size(412, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesApiServiceProvider.overrideWithValue(_Service()),
+          hermesJobsProvider.overrideWith(_Jobs.new),
+          hermesHomeProfileJobsProvider.overrideWith(
+            (ref) async => [
+              (
+                'kai',
+                HermesJob(
+                  id: 'kai-1',
+                  name: 'Inventory sweep',
+                  prompt: 'Sweep',
+                  schedule: '0 7 * * *',
+                  enabled: true,
+                ),
+              ),
+              (
+                'local',
+                HermesJob(
+                  id: 'local-1',
+                  name: 'Nightly backup',
+                  prompt: 'Back up',
+                  schedule: '0 2 * * *',
+                  enabled: false,
+                ),
+              ),
+            ],
+          ),
+          hermesJobRunsProvider.overrideWith(
+            (ref, id) async => const <HermesSessionSummary>[],
+          ),
+        ],
+        child: const MaterialApp(home: HermesJobsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // This profile's one job plus the two others, as Home counts them.
+    expect(find.text('2 active · 3 total'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('OTHER BOTS  2'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Inventory sweep'), findsOneWidget);
+    expect(find.text('Nightly backup'), findsOneWidget);
+    expect(find.text('PAUSED'), findsWidgets);
+  });
 }

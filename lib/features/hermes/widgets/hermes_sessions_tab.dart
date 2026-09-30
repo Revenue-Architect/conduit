@@ -544,7 +544,12 @@ class _ScheduledAgentsTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final jobsAsync = ref.watch(hermesJobsProvider);
-    final jobs = jobsAsync.value;
+    // The same counts Home shows: every bot's schedules when the Desktop
+    // connection can list them, else this profile's.
+    final allJobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
+    final jobs = allJobs != null && allJobs.isNotEmpty
+        ? [for (final entry in allJobs) entry.$2]
+        : jobsAsync.value;
     final count = jobs?.length;
     final activeCount = jobs?.where((job) => job.enabled).length;
     final theme = context.conduitTheme;
