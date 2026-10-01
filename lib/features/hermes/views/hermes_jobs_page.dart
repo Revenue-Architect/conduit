@@ -64,14 +64,16 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
 
-    final mainJobs = jobsAsync.asData?.value;
+    // The last list stays while a refresh runs, so nothing jumps under an
+    // open or closing sheet.
+    final mainJobs = jobsAsync.value;
     // Every bot's schedules, as Home counts them; this profile's own jobs are
     // edited below, the other bots' open their own sheet.
     final service = ref.watch(hermesApiServiceProvider);
     final mainProfile = service is HermesDesktopApiService
         ? service.config.desktopProfile
         : null;
-    final allJobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
+    final allJobs = ref.watch(hermesHomeProfileJobsProvider).value;
     final otherBots = <(String, HermesJob)>[
       if (allJobs != null)
         for (final entry in allJobs)

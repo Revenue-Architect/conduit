@@ -159,7 +159,7 @@ class HermesHomePage extends ConsumerWidget {
       Theme.of(context).brightness,
     );
     final bots = ref.watch(hermesBotsProvider).asData?.value;
-    final jobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
+    final jobs = ref.watch(hermesHomeProfileJobsProvider).value;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
     final sessions = sessionsAsync.asData?.value;
     final kanban = ref.watch(hermesKanbanSummaryProvider).asData?.value;

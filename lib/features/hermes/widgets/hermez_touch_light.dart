@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
-
 import 'package:flutter/physics.dart';
 
 import '../../../shared/theme/theme_extensions.dart';

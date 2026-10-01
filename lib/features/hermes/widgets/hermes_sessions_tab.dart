@@ -546,7 +546,7 @@ class _ScheduledAgentsTile extends ConsumerWidget {
     final jobsAsync = ref.watch(hermesJobsProvider);
     // The same counts Home shows: every bot's schedules when the Desktop
     // connection can list them, else this profile's.
-    final allJobs = ref.watch(hermesHomeProfileJobsProvider).asData?.value;
+    final allJobs = ref.watch(hermesHomeProfileJobsProvider).value;
     final jobs = allJobs != null && allJobs.isNotEmpty
         ? [for (final entry in allJobs) entry.$2]
         : jobsAsync.value;

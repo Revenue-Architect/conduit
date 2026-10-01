@@ -388,95 +388,87 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 22),
-        // Capabilities can arrive in a second pass (cached profile first,
-        // then its skills and tools): the block grows into place on a spring
-        // instead of shoving everything under it down in one frame.
-        HermezSize(
-          child: HermezEntrance(
-            order: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        HermezEntrance(
+          order: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('CAPABILITIES', style: HermezType.technical(palette.muted)),
+              const SizedBox(height: 8),
+              if (curated.featured.isEmpty)
                 Text(
-                  'CAPABILITIES',
-                  style: HermezType.technical(palette.muted),
+                  'No profile capabilities reported.',
+                  style: HermezType.meta(palette),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final name in curated.featured)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.surface,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: palette.border.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        child: Text(
+                          name.replaceAll('_', ' '),
+                          style: HermezType.meta(palette)
+                              .copyWith(color: palette.ink),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                if (curated.featured.isEmpty)
-                  Text(
-                    'No profile capabilities reported.',
-                    style: HermezType.meta(palette),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+              if (curated.rest.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                // More of the same object: the capabilities compartment
+                // opens in place and pushes Knowledge and the rest down.
+                HermezExpandableSection(
+                  expanded: _systemsExpanded,
+                  onExpansionChanged: (expanded) =>
+                      setState(() => _systemsExpanded = expanded),
+                  semanticLabel: 'All skills and tools',
+                  openFeedback: HermezFeedbackCue.compartmentOpen,
+                  closeFeedback: HermezFeedbackCue.compartmentClose,
+                  header: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final name in curated.featured)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: palette.surface,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: palette.border.withValues(alpha: 0.7),
-                            ),
-                          ),
+                      Text(
+                        // The rows inside: every capability not featured.
+                        'SYSTEMS / ${curated.rest.length}',
+                        style: HermezType.technical(palette.muted),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'All skills & tools',
+                        style: HermezType.section(palette)
+                            .copyWith(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final name in curated.rest)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
                             name.replaceAll('_', ' '),
-                            style: HermezType.meta(palette)
-                                .copyWith(color: palette.ink),
+                            style: HermezType.meta(palette),
                           ),
                         ),
                     ],
                   ),
-                if (curated.rest.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  // More of the same object: the capabilities compartment
-                  // opens in place and pushes Knowledge and the rest down.
-                  HermezExpandableSection(
-                    expanded: _systemsExpanded,
-                    onExpansionChanged: (expanded) =>
-                        setState(() => _systemsExpanded = expanded),
-                    semanticLabel: 'All skills and tools',
-                    openFeedback: HermezFeedbackCue.compartmentOpen,
-                    closeFeedback: HermezFeedbackCue.compartmentClose,
-                    header: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          // The rows inside: every capability not featured.
-                          'SYSTEMS / ${curated.rest.length}',
-                          style: HermezType.technical(palette.muted),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'All skills & tools',
-                          style: HermezType.section(palette)
-                              .copyWith(fontSize: 14),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final name in curated.rest)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              name.replaceAll('_', ' '),
-                              style: HermezType.meta(palette),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 22),
