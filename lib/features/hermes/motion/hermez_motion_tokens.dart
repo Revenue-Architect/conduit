@@ -84,6 +84,11 @@ abstract final class HermezMotion {
   static final HermezSpringCurve curveHeavy = HermezSpringCurve(springHeavy);
   static final HermezSpringCurve curvePush = HermezSpringCurve(springPush);
 
+  /// A sheet going home into its card. The flipped spring left at full
+  /// speed and threw the sheet down in its first tenth of a second; this
+  /// eases off the screen and settles into the card.
+  static const Curve sheetClose = Curves.easeInOut;
+
   static NibSpringDescription springFor(HermezMotionWeight weight) =>
       switch (weight) {
         HermezMotionWeight.light => springLight,

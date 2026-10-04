@@ -443,7 +443,11 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
             : _still,
         child: _HermezSheetFrame(
           route: this,
-          progress: hermezCurved(animation, curve),
+          progress: hermezCurved(
+            animation,
+            curve,
+            reverseOf: _pushes ? HermezMotion.sheetClose : null,
+          ),
           child: child,
         ),
       ),
@@ -451,13 +455,19 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     final sheet = _nextSheet;
     return HermezCoveredTransition(
       kind: reducedMotion ? HermezCoverKind.none : _nextCover,
-      animation: hermezCurved(secondaryAnimation, switch (_nextCover) {
-        HermezCoverKind.recede => HermezMotion.curveHeavy,
-        // The same curve the sheet on top moves on, so the push and the
-        // sheet's edge stay in contact.
-        HermezCoverKind.lift => HermezMotion.curvePush,
-        _ => HermezMotion.curveMedium,
-      }),
+      animation: hermezCurved(
+        secondaryAnimation,
+        switch (_nextCover) {
+          HermezCoverKind.recede => HermezMotion.curveHeavy,
+          // The same curve the sheet on top moves on, so the push and the
+          // sheet's edge stay in contact.
+          HermezCoverKind.lift => HermezMotion.curvePush,
+          _ => HermezMotion.curveMedium,
+        },
+        reverseOf: _nextCover == HermezCoverKind.lift
+            ? HermezMotion.sheetClose
+            : null,
+      ),
       // The sheet's rising edge pushes this screen up, and its drag pulls
       // it back down.
       follow: sheet?._dragOffset,
@@ -937,8 +947,11 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     final faceHeight = face == null || face.width == 0
         ? rect.height
         : rect.width * face.height / face.width;
-    final shown = face == null ? 1.0 : _smooth((t - 0.16) / 0.32);
-    final faceShown = face == null ? 0.0 : 1 - _smooth((t - 0.06) / 0.3);
+    // In sequence, not overlapping: the sheet's content is covered by the
+    // card's surface before the card's face comes up on it, so the two
+    // texts are never on screen together.
+    final shown = face == null ? 1.0 : _smooth((t - 0.22) / 0.26);
+    final faceShown = face == null ? 0.0 : 1 - _smooth((t - 0.04) / 0.18);
     // No offscreen layers: fading the whole destination through Opacity
     // cost a full-screen layer and dropped frames as the hand-over began.
     // The object's own surface is painted over the destination instead,
@@ -956,10 +969,13 @@ class _HermezSheetFrame<T> extends StatelessWidget {
         if (face != null)
           Positioned.fromRect(
             rect: Rect.fromLTWH(rect.left, rect.top, rect.width, faceHeight),
-            child: RawImage(
-              image: face,
-              fit: BoxFit.fill,
-              opacity: AlwaysStoppedAnimation(faceShown),
+            // A picture over the destination: it must never take its taps.
+            child: IgnorePointer(
+              child: RawImage(
+                image: face,
+                fit: BoxFit.fill,
+                opacity: AlwaysStoppedAnimation(faceShown),
+              ),
             ),
           ),
       ],

@@ -268,9 +268,8 @@ void main() {
     expect(faceOpacity, inExclusiveRange(0, 1));
     expect(contentOpacity, inExclusiveRange(0, 1));
     expect(faceOpacity + contentOpacity, closeTo(1, 0.001));
-    // Only the small plus blurs; the whole panel is never filtered.
-    final blurs = tester.widgetList<ImageFiltered>(find.byType(ImageFiltered));
-    expect(blurs.where((b) => b.enabled), hasLength(1));
+    // Nothing is blurred: no filter layer on any frame.
+    expect(find.byType(ImageFiltered), findsNothing);
     final state = tester.state<_HarnessState>(find.byType(_Harness));
     expect(state.turns.last, inExclusiveRange(0, 1));
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui show ImageFilter;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
@@ -56,8 +55,8 @@ abstract final class HermezPanelMotion {
   /// `--morph-scale`.
   static const scale = 0.97;
 
-  /// `--morph-blur` (2px), on the plus only. Blurring the whole panel every
-  /// frame cost more than it showed.
+  /// `--morph-blur` (2px). Not drawn: blurring cost more than it showed,
+  /// on the panel every frame and on the plus at the first open.
   static const blur = 2.0;
 }
 
@@ -392,7 +391,9 @@ class _PlusFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sigma = HermezPanelMotion.blur * frame.fade;
+    // No blur: the first blur after launch set up GPU work mid-open and
+    // dropped frames on the first New task of a session, for a 2px effect
+    // on a glyph that is already fading out.
     return Opacity(
       opacity: (1 - frame.fade).clamp(0.0, 1.0),
       child: Transform.translate(
@@ -400,11 +401,7 @@ class _PlusFace extends StatelessWidget {
           -HermezPanelMotion.slide * frame.move * _towardInside(context),
           0,
         ),
-        child: ImageFiltered(
-          enabled: sigma > 0.01,
-          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-          child: child,
-        ),
+        child: child,
       ),
     );
   }

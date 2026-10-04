@@ -56,7 +56,7 @@ class HermesHomePage extends ConsumerWidget {
     HermezMorphOrigin? origin,
   ]) async {
     final bots =
-        ref.read(hermesBotsProvider).asData?.value ?? const <HermesBot>[];
+        ref.read(hermesBotsProvider).value ?? const <HermesBot>[];
     if (bots.isEmpty) return;
     // The + turns into the bot menu, the same plus-to-menu morph as New task:
     // the button's own surface grows from its corner into the menu and folds
@@ -158,11 +158,11 @@ class HermesHomePage extends ConsumerWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final bots = ref.watch(hermesBotsProvider).asData?.value;
+    final bots = ref.watch(hermesBotsProvider).value;
     final jobs = ref.watch(hermesHomeProfileJobsProvider).value;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
-    final sessions = sessionsAsync.asData?.value;
-    final kanban = ref.watch(hermesKanbanSummaryProvider).asData?.value;
+    final sessions = sessionsAsync.value;
+    final kanban = ref.watch(hermesKanbanSummaryProvider).value;
     final now = DateTime.now();
     final todayJobs = (jobs ?? const <(String, HermesJob)>[])
         .where((item) {
