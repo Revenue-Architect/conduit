@@ -199,6 +199,17 @@ class Routes {
   static const String channel = '/channel/:id';
   static const String workspace = '/workspace';
 
+  /// Hermes Spaces: persistent working Pages. Not part of Workspace, which
+  /// is model/knowledge administration.
+  static const String spaces = '/spaces';
+  static const String spaceLibrary = '/spaces/:spaceId';
+  static const String spacePage = '/spaces/:spaceId/pages/:pageId';
+
+  static String spaceLibraryPath(String spaceId) =>
+      '/spaces/${Uri.encodeComponent(spaceId)}';
+  static String spacePagePath(String spaceId, String pageId) =>
+      '/spaces/${Uri.encodeComponent(spaceId)}/pages/${Uri.encodeComponent(pageId)}';
+
   static String folderPath(String id) => '/folder/$id';
   static String directConnectionEditorPath(String id) =>
       '/profile/direct-connections/${Uri.encodeComponent(id)}';
@@ -246,4 +257,7 @@ class RouteNames {
   static const String noteEditor = 'note-editor';
   static const String channel = 'channel';
   static const String workspace = 'workspace';
+  static const String spaces = 'spaces';
+  static const String spaceLibrary = 'space-library';
+  static const String spacePage = 'space-page';
 }

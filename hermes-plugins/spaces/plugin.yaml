@@ -1,0 +1,12 @@
+name: spaces
+version: 1.0.0
+description: "Spaces and Pages: persistent Markdown working documents shared by the user (in Conduit) and Hermes. SQLite store, five spaces_* tools, and a pre_llm_call hook that tells Page-bound conversations which Page they belong to."
+author: "Revenue-Architect / Conduit"
+provides_tools:
+  - spaces_list_spaces
+  - spaces_list_pages
+  - spaces_read_page
+  - spaces_create_page
+  - spaces_edit_page
+provides_hooks:
+  - pre_llm_call

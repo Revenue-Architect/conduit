@@ -1,3 +1,5 @@
+import '../../spaces/providers/spaces_providers.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -97,6 +99,7 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
         if (ref.watch(hermesConfigProvider).mode ==
             HermesBackendMode.desktopGateway)
           const SliverToBoxAdapter(child: _KanbanEntry()),
+        const SliverToBoxAdapter(child: _SpacesEntry()),
         if (showJobs) const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
         ..._sessionSlivers(context, sessionsAsync),
         SliverToBoxAdapter(
@@ -463,6 +466,64 @@ class _HermesHomeEntry extends StatelessWidget {
             }
             context.pushNamed(RouteNames.hermesHome);
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Spaces: shown only when this Hermes has the Spaces plugin.
+class _SpacesEntry extends ConsumerWidget {
+  const _SpacesEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(spacesAvailableProvider).value != true) {
+      return const SizedBox.shrink();
+    }
+    final theme = context.conduitTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.sm,
+        Spacing.xs,
+        Spacing.sm,
+        Spacing.xs,
+      ),
+      child: Material(
+        color: theme.surfaceBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppBorderRadius.card),
+        ),
+        child: ListTile(
+          key: const ValueKey<String>('hermes-spaces-entry'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 9,
+          ),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: theme.buttonPrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppBorderRadius.button),
+            ),
+            child: Icon(
+              Icons.article_outlined,
+              color: theme.buttonPrimary,
+              size: 27,
+            ),
+          ),
+          title: Text(
+            'Spaces',
+            style: AppTypography.bodyMediumStyle.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: theme.textPrimary,
+            ),
+          ),
+          subtitle: const Text('Pages you and Hermes work on'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.pushNamed(RouteNames.spaces),
         ),
       ),
     );

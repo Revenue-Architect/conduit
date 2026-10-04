@@ -317,6 +317,34 @@ final class HermesDesktopApiService
     );
   }
 
+  /// Native-sign-in requests to the Spaces plugin routes only. Errors surface
+  /// as [DioException] with the response body intact, so a revision conflict
+  /// keeps its machine-readable payload.
+  Future<Object?> requestSpacesJson(
+    String method,
+    String path, {
+    Map<String, dynamic>? query,
+    Map<String, Object?>? body,
+    CancelToken? cancelToken,
+  }) {
+    if (_closed ||
+        config.desktopAuthKind != HermesDesktopAuthKind.nativePkce ||
+        !const {'GET', 'POST', 'PATCH', 'PUT', 'DELETE'}.contains(method) ||
+        !path.startsWith('/api/plugins/spaces/') ||
+        path.contains('..') ||
+        path.contains('?') ||
+        path.contains('#')) {
+      throw StateError('Invalid native Spaces request.');
+    }
+    return _requestJson(
+      method,
+      path,
+      query: query,
+      body: body,
+      cancelToken: cancelToken,
+    );
+  }
+
   Stream<HermesDesktopTurnState> get turnStates => _turnStates.stream;
   final Map<String, List<HermesLiveActivityEvent>> _activityHistory = {};
   final StreamController<String> _activityChanges =

@@ -1,3 +1,8 @@
+import '../../hermes/services/hermes_identifier.dart';
+import '../../spaces/models/spaces_models.dart';
+import '../../spaces/providers/spaces_providers.dart';
+import '../../spaces/widgets/page_chat_context_chip.dart';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/l10n/app_localizations.dart';
@@ -3954,6 +3959,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  HermesPageSummary? _pageForConversation(
+    WidgetRef ref,
+    Conversation? conversation,
+  ) {
+    final sessionId = validateHermesOpaqueIdentifier(
+      conversation?.metadata['hermesSessionId'],
+    );
+    if (sessionId == null) return null;
+    return ref.watch(pageForSessionProvider(sessionId)).value;
+  }
+
   Widget _buildComposerSection(BuildContext context) {
     final hasAttachments =
         ref.watch(attachedFilesProvider.select((files) => files.isNotEmpty)) ||
@@ -4107,6 +4123,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     attachedOverlay = DirectMcpComposerPromptOverlay(
                       key: ValueKey(approval['id']),
                       message: pendingDirectMcpPrompt,
+                    );
+                  } else if (_pageForConversation(
+                        composerRef,
+                        activeConversation,
+                      )
+                      case final page?) {
+                    // A Page's own conversation: which Page, and the way
+                    // back. Questions and approvals take this slot first.
+                    attachedOverlay = PageChatContextChip(
+                      key: ValueKey('page-chat-${page.id}'),
+                      page: page,
                     );
                   } else {
                     attachedOverlay = null;

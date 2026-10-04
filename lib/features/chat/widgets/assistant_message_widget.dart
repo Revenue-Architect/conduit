@@ -1,3 +1,6 @@
+import '../../spaces/providers/spaces_providers.dart';
+import '../../spaces/widgets/save_as_page_sheet.dart';
+
 import 'dart:async';
 import 'dart:io' show Platform;
 
@@ -1930,11 +1933,12 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final actions = includeActions
         ? _buildFooterActions()
         : const <_AssistantFooterAction>[];
+    const overflowOnly = {'save_page', 'delete'};
     final forcedOverflowActions = actions
-        .where((action) => action.id == 'delete')
+        .where((action) => overflowOnly.contains(action.id))
         .toList(growable: false);
     final inlineCandidateActions = actions
-        .where((action) => action.id != 'delete')
+        .where((action) => !overflowOnly.contains(action.id))
         .toList(growable: false);
     final visibleActions = inlineCandidateActions
         .take(maxInlineActions)
@@ -2162,6 +2166,24 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 }
               : null,
           sfSymbol: 'chevron.right',
+        ),
+      if (_responseCompleted &&
+          ref.watch(spacesConfirmedProvider))
+        _AssistantFooterAction(
+          id: 'save_page',
+          icon: Icons.post_add_rounded,
+          label: 'Save as Page',
+          onTap: () => unawaited(
+            showSaveAsPageSheet(
+              context,
+              ref,
+              markdown: _resolvedMessageContent(),
+              sourceSessionId: validateHermesOpaqueIdentifier(
+                _chatMessage?.metadata?['hermesSessionId'],
+              ),
+            ),
+          ),
+          sfSymbol: 'doc.badge.plus',
         ),
       if (!widget.readOnly)
         _AssistantFooterAction(

@@ -1,0 +1,12 @@
+{
+  "name": "spaces",
+  "label": "Spaces",
+  "description": "Persistent working pages for Hermes (the UI lives in Conduit)",
+  "version": "1.0.0",
+  "icon": "FileText",
+  "tab": {
+    "hidden": true
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

@@ -676,3 +676,46 @@ User report (screen recording): cards slid their content down fast while shrinki
   - Updated: the panel tokens, timing, blur and aperture tests.
   - `test/features/{hermes,navigation,chat}`: 2193 pass. The 5 failures are the known baseline: the auth epoch test, 3× clipboard symlink, and the timezone-dependent sidebar note row.
   - `hermes_decision_card_test` "wall-clock expiry" also fails on a loaded machine (its 50 ms wall-clock budget lapses during setup). It is pre-existing and unrelated.
+
+## 2026-10-04: Hermes Spaces & Pages (plugin + Conduit feature)
+
+Persistent Markdown working documents shared by the user and Hermes. The design follows the implementation plan given by the user:
+
+- One Hermes user plugin plus a native Conduit feature.
+- No new service, database server, agent runtime or Hermes core change.
+- Steel, Hindsight, the proactive system and skills are untouched.
+
+- **Hermes plugin:** `hermes-plugins/spaces/`. Its README covers contracts, install, backup and rollback.
+  - The store (`spaces_store.py`) is SQLite at `/opt/data/spaces/spaces.db`:
+    - WAL, foreign keys, `BEGIN IMMEDIATE`;
+    - an expected-revision check on every mutation, so a stale writer gets `409 revision_conflict`;
+    - one shared DB for all profiles.
+  - Five tools in the `spaces` toolset, with no delete tool.
+  - A `pre_llm_call` hook that injects Page metadata only (never the body) for a session bound to a Page.
+  - REST at `/api/plugins/spaces/` behind dashboard auth.
+  - Tests: 30 stdlib `unittest` tests, all passing in the Hermes venv.
+- **Deployed 2026-10-04 (user-requested):**
+  - Backups: `config.yaml.bak-20261004-spaces` for root and the kai, fast, strong and local profiles.
+  - `hermes plugins doctor spaces` is clean.
+  - Enabled for root (CLI, no tool-override grant).
+  - Profiles: under a profile Hermes loads bundled plugins and `<profile>/plugins/` only, not root user plugins. The first live test showed Kai using the browser instead of the Page for this reason. Each profile with a config (autopilot, fast, hermuse, kai, local, strong) now has `plugins/spaces` symlinked to the root copy and `spaces` in its `plugins.enabled`. `hermes --profile kai tools list` shows the toolset.
+  - Verified live: in a Page-bound kai session, Hermes finds `spaces_read_page` and reads the Page.
+  - `docker restart hermes-agent_web_1`. The log shows `Mounted plugin API routes: /api/plugins/spaces/`, and unauthenticated health returns 401.
+  - Rollback: remove `spaces` from `plugins.enabled` and restart; keep the DB.
+- **Conduit (`lib/features/spaces/`):**
+  - Models and `HermesSpacesClient`. It uses native PKCE via `HermesDesktopApiService.requestSpacesJson` (prefix-locked to `/api/plugins/spaces/`), or the Dashboard cookie bridge. Ids are validated. `SpacesRevisionConflict` is its own type.
+  - Providers, including `spacesAvailableProvider`: the health probe that hides the feature on an older Hermes.
+  - `PageDraftController`: 800 ms autosave; states saved, dirty, saving, error and conflict. A conflict keeps the draft, stops retries and loads the remote copy. Keep mine and Use latest both require confirmation.
+  - Routes `/spaces`, `/spaces/:spaceId` and `/spaces/:spaceId/pages/:pageId`, not under `/workspace`. They are on the Hermes-only allowlist.
+  - Side-nav entry "Spaces" under Kanban, shown only when health is ok.
+  - Editor: the Fleather visual editor using the Notes codec and toolbar restrictions, with Markdown canonical. Source mode is forced for HTML, images, footnotes, front matter, directives, display math, tables, nested lists, reference links and setext headings (`page_document_codec.dart`).
+  - "Ask Hermes" (`page_chat_launcher.dart`, `page_chat_picker_sheet.dart`):
+    - flushes the draft first;
+    - offers every Hermes profile, those with a conversation for this Page first ("CONTINUE"), then kai, then the rest (`GET /pages/{id}/chats`);
+    - each profile has its own conversation per Page and reuses it;
+    - re-creates and re-binds when the gateway refuses a never-prompted session (Hermes persists sessions lazily).
+  - Assistant replies get "Save as Page" in the overflow menu. It records `source_session_id` and offers "Open Page" afterwards.
+  - In a Page's own conversation, a "PAGE · title · Open" chip sits in the composer's attached slot. Prompts and approvals take the slot first.
+- **Not done in v1:**
+  - Inline "Page created" cards for agent `spaces_create_page` results.
+  - Phase 2 items (Artifact references, reviewed drafts, slash commands, Page links, FTS5, profile picker, proactive Page upkeep).

@@ -64,6 +64,10 @@ import '../../features/direct_connections/views/direct_mcp_server_editor_page.da
 import '../../l10n/app_localizations.dart';
 import '../models/server_config.dart';
 import '../../features/hermes/views/hermes_teams_page.dart';
+import '../../features/spaces/models/spaces_models.dart' show isSpacesId;
+import '../../features/spaces/views/space_library_page.dart';
+import '../../features/spaces/views/space_page_editor.dart';
+import '../../features/spaces/views/spaces_page.dart';
 import '../../features/hermes/models/hermes_team.dart' show isValidHermesTeamId;
 
 /// App-local destinations that remain meaningful without an OpenWebUI account.
@@ -95,6 +99,8 @@ bool _isAccountlessBackendLocation(String location) {
       location.startsWith('/profile/hermes/live/') ||
       location == Routes.hermesTeams ||
       location.startsWith('/profile/hermes/teams/') ||
+      location == Routes.spaces ||
+      location.startsWith('/spaces/') ||
       location == Routes.about;
 }
 
@@ -817,6 +823,44 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               : '',
         ),
       ),
+    ),
+    GoRoute(
+      path: Routes.spaces,
+      name: RouteNames.spaces,
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const SpacesPage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.spaceLibrary,
+      name: RouteNames.spaceLibrary,
+      pageBuilder: (context, state) {
+        final spaceId = state.pathParameters['spaceId'] ?? '';
+        return _buildHermezPage(
+          context: context,
+          state: state,
+          child: isSpacesId(spaceId)
+              ? SpaceLibraryPage(spaceId: spaceId)
+              : const SpacesPage(),
+        );
+      },
+    ),
+    GoRoute(
+      path: Routes.spacePage,
+      name: RouteNames.spacePage,
+      pageBuilder: (context, state) {
+        final spaceId = state.pathParameters['spaceId'] ?? '';
+        final pageId = state.pathParameters['pageId'] ?? '';
+        return _buildHermezPage(
+          context: context,
+          state: state,
+          child: isSpacesId(spaceId) && isSpacesId(pageId)
+              ? SpacePageEditorPage(spaceId: spaceId, pageId: pageId)
+              : const SpacesPage(),
+        );
+      },
     ),
     GoRoute(
       path: Routes.hermesAttention,
