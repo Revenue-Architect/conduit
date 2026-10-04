@@ -504,6 +504,75 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('contracting home, a sheet dissolves into its card\'s own face '
+      'and ends on it; nothing slides inside the card', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.binding.setSurfaceSize(const Size(400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: Align(
+            alignment: const Alignment(0, 0.6),
+            child: Builder(
+              builder: (context) => HermezMotionSurface(
+                onOpen: (origin) => pushHermezSheet<void>(
+                  context,
+                  origin: origin,
+                  builder: (_) => const Material(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Text('Task sheet'),
+                    ),
+                  ),
+                ),
+                child: const SizedBox(
+                  width: 300,
+                  height: 80,
+                  child: Center(child: Text('Task')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Task'));
+    await tester.pumpAndSettle();
+    navigator.currentState!.pop();
+    await tester.pump();
+    double opacityAbove(Finder finder) => tester
+        .widget<Opacity>(
+          find.ancestor(of: finder, matching: find.byType(Opacity)).first,
+        )
+        .opacity;
+    var face = 0.0;
+    var sheet = 1.0;
+    var frames = 0;
+    while (find.text('Task sheet').evaluate().isNotEmpty && frames++ < 120) {
+      final nextFace = opacityAbove(find.byType(RawImage));
+      final nextSheet = opacityAbove(find.text('Task sheet'));
+      // One way only: the sheet's content gives way to the card's.
+      expect(nextFace, greaterThanOrEqualTo(face - 1e-9));
+      expect(nextSheet, lessThanOrEqualTo(sheet + 1e-9));
+      face = nextFace;
+      sheet = nextSheet;
+      // The content rides the shrinking card's top edge: never below it.
+      final aperture = tester.getTopLeft(find.byType(RawImage)).dy;
+      expect(
+        tester.getTopLeft(find.text('Task sheet')).dy,
+        closeTo(aperture, 1),
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    // The last frame drawn was the card itself, so nothing pops in.
+    expect(face, closeTo(1, 1e-6));
+    expect(sheet, closeTo(0, 1e-6));
+    expect(find.text('Task'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a sheet pushes the screen above it up, and pulls it down', (
     tester,
   ) async {
@@ -589,18 +658,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('a card widens first, then its top edge rises to the sheet', () {
+  test('a card widens almost in place, then its top edge rises to the '
+      'sheet over most of the motion', () {
     const card = Rect.fromLTWH(100, 700, 200, 80);
     const sheet = Rect.fromLTWH(0, 40, 400, 860);
     expect(hermezSheetAperture(card, sheet, 0), card);
-    final widened = hermezSheetAperture(card, sheet, 0.3);
+    // It starts widening where it is.
+    expect(hermezSheetAperture(card, sheet, 0.1).top, card.top);
+    final widened = hermezSheetAperture(card, sheet, 0.34);
     expect(widened.left, 0);
     expect(widened.right, 400);
-    expect(widened.top, card.top);
+    // The edge has only begun to rise while the card widens.
+    expect(card.top - widened.top, lessThan((card.top - sheet.top) * 0.2));
     final rising = hermezSheetAperture(card, sheet, 0.7);
     expect(rising.top, lessThan(card.top));
     expect(rising.top, greaterThan(sheet.top));
     expect(hermezSheetAperture(card, sheet, 1), sheet);
+    // The rise is spread out: no stretch of the motion sends the edge
+    // across the screen in a sprint (a close runs fastest at its start).
+    // It used to peak at over four times the distance per unit of
+    // progress. Coarse steps: Cubic curves are solved to within 0.001.
+    const steps = 100;
+    var steepest = 0.0;
+    for (var i = 1; i <= steps; i++) {
+      final a = hermezSheetAperture(card, sheet, (i - 1) / steps).top;
+      final b = hermezSheetAperture(card, sheet, i / steps).top;
+      steepest = math.max(steepest, (a - b).abs() * steps);
+    }
+    expect(steepest, lessThan((card.top - sheet.top) * 2.3));
   });
 
   testWidgets('a sheet can be dragged down to close', (tester) async {

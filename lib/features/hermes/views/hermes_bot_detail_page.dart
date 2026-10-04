@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +44,12 @@ final _botDataProvider = FutureProvider.autoDispose.family<_BotData, String>((
       !HermesConfig.isValidDesktopProfile(profile)) {
     return const _BotData([], [], [], []);
   }
+  // Kept for a while after the page closes, so opening it again arrives
+  // with what it showed last time instead of a spinner that is swapped for
+  // the details mid-flight. The page refreshes it once it has settled.
+  final keep = ref.keepAlive();
+  final release = Timer(const Duration(minutes: 5), keep.close);
+  ref.onDispose(release.cancel);
   Future<T> safe<T>(Future<T> Function() load, T fallback) async {
     try {
       return await load();
@@ -103,6 +111,46 @@ class HermesBotDetailPage extends ConsumerStatefulWidget {
 
 class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
   bool _opening = false;
+
+  /// Whether this page has finished growing out of its card. Until then it
+  /// keeps what it opened with (the details it had, or the spinner): content
+  /// that arrived mid-flight re-laid the whole page out while it was still
+  /// moving, which read as a stutter.
+  bool _settled = true;
+  Animation<double>? _routeAnimation;
+
+  /// Whether the details were already at hand when the page opened.
+  bool? _openedWithDetails;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (identical(animation, _routeAnimation)) return;
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    _routeAnimation = animation;
+    _settled =
+        animation == null || animation.status == AnimationStatus.completed;
+    if (!_settled) animation!.addStatusListener(_onRouteStatus);
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed || _settled) return;
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    if (!mounted) return;
+    setState(() => _settled = true);
+    // What it arrived with may be minutes old: fetch fresh now, keeping it
+    // on screen until the new details land.
+    if (_openedWithDetails ?? false) {
+      ref.invalidate(_botDataProvider(widget.profile));
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    super.dispose();
+  }
 
   /// Screen-local: whether the Systems compartment is open.
   bool _systemsExpanded = false;
@@ -170,7 +218,11 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
     final title = bot?.title ?? profile;
     final description = bot?.description?.trim();
     final morphId = hermezBotMorphId(bot?.name ?? profile);
-    final detail = data.asData?.value;
+    _openedWithDetails ??= data.hasValue;
+    final current = _settled || (_openedWithDetails ?? false);
+    // Kept on screen through a refresh, and held while the page grows.
+    final detail = current ? data.value : null;
+    final failed = current && detail == null && data.hasError;
     return HermesPageChrome(
       title: title,
       subtitle: description ?? 'Hermes profile',
@@ -349,14 +401,14 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
               presenceKey: ValueKey(
                 detail != null
                     ? 'data'
-                    : data.hasError
+                    : failed
                     ? 'error'
                     : 'loading',
               ),
               weight: HermezMotionWeight.medium,
               child: detail != null
                   ? _details(context, detail, palette, profile)
-                  : data.hasError
+                  : failed
                   ? const Padding(
                       padding: EdgeInsets.only(top: 14),
                       child: HermesPanel(

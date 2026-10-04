@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
     show ValueNotifier, kIsWeb, visibleForTesting;
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -3675,11 +3676,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.attachedOverlay != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: Spacing.xs),
-              child: widget.attachedOverlay!,
-            ),
+          _ComposerAttachedOverlay(child: widget.attachedOverlay),
           ?compactPromptOverlay,
           shell,
         ],
@@ -5203,6 +5200,159 @@ class _ContextSuggestionPlaceholder extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [leading],
       ),
+    );
+  }
+}
+
+/// The card attached above the composer (a question, an approval) rises out
+/// of the composer when it arrives and sinks back into it when it is
+/// answered or replaced, instead of appearing and vanishing on one frame.
+///
+/// A leaving card is drawn as it last looked: the live card rebuilds to
+/// nothing the moment its question is resolved, so it cannot animate itself
+/// away. The drawing takes no input.
+class _ComposerAttachedOverlay extends StatefulWidget {
+  const _ComposerAttachedOverlay({required this.child});
+
+  final Widget? child;
+
+  @override
+  State<_ComposerAttachedOverlay> createState() =>
+      _ComposerAttachedOverlayState();
+}
+
+class _LeavingComposerOverlay {
+  _LeavingComposerOverlay(this.image, this.size, this.controller);
+
+  final ui.Image image;
+  final Size size;
+  final AnimationController controller;
+}
+
+class _ComposerAttachedOverlayState extends State<_ComposerAttachedOverlay>
+    with TickerProviderStateMixin {
+  static const _enterDuration = Duration(milliseconds: 300);
+  static const _leaveDuration = Duration(milliseconds: 280);
+
+  final GlobalKey _face = GlobalKey();
+  late final AnimationController _enter = AnimationController(
+    vsync: this,
+    duration: _enterDuration,
+    value: widget.child == null ? 0 : 1,
+  );
+  final List<_LeavingComposerOverlay> _leaving = [];
+
+  bool get _reduced => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  @override
+  void didUpdateWidget(covariant _ComposerAttachedOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final previous = oldWidget.child;
+    final next = widget.child;
+    final replaced =
+        previous != null && (next == null || !Widget.canUpdate(previous, next));
+    if (replaced) _leave();
+    if (next != null && (previous == null || replaced)) {
+      if (_reduced) {
+        _enter.value = 1;
+      } else {
+        _enter
+          ..value = 0
+          ..forward();
+      }
+    }
+  }
+
+  void _leave() {
+    if (_reduced) return;
+    final boundary = _face.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary ||
+        !boundary.attached ||
+        !boundary.hasSize ||
+        boundary.debugNeedsPaint) {
+      return;
+    }
+    final ui.Image image;
+    try {
+      image = boundary.toImageSync(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+    } catch (_) {
+      return;
+    }
+    // From however far it had risen, if it was still arriving.
+    final controller = AnimationController(
+      vsync: this,
+      duration: _leaveDuration,
+      value: _enter.value,
+    );
+    final leaving = _LeavingComposerOverlay(image, boundary.size, controller);
+    _leaving.add(leaving);
+    controller.reverse().whenCompleteOrCancel(() {
+      if (mounted) setState(() => _leaving.remove(leaving));
+      controller.dispose();
+      image.dispose();
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final leaving in _leaving) {
+      leaving.controller.dispose();
+      leaving.image.dispose();
+    }
+    _enter.dispose();
+    super.dispose();
+  }
+
+  /// Rides the slot's top edge, so the card goes down behind the composer's
+  /// edge and comes up out of it. Nothing fades: it is a solid object.
+  Widget _travel(
+    Key key,
+    Animation<double> animation,
+    Curve curve,
+    Widget child,
+  ) => SizeTransition(
+    key: key,
+    sizeFactor: animation.drive(CurveTween(curve: curve)),
+    alignment: Alignment.topCenter,
+    child: child,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    if (child == null && _leaving.isEmpty) return const SizedBox.shrink();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final leaving in _leaving)
+          _travel(
+            ObjectKey(leaving),
+            leaving.controller,
+            Curves.easeInOutCubic,
+            IgnorePointer(
+              child: SizedBox.fromSize(
+                size: leaving.size,
+                child: RawImage(image: leaving.image, fit: BoxFit.fill),
+              ),
+            ),
+          ),
+        if (child != null)
+          _travel(
+            const ValueKey('composer-overlay-current'),
+            _enter,
+            Curves.easeOutCubic,
+            RepaintBoundary(
+              key: _face,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.xs),
+                child: child,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

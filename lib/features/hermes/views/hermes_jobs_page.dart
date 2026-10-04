@@ -150,23 +150,26 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
         // padded background here read as a decoration cut off mid-screen.
         child: Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 16),
+          // Its own layer, so the editor can carry the button's face.
           child: Builder(
-            builder: (buttonContext) => ConduitButton(
-              text: l10n.hermesJobNew,
-              icon: Icons.add,
-              isFullWidth: true,
-              isLoading: _creating,
-              onPressed: writable && !_creating
-                  ? () => _createJob(
-                      HermezMorphOrigin.of(
-                        buttonContext,
-                        radius: 16,
-                        color: HermezChatPalette.forBrightness(
-                          Theme.of(buttonContext).brightness,
-                        ).accent,
-                      ),
-                    )
-                  : null,
+            builder: (buttonContext) => RepaintBoundary(
+              child: ConduitButton(
+                text: l10n.hermesJobNew,
+                icon: Icons.add,
+                isFullWidth: true,
+                isLoading: _creating,
+                onPressed: writable && !_creating
+                    ? () => _createJob(
+                        HermezMorphOrigin.of(
+                          buttonContext,
+                          radius: 16,
+                          color: HermezChatPalette.forBrightness(
+                            Theme.of(buttonContext).brightness,
+                          ).accent,
+                        ),
+                      )
+                    : null,
+              ),
             ),
           ),
         ),
@@ -293,16 +296,16 @@ class _OtherBotsSchedules extends ConsumerWidget {
                   semanticLabel:
                       '${job.displayName}. $profile. '
                       '${job.enabled ? 'Active' : 'Paused'}',
-                  onTap: () async {
+                  originRadius: 16,
+                  originColor: palette.surface,
+                  // The surface hands over its face too, so the sheet
+                  // dissolves back into this row instead of popping it in.
+                  onOpen: (origin) async {
                     final run = await showHermesScheduledAgentSheet(
                       rowContext,
                       job: job,
                       profile: profile,
-                      origin: HermezMorphOrigin.of(
-                        rowContext,
-                        radius: 16,
-                        color: palette.surface,
-                      ),
+                      origin: origin,
                     );
                     if (run != null && rowContext.mounted) {
                       await openHermesSession(rowContext, ref, run);
@@ -465,206 +468,210 @@ class _JobCardState extends ConsumerState<_JobCard> {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return Container(
-      padding: const EdgeInsets.all(Spacing.md),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.border.withValues(alpha: 0.8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  job.displayName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.standard.copyWith(
-                    color: theme.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (_busy)
-                const Padding(
-                  padding: EdgeInsets.all(Spacing.sm),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else
-                AdaptiveSwitch(
-                  value: job.enabled,
-                  onChanged: writable ? _setEnabled : null,
-                ),
-            ],
-          ),
-          const SizedBox(height: Spacing.xs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(
-                  Icons.schedule,
-                  size: 14,
-                  color: theme.textSecondary,
-                ),
-              ),
-              const SizedBox(width: Spacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      describeHermesCronSchedule(job.schedule),
-                      style: AppTypography.bodySmallStyle.copyWith(
-                        color: theme.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
+    // Drawn on its own layer: the editor grows out of this card's face and
+    // dissolves back into it.
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.all(Spacing.md),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: palette.border.withValues(alpha: 0.8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    job.displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.standard.copyWith(
+                      color: theme.textPrimary,
+                      fontWeight: FontWeight.w600,
                     ),
-                    if (hermesScheduleNeedsRawDisplay(job.schedule))
+                  ),
+                ),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.all(Spacing.sm),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  AdaptiveSwitch(
+                    value: job.enabled,
+                    onChanged: writable ? _setEnabled : null,
+                  ),
+              ],
+            ),
+            const SizedBox(height: Spacing.xs),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: theme.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: Spacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        job.schedule,
-                        style: AppTypography.codeStyle.copyWith(
+                        describeHermesCronSchedule(job.schedule),
+                        style: AppTypography.bodySmallStyle.copyWith(
                           color: theme.textSecondary,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                  ],
+                      if (hermesScheduleNeedsRawDisplay(job.schedule))
+                        Text(
+                          job.schedule,
+                          style: AppTypography.codeStyle.copyWith(
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
+                if (!job.enabled) ...[
+                  const SizedBox(width: Spacing.sm),
+                  Text(
+                    l10n.hermesJobPaused,
+                    style: AppTypography.captionStyle.copyWith(
+                      color: theme.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            if (desktop) ...[
+              Wrap(
+                spacing: Spacing.sm,
+                runSpacing: Spacing.xxs,
+                children: [
+                  Text(
+                    '${l10n.hermesJobStateLabel}: ${job.state ?? (job.enabled ? 'active' : 'paused')}',
+                    style: AppTypography.bodySmallStyle.copyWith(
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    '${l10n.hermesJobDeliveryLabel}: ${job.deliveryTarget ?? 'local'}',
+                    style: AppTypography.bodySmallStyle.copyWith(
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  if (job.lastRun != null)
+                    Text(
+                      '${l10n.hermesJobLastLabel}: ${_formatJobTime(context, job.lastRun!)}',
+                      style: AppTypography.bodySmallStyle.copyWith(
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  if (job.nextRun != null)
+                    Text(
+                      '${l10n.hermesJobNextLabel}: ${_formatJobTime(context, job.nextRun!)}',
+                      style: AppTypography.bodySmallStyle.copyWith(
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                ],
               ),
-              if (!job.enabled) ...[
-                const SizedBox(width: Spacing.sm),
+              if (job.lastStatus?.isNotEmpty == true)
                 Text(
-                  l10n.hermesJobPaused,
-                  style: AppTypography.captionStyle.copyWith(
+                  job.lastStatus!,
+                  style: AppTypography.bodySmallStyle.copyWith(
+                    color: theme.textSecondary,
+                  ),
+                ),
+              if (job.lastError?.isNotEmpty == true)
+                HermesJobError(text: job.lastError!, color: theme.error),
+              if (job.lastDeliveryError?.isNotEmpty == true)
+                Text(
+                  'Delivery: ${job.lastDeliveryError}',
+                  style: AppTypography.bodySmallStyle.copyWith(
                     color: theme.error,
                   ),
                 ),
-              ],
+              const SizedBox(height: Spacing.xs),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _historyExpanded = !_historyExpanded),
+                  icon: Icon(
+                    _historyExpanded ? Icons.expand_less : Icons.history,
+                    size: 18,
+                  ),
+                  label: Text(l10n.hermesJobRunHistory),
+                ),
+              ),
+              if (_historyExpanded) _buildRunHistory(theme),
+              const SizedBox(height: Spacing.xs),
             ],
-          ),
-          const SizedBox(height: Spacing.sm),
-          if (desktop) ...[
-            Wrap(
-              spacing: Spacing.sm,
-              runSpacing: Spacing.xxs,
-              children: [
-                Text(
-                  '${l10n.hermesJobStateLabel}: ${job.state ?? (job.enabled ? 'active' : 'paused')}',
-                  style: AppTypography.bodySmallStyle.copyWith(
-                    color: theme.textSecondary,
+            if (writable)
+              Row(
+                children: [
+                  ConduitButton(
+                    key: ValueKey<String>('hermes-job-run-${job.id}'),
+                    text: l10n.hermesJobRunNow,
+                    isSecondary: true,
+                    isCompact: true,
+                    isLoading: _mutation == _JobMutation.run,
+                    onPressed: _busy ? null : _runNow,
                   ),
-                ),
-                Text(
-                  '${l10n.hermesJobDeliveryLabel}: ${job.deliveryTarget ?? 'local'}',
-                  style: AppTypography.bodySmallStyle.copyWith(
-                    color: theme.textSecondary,
+                  const Spacer(),
+                  ConduitIconButton(
+                    icon: Icons.edit_outlined,
+                    iconColor: theme.iconSecondary,
+                    tooltip: l10n.hermesJobEdit,
+                    onPressed: _busy ? null : _editJob,
+                    isCompact: true,
                   ),
-                ),
-                if (job.lastRun != null)
-                  Text(
-                    '${l10n.hermesJobLastLabel}: ${_formatJobTime(context, job.lastRun!)}',
-                    style: AppTypography.bodySmallStyle.copyWith(
-                      color: theme.textSecondary,
-                    ),
+                  ConduitIconButton(
+                    icon: Icons.delete_outline,
+                    iconColor: theme.error,
+                    tooltip: l10n.hermesJobDelete,
+                    onPressed: _busy
+                        ? null
+                        : () => setState(
+                            () => _confirmingDelete = !_confirmingDelete,
+                          ),
+                    isCompact: true,
                   ),
-                if (job.nextRun != null)
-                  Text(
-                    '${l10n.hermesJobNextLabel}: ${_formatJobTime(context, job.nextRun!)}',
-                    style: AppTypography.bodySmallStyle.copyWith(
-                      color: theme.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-            if (job.lastStatus?.isNotEmpty == true)
-              Text(
-                job.lastStatus!,
-                style: AppTypography.bodySmallStyle.copyWith(
-                  color: theme.textSecondary,
-                ),
+                ],
               ),
-            if (job.lastError?.isNotEmpty == true)
-              HermesJobError(text: job.lastError!, color: theme.error),
-            if (job.lastDeliveryError?.isNotEmpty == true)
-              Text(
-                'Delivery: ${job.lastDeliveryError}',
-                style: AppTypography.bodySmallStyle.copyWith(
-                  color: theme.error,
-                ),
-              ),
-            const SizedBox(height: Spacing.xs),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: () =>
-                    setState(() => _historyExpanded = !_historyExpanded),
-                icon: Icon(
-                  _historyExpanded ? Icons.expand_less : Icons.history,
-                  size: 18,
-                ),
-                label: Text(l10n.hermesJobRunHistory),
+            // The guarded delete opens inside the card, under the control
+            // that asked for it, and pushes the rest down.
+            HermezReveal(
+              visible: writable && _confirmingDelete,
+              weight: HermezMotionWeight.medium,
+              revealKey: ValueKey<String>('hermes-job-delete-${job.id}'),
+              child: _DeleteGuard(
+                title: l10n.hermesJobDeleteTitle,
+                message: l10n.hermesJobDeleteMessage,
+                confirmText: l10n.delete,
+                cancelText: l10n.cancel,
+                busy: _mutation == _JobMutation.delete,
+                onCancel: () => setState(() => _confirmingDelete = false),
+                onConfirm: _busy ? null : _deleteJob,
               ),
             ),
-            if (_historyExpanded) _buildRunHistory(theme),
-            const SizedBox(height: Spacing.xs),
           ],
-          if (writable)
-            Row(
-              children: [
-                ConduitButton(
-                  key: ValueKey<String>('hermes-job-run-${job.id}'),
-                  text: l10n.hermesJobRunNow,
-                  isSecondary: true,
-                  isCompact: true,
-                  isLoading: _mutation == _JobMutation.run,
-                  onPressed: _busy ? null : _runNow,
-                ),
-                const Spacer(),
-                ConduitIconButton(
-                  icon: Icons.edit_outlined,
-                  iconColor: theme.iconSecondary,
-                  tooltip: l10n.hermesJobEdit,
-                  onPressed: _busy ? null : _editJob,
-                  isCompact: true,
-                ),
-                ConduitIconButton(
-                  icon: Icons.delete_outline,
-                  iconColor: theme.error,
-                  tooltip: l10n.hermesJobDelete,
-                  onPressed: _busy
-                      ? null
-                      : () => setState(
-                          () => _confirmingDelete = !_confirmingDelete,
-                        ),
-                  isCompact: true,
-                ),
-              ],
-            ),
-          // The guarded delete opens inside the card, under the control
-          // that asked for it, and pushes the rest down.
-          HermezReveal(
-            visible: writable && _confirmingDelete,
-            weight: HermezMotionWeight.medium,
-            revealKey: ValueKey<String>('hermes-job-delete-${job.id}'),
-            child: _DeleteGuard(
-              title: l10n.hermesJobDeleteTitle,
-              message: l10n.hermesJobDeleteMessage,
-              confirmText: l10n.delete,
-              cancelText: l10n.cancel,
-              busy: _mutation == _JobMutation.delete,
-              onCancel: () => setState(() => _confirmingDelete = false),
-              onConfirm: _busy ? null : _deleteJob,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

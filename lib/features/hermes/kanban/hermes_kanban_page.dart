@@ -540,7 +540,10 @@ class _MorphTrigger extends StatelessWidget {
   final double radius;
   final Color color;
   final String semanticLabel;
-  final ValueChanged<HermezMorphOrigin?> onOpen;
+
+  /// Null while there is nothing to open yet: the button is in place but
+  /// does not respond.
+  final ValueChanged<HermezMorphOrigin?>? onOpen;
   final Widget child;
 
   @override
@@ -1148,19 +1151,26 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
               ),
             ],
           ),
-          floatingActionButton: _board == null
+          // The button is part of the screen from its first frame, so it
+          // arrives with the page. Shown only once the boards had loaded,
+          // Material's own entrance spun and scaled it in on its own.
+          floatingActionButtonAnimator:
+              FloatingActionButtonAnimator.noAnimation,
+          floatingActionButton: _board == null && !_loading
               ? null
               : _MorphTrigger(
                   hidden: _creatingFrom == 'fab',
                   radius: 16,
                   color: palette.accent,
                   semanticLabel: 'New task',
-                  onOpen: (origin) => _create(
-                    origin: origin,
-                    source: 'fab',
-                    originRadius: 16,
-                    originElevation: 2,
-                  ),
+                  onOpen: _board == null
+                      ? null
+                      : (origin) => _create(
+                          origin: origin,
+                          source: 'fab',
+                          originRadius: 16,
+                          originElevation: 2,
+                        ),
                   child: const _NewTaskPill(),
                 ),
           body: Column(

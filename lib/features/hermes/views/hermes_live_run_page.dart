@@ -430,32 +430,34 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                                 children: [
                                   for (final decision in decisions)
                                     Builder(
-                                      builder: (rowContext) => ListTile(
-                                        title: Text(
-                                          decision.prompt ??
-                                              'Hermes needs input',
-                                        ),
-                                        trailing: const Icon(
-                                          Icons.chevron_right_rounded,
-                                        ),
-                                        onTap: () async {
-                                          final resolved =
-                                              await showHermesAttentionResolutionSheet(
-                                                context,
-                                                decision,
-                                                origin: HermezMorphOrigin.of(
-                                                  rowContext,
-                                                  radius: 18,
-                                                  color: palette.surface,
-                                                ),
+                                      builder: (rowContext) => RepaintBoundary(
+                                        child: ListTile(
+                                          title: Text(
+                                            decision.prompt ??
+                                                'Hermes needs input',
+                                          ),
+                                          trailing: const Icon(
+                                            Icons.chevron_right_rounded,
+                                          ),
+                                          onTap: () async {
+                                            final resolved =
+                                                await showHermesAttentionResolutionSheet(
+                                                  context,
+                                                  decision,
+                                                  origin: HermezMorphOrigin.of(
+                                                    rowContext,
+                                                    radius: 18,
+                                                    color: palette.surface,
+                                                  ),
+                                                );
+                                            if (resolved == true && mounted) {
+                                              setState(
+                                                () => _pendingFuture =
+                                                    _loadPending(service),
                                               );
-                                          if (resolved == true && mounted) {
-                                            setState(
-                                              () => _pendingFuture =
-                                                  _loadPending(service),
-                                            );
-                                          }
-                                        },
+                                            }
+                                          },
+                                        ),
                                       ),
                                     ),
                                 ],

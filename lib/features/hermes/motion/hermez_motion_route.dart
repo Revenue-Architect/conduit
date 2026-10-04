@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 import '../feedback/hermez_feedback.dart';
+import '../widgets/hermez_chat_palette.dart';
 import 'hermez_morph_origin.dart';
 import 'hermez_motion_tokens.dart';
 
@@ -19,9 +20,11 @@ enum HermezExpandShape {
 
 /// Page for GoRouter destinations owned by Hermez.
 ///
-/// Nothing in these transitions animates opacity. A destination either grows
-/// out of the object that opened it ([HermezRouteMotion.expand]) or slides in
-/// over its sibling ([HermezRouteMotion.standard]). The screen underneath
+/// A destination either grows out of the object that opened it
+/// ([HermezRouteMotion.expand]) or slides in over its sibling
+/// ([HermezRouteMotion.standard]). The only fade is inside a growing object:
+/// its content and the source's own face hand over to each other near the
+/// source, so it starts and ends on exactly what the card shows. The screen underneath
 /// recedes or shifts back and returns on Back.
 class HermezMotionPage<T> extends Page<T> {
   const HermezMotionPage({
@@ -314,6 +317,11 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     // object came from, so it slides away instead of contracting into a
     // card that is no longer there.
     if (HermezRouteExits.leavingElsewhere) _slideOut = true;
+    // Contracting home lands on the object as it looks now (edited, toggled,
+    // updated while this was open), not as it looked when it was opened.
+    if (!_slideOut && effectiveMotion == HermezRouteMotion.expand) {
+      origin?.refreshFace();
+    }
     final popped = super.didPop(result);
     // The object returns into the card it came from: a soft closing latch.
     if (popped &&
@@ -454,6 +462,9 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
       // it back down.
       follow: sheet?._dragOffset,
       push: sheet?._pushAt,
+      backdrop: shape == HermezExpandShape.page
+          ? HermezChatPalette.forBrightness(Theme.of(context).brightness).canvas
+          : null,
       child: moving,
     );
   }
@@ -624,11 +635,18 @@ class HermezCoveredTransition extends StatelessWidget {
     required this.child,
     this.follow,
     this.push,
+    this.backdrop,
   });
 
   final HermezCoverKind kind;
   final Animation<double> animation;
   final Widget child;
+
+  /// For [HermezCoverKind.lift] on a full page: what shows in the strip the
+  /// page uncovers as it rises, instead of whatever lies behind the route
+  /// (the side navigation's list). Null keeps the strip see-through, as a
+  /// sheet under a sheet must be.
+  final Color? backdrop;
 
   /// Something besides [animation] that moves this screen, such as the drag
   /// of the sheet on top of it.
@@ -669,6 +687,7 @@ class HermezCoveredTransition extends StatelessWidget {
             final rise = kind != HermezCoverKind.lift
                 ? 0.0
                 : push?.call(value) ?? lift * value;
+            final backdrop = this.backdrop;
             return Transform.scale(
               scale: scale,
               child: FractionalTranslation(
@@ -678,9 +697,23 @@ class HermezCoveredTransition extends StatelessWidget {
                       : 0,
                   0,
                 ),
-                child: Transform.translate(
-                  offset: Offset(0, -rise),
-                  child: child,
+                child: Stack(
+                  fit: StackFit.passthrough,
+                  children: [
+                    // Never hit-tested: taps outside a sheet still reach its
+                    // barrier.
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _UncoveredStripPainter(
+                            color: backdrop,
+                            height: rise,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Transform.translate(offset: Offset(0, -rise), child: child),
+                  ],
                 ),
               ),
             );
@@ -689,6 +722,28 @@ class HermezCoveredTransition extends StatelessWidget {
       },
     );
   }
+}
+
+/// Fills the strip a rising page uncovers at its bottom edge.
+class _UncoveredStripPainter extends CustomPainter {
+  const _UncoveredStripPainter({required this.color, required this.height});
+
+  final Color? color;
+  final double height;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final color = this.color;
+    if (color == null || height <= 0) return;
+    canvas.drawRect(
+      Rect.fromLTRB(0, size.height - height - 1, size.width, size.height),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_UncoveredStripPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.height != height;
 }
 
 /// Grows a route out of its origin rectangle into a page or a sheet.
@@ -861,12 +916,15 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     );
   }
 
-  /// Near the source, the destination slides up and away inside the
-  /// aperture and uncovers the source object's own face, which rides the
-  /// aperture at its own proportions. Contracting, the card's content is
-  /// already in place when the route ends; opening, the destination slides
-  /// down over it. Nothing fades and nothing is swapped on a single frame.
-  /// Same widgets at every [t], so nothing remounts.
+  /// The destination and the source object's face share the travelling
+  /// aperture and both move with it; neither slides inside it. Near the
+  /// source the destination dissolves into the face, which rides the
+  /// aperture's top at its own proportions, so a contraction ends on the
+  /// card's own content and a growth starts from it. The two overlap, so the
+  /// object is never empty for long. Without a face (a live browser view
+  /// cannot be drawn) the destination stays as it is. A function of [t]
+  /// alone, so reversing mid-flight never jumps, and the same widgets at
+  /// every [t], so nothing remounts.
   static Widget _landing({
     required HermezMorphOrigin? origin,
     required Rect rect,
@@ -874,34 +932,30 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     required Widget destination,
   }) {
     final face = origin?.snapshot;
-    // 0 while the aperture is near the source, 1 once it has grown clear.
-    final raw = face == null ? 1.0 : ((t - 0.12) / 0.38).clamp(0.0, 1.0);
-    final cover = raw * raw * (3 - 2 * raw);
     final faceHeight = face == null || face.width == 0
         ? rect.height
         : rect.width * face.height / face.width;
+    final shown = face == null ? 1.0 : _smooth((t - 0.16) / 0.32);
+    final faceShown = face == null ? 0.0 : 1 - _smooth((t - 0.06) / 0.3);
     return Stack(
       fit: StackFit.expand,
       children: [
         if (face != null)
           Positioned.fromRect(
             rect: Rect.fromLTWH(rect.left, rect.top, rect.width, faceHeight),
-            child: RawImage(image: face, fit: BoxFit.fill),
+            child: Opacity(
+              opacity: faceShown,
+              child: RawImage(image: face, fit: BoxFit.fill),
+            ),
           ),
-        // The destination slides down and out through the aperture's bottom
-        // as one piece, uncovering the source's face from the top, where the
-        // face sits. Its top edge travels with it, so no more of the (much
-        // taller) page scrolls into view while it leaves.
-        ClipRect(
-          clipper: _LeavingEdge(rect, cover),
-          clipBehavior: cover >= 1 ? Clip.none : Clip.hardEdge,
-          child: Transform.translate(
-            offset: Offset(0, (1 - cover) * rect.height),
-            child: destination,
-          ),
-        ),
+        Opacity(opacity: shown, child: destination),
       ],
     );
+  }
+
+  static double _smooth(double x) {
+    final v = x.clamp(0.0, 1.0);
+    return v * v * (3 - 2 * v);
   }
 
   /// Maps the destination's final rectangle onto the travelling aperture:
@@ -921,26 +975,6 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     final height = math.min(bottom - top, size.height * factor);
     return Rect.fromLTRB(0, bottom - math.max(height, 0), size.width, bottom);
   }
-}
-
-/// The part of the aperture the leaving destination still covers: the
-/// bottom [cover] of it, below an edge that moves down as it leaves.
-class _LeavingEdge extends CustomClipper<Rect> {
-  const _LeavingEdge(this.aperture, this.cover);
-  final Rect aperture;
-  final double cover;
-
-  @override
-  Rect getClip(Size size) => Rect.fromLTRB(
-    aperture.left,
-    aperture.top + aperture.height * (1 - cover),
-    aperture.right,
-    aperture.bottom,
-  );
-
-  @override
-  bool shouldReclip(_LeavingEdge oldClipper) =>
-      oldClipper.aperture != aperture || oldClipper.cover != cover;
 }
 
 class _ApertureClipper extends CustomClipper<RRect> {
@@ -1008,18 +1042,21 @@ abstract final class HermezRouteExits {
 
 /// The outline of a card growing into a sheet at progress [t] (0 to 1).
 ///
-/// First the card widens to the sheet's width, staying where it is; then
-/// its top edge rises to the sheet's top. The bottom edge travels to the
-/// sheet's bottom throughout. [card] is where the card is laid out on the
-/// screen underneath, which the rising edge pushes up by exactly as much as
-/// the edge has risen, so the two stay in contact.
+/// The card widens to the sheet's width almost in place, and its top edge
+/// rises to the sheet's top, starting gently as it widens. The bottom edge
+/// travels to the sheet's bottom throughout. [card] is where the card is
+/// laid out on the screen underneath, which the rising edge pushes up by
+/// exactly as much as the edge has risen, so the two stay in contact.
 Rect hermezSheetAperture(Rect card, Rect end, double t) {
-  const widen = 0.3;
+  const widen = 0.34;
+  const riseFrom = 0.12;
   final across = Curves.easeOut.transform((t / widen).clamp(0.0, 1.0));
   // The rise starts slowly, as if taking the screen's weight, then carries
-  // it: resistance at first contact rather than a snap.
-  final rise = Curves.easeInOutCubic.transform(
-    ((t - widen) / (1 - widen)).clamp(0.0, 1.0),
+  // it: resistance at first contact rather than a snap. It begins while the
+  // card is still widening and spans most of the motion, so the edge never
+  // has to cross the screen in the short, fastest part of a close.
+  final rise = Curves.easeInOut.transform(
+    ((t - riseFrom) / (1 - riseFrom)).clamp(0.0, 1.0),
   );
   return Rect.fromLTRB(
     lerpDouble(card.left, end.left, across)!,

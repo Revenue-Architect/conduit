@@ -333,20 +333,22 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
         title: const Text('Hermes MCP'),
         actions: [
           Builder(
-            builder: (iconContext) => IconButton(
-              tooltip: 'Add from catalog',
-              onPressed: () => unawaited(
-                _run(
-                  () => _addPreset(
-                    HermezMorphOrigin.of(
-                      iconContext,
-                      radius: 24,
-                      color: Theme.of(iconContext).colorScheme.surface,
+            builder: (iconContext) => RepaintBoundary(
+              child: IconButton(
+                tooltip: 'Add from catalog',
+                onPressed: () => unawaited(
+                  _run(
+                    () => _addPreset(
+                      HermezMorphOrigin.of(
+                        iconContext,
+                        radius: 24,
+                        color: Theme.of(iconContext).colorScheme.surface,
+                      ),
                     ),
                   ),
                 ),
+                icon: const Icon(Icons.auto_awesome_outlined),
               ),
-              icon: const Icon(Icons.auto_awesome_outlined),
             ),
           ),
         ],
@@ -377,94 +379,99 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
                       radius: 14,
                       color: Theme.of(rowContext).colorScheme.surface,
                     );
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ListTile(
-                          title: Text(name),
-                          subtitle: Text(
-                            _serverSubtitle(server),
-                            maxLines: 5,
-                            overflow: TextOverflow.ellipsis,
+                    return RepaintBoundary(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ListTile(
+                            title: Text(name),
+                            subtitle: Text(
+                              _serverSubtitle(server),
+                              maxLines: 5,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            isThreeLine: true,
+                            trailing: _oauthPending.contains(name)
+                                ? const CircularProgressIndicator.adaptive()
+                                : IconButton(
+                                    tooltip: 'Server actions',
+                                    isSelected: open,
+                                    onPressed: () => setState(() {
+                                      _openActions = open ? null : name;
+                                      _confirmingRemove = null;
+                                    }),
+                                    icon: const Icon(Icons.more_horiz_rounded),
+                                  ),
                           ),
-                          isThreeLine: true,
-                          trailing: _oauthPending.contains(name)
-                              ? const CircularProgressIndicator.adaptive()
-                              : IconButton(
-                                  tooltip: 'Server actions',
-                                  isSelected: open,
-                                  onPressed: () => setState(() {
-                                    _openActions = open ? null : name;
-                                    _confirmingRemove = null;
-                                  }),
-                                  icon: const Icon(Icons.more_horiz_rounded),
-                                ),
-                        ),
-                        // Actions open in place under the server's row and
-                        // push the list down.
-                        HermezReveal(
-                          visible: open,
-                          weight: HermezMotionWeight.medium,
-                          revealKey: ValueKey('mcp-actions-$name'),
-                          child: _ActionTray(
-                            children: [
-                              _TrayAction(
-                                icon: Icons.network_check_rounded,
-                                label: 'Test',
-                                onTap: () => unawaited(_run(() => _test(name))),
-                              ),
-                              _TrayAction(
-                                icon: Icons.login_rounded,
-                                label: 'Authenticate',
-                                onTap: () =>
-                                    unawaited(_run(() => _oauth(name))),
-                              ),
-                              if (supportsCredentialUpdate)
+                          // Actions open in place under the server's row and
+                          // push the list down.
+                          HermezReveal(
+                            visible: open,
+                            weight: HermezMotionWeight.medium,
+                            revealKey: ValueKey('mcp-actions-$name'),
+                            child: _ActionTray(
+                              children: [
                                 _TrayAction(
-                                  icon: Icons.key_rounded,
-                                  label: 'Set API key',
+                                  icon: Icons.network_check_rounded,
+                                  label: 'Test',
+                                  onTap: () =>
+                                      unawaited(_run(() => _test(name))),
+                                ),
+                                _TrayAction(
+                                  icon: Icons.login_rounded,
+                                  label: 'Authenticate',
+                                  onTap: () =>
+                                      unawaited(_run(() => _oauth(name))),
+                                ),
+                                if (supportsCredentialUpdate)
+                                  _TrayAction(
+                                    icon: Icons.key_rounded,
+                                    label: 'Set API key',
+                                    onTap: () => unawaited(
+                                      _run(() => _setApiKey(name, rowOrigin())),
+                                    ),
+                                  ),
+                                _TrayAction(
+                                  icon: server.enabled
+                                      ? Icons.toggle_off_outlined
+                                      : Icons.toggle_on_outlined,
+                                  label: server.enabled
+                                      ? 'Disable tools'
+                                      : 'Enable tools',
                                   onTap: () => unawaited(
-                                    _run(() => _setApiKey(name, rowOrigin())),
+                                    _run(
+                                      () =>
+                                          _setEnabled(server, !server.enabled),
+                                    ),
                                   ),
                                 ),
-                              _TrayAction(
-                                icon: server.enabled
-                                    ? Icons.toggle_off_outlined
-                                    : Icons.toggle_on_outlined,
-                                label: server.enabled
-                                    ? 'Disable tools'
-                                    : 'Enable tools',
-                                onTap: () => unawaited(
-                                  _run(
-                                    () => _setEnabled(server, !server.enabled),
+                                _TrayAction(
+                                  icon: Icons.delete_outline_rounded,
+                                  label: 'Remove',
+                                  destructive: true,
+                                  onTap: () => setState(
+                                    () => _confirmingRemove =
+                                        _confirmingRemove == name ? null : name,
                                   ),
                                 ),
-                              ),
-                              _TrayAction(
-                                icon: Icons.delete_outline_rounded,
-                                label: 'Remove',
-                                destructive: true,
-                                onTap: () => setState(
-                                  () => _confirmingRemove =
-                                      _confirmingRemove == name ? null : name,
+                                HermezReveal(
+                                  visible: _confirmingRemove == name,
+                                  weight: HermezMotionWeight.medium,
+                                  revealKey: ValueKey('mcp-remove-$name'),
+                                  child: _RemoveGuard(
+                                    name: name,
+                                    onCancel: () => setState(
+                                      () => _confirmingRemove = null,
+                                    ),
+                                    onRemove: () =>
+                                        unawaited(_run(() => _remove(name))),
+                                  ),
                                 ),
-                              ),
-                              HermezReveal(
-                                visible: _confirmingRemove == name,
-                                weight: HermezMotionWeight.medium,
-                                revealKey: ValueKey('mcp-remove-$name'),
-                                child: _RemoveGuard(
-                                  name: name,
-                                  onCancel: () =>
-                                      setState(() => _confirmingRemove = null),
-                                  onRemove: () =>
-                                      unawaited(_run(() => _remove(name))),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -473,20 +480,22 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
         },
       ),
       floatingActionButton: Builder(
-        builder: (fabContext) => FloatingActionButton(
-          tooltip: 'Add MCP server',
-          onPressed: () => unawaited(
-            _run(
-              () => _add(
-                HermezMorphOrigin.of(
-                  fabContext,
-                  radius: 16,
-                  color: Theme.of(fabContext).colorScheme.primaryContainer,
+        builder: (fabContext) => RepaintBoundary(
+          child: FloatingActionButton(
+            tooltip: 'Add MCP server',
+            onPressed: () => unawaited(
+              _run(
+                () => _add(
+                  HermezMorphOrigin.of(
+                    fabContext,
+                    radius: 16,
+                    color: Theme.of(fabContext).colorScheme.primaryContainer,
+                  ),
                 ),
               ),
             ),
+            child: const Icon(Icons.add),
           ),
-          child: const Icon(Icons.add),
         ),
       ),
     );

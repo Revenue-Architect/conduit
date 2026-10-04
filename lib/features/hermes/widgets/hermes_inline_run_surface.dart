@@ -360,17 +360,21 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       ),
       duration: settle,
       curve: HermezMotion.curveMedium,
-      builder: (context, edge, child) => DecoratedBox(
+      // Its own layer, edge included: a review sheet grows out of this card's
+      // face and dissolves back into it.
+      builder: (context, edge, child) => RepaintBoundary(
         key: _surfaceKey,
-        decoration: BoxDecoration(
-          color: palette.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: edge ?? palette.border,
-            width: attention ? 1.5 : 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: edge ?? palette.border,
+              width: attention ? 1.5 : 1,
+            ),
           ),
+          child: child,
         ),
-        child: child,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),

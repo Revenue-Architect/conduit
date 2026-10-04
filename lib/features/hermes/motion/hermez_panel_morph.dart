@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui show ImageFilter;
 import 'dart:ui' show lerpDouble;
@@ -18,24 +19,30 @@ typedef HermezPanelFaceBuilder = Widget Function(
 /// The motion tokens of Transitions.dev's "Dropdown menu morph" (also named
 /// "Plus to menu morph"), which this control reproduces.
 ///
-/// This is the one Hermez control that deliberately cross-fades and blurs:
-/// the reference design calls for it.
+/// This is the one Hermez control that deliberately cross-fades: the
+/// reference design calls for it.
 abstract final class HermezPanelMotion {
   /// `--morph-open-dur`: surface size and corner, content slide and scale.
-  static const openDuration = Duration(milliseconds: 350);
+  static const openDuration = Duration(milliseconds: 320);
 
   /// `--morph-close-dur`: surface size and corner on the way home.
-  static const closeDuration = Duration(milliseconds: 340);
+  static const closeDuration = Duration(milliseconds: 320);
 
   /// `--morph-fade-dur`: the plus and the content cross-fade.
-  static const fadeDuration = Duration(milliseconds: 200);
+  static const fadeDuration = Duration(milliseconds: 180);
 
-  /// `--morph-ease`: the surface opens with a slight overshoot.
-  static const openEase = Cubic(0.34, 1.25, 0.64, 1);
+  /// Opening: the surface leaves the button at speed and settles into the
+  /// panel. No overshoot: a panel that grows past its size and pulls back
+  /// reads as a wobble, not as the button opening.
+  static const openEase = Cubic(0.22, 1, 0.36, 1);
 
-  /// `--morph-close-ease`: everything else, and the close.
-  // Eased both ways so the fold home settles instead of snapping shut.
+  /// The fold home: eased both ways so it settles into the button instead
+  /// of snapping shut.
   static const closeEase = Cubic(0.4, 0, 0.2, 1);
+
+  /// The content and the plus trade places on a quick ease-out, so the swap
+  /// is under way on the first frame.
+  static const fadeEase = Cubic(0.2, 0, 0, 1);
 
   /// `--morph-r-open`: the open panel's corner radius.
   static const openRadius = 20.0;
@@ -49,7 +56,8 @@ abstract final class HermezPanelMotion {
   /// `--morph-scale`.
   static const scale = 0.97;
 
-  /// `--morph-blur` (2px).
+  /// `--morph-blur` (2px), on the plus only. Blurring the whole panel every
+  /// frame cost more than it showed.
   static const blur = 2.0;
 }
 
@@ -70,7 +78,7 @@ class HermezMorphFrame {
       fade = value,
       move = value;
 
-  /// Surface size and corner: 0 the button, 1 the panel. Opening overshoots.
+  /// Surface size and corner: 0 the button, 1 the panel.
   final double size;
 
   /// Opacity and blur of the content (the plus is the inverse): 0 to 1.
@@ -93,14 +101,14 @@ class HermezMorphFrame {
     if (opening) {
       return HermezMorphFrame(
         size: eased(HermezPanelMotion.openEase, open),
-        fade: eased(HermezPanelMotion.closeEase, fade),
-        move: eased(HermezPanelMotion.closeEase, open),
+        fade: eased(HermezPanelMotion.fadeEase, fade),
+        move: eased(HermezPanelMotion.openEase, open),
       );
     }
     return HermezMorphFrame(
       size: 1 - eased(HermezPanelMotion.closeEase, close),
-      fade: 1 - eased(HermezPanelMotion.closeEase, fade),
-      move: 1 - eased(HermezPanelMotion.closeEase, open),
+      fade: 1 - eased(HermezPanelMotion.fadeEase, fade),
+      move: 1 - eased(HermezPanelMotion.closeEase, close),
     );
   }
 
@@ -126,8 +134,9 @@ class HermezMorphFrame {
 ///
 /// With the keyboard up the anchored edge moves above it, so the whole panel
 /// rises as one object. The caller hides the real button while this is up
-/// and shows it again when the returned future completes, which is only after
-/// the panel has gone home.
+/// and shows it again when the returned future completes: in the frame the
+/// panel lands on the button, which is also the frame the panel goes, so
+/// there is never a frame with neither.
 Future<T?> pushHermezPanel<T>(
   BuildContext context, {
   required HermezMorphOrigin origin,
@@ -156,7 +165,23 @@ Future<T?> pushHermezPanel<T>(
     reducedMotion: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
   );
   final result = await navigator.push<T>(route);
-  await route.completed;
+  // Not route.completed: that resolves after the route is disposed, a frame
+  // after the panel has stopped being drawn, and a button shown only then
+  // blinked out for that frame.
+  final animation = route.animation;
+  if (animation != null && animation.status != AnimationStatus.dismissed) {
+    final landed = Completer<void>();
+    void onStatus(AnimationStatus status) {
+      if (status != AnimationStatus.dismissed) return;
+      animation.removeStatusListener(onStatus);
+      landed.complete();
+    }
+
+    animation.addStatusListener(onStatus);
+    // A route removed without animating never lands; it is disposed.
+    await Future.any([landed.future, route.completed]);
+    if (!landed.isCompleted) animation.removeStatusListener(onStatus);
+  }
   return result;
 }
 
@@ -248,6 +273,7 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
     // The last value notification arrives before the status flips to
     // completed, so input would never unlock from the value alone.
     animation.addStatusListener(_onStatus);
+    _direction = _moving(animation.status) ? animation.status : null;
   }
 
   @override
@@ -256,7 +282,16 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
     super.dispose();
   }
 
+  /// The direction this motion started in, kept until it lands (as
+  /// [CurvedAnimation] does): a tap outside that reverses an opening
+  /// mid-flight would otherwise switch mappings and jump the panel.
+  AnimationStatus? _direction;
+
+  static bool _moving(AnimationStatus status) =>
+      status == AnimationStatus.forward || status == AnimationStatus.reverse;
+
   void _onStatus(AnimationStatus status) {
+    _direction = _moving(status) ? _direction ?? status : null;
     if (mounted) setState(() {});
   }
 
@@ -302,7 +337,7 @@ class _HermezPanelPageState<T> extends State<_HermezPanelPage<T>> {
             AnimationStatus.dismissed => const HermezMorphFrame.at(0),
             _ => HermezMorphFrame.of(
               animation.value,
-              opening: status == AnimationStatus.forward,
+              opening: (_direction ?? status) == AnimationStatus.forward,
             ),
           };
           // Input waits for the panel to be open: a moving target cannot
@@ -375,8 +410,8 @@ class _PlusFace extends StatelessWidget {
   }
 }
 
-/// `.t-morph-menu` arriving: fades and sharpens over the fade duration,
-/// slides in and scales up over the open duration.
+/// `.t-morph-menu` arriving: fades in over the fade duration, slides in and
+/// scales up over the open duration.
 class _MenuContent extends StatelessWidget {
   const _MenuContent({required this.frame, required this.child});
 
@@ -385,7 +420,6 @@ class _MenuContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sigma = HermezPanelMotion.blur * (1 - frame.fade);
     final scale = lerpDouble(HermezPanelMotion.scale, 1, frame.move)!;
     return Opacity(
       opacity: frame.fade.clamp(0.0, 1.0),
@@ -399,11 +433,7 @@ class _MenuContent extends StatelessWidget {
             1,
           )
           ..scaleByDouble(scale, scale, 1, 1),
-        child: ImageFiltered(
-          enabled: sigma > 0.01,
-          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-          child: child,
-        ),
+        child: child,
       ),
     );
   }

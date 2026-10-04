@@ -9,7 +9,7 @@ Updated 2026-09-28 (night), after the physical-motion rewrite, two device feedba
 3. Phone package is `app.cogwheel.conduit.debug`. Wireless ADB (Samsung SM-S938W): serial `adb-R5CY13VFPEP-JAeGpv._adb-tls-connect._tcp`; if `adb devices` is empty after an adb restart, run `adb mdns services` and the phone reappears. `adb install -r` keeps the Hermes account. Toolchain: `../toolchain/flutter`, `../toolchain/android-sdk`, `../toolchain/jdk-17.0.20.1+1`.
 4. Backups outside git: `work/backups/pre-motion-v2-20260928` (HEAD bundle, the pre-session uncommitted patch, copies of dirty files). Device frame captures and test logs: `work/diagnostics/hermez-motion-v2-20260928`.
 
-**No fades.** The user's hard rule: nothing in Hermez animates opacity. Use the primitives in `lib/features/hermes/motion/` (`HermezMotionSurface`, `HermezMorph*`, `HermezRoute`/`pushHermezSheet`, `HermezEntrance`, `HermezPresence`, `HermezSize`, `HermezMotionGroup`, `HermezIconSwap`) and `showConduitDialog` for dialogs. Do not add `FadeTransition`, `AnimatedOpacity`, `AnimatedSwitcher` default transitions, `.fadeIn()`, or plain `showDialog`. `nib_motion` 0.3.1 is pinned and wrapped.
+**No fades.** The user's hard rule: nothing in Hermez animates opacity, apart from the four sanctioned exceptions listed at the top of `docs/HERMEZ_MOTION_SYSTEM.md` (sheet dim, side-navigation labels, the plus-to-panel morph, and the landing handoff inside a growing card). Use the primitives in `lib/features/hermes/motion/` (`HermezMotionSurface`, `HermezMorph*`, `HermezRoute`/`pushHermezSheet`, `HermezEntrance`, `HermezPresence`, `HermezSize`, `HermezMotionGroup`, `HermezIconSwap`) and `showConduitDialog` for dialogs. Do not add `FadeTransition`, `AnimatedOpacity`, `AnimatedSwitcher` default transitions, `.fadeIn()`, or plain `showDialog`. `nib_motion` 0.3.1 is pinned and wrapped.
 
 ## 2026-09-28 late pass (device feedback round 2)
 
@@ -641,3 +641,38 @@ Spec: `docs/HERMEZ_A2UI_CATALOG_EXPANSION_SPEC.md`. Phases 1–5 are in commits 
   - The default bot, asked for a restart command, loaded the skill and answered with a CommandBlock (Copy), an InfoRow with state Unknown, and a full-outline ActionCallout. No edge stripe.
   - The remaining §66 prompts were not run (the user took the phone).
 - **Log note:** after the restart the gateway warns "Skipping secondary profile fast/local/strong: port-binding platforms with multiplex_profiles on". This is profile `config.yaml` state and was not changed here. Chats are served through the default listener's `/p/<profile>/` prefix.
+
+## 2026-10-03: card closes land on the card; panel, Kanban, chat and drawer polish
+
+User report (screen recording): cards slid their content down fast while shrinking home, then popped into the card; New task and lane + blinked at the end of the close; the Kanban New task button flipped in; bot detail → new chat flashed the side navigation; the clarify card vanished when answered; everything felt slow. Earlier the same day `f964d2dd` turned off `HeroMode` on Hermez pages and `143da7e3` removed `HermezSize` under closing bot cards and schedule sheets; neither had a section here.
+
+- **Landing (`_HermezSheetFrame._landing`).**
+  - The destination no longer slides out through the aperture. It and the source's face cross-dissolve while both ride the moving aperture: destination 1 to 0 over t 0.48 to 0.16, face 0 to 1 over t 0.36 to 0.06.
+  - This is a deliberate exception to "no opacity", listed at the top of `HERMEZ_MOTION_SYSTEM.md`. Without a face the destination stays as it is (the live browser aperture cannot be drawn).
+- **Faces everywhere.**
+  - `HermezMorphOrigin.of` now draws the face itself from the first same-size `RepaintBoundary` at the top of the source's subtree, and `didPop` calls `refreshFace()` so a close lands on the card as it is now.
+  - Boundaries were added for the Jobs page job card (Edit), the New scheduled job button, the attention rows, the live-run pending rows, the MCP rows, catalog button and FAB, and the inline run surface (key moved onto the boundary).
+  - The Jobs OTHER BOTS rows now use `onOpen`.
+- **Sheet aperture.** It widens over t 0 to 0.34, and the top edge rises over t 0.12 to 1 on ease-in-out (was ease-in-out cubic over t 0.3 to 1). The peak edge speed is about half, so a close no longer throws the content down in its first 200 ms.
+- **Lifted page backdrop.** `HermezCoveredTransition.backdrop` paints the strip a pushed page uncovers in the canvas colour (pages only, never hit-tested), so the side navigation no longer shows under a rising sheet.
+- **Spring tails.** `HermezSpringCurve` settles at 0.8 % and under 0.15 travel/s (was 0.2 % and 0.1).
+  - Settle times: light 265 ms, medium 353 ms, heavy 382 ms, push 622 ms (was 302, 433, 463, 763).
+  - The New scheduled job sheet closes 18 % faster.
+- **Panel morph (Home +, New task, lane +).**
+  - Open is 320 ms on `Cubic(0.22, 1, 0.36, 1)` with no overshoot. Close is 320 ms on `Cubic(0.4, 0, 0.2, 1)`. The fade is 180 ms on `Cubic(0.2, 0, 0, 1)`.
+  - Only the plus blurs now; the content panel no longer does.
+  - The mapping keeps the direction it started in until it lands, so a tap outside mid-open never jumps.
+  - `pushHermezPanel` returns on the frame the panel lands, not after route disposal. That disposal came one frame later, and a caller-hidden button blinked out for that frame (the end-of-close glitch).
+- **Kanban.** The New task button is present from the first frame (inert until the boards load) with `FloatingActionButtonAnimator.noAnimation`. Before, it appeared after the boards request and Material's FAB entrance spun it in.
+- **Bot detail → chat flash.**
+  - Home is pushed over the chat shell from the open drawer, so the drawer stayed open underneath. Leaving for Chat revealed it, then slid it shut.
+  - `DrawerShellPage` now calls `ResponsiveDrawerLayoutState.closeUnseen()` when Chat becomes the destination while its route is covered: instant, silent, no latch.
+- **Bot detail open stutter.**
+  - `_botDataProvider` was auto-disposed, so every open refetched and swapped spinner → details mid-flight in one long frame.
+  - It is now kept for 5 minutes. The page shows what it opened with until its route settles, then refreshes in the background. `.value` keeps the old details visible during refresh and pull-to-refresh.
+- **Clarify / approval card above the composer.** `_ComposerAttachedOverlay` in `modern_chat_input.dart` rises out of the composer and sinks back into it (SizeTransition riding the top edge, no fade). A leaving card is drawn from a snapshot, because the live card rebuilds to nothing once answered.
+- **Tests:**
+  - New: `contracting home, a sheet dissolves into its card's own face…` and `the caller hears back on the frame the panel lands…`.
+  - Updated: the panel tokens, timing, blur and aperture tests.
+  - `test/features/{hermes,navigation,chat}`: 2193 pass. The 5 failures are the known baseline: the auth epoch test, 3× clipboard symlink, and the timezone-dependent sidebar note row.
+  - `hermes_decision_card_test` "wall-clock expiry" also fails on a loaded machine (its 50 ms wall-clock budget lapses during setup). It is pre-existing and unrelated.

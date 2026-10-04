@@ -43,7 +43,7 @@ abstract final class HermezMotion {
     stiffness: 385,
     damping: 39.3,
   );
-  // A growing page or sheet: critically damped, ~0.43 s to rest.
+  // A growing page or sheet: critically damped, ~0.38 s to rest.
   static const springHeavy = NibSpringDescription(
     mass: 1,
     stiffness: 300,
@@ -52,7 +52,7 @@ abstract final class HermezMotion {
 
   // A sheet pushing the screen it grew out of: heavier and slower than a
   // page, still critically damped, so the push and the pull read as moving
-  // real weight (~0.6 s to 99 %, ~0.75 s to rest).
+  // real weight (~0.6 s to rest).
   static const springPush = NibSpringDescription(
     mass: 1.7,
     stiffness: 210,
@@ -146,10 +146,12 @@ class HermezSpringCurve extends Curve {
     final simulation = SpringSimulation(spring.toFlutter(), 0, 1, 0);
     const step = 1 / 600;
     for (var time = step; time < 3; time += step) {
-      // Visibly at rest: within 0.2 % of the target and barely moving. The
-      // curve is rescaled so this moment is exactly 1.
-      if ((simulation.x(time) - 1).abs() < 0.002 &&
-          simulation.dx(time).abs() < 0.1) {
+      // Visibly at rest: within 0.8 % of the target and moving under a
+      // pixel a frame. The curve is rescaled so this moment is exactly 1.
+      // A tighter test only added a long, invisible tail that kept routes
+      // (and whatever waits for them) running after the motion had ended.
+      if ((simulation.x(time) - 1).abs() < 0.008 &&
+          simulation.dx(time).abs() < 0.15) {
         return time;
       }
     }

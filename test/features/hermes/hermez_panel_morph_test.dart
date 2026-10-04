@@ -37,6 +37,7 @@ class _HarnessState extends State<_Harness> {
   int taps = 0;
   bool grown = false;
   bool? closedWith;
+  bool returned = false;
   final turns = <double>[];
 
   Future<void> _open(BuildContext context) async {
@@ -85,7 +86,12 @@ class _HarnessState extends State<_Harness> {
         ),
       ),
     );
-    if (mounted) setState(() => closedWith = result);
+    if (mounted) {
+      setState(() {
+        closedWith = result;
+        returned = true;
+      });
+    }
   }
 
   @override
@@ -98,6 +104,7 @@ class _HarnessState extends State<_Harness> {
     home: Scaffold(
       body: Stack(
         children: [
+          if (returned) const Positioned(top: 0, child: Text('returned')),
           Positioned(
             right: widget.topLeft ? null : 16,
             bottom: widget.topLeft ? null : 16,
@@ -169,12 +176,14 @@ void main() {
   }
 
   test('the motion tokens are those of the Dropdown menu morph', () {
-    expect(HermezPanelMotion.openDuration, const Duration(milliseconds: 350));
-    // The close is eased and slower than the reference so it settles home.
-    expect(HermezPanelMotion.closeDuration, const Duration(milliseconds: 340));
-    expect(HermezPanelMotion.fadeDuration, const Duration(milliseconds: 200));
-    expect(HermezPanelMotion.openEase, const Cubic(0.34, 1.25, 0.64, 1));
+    expect(HermezPanelMotion.openDuration, const Duration(milliseconds: 320));
+    // The close is eased both ways so it settles home.
+    expect(HermezPanelMotion.closeDuration, const Duration(milliseconds: 320));
+    expect(HermezPanelMotion.fadeDuration, const Duration(milliseconds: 180));
+    // Opening arrives at speed and settles, with no overshoot.
+    expect(HermezPanelMotion.openEase, const Cubic(0.22, 1, 0.36, 1));
     expect(HermezPanelMotion.closeEase, const Cubic(0.4, 0, 0.2, 1));
+    expect(HermezPanelMotion.fadeEase, const Cubic(0.2, 0, 0, 1));
     expect(HermezPanelMotion.openRadius, 20);
     expect(HermezPanelMotion.slide, 40);
     expect(HermezPanelMotion.scale, 0.97);
@@ -182,22 +191,25 @@ void main() {
   });
 
   test('each property keeps its own timing, both ways', () {
-    // Opening, at the end of the 200 ms fade the content is fully in while
-    // the size (350 ms, overshooting ease) is still travelling.
-    final fadeDone = HermezMorphFrame.of(200 / 350, opening: true);
+    // Opening, at the end of the 180 ms fade the content is fully in while
+    // the size (320 ms) is still travelling.
+    final fadeDone = HermezMorphFrame.of(180 / 320, opening: true);
     expect(fadeDone.fade, closeTo(1, 0.001));
-    expect(fadeDone.size, lessThan(1.1));
+    expect(fadeDone.size, lessThan(1));
     expect(fadeDone.move, lessThan(1));
-    // The open size overshoots past the panel before settling.
+    // The open size never passes the panel: it settles, it does not wobble.
     var peak = 0.0;
-    for (var i = 0; i <= 350; i++) {
-      final f = HermezMorphFrame.of(i / 350, opening: true);
+    var last = 0.0;
+    for (var i = 0; i <= 320; i++) {
+      final f = HermezMorphFrame.of(i / 320, opening: true);
       if (f.size > peak) peak = f.size;
+      expect(f.size, greaterThanOrEqualTo(last - 1e-9));
+      last = f.size;
     }
-    expect(peak, greaterThan(1.01));
-    // Closing, 300 ms of the 340 ms in, the content is fully out and the
+    expect(peak, lessThanOrEqualTo(1 + 1e-9));
+    // Closing, 290 ms of the 320 ms in, the content is fully out and the
     // surface is nearly home.
-    final closing = HermezMorphFrame.of(1 - 300 / 340, opening: false);
+    final closing = HermezMorphFrame.of(1 - 290 / 320, opening: false);
     expect(closing.fade, closeTo(0, 0.001));
     expect(closing.size, lessThan(0.1));
     expect(HermezMorphFrame.of(0, opening: false).size, closeTo(0, 1e-9));
@@ -246,7 +258,7 @@ void main() {
   });
 
   testWidgets('the plus fades, blurs, slides and turns; the content fades '
-      'and sharpens in', (tester) async {
+      'in', (tester) async {
     await pumpHarness(tester);
     await _open(tester);
     await tester.pump(const Duration(milliseconds: 60));
@@ -256,8 +268,9 @@ void main() {
     expect(faceOpacity, inExclusiveRange(0, 1));
     expect(contentOpacity, inExclusiveRange(0, 1));
     expect(faceOpacity + contentOpacity, closeTo(1, 0.001));
+    // Only the small plus blurs; the whole panel is never filtered.
     final blurs = tester.widgetList<ImageFiltered>(find.byType(ImageFiltered));
-    expect(blurs.where((b) => b.enabled), hasLength(2));
+    expect(blurs.where((b) => b.enabled), hasLength(1));
     final state = tester.state<_HarnessState>(find.byType(_Harness));
     expect(state.turns.last, inExclusiveRange(0, 1));
 
@@ -287,7 +300,7 @@ void main() {
     expect(state.taps, 1);
   });
 
-  testWidgets('tapping outside runs it home into the button in 340 ms and '
+  testWidgets('tapping outside runs it home into the button in 320 ms and '
       'reports the result only afterwards', (tester) async {
     await pumpHarness(tester);
     final button = tester.getRect(find.byKey(_triggerKey));
@@ -307,6 +320,22 @@ void main() {
     await tester.pump();
     expect(find.byType(HermezPanelMorph), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the caller hears back on the frame the panel lands, so a '
+      'button it hid is never missing for a frame', (tester) async {
+    await pumpHarness(tester);
+    await _open(tester);
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(200, 60));
+    var frames = 0;
+    while (find.byType(HermezPanelMorph).evaluate().isNotEmpty &&
+        frames++ < 120) {
+      await tester.pump(const Duration(milliseconds: 8));
+    }
+    expect(find.byType(HermezPanelMorph), findsNothing);
+    // Built in the same frame the panel went: no frame without either.
+    expect(find.text('returned'), findsOneWidget);
   });
 
   testWidgets('the panel follows its content, anchored edge fixed', (

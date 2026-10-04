@@ -402,6 +402,19 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
     _settleTo(0.0);
   }
 
+  /// Closes the mobile navigation at once, with no motion and no latch: for
+  /// a drawer nobody can see, such as one left open under a page that is
+  /// leaving for this shell's chat. Revealed later, it is already shut.
+  void closeUnseen() {
+    if (_isTablet(context)) return;
+    _navTarget = 0.0;
+    _pendingSettledEndpoint = null;
+    _controller.stop();
+    if (!_controller.isDismissed) _controller.value = 0.0;
+    _lastSettledEndpoint = _DrawerSettleEndpoint.closed;
+    _setComposeMobileDrawerChrome(false);
+  }
+
   @override
   void toggle() {
     if (_isTablet(context)) {

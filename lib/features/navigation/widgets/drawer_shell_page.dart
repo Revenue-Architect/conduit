@@ -51,10 +51,12 @@ class DrawerShellPage extends ConsumerStatefulWidget {
 class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
   final _drawerKey = GlobalKey<ResponsiveDrawerLayoutState>();
   GoRouter? _observedRouter;
+  ModalRoute<Object?>? _route;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _route = ModalRoute.of(context);
     final router = GoRouter.of(context);
     if (identical(router, _observedRouter)) return;
     _observedRouter?.routeInformationProvider.removeListener(_onRouteChanged);
@@ -66,6 +68,16 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
   void _onRouteChanged() {
     if (_observedRouter?.routeInformationProvider.value.uri.path !=
         Routes.chat) {
+      return;
+    }
+    // Leaving a page above this shell for Chat (a conversation opened from
+    // Home or a bot): the drawer left open under it, from when Home was
+    // opened from it, shuts before the shell is uncovered. Closed later, it
+    // slid shut in plain view on the way to the chat.
+    if (_route?.isCurrent == false &&
+        mounted &&
+        !usesPersistentTabletSidebar(context)) {
+      _drawerKey.currentState?.closeUnseen();
       return;
     }
     // A session selected on Hermes Home can bind before this shell is visible.

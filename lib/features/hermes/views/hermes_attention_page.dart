@@ -142,50 +142,53 @@ class HermesAttentionPage extends ConsumerWidget {
                   (item) => item.kind == kind,
                 )) ...[
                   Builder(
-                    builder: (rowContext) => HermesPanel(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(_icon(kind), color: palette.accent),
-                        // What is asked, by which bot, in which conversation.
-                        title: Text(
-                          (item.prompt?.trim().isNotEmpty ?? false)
-                              ? item.prompt!.trim()
-                              : _title(kind),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                    builder: (rowContext) => RepaintBoundary(
+                      child: HermesPanel(
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(_icon(kind), color: palette.accent),
+                          // What is asked, by which bot, in which conversation.
+                          title: Text(
+                            (item.prompt?.trim().isNotEmpty ?? false)
+                                ? item.prompt!.trim()
+                                : _title(kind),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            [
+                              if (item.profile?.isNotEmpty ?? false)
+                                item.profile!,
+                              switch (sessionTitles[item.storedSessionId]) {
+                                final String title
+                                    when title.trim().isNotEmpty =>
+                                  'In “${title.trim()}”',
+                                _ => 'Open to respond',
+                              },
+                            ].join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () async {
+                            // The request card grows into its resolution sheet
+                            // and contracts back into it.
+                            final resolved =
+                                await showHermesAttentionResolutionSheet(
+                                  context,
+                                  item,
+                                  origin: HermezMorphOrigin.of(
+                                    rowContext,
+                                    radius: 18,
+                                    color: palette.surface,
+                                  ),
+                                );
+                            if (resolved == true) {
+                              ref.invalidate(_attentionDecisionsProvider);
+                            }
+                          },
                         ),
-                        subtitle: Text(
-                          [
-                            if (item.profile?.isNotEmpty ?? false)
-                              item.profile!,
-                            switch (sessionTitles[item.storedSessionId]) {
-                              final String title when title.trim().isNotEmpty =>
-                                'In “${title.trim()}”',
-                              _ => 'Open to respond',
-                            },
-                          ].join(' · '),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () async {
-                          // The request card grows into its resolution sheet
-                          // and contracts back into it.
-                          final resolved =
-                              await showHermesAttentionResolutionSheet(
-                                context,
-                                item,
-                                origin: HermezMorphOrigin.of(
-                                  rowContext,
-                                  radius: 18,
-                                  color: palette.surface,
-                                ),
-                              );
-                          if (resolved == true) {
-                            ref.invalidate(_attentionDecisionsProvider);
-                          }
-                        },
                       ),
                     ),
                   ),
