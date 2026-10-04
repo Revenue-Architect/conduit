@@ -654,10 +654,20 @@ class _LanePlus extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
+    // A round object, not a bare glyph: the panel grows out of it and folds
+    // back into it. With only a glyph, the panel landed as a tile that was
+    // not there and vanished on the last frame.
     return SizedBox.square(
       dimension: 48,
-      child: Center(
-        child: _turningPlus(Icons.add_rounded, palette.accent, turn),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          shape: BoxShape.circle,
+          border: Border.all(color: palette.border),
+        ),
+        child: Center(
+          child: _turningPlus(Icons.add_rounded, palette.accent, turn),
+        ),
       ),
     );
   }

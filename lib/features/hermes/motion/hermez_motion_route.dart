@@ -883,6 +883,7 @@ class _HermezSheetFrame<T> extends StatelessWidget {
                       origin: origin,
                       rect: rect,
                       t: settledT,
+                      slab: slabColor,
                       destination: Transform(
                         transform: _zoom(rect, end),
                         child: content,
@@ -929,6 +930,7 @@ class _HermezSheetFrame<T> extends StatelessWidget {
     required HermezMorphOrigin? origin,
     required Rect rect,
     required double t,
+    required Color slab,
     required Widget destination,
   }) {
     final face = origin?.snapshot;
@@ -937,18 +939,29 @@ class _HermezSheetFrame<T> extends StatelessWidget {
         : rect.width * face.height / face.width;
     final shown = face == null ? 1.0 : _smooth((t - 0.16) / 0.32);
     final faceShown = face == null ? 0.0 : 1 - _smooth((t - 0.06) / 0.3);
+    // No offscreen layers: fading the whole destination through Opacity
+    // cost a full-screen layer and dropped frames as the hand-over began.
+    // The object's own surface is painted over the destination instead,
+    // and the face draws itself translucent. The destination is either
+    // drawn or skipped (opacity 0 or 1 needs no layer).
     return Stack(
       fit: StackFit.expand,
       children: [
+        Opacity(opacity: shown > 0 ? 1 : 0, child: destination),
+        IgnorePointer(
+          child: ColoredBox(
+            color: slab.withValues(alpha: slab.a * (1 - shown)),
+          ),
+        ),
         if (face != null)
           Positioned.fromRect(
             rect: Rect.fromLTWH(rect.left, rect.top, rect.width, faceHeight),
-            child: Opacity(
-              opacity: faceShown,
-              child: RawImage(image: face, fit: BoxFit.fill),
+            child: RawImage(
+              image: face,
+              fit: BoxFit.fill,
+              opacity: AlwaysStoppedAnimation(faceShown),
             ),
           ),
-        Opacity(opacity: shown, child: destination),
       ],
     );
   }

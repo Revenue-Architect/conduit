@@ -551,7 +551,10 @@ void main() {
     var sheet = 1.0;
     var frames = 0;
     while (find.text('Task sheet').evaluate().isNotEmpty && frames++ < 120) {
-      final nextFace = opacityAbove(find.byType(RawImage));
+      final nextFace = tester
+          .widget<RawImage>(find.byType(RawImage))
+          .opacity!
+          .value;
       final nextSheet = opacityAbove(find.text('Task sheet'));
       // One way only: the sheet's content gives way to the card's.
       expect(nextFace, greaterThanOrEqualTo(face - 1e-9));
