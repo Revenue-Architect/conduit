@@ -318,6 +318,10 @@ int _hermesEventCharacters(
   HermesLifecycle(:final status) => status.length,
   HermesFinalOutput(:final text) => text.length,
   HermesComposerPrefill(:final text) => text.length,
+  HermesTodoUpdated(:final snapshot) => snapshot.items.fold<int>(
+    0,
+    (total, item) => total + item.id.length + item.content.length,
+  ),
   HermesRunError(:final message) => message.length,
   HermesRunDone() => 0,
 };

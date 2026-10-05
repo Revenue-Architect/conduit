@@ -85,6 +85,9 @@ bool _projectHermesTurnEvent(
           failed: done && value('error').isNotEmpty,
         ),
       );
+    case 'todo.updated':
+      final snapshot = HermesTodoSnapshot.fromJson(event.payload);
+      if (snapshot != null) add(HermesTodoUpdated(snapshot));
     case 'review.summary':
       add(
         HermesToolProgress(

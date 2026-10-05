@@ -3,8 +3,10 @@ directory, the way the Hermes loader does, against a throwaway database."""
 
 from __future__ import annotations
 
+import atexit
 import importlib
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -24,6 +26,8 @@ def module(name: str):
 
 def temp_db() -> Path:
     directory = tempfile.mkdtemp(prefix="spaces-test-")
+    # Throwaway databases go when the test run ends.
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
     return Path(directory) / "spaces.db"
 
 

@@ -7,18 +7,20 @@ import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../feedback/hermez_feedback.dart';
 import '../kanban/hermes_kanban_summary_provider.dart';
 import '../models/hermes_bot.dart';
-import '../models/hermes_config.dart';
 import '../models/hermes_job.dart';
 import '../models/hermes_session.dart';
+import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../sheets/hermes_active_work_sheet.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermez_bot_identity.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_live.dart';
 import '../widgets/hermez_relative_time.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_surfaces.dart';
@@ -55,8 +57,7 @@ class HermesHomePage extends ConsumerWidget {
     WidgetRef ref, [
     HermezMorphOrigin? origin,
   ]) async {
-    final bots =
-        ref.read(hermesBotsProvider).value ?? const <HermesBot>[];
+    final bots = ref.read(hermesBotsProvider).value ?? const <HermesBot>[];
     if (bots.isEmpty) return;
     // The + turns into the bot menu, the same plus-to-menu morph as New task:
     // the button's own surface grows from its corner into the menu and folds
@@ -238,36 +239,49 @@ class HermesHomePage extends ConsumerWidget {
               onAction: () => context.pushNamed(RouteNames.hermesConversations),
             ),
             const SizedBox(height: 8),
-            if (bots == null)
-              const LinearProgressIndicator()
-            else if (bots.isEmpty)
-              Text(
-                'No Hermes bot profiles available.',
-                style: HermezType.meta(palette),
-              )
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(1);
-                  final columns = constraints.maxWidth >= 300 && scale <= 1.35
-                      ? 2
-                      : 1;
-                  const gap = 10.0;
-                  final width =
-                      (constraints.maxWidth - gap * (columns - 1)) / columns;
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final bot in bots.take(6))
-                        SizedBox(
-                          width: width,
-                          child: _BotCard(bot: bot),
-                        ),
-                    ],
-                  );
-                },
+            // The roster arrives as one object: the loading line rolls away
+            // as the cards unroll in its place.
+            HermezPresence(
+              presenceKey: ValueKey(
+                bots == null
+                    ? 'bots-loading'
+                    : bots.isEmpty
+                    ? 'bots-empty'
+                    : 'bots',
               ),
+              weight: HermezMotionWeight.medium,
+              child: bots == null
+                  ? const LinearProgressIndicator()
+                  : bots.isEmpty
+                  ? Text(
+                      'No Hermes bot profiles available.',
+                      style: HermezType.meta(palette),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final scale = MediaQuery.textScalerOf(context).scale(1);
+                        final columns =
+                            constraints.maxWidth >= 300 && scale <= 1.35
+                            ? 2
+                            : 1;
+                        const gap = 10.0;
+                        final width =
+                            (constraints.maxWidth - gap * (columns - 1)) /
+                            columns;
+                        return Wrap(
+                          spacing: gap,
+                          runSpacing: gap,
+                          children: [
+                            for (final bot in bots.take(6))
+                              SizedBox(
+                                width: width,
+                                child: _BotCard(bot: bot),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
             const SizedBox(height: 22),
             Text('TODAY', style: HermezType.technical(palette.muted)),
             const SizedBox(height: 8),
@@ -327,8 +341,8 @@ class HermesHomePage extends ConsumerWidget {
                     width: 72,
                     child: Column(
                       children: [
-                        Text(
-                          '${todayJobs.length + running.length}',
+                        HermezRollingCount(
+                          value: '${todayJobs.length + running.length}',
                           style: HermezType.numeric(palette.ink),
                         ),
                         const SizedBox(height: 4),
@@ -342,10 +356,7 @@ class HermesHomePage extends ConsumerWidget {
                 ],
               ),
             ),
-            _ActiveWorkCard(
-              sessions: sessions ?? const [],
-              bots: bots ?? const [],
-            ),
+            const _ActiveWorkCard(),
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,93 +697,122 @@ class _UtilityObject extends StatelessWidget {
   }
 }
 
+/// What Hermes is doing right now, on any chat, bot or device: the first
+/// item and a count. Opens Active Work. When the work ends the card stays a
+/// while and says so in place, rather than vanishing from under a finger;
+/// it leaves once nothing has run recently.
 class _ActiveWorkCard extends ConsumerWidget {
-  const _ActiveWorkCard({required this.sessions, required this.bots});
-  final List<HermesSessionSummary> sessions;
-  final List<HermesBot> bots;
+  const _ActiveWorkCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final service = ref.watch(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return const SizedBox.shrink();
-    return StreamBuilder<HermesDesktopTurnState>(
-      stream: service.turnStates,
-      builder: (context, _) {
-        final candidates = <HermesSessionSummary>[
-          ...sessions,
-          for (final bot in bots)
-            if (bot.chatSessionId != null &&
-                !sessions.any((session) => session.id == bot.chatSessionId))
-              HermesSessionSummary(
-                id: bot.chatSessionId!,
-                title: bot.title,
-                profile: bot.name,
+    final sessions =
+        ref.watch(hermesActiveWorkProvider).value ??
+        const <HermesLiveSession>[];
+    final live = [
+      for (final session in sessions)
+        if (session.needsYou || session.working) session,
+    ];
+    final first = live.isEmpty ? null : live.first;
+    // Refreshed with every Active Work poll.
+    final finished = hermesFinishedWork(service, sessions);
+    final lastDone = first == null && finished.isNotEmpty
+        ? finished.first
+        : null;
+    final known =
+        ref.watch(hermesSessionsProvider).value ??
+        const <HermesSessionSummary>[];
+    final title =
+        first?.title ??
+        (lastDone == null
+            ? null
+            : known
+                      .where((session) => session.id == lastDone.storedId)
+                      .firstOrNull
+                      ?.title ??
+                  'Chat');
+    final summary = first != null
+        ? hermesActiveWorkSummary(live)
+        : finished.length == 1
+        ? 'finished'
+        : '${finished.length} finished';
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    const light = Color(0xFFF6F5F2);
+    return HermezReveal(
+      visible: title != null,
+      weight: HermezMotionWeight.medium,
+      revealKey: const ValueKey('home-active-work'),
+      child: title == null
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: HermezSurface(
+                kind: HermezSurfaceKind.technical,
+                motif: HermezMotif.arc,
+                semanticLabel: 'Active work: $summary. $title',
+                feedbackCue: HermezFeedbackCue.objectOpen,
+                onOpen: (origin) =>
+                    showHermesActiveWorkSheet(context, ref, origin: origin),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    HermezLiveDot(
+                      state: first != null
+                          ? (first.needsYou
+                                ? HermezLiveState.attention
+                                : HermezLiveState.working)
+                          : lastDone!.failed
+                          ? HermezLiveState.failed
+                          : HermezLiveState.done,
+                      size: 9,
+                      // The card stays dark in both themes.
+                      ink: light,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ACTIVE WORK · ${summary.toUpperCase()}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: HermezType.technical(palette.accent),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: light,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (first?.preview case final preview?)
+                            HermezLiveText(
+                              preview,
+                              live: first!.working,
+                              style: TextStyle(
+                                color: light.withValues(alpha: 0.75),
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: light),
+                  ],
+                ),
               ),
-        ];
-        HermesSessionSummary? active;
-        for (final candidate in candidates) {
-          if (service.turnStateFor(candidate.id) ==
-              HermesDesktopTurnState.running) {
-            active = candidate;
-            break;
-          }
-        }
-        if (active == null) return const SizedBox.shrink();
-        final palette = HermezChatPalette.forBrightness(
-          Theme.of(context).brightness,
-        );
-        return Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: HermezSurface(
-            kind: HermezSurfaceKind.technical,
-            motif: HermezMotif.arc,
-            // Live work belongs to the conversation's inline activity panel.
-            onTap: () => openHermesSession(context, ref, active!),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: palette.accent,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'LIVE WORK',
-                        style: HermezType.technical(
-                          HermezChatPalette.forBrightness(
-                            Theme.of(context).brightness,
-                          ).accent,
-                        ),
-                      ),
-                      Text(
-                        active.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFF6F5F2),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFFF6F5F2),
-                ),
-              ],
             ),
-          ),
-        );
-      },
     );
   }
 }

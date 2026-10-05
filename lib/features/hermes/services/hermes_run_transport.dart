@@ -1445,6 +1445,10 @@ void _handleEvent(
     case HermesComposerPrefill():
       break;
 
+    case HermesTodoUpdated():
+      // The plan lives with the session (resume-safe), not in one message.
+      break;
+
     case HermesLifecycle():
       // Lifecycle transitions are advisory; terminal ones also emit RunDone.
       break;

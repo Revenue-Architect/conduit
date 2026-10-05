@@ -717,5 +717,69 @@ Persistent Markdown working documents shared by the user and Hermes. The design 
   - Assistant replies get "Save as Page" in the overflow menu. It records `source_session_id` and offers "Open Page" afterwards.
   - In a Page's own conversation, a "PAGE · title · Open" chip sits in the composer's attached slot. Prompts and approvals take the slot first.
 - **Not done in v1:**
-  - Inline "Page created" cards for agent `spaces_create_page` results.
+  - ~~Inline "Page created" cards~~: done in the agentic activity rows (below).
   - Phase 2 items (Artifact references, reviewed drafts, slash commands, Page links, FTS5, profile picker, proactive Page upkeep).
+
+## 2026-10-04: Agentic chat: plan, activity, inspector, delegates, model picker, Active Work, Teams live
+
+Follows the user's "Conduit Agentic Chat UX" spec, scoped to what the live Hermes 0.21.1 exposes. There is no new service, store, planner or Hermes core change: everything is a projection of Hermes sessions, and nothing is invented (no percentages, no guessed durations).
+
+- **What Hermes 0.21.1 sends (verified on the Umbrel):**
+  - Plan: `todo.updated {todos, revision}`; resume and create return `todo_state` (Hermes rebuilds it from the transcript when needed). `todo_list` is a deferred core tool but still emits.
+  - Tools: `tool.start {tool_id, name, context, args}` and `tool.complete {tool_id, name, args, duration_s, result, summary?}`. Deferred plugin tools run through the bridge `tool_call {name, arguments}`; Conduit names the tool that actually ran.
+  - Delegates: `subagent.*` events; RPC `subagent.steer` (returns `queued`, which is not "delivered") and `subagent.interrupt`. 0.21.1 has no `subagent.list` or `tail`.
+  - Model: `model.options {profile, session_id?, explicit_only}` per profile. `config.set {session_id, key: model, value: "<model> --provider <p> --session"}`, `key: reasoning` (no scope) and `key: fast` are session-scoped, so a profile's saved default is never rewritten. A switch during a turn is deferred by Hermes to the next turn.
+  - Teams: each member's turn runs in a hidden session titled `Group: <room_id>` (source `bot_room`), one per room and profile. Conduit reads it with `session.list {profile, title, include_hidden}`, `session.active_list` and `session.events.since`. It never resumes, steers or interrupts a room session.
+- **Data layer:**
+  - `HermesAgenticStateStore` (`services/hermes_agentic_state.dart`), per session: the plan (revision-monotonic), delegates (terminal states are sticky; a completion without a known status fails closed) and live model info from `session.info`. It is fed by the Desktop event stream and by resume and create results. Read it through `hermesAgenticStateProvider`.
+  - Models: `HermesTodoSnapshot` (`models/hermes_todo.dart`) drops bad steps, roots dangling parents and flattens cycles. `HermesSubagentState` (`models/hermes_subagent.dart`).
+  - `HermesTodoUpdated` run event.
+  - `HermesLiveActivityEvent` gains the tool id, a preview, Hermes' summary and duration, failure, the delegate id and a Page reference.
+  - `HermesActivityPresenter` (pure): verbs ("Searched web" / "Searching web"); start and finish paired into one row; adjacent identical successes folded (never failures, waits, plan updates, delegates or Pages); "+N earlier"; previews redacted.
+- **Chat:**
+  - Inline run surface:
+    - the present-tense line ("Searching web · …"), and a plan bar under the header;
+    - the plan preview (current step first), a delegates row and semantic activity, where any row opens the inspector;
+    - "Plan paused · 3 of 7" when a run stops with steps left.
+  - Context bar above the composer in every Hermes chat: [Page] [Plan n/m] [Delegates] [Model · Effort]. Pending prompts still take the slot first.
+  - Sheets:
+    - **Plan:** comment, add after, change, cancel a step, replan, continue. Each is a steer while the run is live, or a draft in the composer when idle.
+    - **Tool inspector:** reads the transcript by `tool_call_id`; bounded, redacted, with copy.
+    - **Delegates:** steer and stop each worker.
+    - **Model:** Model and Effort tabs. Applies to this chat only, and a new chat keeps its pick until it is created.
+    - **Active Work.**
+  - A Page the agent creates or edits shows as "Created Page · title" with an Open button.
+- **Elsewhere:**
+  - Home: the Active Work card from `session.active_list` covers every client, profile and schedule, needs-you first, and opens a sheet that opens the chat.
+  - Live Run: an honest hero (state, elapsed time, the current step) instead of the indeterminate ring.
+  - Teams: a live card per working member: current step, recent steps, plan, latest reasoning and the reply as it is written. It is polled every 1.2 s only while the team is busy, and tapping it shows every step.
+- **Spaces fixes found in device QA:**
+  - Conflicts showed "Spaces request failed (409)". The Desktop Dio drops error bodies (`receiveDataWhenStatusError: false`); Spaces requests now opt in (`receiveErrorBody`) and decode under the client's own cap. A regression test reproduces the phone symptom when the fix is removed.
+  - The Ask Hermes picker put a `ListView` inside the sheet's own scroll view (unbounded height). It is now a column, covered by a widget test.
+  - Tool search defers every plugin tool; only `tools.tool_search.enabled: off` keeps them eager. The Page hook names `spaces_read_page` and Kai reaches it through the bridge. Documented, not changed.
+- **Motion and visual:** see "Live work" in `docs/HERMEZ_MOTION_SYSTEM.md`. Live state moves scale and position only (a breathing dot, rolling text, a travelling band on the live plan step). Large titles collapse into a compact title that travels up from under the bar. The mechanical motif appears on the Live Run hero only while it runs.
+- **Device QA (2026-10-05) and what it changed:**
+  - The model switch is session-scoped and holds at send time. In the QA turn, OpenCode's free tier answered HTTP 400 and Hermes' fallback chain served the turn on `mimo-v2.6-pro` (Xiaomi).
+    - `session.info` reports the model that really served, so Conduit shows it as is.
+    - When it differs from the chat's own pick, the pill adds an accent "Fallback" tag and the Model sheet says what happened.
+  - The transcript REST endpoint accepts `order=oldest|latest` only. `latest` pages are in time order. An earlier `newest` silently 400'd.
+  - Profile chats load history over the socket (`session.history`), which drops tool-call ids. The inspector reads the REST transcript instead (`toolCallMessages`), newest pages first.
+  - With a compute host, a resume carries no `todo_state`. A chat on screen restores its plan once from the latest stored `todo_list` result (`restorePlanIfMissing`, triggered by `hermesAgenticStateProvider`). Sends never make that extra request.
+  - `tool.generating` (no id, raw bridge name) no longer opens activity rows. A row a finished run never closed shows as finished.
+  - Teams: a room's first turn creates the member session, so discovery re-checks every 2 s while the team is busy. Reasoning that repeats the reply preview shows once.
+  - The Spaces plugin tests now delete their temp databases. About 90 leftovers from the 2026-10-04 runs were removed from the container's `/tmp` (test artifacts only).
+- **Motion polish after QA:**
+  - Every "say something to Hermes" control is now a pill that stretches into its field with the Steer morph (`HermezActionPills`): plan step Comment, Add after and Change; Replan; a delegate's Steer.
+  - Every agent sheet grows out of what was tapped.
+  - Text that changes in place changes instantly, per the motion rules.
+  - The Model sheet's panel swaps instantly under its travelling tab indicator.
+  - The pill field draws no border of its own (the theme's focused outline showed inside the pill).
+- **Second device pass (2026-10-05) and what it changed:**
+  - Direction drafted from an open field (Replan with nothing typed while no run is live) now closes the Plan sheet. The field's fold-first Back handling swallowed `maybePop`, so the sheet uses a plain `pop`. The draft waits in the composer beside the send button, keyboard down.
+  - Hermes' background self-review emits `review.summary` after `message.complete`. "Finished recently" now skips review events when it looks for the run's last event, so a reviewed run still counts as finished.
+  - A finished run's card names its work ("Ran command, Searched files"), not its housekeeping (finding tools, opening skills, keeping the plan), unless that was all it did (`HermesActivityPresenter.headline`).
+  - The Home Active Work card stays after work ends, showing "Finished" with a done dot. It used to collapse the moment a run ended, so a tap aimed at it landed on the card that slid up. It leaves once nothing has finished in the last 20 minutes.
+  - `session.active_list` also lists open idle sessions. A finished chat was treated as still live, so it never reached "Finished recently". Only working or waiting sessions now count as live (`hermesFinishedWork`, shared by the card and the sheet).
+  - Verified on device: the tool inspector grows from its row and shows INPUT and RESULT from the REST transcript; Active Work lists a live run with its model; plan recovery after restart; Replan and Comment morphs.
+  - Known issue, older than this work: reopen a native chat in the same app session after a run, and its last reply shows twice until the app restarts. Messages from `session.history` carry no `hermesResponseId`/`hermesRunId`, so the finished run projection is never matched and is appended (`chat_providers.dart`, the projection overlay on load).
+- **Open:** profile sessions use a local browser, not Steel (root config only); enabling Steel for profiles is a permission change awaiting the user.

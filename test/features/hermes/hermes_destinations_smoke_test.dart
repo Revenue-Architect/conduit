@@ -269,7 +269,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(tester.takeException(), isNull);
-      expect(find.text('STATUS'), findsOneWidget);
+      // The run's honest state, not a decorative ring.
+      expect(find.text('NOT RUNNING'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

@@ -66,9 +66,11 @@ import '../../hermes/models/hermes_capabilities.dart';
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/models/hermes_model.dart';
 import '../../hermes/controllers/hermes_busy_turn_controller.dart';
+import '../../hermes/providers/hermes_agentic_providers.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_api_service.dart';
 import '../../hermes/services/hermes_backend_service.dart';
+import '../../hermes/services/hermes_desktop_api_service.dart';
 import '../../hermes/services/hermes_local_document_service.dart';
 import '../../hermes/services/hermes_local_document_trust_store.dart';
 import '../../hermes/services/hermes_message_mapper.dart';
@@ -13503,6 +13505,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
   }
   final isDesktop = service is HermesDesktopTurnService;
   HermesDesktopSessionOptions? desktopOptions;
+  HermesSessionModelChoice? draftModelChoice;
   if (service is HermesDesktopTurnService) {
     final selected = ref.read(selectedModelProvider);
     final metadata = selected?.metadata;
@@ -13520,6 +13523,14 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
         selected: ref.read(hermesFastTierSelectionProvider),
       ),
     );
+    // A model or effort picked in this new chat before its first message:
+    // the session is created with it, and keeps it on later turns.
+    if (capturedSessionId == null || capturedSessionId.isEmpty) {
+      draftModelChoice = ref.read(hermesDraftModelChoiceProvider);
+      if (draftModelChoice != null) {
+        desktopOptions = draftModelChoice.over(desktopOptions);
+      }
+    }
   }
   final endpointIdentity = HermesConfigController.connectionEndpoint(
     service.config.baseUrl,
@@ -13586,6 +13597,15 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
         return;
       }
       sessionId = createdSessionId;
+      if (draftModelChoice != null) {
+        if (service is HermesDesktopApiService) {
+          service.rememberSessionModelChoice(
+            createdSessionId,
+            draftModelChoice,
+          );
+        }
+        ref.read(hermesDraftModelChoiceProvider.notifier).set(null);
+      }
       if (documentTrustConnectionIdentity != null) {
         try {
           await HermesLocalDocumentTrustStore.prepareNewSession(

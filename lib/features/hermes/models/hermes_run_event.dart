@@ -1,3 +1,5 @@
+import 'hermes_todo.dart';
+
 /// Typed events emitted by the Hermes Agent runs stream
 /// (`GET /v1/runs/{id}/events`) and the chat-completions
 /// `hermes.tool.progress` custom event.
@@ -122,6 +124,14 @@ final class HermesComposerPrefill extends HermesRunEvent {
   const HermesComposerPrefill(this.text);
 
   final String text;
+}
+
+/// The agent's plan changed (`todo.updated`): always a full snapshot, so
+/// the newest revision simply replaces what was shown.
+final class HermesTodoUpdated extends HermesRunEvent {
+  const HermesTodoUpdated(this.snapshot);
+
+  final HermesTodoSnapshot snapshot;
 }
 
 /// A terminal error reported by the run.

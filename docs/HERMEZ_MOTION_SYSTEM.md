@@ -80,6 +80,21 @@ Bot marks (`hermez_bot_mark.dart`) are drawn to match the reference renders: sph
 - Reduced motion (`context.reduceMotion`): no flights, instant routes, no press scale, instant presence.
 - Do not use `NibBounce`, `NibRubberBand`, `NibFloat`, `NibGlass`, or `NibScaffold`.
 
+## Live work
+
+Agent work in progress (runs, plans, delegates, team members, Active Work) shares one set of primitives in `widgets/hermez_live.dart`. Like the rest of Hermez they move position and scale, never opacity.
+
+- `HermezLiveDot`: the one live mark. Working breathes by scale (0.86 to 1.14, about 0.8 Hz), the way a bot mark breathes; needing attention adds a still ring; done, failed and idle are still.
+- `HermezLiveText` / `HermezRollingCount`: text and counts that change in place change instantly (the rule for in-place text below), with tabular figures for counts. The live text is a live region for screen readers.
+- `HermezPlanBar`: one segment per real plan step, solid when done. While the run is live the step in progress carries a darker band that travels along it. It has no percentage and no glow.
+- `HermezTodoGlyph`: a ring, a ring drawing itself round, a check stroking itself in, or a cancel stroke.
+- `HermezLiveMotion.enabled`: the continuous loops (breath, travelling band) never settle, so like `HermezBotPresence.loopsEnabled` they are off under `flutter test` and with reduced motion.
+- Large titles (`HermesPageChrome` with `showHeader`): the header scrolls with the content (`NestedScrollView`). Once it is under the bar, a compact title travels up from under the bar's bottom edge, the bar's backdrop changes colour to the canvas, and a hairline draws across from the centre. Pages that draw their own header are unchanged.
+- `HermezActionPills` (`widgets/hermez_action_pills.dart`): a row of run pills where a field pill grows into a one-line field across its row with the inline run's Steer geometry and springs (medium out, light mirrored back; the field laid out at full width and uncovered by the travelling edge; the send control scales in after 35 % of the way; close turns into send in place; Back folds it first). Plan steps (Comment, Add after, Change), Replan and a delegate's Steer use it, so every "say something to Hermes" control morphs the same way.
+- Every agent sheet grows out of what was tapped: the plan preview, the delegates row, an activity row (tool inspector), the context bar's pills (radius 17, the pill's own), and the Active Work card.
+- When work ends, its object changes state in place rather than leaving: Home's Active Work card turns from a working dot to a done one ("Finished") and stays for the recent window, so nothing collapses from under a finger at the moment a run ends.
+- Home's bot roster arrives as one object: the loading line rolls away and the cards unroll in its place (`HermezPresence`), with no per-card stagger.
+
 ## Sensory feedback (sound and haptics)
 
 `lib/features/hermes/feedback/` is a presentation-only observer. Backend state decides; feedback describes it after the fact.

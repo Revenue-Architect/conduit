@@ -10,7 +10,11 @@ import '../widgets/hermez_visual_theme.dart';
 
 /// Shared native chrome for Hermes-owned destinations. Content is always real
 /// Hermes data; this widget owns presentation only.
-class HermesPageChrome extends StatelessWidget {
+///
+/// The large title scrolls away with the content; once it has gone under
+/// the app bar a compact title takes its place over a hairline, the way a
+/// large-title page settles on iOS.
+class HermesPageChrome extends StatefulWidget {
   const HermesPageChrome({
     super.key,
     required this.title,
@@ -46,12 +50,49 @@ class HermesPageChrome extends StatelessWidget {
   );
 
   @override
+  State<HermesPageChrome> createState() => _HermesPageChromeState();
+}
+
+class _HermesPageChromeState extends State<HermesPageChrome> {
+  final ScrollController _outer = ScrollController();
+
+  /// 0 while the large title shows, 1 once it is under the app bar.
+  final ValueNotifier<double> _collapsed = ValueNotifier(0);
+
+  @override
+  void initState() {
+    super.initState();
+    _outer.addListener(_track);
+  }
+
+  void _track() {
+    if (!_outer.hasClients) return;
+    final offset = _outer.positions.isEmpty ? 0.0 : _outer.offset;
+    _collapsed.value = ((offset - 28) / 34).clamp(0.0, 1.0);
+  }
+
+  @override
+  void dispose() {
+    _outer
+      ..removeListener(_track)
+      ..dispose();
+    _collapsed.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
     // Hermez is on screen: start interface audio in the background (once).
     HermezFeedback.instance.warmUp();
+    final header = HermezPageHeader(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      titleMorphId: widget.titleMorphId,
+      palette: palette,
+    );
     return NibMotionConfig(
       reducedMotion: context.reduceMotion,
       entranceWarmup: Duration.zero,
@@ -65,24 +106,70 @@ class HermesPageChrome extends StatelessWidget {
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
-              leading: leading,
-              actions: actions,
+              leading: widget.leading,
+              actions: widget.actions,
+              centerTitle: true,
+              flexibleSpace: widget.showHeader
+                  ? ValueListenableBuilder<double>(
+                      valueListenable: _collapsed,
+                      builder: (context, t, _) => IgnorePointer(
+                        child: ColoredBox(
+                          color: Color.lerp(
+                            palette.canvas.withValues(alpha: 0),
+                            palette.canvas,
+                            t,
+                          )!,
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Transform.scale(
+                              scaleX: t,
+                              child: SizedBox(
+                                height: 0.5,
+                                width: double.infinity,
+                                child: ColoredBox(color: palette.border),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+              title: widget.showHeader
+                  ? ValueListenableBuilder<double>(
+                      valueListenable: _collapsed,
+                      builder: (context, t, _) => ExcludeSemantics(
+                        excluding: t < 0.5,
+                        child: ClipRect(
+                          child: Transform.translate(
+                            offset: Offset(0, 28 * (1 - t)),
+                            child: Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: palette.ink,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
             ),
             body: SafeArea(
               top: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (showHeader)
-                    HermezPageHeader(
-                      title: title,
-                      subtitle: subtitle,
-                      titleMorphId: titleMorphId,
-                      palette: palette,
-                    ),
-                  Expanded(child: child),
-                ],
-              ),
+              child: widget.showHeader
+                  ? NestedScrollView(
+                      controller: _outer,
+                      headerSliverBuilder: (context, _) => [
+                        SliverToBoxAdapter(child: header),
+                      ],
+                      body: widget.child,
+                    )
+                  : widget.child,
             ),
           ),
         ),

@@ -87,7 +87,7 @@ void main() {
     expect(find.text('Hermes is working'), findsOneWidget);
     await tester.tap(find.text('Hermes is working'));
     await tester.pumpAndSettle();
-    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('ACTIVITY'), findsOneWidget);
     expect(find.text('Steer'), findsOneWidget);
     expect(find.text('Stop'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -102,7 +102,7 @@ void main() {
       events: [_toolEvent('browser_navigate')],
     );
     expect(find.text('Watch browser'), findsOneWidget);
-    expect(find.text('Recent activity'), findsNothing);
+    expect(find.text('ACTIVITY'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -295,10 +295,10 @@ void main() {
     expect(find.textContaining('42s'), findsOneWidget);
     expect(find.textContaining('1 step'), findsOneWidget);
     // Collapsed: details wait behind the header.
-    expect(find.text('Recent activity'), findsNothing);
+    expect(find.text('ACTIVITY'), findsNothing);
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('ACTIVITY'), findsOneWidget);
     expect(find.text('TIME'), findsOneWidget);
     expect(find.text('web_search'), findsWidgets);
     // A finished run cannot be steered or stopped.

@@ -22,6 +22,19 @@ import '../widgets/hermez_chat_palette.dart';
 import '../motion/hermez_morph_origin.dart';
 import '../motion/hermez_motion_route.dart' show HermezRouteExits;
 import 'hermes_page_chrome.dart';
+import '../providers/hermes_agentic_providers.dart';
+import '../services/hermes_activity_presenter.dart';
+import '../services/hermes_agentic_state.dart';
+import '../sheets/hermes_delegates_sheet.dart';
+import '../sheets/hermes_plan_sheet.dart';
+import '../sheets/hermes_tool_inspector_sheet.dart';
+import '../widgets/hermes_activity_view.dart';
+import '../widgets/hermes_plan_view.dart';
+import '../widgets/hermez_live.dart';
+import '../widgets/hermez_technical_background.dart';
+import '../widgets/hermez_surfaces.dart';
+import '../motion/hermez_motion_surface.dart';
+import '../motion/hermez_motion_tokens.dart';
 
 class HermesLiveRunPage extends ConsumerStatefulWidget {
   const HermesLiveRunPage({
@@ -258,130 +271,45 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                   builder: (context, activity) => ListView(
                     padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
                     children: [
-                      HermesPanel(
-                        child: Column(
-                          children: [
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                running
-                                    ? '●  RUNNING'
-                                    : state ==
-                                          HermesDesktopTurnState.reconnecting
-                                    ? '●  RECONNECTING'
-                                    : '●  NOT RUNNING',
-                                style: TextStyle(
-                                  color: running
-                                      ? palette.accent
-                                      : palette.muted,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: 215,
-                              height: 215,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: palette.ink,
-                                      border: Border.all(
-                                        color: palette.border,
-                                        width: 9,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 178,
-                                    height: 178,
-                                    child: CircularProgressIndicator(
-                                      value: running ? null : 0,
-                                      strokeWidth: 7,
-                                      color: palette.accent,
-                                      backgroundColor: palette.muted.withValues(
-                                        alpha: 0.25,
-                                      ),
-                                    ),
-                                  ),
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        running ? 'EXECUTING' : 'STATUS',
-                                        style: TextStyle(
-                                          color: palette.surface,
-                                          fontSize: 11,
-                                          letterSpacing: 2,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      SizedBox(
-                                        width: 145,
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            running
-                                                ? 'LIVE'
-                                                : state.name.toUpperCase(),
-                                            style: TextStyle(
-                                              color: palette.surface,
-                                              fontSize: 28,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              running ? 'Hermes is working in the background.' : 'Open the conversation for the latest result.',
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
+                      _LiveHero(
+                        sessionId: widget.sessionId,
+                        state: state,
+                        events: activity.data ?? const [],
+                        startedAt: _startedAt,
                       ),
                       const SizedBox(height: 18),
                       const HermesSectionTitle('Activity'),
                       const SizedBox(height: 8),
                       HermesPanel(
-                        child: (activity.data ?? const []).isEmpty
-                            ? const Text(
-                                'Live events will appear here while Hermes works.',
-                              )
-                            : Column(
-                                children: [
-                                  for (final event
-                                      in (activity.data ?? const []).reversed
-                                          .take(30))
-                                    ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      dense: true,
-                                      leading: Icon(
-                                        _icon(event.kind),
-                                        color:
-                                            event.kind ==
-                                                HermesLiveActivityKind.failed
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .error
-                                            : palette.accent,
-                                      ),
-                                      title: Text(event.title),
-                                      subtitle: Text(
-                                        '${event.timestamp.toLocal().hour.toString().padLeft(2, '0')}:${event.timestamp.toLocal().minute.toString().padLeft(2, '0')}',
-                                      ),
-                                    ),
-                                ],
-                              ),
+                        child: Builder(
+                          builder: (context) {
+                            final events = activity.data ?? const [];
+                            final run = HermesRunSummary.latest(
+                              events,
+                              running: running,
+                            );
+                            final rows = HermesActivityPresenter.rows(
+                              run.isEmpty ? events : run.events,
+                              running: running,
+                            );
+                            if (rows.isEmpty) {
+                              return const Text(
+                                'Steps appear here while Hermes works.',
+                              );
+                            }
+                            return HermesActivityList(
+                              rows: rows,
+                              visible: 30,
+                              onInspect: (row, origin) =>
+                                  showHermesToolInspector(
+                                    context,
+                                    sessionId: widget.sessionId,
+                                    row: row,
+                                    origin: origin,
+                                  ),
+                            );
+                          },
+                        ),
                       ),
                       const SizedBox(height: 14),
                       HermesRunActions(
@@ -473,14 +401,198 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
             ),
     );
   }
+}
 
-  static IconData _icon(HermesLiveActivityKind kind) => switch (kind) {
-    HermesLiveActivityKind.toolCompleted ||
-    HermesLiveActivityKind.subagentCompleted ||
-    HermesLiveActivityKind.completed => Icons.check_circle_outline_rounded,
-    HermesLiveActivityKind.failed => Icons.error_outline_rounded,
-    HermesLiveActivityKind.waitingForInput => Icons.pan_tool_alt_outlined,
-    HermesLiveActivityKind.review => Icons.rate_review_outlined,
-    _ => Icons.radio_button_checked_rounded,
-  };
+/// The run, honestly: whether it is working, for how long, what it is
+/// doing now, and its plan and delegates when it has them.
+class _LiveHero extends ConsumerWidget {
+  const _LiveHero({
+    required this.sessionId,
+    required this.state,
+    required this.events,
+    required this.startedAt,
+  });
+
+  final String sessionId;
+  final HermesDesktopTurnState state;
+  final List<HermesLiveActivityEvent> events;
+  final DateTime? startedAt;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final running = state == HermesDesktopTurnState.running;
+    final run = HermesRunSummary.latest(events, running: running);
+    final rows = HermesActivityPresenter.rows(
+      run.isEmpty ? events : run.events,
+      running: running,
+    );
+    final agentic =
+        ref.watch(hermesAgenticStateProvider(sessionId)).value ??
+        HermesAgenticSnapshot.empty;
+    final plan = agentic.hasPlan ? agentic.todo : null;
+    final workers = agentic.subagents;
+    final current = rows.reversed
+        .where((row) => row.state == HermesActivityRowState.running)
+        .firstOrNull;
+    final elapsed = run.elapsed(startedAt: running ? startedAt?.toUtc() : null);
+    final status = switch (state) {
+      HermesDesktopTurnState.running => 'Working',
+      HermesDesktopTurnState.reconnecting => 'Reconnecting',
+      HermesDesktopTurnState.synchronizing => 'Recovering the run',
+      _ when run.failed => 'Run failed',
+      _ when plan != null && plan.hasActiveWork => 'Plan paused',
+      _ when !run.isEmpty => 'Done',
+      _ => 'Not running',
+    };
+    final headline =
+        current?.verb ??
+        (running
+            ? 'Thinking'
+            : run.failed
+            ? 'Stopped with an error'
+            : run.isEmpty
+            ? 'Nothing running'
+            : 'Finished');
+    return HermesPanel(
+      // Mechanical linework only while the run is actually working.
+      backgroundVariant: running ? HermezBackgroundVariant.mechanical : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              HermezLiveDot(
+                state: running
+                    ? HermezLiveState.working
+                    : run.failed
+                    ? HermezLiveState.failed
+                    : run.isEmpty
+                    ? HermezLiveState.idle
+                    : HermezLiveState.done,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  status.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: HermezType.technical(
+                    running ? palette.accent : palette.muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (elapsed != null)
+                Text(
+                  formatHermesRunDuration(elapsed),
+                  style: HermezType.meta(palette).copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          HermezLiveText(
+            headline,
+            live: running,
+            maxLines: 2,
+            style: HermezType.display(palette).copyWith(fontSize: 30),
+          ),
+          if (current?.object != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              current!.object!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: HermezType.body(palette).copyWith(color: palette.muted),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _Stat(label: 'steps', value: '${run.steps}'),
+              _Stat(label: 'tools', value: '${run.tools.length}'),
+              if (workers.isNotEmpty)
+                _Stat(label: 'delegates', value: '${workers.length}'),
+            ],
+          ),
+          if (plan != null) ...[
+            const SizedBox(height: 14),
+            HermesPlanPreview(
+              plan: plan,
+              running: running,
+              onOpen: (origin) => showHermesPlanSheet(
+                context,
+                sessionId: sessionId,
+                origin: origin,
+              ),
+            ),
+          ],
+          if (workers.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            HermezMotionSurface(
+              weight: HermezMotionWeight.light,
+              semanticLabel: '${hermesDelegatesSummary(workers)}. Open',
+              originRadius: 14,
+              onOpen: (origin) => showHermesDelegatesSheet(
+                context,
+                sessionId: sessionId,
+                origin: origin,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.call_split_rounded, color: palette.ink),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hermesDelegatesSummary(workers),
+                        style: HermezType.body(palette)
+                            .copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: palette.muted),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        HermezRollingCount(
+          value: value,
+          style: HermezType.section(palette).copyWith(fontSize: 18),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: HermezType.meta(palette)),
+      ],
+    );
+  }
 }

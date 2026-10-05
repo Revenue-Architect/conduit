@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,17 +8,27 @@ import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../motion/hermez_motion.dart';
 import '../models/hermes_config.dart';
+import '../models/hermes_subagent.dart';
+import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_live_run_providers.dart';
+import '../services/hermes_activity_presenter.dart';
+import '../services/hermes_agentic_state.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_live_activity.dart';
 import '../services/hermes_pending_decision_store.dart';
 import '../services/hermes_steel_viewer.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
-import 'hermes_live_activity_disclosure.dart';
+import '../sheets/hermes_delegates_sheet.dart';
+import '../sheets/hermes_plan_sheet.dart';
+import '../sheets/hermes_tool_inspector_sheet.dart';
+import 'hermes_activity_view.dart';
+import 'hermes_plan_view.dart';
 import 'hermes_run_action_dialogs.dart';
 import 'hermes_run_actions.dart';
 import 'hermes_steel_live_view.dart';
 import 'hermez_chat_palette.dart';
+import 'hermez_live.dart';
+import 'hermez_surfaces.dart';
 import '../feedback/hermez_feedback.dart';
 
 /// One session-owned run control surface in the transcript's live footer.
@@ -310,6 +318,16 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     final working = widget.turnState == HermesDesktopTurnState.running;
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
     final run = HermesRunSummary.latest(_events, running: working);
+    final agentic =
+        ref.watch(hermesAgenticStateProvider(widget.sessionId)).value ??
+        HermesAgenticSnapshot.empty;
+    final plan = agentic.hasPlan ? agentic.todo : null;
+    final workers = agentic.subagents;
+    final rows = HermesActivityPresenter.rows(
+      run.isEmpty ? _events : run.events,
+      running: working,
+    );
+    final nowLine = working ? HermesActivityPresenter.now(rows) : null;
     // Offered once the run has used a browser tool: a run that only searched
     // or ran a command has nothing to watch.
     final browserAvailable =
@@ -323,7 +341,11 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     final title = attention
         ? 'Input needed'
         : finished
-        ? (run.failed ? 'Run failed' : 'Done')
+        ? (run.failed
+              ? 'Run failed'
+              : plan != null && plan.hasActiveWork
+              ? hermesPlanStatus(plan, running: false)
+              : 'Done')
         : switch (widget.turnState) {
             HermesDesktopTurnState.running => 'Hermes is working',
             HermesDesktopTurnState.reconnecting => 'Reconnecting to Hermes',
@@ -332,20 +354,30 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
             HermesDesktopTurnState.unsupportedGateway =>
               'Live activity unavailable',
           };
-    final latest = _events.isEmpty ? null : _events.last;
     final elapsed = run.elapsed(
       startedAt: working || finished ? _runStartedAt : null,
     );
     final steps = run.steps;
     final tools = run.tools;
+    // Between steps, the step that just finished, in words.
+    final lastRow = rows.isEmpty ? null : rows.last;
+    final lastLine = lastRow == null
+        ? null
+        : lastRow.object == null
+        ? lastRow.verb
+        : '${lastRow.verb} · ${lastRow.object}';
     final details = <String>[
-      if (working && latest != null) latest.title,
+      if (working) nowLine ?? lastLine ?? 'Thinking',
       if (finished && elapsed != null) formatHermesRunDuration(elapsed),
       if (steps > 0) steps == 1 ? '1 step' : '$steps steps',
-      if (working && elapsed != null) formatHermesRunDuration(elapsed),
       if (finished && tools.isNotEmpty)
-        tools.take(2).map((tool) => tool.name).join(', '),
+        HermesActivityPresenter.headline(tools)
+            .map(HermesActivityPresenter.verb)
+            .join(', '),
     ].join(' · ');
+    final clock = working && elapsed != null
+        ? formatHermesRunDuration(elapsed)
+        : null;
     final reduced = context.reduceMotion;
     final settle = reduced
         ? Duration.zero
@@ -436,18 +468,43 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              Text(
-                                attention
-                                    ? 'Review the request below'
-                                    : details.isNotEmpty
-                                    ? details
-                                    : latest?.title ?? 'Live activity',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: palette.muted,
-                                  fontSize: 12,
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: HermezLiveText(
+                                      attention
+                                          ? 'Review the request below'
+                                          : details.isNotEmpty
+                                          ? details
+                                          : 'Live activity',
+                                      live: working && !attention,
+                                      style: TextStyle(
+                                        color: working
+                                            ? palette.ink
+                                            : palette.muted,
+                                        fontSize: 12.5,
+                                        fontWeight: working
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  if (clock != null && !attention) ...[
+                                    const SizedBox(width: 8),
+                                    // Ticks in place: a clock, not news.
+                                    Text(
+                                      clock,
+                                      style: TextStyle(
+                                        color: palette.muted,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),
@@ -466,6 +523,20 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                       ],
                     ),
                   ),
+                ),
+                HermezReveal(
+                  visible: plan != null && !_expanded,
+                  revealKey: const ValueKey('inline-plan-bar'),
+                  child: plan == null
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 6, bottom: 2),
+                          child: HermezPlanBar(
+                            snapshot: plan,
+                            height: 3,
+                            paused: !working && plan.hasActiveWork,
+                          ),
+                        ),
                 ),
                 HermezReveal(
                   visible: attention && !widget.requestShownBelow,
@@ -567,6 +638,29 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (plan != null) ...[
+                        const SizedBox(height: 8),
+                        HermesPlanPreview(
+                          plan: plan,
+                          running: working,
+                          onOpen: (origin) => showHermesPlanSheet(
+                            context,
+                            sessionId: widget.sessionId,
+                            origin: origin,
+                          ),
+                        ),
+                      ],
+                      if (workers.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        _DelegatesRow(
+                          workers: workers,
+                          onOpen: (origin) => showHermesDelegatesSheet(
+                            context,
+                            sessionId: widget.sessionId,
+                            origin: origin,
+                          ),
+                        ),
+                      ],
                       if (!run.isEmpty) ...[
                         const SizedBox(height: 10),
                         _RunStats(
@@ -577,28 +671,32 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                           subagents: run.subagents,
                         ),
                       ],
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Text(
-                        'Recent activity',
-                        style: TextStyle(
-                          color: palette.ink,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        'ACTIVITY',
+                        style: HermezType.technical(palette.muted),
                       ),
-                      const SizedBox(height: 6),
-                      if (_events.isEmpty)
-                        Text(
-                          'Waiting for the first tool update…',
-                          style: TextStyle(color: palette.muted),
+                      const SizedBox(height: 4),
+                      if (rows.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: HermezLiveText(
+                            working
+                                ? 'Waiting for the first step…'
+                                : 'No steps in this run.',
+                            live: working,
+                            style: TextStyle(color: palette.muted),
+                          ),
                         )
                       else
-                        SizedBox(
-                          height: 190,
-                          child: HermesLiveActivityTimeline(
-                            // This run only; earlier runs are in the
-                            // transcript.
-                            events: run.isEmpty ? _events : run.events,
-                            running: working,
+                        // This run only; earlier runs are in the transcript.
+                        HermesActivityList(
+                          rows: rows,
+                          onInspect: (row, origin) => showHermesToolInspector(
+                            context,
+                            sessionId: widget.sessionId,
+                            row: row,
+                            origin: origin,
                           ),
                         ),
                       const SizedBox(height: 10),
@@ -735,6 +833,82 @@ class _RunStats extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// "2 delegates working · 1 done", opening the delegates sheet.
+class _DelegatesRow extends StatelessWidget {
+  const _DelegatesRow({required this.workers, required this.onOpen});
+
+  final List<HermesSubagentState> workers;
+  final ValueChanged<HermezMorphOrigin?> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final live = workers.live;
+    final latest = workers
+        .where((worker) => worker.status.isLive)
+        .map((worker) => worker.latest ?? worker.goal)
+        .firstOrNull;
+    return HermezMotionSurface(
+      weight: HermezMotionWeight.light,
+      semanticLabel: '${hermesDelegatesSummary(workers)}. Open delegates',
+      originRadius: 14,
+      onOpen: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: palette.ink.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: live > 0
+                    ? const HermezLiveDot(
+                        state: HermezLiveState.working,
+                        size: 6,
+                      )
+                    : Icon(
+                        Icons.call_split_rounded,
+                        size: 17,
+                        color: palette.ink,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hermesDelegatesSummary(workers),
+                    style: HermezType.body(palette).copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (latest != null)
+                    HermezLiveText(
+                      latest,
+                      live: live > 0,
+                      style: HermezType.meta(palette).copyWith(fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: palette.muted),
+          ],
+        ),
+      ),
     );
   }
 }

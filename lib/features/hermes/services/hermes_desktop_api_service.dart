@@ -18,7 +18,11 @@ import '../models/hermes_config.dart';
 import '../models/hermes_mcp.dart';
 import '../models/hermes_model.dart';
 import '../models/hermes_run_event.dart';
+import '../models/hermes_subagent.dart';
 import '../models/hermes_team.dart';
+import '../models/hermes_todo.dart';
+import 'hermes_activity_presenter.dart';
+import 'hermes_agentic_state.dart';
 import 'hermes_backend_service.dart';
 import 'hermes_http_transport.dart';
 import 'hermes_dashboard_rest_bridge.dart';
@@ -37,6 +41,7 @@ part 'hermes_desktop_teams.dart';
 part 'hermes_desktop_event_projection.dart';
 part 'hermes_desktop_live_runtime.dart';
 part 'hermes_desktop_turn_runtime.dart';
+part 'hermes_desktop_agentic.dart';
 
 typedef HermesDesktopCredentialsWriter = Future<void> Function(
   HermesDesktopCredentials credentials,
@@ -251,6 +256,31 @@ final class HermesDesktopApiService
   final Map<String, List<Map<String, dynamic>>> _lastTranscripts = {};
   final Map<String, String> _appliedSessionOptions = {};
 
+  /// Model/effort picked inside a chat, per Hermes server and stored
+  /// session. Hermes keeps the switch with the session; this seeds the next
+  /// send and what the chat shows. Static, so a service rebuilt by a token
+  /// refresh keeps what the user picked.
+  static final Map<String, HermesSessionModelChoice> _modelChoices = {};
+
+  HermesSessionModelChoice? _choiceFor(String storedId) =>
+      _modelChoices['$_origin\u0000$storedId'];
+
+  void _rememberChoice(String storedId, HermesSessionModelChoice choice) {
+    final key = '$_origin\u0000$storedId';
+    _modelChoices.remove(key);
+    _modelChoices[key] = choice;
+    while (_modelChoices.length > 256) {
+      _modelChoices.remove(_modelChoices.keys.first);
+    }
+  }
+
+  /// Sessions whose plan was already looked for in the transcript.
+  static final Set<String> _planRecoveryTried = {};
+
+  /// Room member sessions found so far, keyed by room id + profile.
+  final Map<String, _RoomSessionCursor> _roomSessions = {};
+  final Map<String, DateTime> _roomSessionChecks = {};
+
   /// Sessions owned by another profile (Bot Mode chats), keyed by stored id.
   /// Absent means the connection's configured profile owns the session.
   final Map<String, String> _sessionProfiles = {};
@@ -342,6 +372,7 @@ final class HermesDesktopApiService
       query: query,
       body: body,
       cancelToken: cancelToken,
+      receiveErrorBody: true,
     );
   }
 
@@ -358,6 +389,23 @@ final class HermesDesktopApiService
 
   List<HermesLiveActivityEvent> activitySnapshotFor(String storedId) =>
       List.unmodifiable(_activityHistory[storedId] ?? const []);
+
+  late final HermesAgenticStateStore _agentic = HermesAgenticStateStore(
+    sensitiveValues: config.sensitiveValues,
+  );
+
+  /// The session's plan, delegated workers and live model, as Hermes last
+  /// reported them on this connection (or in its resume snapshot).
+  HermesAgenticSnapshot agenticSnapshotFor(String storedId) =>
+      _agentic.snapshotFor(storedId);
+
+  Stream<HermesAgenticSnapshot> agenticStateFor(String storedId) =>
+      _agentic.watch(storedId);
+
+  /// Looks for [storedId]'s plan in its stored transcript when Hermes has
+  /// sent none; once per session, in the background.
+  void restorePlanIfMissing(String storedId) =>
+      _restorePlanFromTranscript(storedId);
 
   Stream<List<HermesLiveActivityEvent>> activityFor(String storedId) =>
       Stream<List<HermesLiveActivityEvent>>.multi((controller) {
@@ -763,6 +811,86 @@ final class HermesDesktopApiService
     cancelToken: cancelToken,
   );
   Future<void> interrupt(String storedId) => _runtimeInterrupt(storedId);
+
+  /// The models [storedId]'s profile (or [profile], for a chat with no
+  /// session yet) can switch to, with what it runs on now.
+  Future<HermesModelCatalog> modelCatalog({
+    String? storedId,
+    String? profile,
+  }) => _modelCatalog(storedId: storedId, profile: profile);
+
+  HermesSessionModelChoice? sessionModelChoice(String storedId) =>
+      _choiceFor(storedId);
+
+  /// A session created with a chat's own pick keeps it on later turns.
+  void rememberSessionModelChoice(
+    String storedId,
+    HermesSessionModelChoice choice,
+  ) => _rememberChoice(storedId, choice);
+
+  /// The Hermes profile that owns [storedId]: a bot chat's own profile, or
+  /// this connection's.
+  String profileForSession(String storedId) =>
+      _sessionProfiles[storedId] ?? config.desktopProfile;
+
+  /// Switches this chat's session only: the profile's saved default stays.
+  Future<HermesModelSwitchOutcome> switchSessionModel(
+    String storedId,
+    HermesSessionModelChoice choice,
+  ) => _switchSessionModel(storedId, choice);
+
+  /// The stored messages that hold one tool call and its result, with ids.
+  Future<List<Map<String, dynamic>>> toolCallMessages(
+    String storedId,
+    String toolId, {
+    CancelToken? cancelToken,
+  }) => _toolCallMessages(storedId, toolId, cancelToken: cancelToken);
+
+  /// Queues direction for one delegated worker ("queued" is not "read").
+  Future<bool> steerSubagent(String storedId, String subagentId, String text) =>
+      _steerSubagent(storedId, subagentId, text);
+
+  Future<bool> stopSubagent(String storedId, String subagentId) =>
+      _stopSubagent(storedId, subagentId);
+
+  /// Every session live on this Hermes, needs-you and working first.
+  Future<List<HermesLiveSession>> activeSessions() => _activeSessions();
+
+  /// Sessions on this connection whose last run finished within [window],
+  /// newest first, with when it ended and whether it failed.
+  List<({String storedId, DateTime at, bool failed})> recentlyFinished({
+    Duration window = const Duration(minutes: 20),
+  }) {
+    final cutoff = DateTime.now().toUtc().subtract(window);
+    final out = <({String storedId, DateTime at, bool failed})>[];
+    for (final entry in _activityHistory.entries) {
+      HermesLiveActivityEvent? last;
+      for (final event in entry.value.reversed) {
+        // Hermes' background self-review reports after the reply; the run
+        // still ended with its completed or failed event.
+        if (event.kind == HermesLiveActivityKind.review) continue;
+        last = event;
+        break;
+      }
+      if (last == null || !last.isTerminal || last.timestamp.isBefore(cutoff)) {
+        continue;
+      }
+      out.add((
+        storedId: entry.key,
+        at: last.timestamp,
+        failed: last.kind == HermesLiveActivityKind.failed,
+      ));
+    }
+    out.sort((a, b) => b.at.compareTo(a.at));
+    return out;
+  }
+
+  /// What each team member is doing in its room session right now.
+  Future<Map<String, HermesTeamMemberLive>> teamMembersLive(
+    String roomId,
+    List<HermesTeamMember> members,
+  ) => _teamMembersLive(roomId, members);
+
   Future<bool> steer(String storedId, String text) =>
       _runtimeSteer(storedId, text);
   Future<void> queue(String storedId, String text) =>
@@ -834,6 +962,7 @@ final class HermesDesktopApiService
     unawaited(_sessionTurnStateChanges.close());
     unawaited(_activityChanges.close());
     unawaited(_activityEvents.close());
+    unawaited(_agentic.close());
     unawaited(_transcriptChanges.close());
     unawaited(_desktopContractChanges.close());
     _eventBuffer.clear();

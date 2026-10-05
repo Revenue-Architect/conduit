@@ -13,10 +13,13 @@ import '../models/hermes_team.dart';
 import '../models/hermes_team_timeline.dart';
 import '../motion/hermez_motion.dart';
 import '../providers/hermes_providers.dart';
+import '../services/hermes_activity_presenter.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermez_modal_sheet.dart';
+import '../widgets/hermes_activity_view.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
 
@@ -443,6 +446,11 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
   bool _refreshing = false;
   Timer? _poll;
 
+  /// What each member is doing in its own room session, by profile.
+  Map<String, HermesTeamMemberLive> _live = const {};
+  Timer? _livePoll;
+  bool _liveLoading = false;
+
   /// Lines that were already there when the room opened do not animate in.
   Set<String>? _initialKeys;
 
@@ -458,6 +466,7 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
   @override
   void dispose() {
     _poll?.cancel();
+    _livePoll?.cancel();
     _input.dispose();
     _focus.dispose();
     super.dispose();
@@ -515,6 +524,54 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
     } finally {
       _refreshing = false;
       _schedule();
+      _scheduleLive(immediately: _livePoll == null && _teamBusy);
+    }
+  }
+
+  bool get _teamBusy {
+    final sent = _sentAt;
+    return _status.working ||
+        _status.blocked ||
+        _live.values.any((member) => member.working) ||
+        (sent != null &&
+            DateTime.now().difference(sent) < const Duration(seconds: 20));
+  }
+
+  /// Reads each member's room session while the team works: read only,
+  /// never resumed or steered from here.
+  void _scheduleLive({bool immediately = false}) {
+    if (!mounted || _livePoll?.isActive == true) return;
+    if (!_teamBusy) {
+      if (_live.values.any((member) => member.working)) {
+        setState(() => _live = const {});
+      }
+      return;
+    }
+    _livePoll = Timer(
+      immediately ? Duration.zero : const Duration(milliseconds: 1200),
+      () => unawaited(_pollLive()),
+    );
+  }
+
+  Future<void> _pollLive() async {
+    _livePoll = null;
+    final team = _team;
+    final service = _service;
+    if (!mounted || team == null || service == null || _liveLoading) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+      _scheduleLive();
+      return;
+    }
+    _liveLoading = true;
+    try {
+      final live = await service.teamMembersLive(team.roomId, team.members);
+      if (mounted) setState(() => _live = live);
+    } catch (_) {
+      // Live detail is optional: the room log still shows every reply.
+    } finally {
+      _liveLoading = false;
+      _scheduleLive();
     }
   }
 
@@ -567,6 +624,7 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
       await service.sendToTeam(widget.roomId, text);
       _input.clear();
       _sentAt = DateTime.now();
+      _scheduleLive(immediately: true);
     } catch (_) {
       if (mounted) {
         AdaptiveSnackBar.show(
@@ -626,7 +684,10 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
     final timeline = team == null
         ? const HermesTeamTimeline(lines: [], thinking: [])
         : HermesTeamTimeline.from(_events, team);
-    final working = _status.working || timeline.thinking.isNotEmpty;
+    final working =
+        _status.working ||
+        timeline.thinking.isNotEmpty ||
+        _live.values.any((member) => member.working);
     return HermesPageChrome(
       title: team?.name ?? 'Team',
       subtitle: '',
@@ -683,7 +744,9 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
                     ),
                   )
                 : _RoomLog(
+                    team: team,
                     timeline: timeline,
+                    live: _live,
                     initialKeys: _initialKeys ?? const {},
                   ),
           ),
@@ -777,9 +840,16 @@ class _RoomHeader extends StatelessWidget {
 }
 
 class _RoomLog extends StatelessWidget {
-  const _RoomLog({required this.timeline, required this.initialKeys});
+  const _RoomLog({
+    required this.team,
+    required this.timeline,
+    required this.live,
+    required this.initialKeys,
+  });
 
+  final HermesTeam team;
   final HermesTeamTimeline timeline;
+  final Map<String, HermesTeamMemberLive> live;
   final Set<String> initialKeys;
 
   @override
@@ -788,8 +858,19 @@ class _RoomLog extends StatelessWidget {
       Theme.of(context).brightness,
     );
     final lines = timeline.lines;
-    final thinking = timeline.thinking;
-    if (lines.isEmpty && thinking.isEmpty) {
+    // A member whose session is visibly working gets a live card instead
+    // of a bare "is thinking" row.
+    final working = [
+      for (final member in team.members)
+        if (live[member.profile] case final state? when state.working)
+          (member: member, state: state),
+    ];
+    final busy = {for (final entry in working) entry.member.memberId};
+    final thinking = [
+      for (final member in timeline.thinking)
+        if (!busy.contains(member.memberId)) member,
+    ];
+    if (lines.isEmpty && thinking.isEmpty && working.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Align(
@@ -803,12 +884,21 @@ class _RoomLog extends StatelessWidget {
       );
     }
     // Newest at the bottom, anchored there as the discussion grows.
-    final count = lines.length + thinking.length;
+    final count = working.length + lines.length + thinking.length;
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       itemCount: count,
       itemBuilder: (context, index) {
+        if (index < working.length) {
+          final entry = working[working.length - 1 - index];
+          return _Arrival(
+            key: ValueKey('live-${entry.member.memberId}'),
+            animate: true,
+            child: _MemberLiveCard(member: entry.member, live: entry.state),
+          );
+        }
+        index -= working.length;
         if (index < thinking.length) {
           final member = thinking[thinking.length - 1 - index];
           return _Arrival(
@@ -1028,6 +1118,190 @@ class _ThinkingRow extends StatelessWidget {
             child: CircularProgressIndicator(
               strokeWidth: 1.6,
               color: palette.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One member at work in its own session: what it is doing now, the steps
+/// it just took, its plan, what it is thinking, and its reply as it is
+/// written. Tap for every step of this turn.
+class _MemberLiveCard extends StatefulWidget {
+  const _MemberLiveCard({required this.member, required this.live});
+
+  final HermesTeamMember member;
+  final HermesTeamMemberLive live;
+
+  @override
+  State<_MemberLiveCard> createState() => _MemberLiveCardState();
+}
+
+class _MemberLiveCardState extends State<_MemberLiveCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final live = widget.live;
+    final rows = HermesActivityPresenter.rows(
+      live.activity,
+      running: live.working,
+    );
+    final now = HermesActivityPresenter.now(rows);
+    final done = rows
+        .where((row) => row.state != HermesActivityRowState.running)
+        .toList();
+    final recent = done.length > 2 ? done.sublist(done.length - 2) : done;
+    final status = switch (live.status) {
+      'waiting' => 'needs you',
+      'starting' => 'starting',
+      _ => 'working',
+    };
+    final todo = live.todo;
+    // A model's interim words can arrive as both reasoning and reply: show
+    // them once.
+    String squash(String value) =>
+        value.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    final thinking = live.thinking;
+    final preview = live.preview;
+    final showThinking =
+        thinking != null &&
+        (preview == null ||
+            !(squash(preview).contains(squash(thinking)) ||
+                squash(thinking).contains(squash(preview))));
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HermezBotMark(
+            identity: hermezIdentityForName(widget.member.profile),
+            size: 30,
+            label: widget.member.label,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: HermezMotionSurface(
+              weight: HermezMotionWeight.light,
+              semanticsExpanded: _open,
+              semanticLabel:
+                  '${widget.member.label} is $status${now == null ? '' : ': $now'}',
+              onTap: () => setState(() => _open = !_open),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: live.status == 'waiting'
+                        ? palette.accent.withValues(alpha: 0.6)
+                        : palette.border.withValues(alpha: 0.9),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.member.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: HermezType.section(palette)
+                                .copyWith(fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        HermezLiveDot(
+                          state: live.status == 'waiting'
+                              ? HermezLiveState.attention
+                              : HermezLiveState.working,
+                          size: 6,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(status, style: HermezType.meta(palette)),
+                        const Spacer(),
+                        AnimatedRotation(
+                          turns: _open ? 0.5 : 0,
+                          duration: HermezMotion.settleFor(
+                            HermezMotionWeight.light,
+                          ),
+                          curve: HermezMotion.curveLight,
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            size: 18,
+                            color: palette.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (todo != null && !todo.isEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            'PLAN ${todo.completed}/${todo.total}',
+                            style: HermezType.technical(palette.muted),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: HermezPlanBar(snapshot: todo, height: 3),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (now != null) ...[
+                      const SizedBox(height: 8),
+                      HermezLiveText(
+                        now,
+                        style: HermezType.body(
+                          palette,
+                        ).copyWith(fontSize: 13.5, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                    if (!_open)
+                      for (final row in recent)
+                        HermesActivityRowView(row: row, dense: true)
+                    else if (rows.isNotEmpty)
+                      HermesActivityList(rows: rows, visible: 40, dense: true),
+                    if (showThinking) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        thinking,
+                        maxLines: _open ? 12 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: HermezType.meta(palette)
+                            .copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                    if (live.preview != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        live.preview!,
+                        maxLines: _open ? 8 : 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: palette.ink, height: 1.4),
+                      ),
+                    ],
+                    if (now == null &&
+                        recent.isEmpty &&
+                        live.preview == null &&
+                        live.thinking == null) ...[
+                      const SizedBox(height: 6),
+                      HermezLiveText(
+                        'Thinking…',
+                        style: HermezType.meta(palette),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ],

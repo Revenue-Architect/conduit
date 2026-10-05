@@ -28,6 +28,43 @@ final class HermesDesktopSessionOptions {
       '${provider ?? ''}\u0000${model ?? ''}\u0000${reasoningEffort ?? ''}\u0000${fast ?? ''}';
 }
 
+/// A model/effort picked for one chat. Applied to that Hermes session only
+/// (`--session`); the profile's saved default is never rewritten.
+final class HermesSessionModelChoice {
+  const HermesSessionModelChoice({
+    this.model,
+    this.provider,
+    this.reasoningEffort,
+    this.fast,
+  });
+
+  final String? model;
+  final String? provider;
+  final String? reasoningEffort;
+  final bool? fast;
+
+  HermesSessionModelChoice copyWith({
+    String? model,
+    String? provider,
+    String? reasoningEffort,
+    bool? fast,
+  }) => HermesSessionModelChoice(
+    model: model ?? this.model,
+    provider: model != null ? provider : (provider ?? this.provider),
+    reasoningEffort: reasoningEffort ?? this.reasoningEffort,
+    fast: fast ?? this.fast,
+  );
+
+  /// The send-time options with this chat's own choices on top.
+  HermesDesktopSessionOptions over(HermesDesktopSessionOptions options) =>
+      HermesDesktopSessionOptions(
+        model: model ?? options.model,
+        provider: model != null ? provider : options.provider,
+        reasoningEffort: reasoningEffort ?? options.reasoningEffort,
+        fast: fast ?? options.fast,
+      );
+}
+
 /// Shared settings, session, and scheduler surface implemented by both Hermes
 /// connection modes. Turn streaming remains transport-specific.
 abstract interface class HermesBackendService {

@@ -236,6 +236,7 @@ extension _HermesDesktopAuthRest on HermesDesktopApiService {
     CancelToken? cancelToken,
     int nativeRetry = 0,
     int dashboardRetry = 0,
+    bool receiveErrorBody = false,
   }) async {
     final requestQuery = <String, dynamic>{...?query};
     if (authenticated && _isProfileScopedRestPath(path)) {
@@ -261,6 +262,10 @@ extension _HermesDesktopAuthRest on HermesDesktopApiService {
           method: method,
           headers: await _headers(authenticated: authenticated),
           responseType: ResponseType.bytes,
+          // Error bodies are dropped by default. A caller that types its
+          // errors (Spaces: 409 revision_conflict + current_revision) opts in
+          // and decodes them itself under its own size cap.
+          receiveDataWhenStatusError: receiveErrorBody ? true : null,
         ),
       );
       final bytes = response.data ?? const <int>[];
@@ -297,6 +302,7 @@ extension _HermesDesktopAuthRest on HermesDesktopApiService {
               query: query,
               cancelToken: cancelToken,
               nativeRetry: 1,
+              receiveErrorBody: receiveErrorBody,
             );
           }
           if (nativeRetry == 0 && identical(previous, refreshed)) rethrow;

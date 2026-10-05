@@ -55,6 +55,16 @@ writer always gets `409 revision_conflict` and never overwrites.
    `Mounted plugin API routes: /api/plugins/spaces/` and that an
    unauthenticated `GET /api/plugins/spaces/health` returns 401.
 
+## Tool search
+
+Hermes' tool search defers every plugin tool: the model sees it in a
+catalog and calls it through the `tool_call` bridge. Only
+`tools.tool_search.enabled: off` keeps plugin tools in the direct list, and
+that changes every tool, so it was left alone. The `pre_llm_call` hook names
+`spaces_read_page` and the Page id, which is enough for the model to reach it
+(verified with Kai). Conduit's activity rows unwrap the bridge and show the
+Spaces tool by name.
+
 ## Tests
 
 Stdlib `unittest`, runnable in the Hermes venv (FastAPI only there):

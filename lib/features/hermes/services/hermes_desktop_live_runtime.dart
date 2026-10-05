@@ -45,6 +45,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     _stateSubscription ??= _rpc.events.listen((event) {
       final startedBuffering = _eventBuffer.add(event);
       _recordLiveActivity(event);
+      _recordAgenticState(event);
       if (event.type == 'session.info') {
         // Update BOTH keys. `session.create` can omit `running`, which parks
         // the stored id at unsupportedGateway; a runtime-only update never
@@ -83,12 +84,56 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     _emitTurnState(HermesDesktopTurnState.idle);
   }
 
+  /// Plan, delegate and model state is application data, not chrome: Hermes
+  /// sends it even when tool progress display is off.
+  void _recordAgenticState(HermesDesktopEvent event) {
+    if (_closed) return;
+    final storedId =
+        _storedIdForRuntime(event.sessionId) ??
+        validateHermesOpaqueIdentifier(event.sessionId);
+    if (storedId == null) return;
+    switch (event.type) {
+      case 'todo.updated':
+        _agentic.applyTodo(storedId, event.payload);
+      case 'tool.complete':
+        final name = event.payload['name'];
+        if ((name == 'todo_list' || name == 'todo') &&
+            event.payload['todos'] is List) {
+          _agentic.applyTodo(storedId, event.payload);
+        }
+      case 'session.info':
+        _agentic.applySessionInfo(storedId, event.payload);
+      case 'message.start':
+        _agentic.pruneFinishedSubagents(storedId);
+      default:
+        if (event.type.startsWith('subagent.') &&
+            event.type != 'subagent.text') {
+          _agentic.applySubagentEvent(storedId, event.type, event.payload);
+        }
+    }
+  }
+
   void _recordLiveActivity(HermesDesktopEvent event) {
     if (_closed || _activityChanges.isClosed) return;
     final storedId =
         _storedIdForRuntime(event.sessionId) ??
         validateHermesOpaqueIdentifier(event.sessionId);
     if (storedId == null) return;
+    final recorded = _projectActivity(event, storedId: storedId);
+    if (recorded == null) return;
+    final history = _activityHistory.putIfAbsent(storedId, () => []);
+    history.add(recorded);
+    if (history.length > 100) history.removeRange(0, history.length - 100);
+    _activityChanges.add(storedId);
+    if (!_activityEvents.isClosed) _activityEvents.add(recorded);
+  }
+
+  /// One gateway event as an activity entry, or null when it is not one.
+  /// Shared by this connection's sessions and the Teams observer.
+  HermesLiveActivityEvent? _projectActivity(
+    HermesDesktopEvent event, {
+    required String storedId,
+  }) {
     final kind = switch (event.type) {
       'tool.start' => HermesLiveActivityKind.toolStarted,
       'tool.generating' ||
@@ -110,11 +155,19 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       'message.error' || 'session.error' => HermesLiveActivityKind.failed,
       _ => null,
     };
-    if (kind == null) return;
-    final name = validateHermesBoundedString(
+    if (kind == null) return null;
+    final rawName = validateHermesBoundedString(
       event.payload['name'],
       maxCharacters: 80,
     );
+    // A deferred tool runs through the `tool_call` bridge: name the tool
+    // that actually ran, with its own arguments.
+    final call = rawName == null
+        ? null
+        : HermesActivityPresenter.unwrap(rawName, event.payload['args']);
+    final name = call == null
+        ? null
+        : validateHermesBoundedString(call.name, maxCharacters: 80);
     final safeName =
         name != null &&
             !config.sensitiveValues.any(
@@ -122,6 +175,40 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
             )
         ? name
         : null;
+    final isTool =
+        kind == HermesLiveActivityKind.toolStarted ||
+        kind == HermesLiveActivityKind.toolProgress ||
+        kind == HermesLiveActivityKind.toolCompleted;
+    final isSubagent =
+        kind == HermesLiveActivityKind.subagentStarted ||
+        kind == HermesLiveActivityKind.subagentProgress ||
+        kind == HermesLiveActivityKind.subagentCompleted;
+    final context = event.payload['context'];
+    final preview = !isTool || safeName == null
+        ? (isSubagent
+              ? HermesActivityPresenter.clean(
+                  event.payload['goal']?.toString(),
+                  sensitiveValues: config.sensitiveValues,
+                )
+              : null)
+        : HermesActivityPresenter.clean(
+            rawName != safeName || context is! String
+                ? HermesActivityPresenter.objectFromArgs(safeName, call!.args)
+                : context,
+            sensitiveValues: config.sensitiveValues,
+          );
+    final result = event.payload['result'];
+    final seconds = event.payload['duration_s'];
+    final error = event.payload['error'];
+    final failed =
+        (kind == HermesLiveActivityKind.toolCompleted &&
+            ((error is String && error.trim().isNotEmpty) ||
+                HermesActivityPresenter.resultFailed(result))) ||
+        (kind == HermesLiveActivityKind.subagentCompleted &&
+            HermesSubagentStatus.parse(
+              event.payload['status'],
+              terminalEvent: true,
+            ).isProblem);
     final title = switch (kind) {
       HermesLiveActivityKind.toolStarted => 'Started ${safeName ?? 'tool'}',
       HermesLiveActivityKind.toolProgress => 'Running ${safeName ?? 'tool'}',
@@ -134,8 +221,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       HermesLiveActivityKind.completed => 'Response completed',
       HermesLiveActivityKind.failed => 'Run failed',
     };
-    final history = _activityHistory.putIfAbsent(storedId, () => []);
-    final recorded = HermesLiveActivityEvent(
+    return HermesLiveActivityEvent(
       sessionId: storedId,
       kind: kind,
       title: title,
@@ -152,11 +238,38 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
           ),
         _ => null,
       },
+      toolId: isTool
+          ? validateHermesOpaqueIdentifier(
+              event.payload['tool_id'],
+              sensitiveValues: config.sensitiveValues,
+            )
+          : null,
+      preview: preview,
+      summary: kind == HermesLiveActivityKind.toolCompleted
+          ? HermesActivityPresenter.clean(
+              event.payload['summary']?.toString(),
+              sensitiveValues: config.sensitiveValues,
+            )
+          : null,
+      duration:
+          kind == HermesLiveActivityKind.toolCompleted &&
+              seconds is num &&
+              seconds.isFinite &&
+              seconds >= 0 &&
+              seconds < 86400
+          ? Duration(milliseconds: (seconds * 1000).round())
+          : null,
+      failed: failed,
+      subagentId: isSubagent
+          ? validateHermesOpaqueIdentifier(
+              event.payload['subagent_id'],
+              sensitiveValues: config.sensitiveValues,
+            )
+          : null,
+      page: kind == HermesLiveActivityKind.toolCompleted && safeName != null
+          ? HermesActivityPresenter.pageFromResult(safeName, result)
+          : null,
     );
-    history.add(recorded);
-    if (history.length > 100) history.removeRange(0, history.length - 100);
-    _activityChanges.add(storedId);
-    if (!_activityEvents.isClosed) _activityEvents.add(recorded);
   }
 
   Future<void> _resolvePendingDecisionEvent(HermesDesktopEvent event) async {
@@ -315,6 +428,11 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     final info = _object(result['info']);
     final running = result['running'] ?? info['running'];
     _recordDesktopContract(info);
+    // Hermes answers a resume with the authoritative plan (live, cached, or
+    // rebuilt from the transcript) and what the session runs on.
+    if (stored != storedId) _agentic.alias(storedId, stored);
+    _agentic.applyTodo(stored, result['todo_state']);
+    _agentic.applySessionInfo(stored, info);
     final binding = HermesSessionBinding(storedId: stored, runtimeId: runtime);
     final profile = _sessionProfiles[storedId];
     if (profile != null) _sessionProfiles[stored] = profile;
@@ -445,6 +563,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     _appliedSessionOptions[stored] = normalized.fingerprint;
     final info = _object(result['info']);
     _recordDesktopContract(info);
+    _agentic.applySessionInfo(stored, info);
     final running = result['running'] ?? info['running'];
     if (running is bool) {
       _applyAuthoritativeRunning(running, storedId: stored, runtimeId: runtime);

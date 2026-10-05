@@ -11,6 +11,9 @@ enum HermesLiveActivityKind {
   failed,
 }
 
+/// A Page a tool call created or changed, from the Spaces tools' own result.
+typedef HermesActivityPageRef = ({String pageId, String spaceId, String title});
+
 final class HermesLiveActivityEvent {
   const HermesLiveActivityEvent({
     required this.sessionId,
@@ -18,6 +21,13 @@ final class HermesLiveActivityEvent {
     required this.title,
     required this.timestamp,
     this.detail,
+    this.toolId,
+    this.preview,
+    this.summary,
+    this.duration,
+    this.failed = false,
+    this.subagentId,
+    this.page,
   });
 
   final String sessionId;
@@ -27,6 +37,25 @@ final class HermesLiveActivityEvent {
 
   /// The tool name for tool events, when Hermes reported a safe one.
   final String? detail;
+
+  /// Hermes' `tool_call_id`: pairs a tool's start with its finish and finds
+  /// the call in the transcript for the inspector.
+  final String? toolId;
+
+  /// What the tool was pointed at (a command, a query, a path), already
+  /// redacted and shortened by Hermes and again here.
+  final String? preview;
+
+  /// Hermes' own one-line result summary ("Did 3 searches in 2.1s").
+  final String? summary;
+
+  /// Server-measured tool time.
+  final Duration? duration;
+
+  /// A finished tool reported an error.
+  final bool failed;
+  final String? subagentId;
+  final HermesActivityPageRef? page;
 
   bool get isTerminal =>
       kind == HermesLiveActivityKind.completed ||

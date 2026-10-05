@@ -61,6 +61,7 @@ import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
 import '../../hermes/widgets/hermes_live_activity_disclosure.dart';
+import '../../hermes/widgets/hermes_chat_context_bar.dart';
 import '../../hermes/widgets/hermes_inline_run_surface.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
@@ -3970,6 +3971,32 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ref.watch(pageForSessionProvider(sessionId)).value;
   }
 
+  Widget? _hermesContextBar(WidgetRef ref, Conversation? conversation) {
+    final service = ref.watch(hermesApiServiceProvider);
+    if (service is! HermesDesktopApiService) return null;
+    final selected = ref.watch(selectedModelProvider);
+    final native =
+        conversation != null && isNativeHermesConversation(conversation);
+    final draft =
+        conversation == null && selected != null && isHermesModel(selected);
+    if (!native && !draft) return null;
+    final sessionId = validateHermesOpaqueIdentifier(
+      conversation?.metadata['hermesSessionId'],
+    );
+    final title = conversation?.metadata[kHermesBotTitleMetadataKey];
+    return HermesChatContextBar(
+      key: ValueKey('hermes-context-${sessionId ?? 'draft'}'),
+      sessionId: sessionId,
+      profile: sessionId == null
+          ? service.config.desktopProfile
+          : service.profileForSession(sessionId),
+      profileTitle: title is String && title.trim().isNotEmpty
+          ? title.trim()
+          : null,
+      page: _pageForConversation(ref, conversation),
+    );
+  }
+
   Widget _buildComposerSection(BuildContext context) {
     final hasAttachments =
         ref.watch(attachedFilesProvider.select((files) => files.isNotEmpty)) ||
@@ -4124,6 +4151,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       key: ValueKey(approval['id']),
                       message: pendingDirectMcpPrompt,
                     );
+                  } else if (_hermesContextBar(composerRef, activeConversation)
+                      case final bar?) {
+                    // Every Hermes chat: its Page, plan, delegates and model,
+                    // one tap away. Questions and approvals take this slot
+                    // first.
+                    attachedOverlay = bar;
                   } else if (_pageForConversation(
                         composerRef,
                         activeConversation,

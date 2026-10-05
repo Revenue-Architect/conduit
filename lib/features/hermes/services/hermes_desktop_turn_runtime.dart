@@ -551,8 +551,11 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
 
   Future<void> _applySessionOptions(
     HermesSessionBinding binding,
-    HermesDesktopSessionOptions options,
+    HermesDesktopSessionOptions requested,
   ) async {
+    // A model or effort picked inside this chat outranks the composer's
+    // global selection for this session.
+    final options = _choiceFor(binding.storedId)?.over(requested) ?? requested;
     final selection = hermesDesktopSessionModelSelection(
       options.model,
       options.provider,
