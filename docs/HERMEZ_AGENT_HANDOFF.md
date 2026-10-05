@@ -783,3 +783,37 @@ Follows the user's "Conduit Agentic Chat UX" spec, scoped to what the live Herme
   - Reopening a native chat in the same app session after a run no longer shows its last reply twice. `session.history` rows carry no `hermesResponseId`/`hermesRunId`, so the finished run's projection was never matched and was appended. A finished, settled projection is now retired when the native transcript ends with the same session's reply with the same visible text (`hermesNativeTranscriptEndsWithReply`, used in the projection overlay on load).
   - Steel: profiles `kai`, `hermuse` and `autopilot` had no `browser:` section and ran a local browser; they now carry the root's Steel block (backups `config.yaml.bak-20261005-steel`). `fast`, `local`, `strong` and the root already had it.
 - **Open:** profile sessions use a local browser, not Steel (root config only); enabling Steel for profiles is a permission change awaiting the user.
+
+## 2026-10-05 — Hermes 0.21.5 migration preflight (BLOCKED)
+
+See [migration report](hermes-migration/2026-10-05/REPORT.md),
+[customization audit](hermes-migration/2026-10-05/CUSTOMIZATION_AUDIT.md), and
+[client compatibility matrix](hermes-migration/2026-10-05/CONDUIT_COMPATIBILITY.md)
+before upgrading Hermes. Production remains on custom 0.21.1; stable target is
+0.21.5 (`v2026.9.24`, `f97608f1`). No runtime cutover or APK update was performed.
+The separately authored [app-impact notes](HERMES_0_21_5_APP_IMPACT.md) complement
+the preflight; they do not supersede its deployment gates.
+
+The client patch adds per-socket server-request capability advertisement,
+approval queue/frame ID mapping, `open_requests` replay and v7+ decision reply
+recovery. It preserves old-server notifications/fallbacks and rejects expired
+approvals rather than reporting false success. 48 focused tests pass, including
+9 new regressions. Full checks are not green: the serial run was stopped after
+3,446 passes / 10 failures, and full analysis exhausted memory. Details and logs
+belong in the migration report; these are not full-suite completion counts.
+This does NOT make contract 8 fully supported: `connection.request/update/respond`
+and `pending_connection` still need the typed MCP/connector adapter before cutover.
+
+Other gates: stale judge backlog, five failed mail items, later seven overdue SMS,
+broken Assurance canary/reconcile entry points, a fresh privileged ZFS snapshot,
+recovering custom image inputs, and copied-state staging/E2E. Do not clear queues,
+change the router's ARMED flag or edit frozen skills to get green checks. Private
+recovery copies include 45 integrity-checked SQLite DBs, Postgres dump/globals and
+hot-patched source; they are not an atomic cross-service snapshot and never go to Git.
+Hindsight's separate embedded-Postgres volume and Qdrant snapshot exports are
+not covered by those recovery copies; verify their recovery path before cutover.
+
+Upstream supersedes the hosted-room lease patch. It does NOT supersede the
+Hindsight cron/system auto-retain gate: stable removes the bundled provider and
+the exclusion must move to the selected external provider. No provider patch,
+model/profile changes or unrelated infrastructure changes were deployed.
