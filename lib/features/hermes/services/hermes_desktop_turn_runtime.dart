@@ -953,15 +953,22 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
       throw ArgumentError.value(choice, 'choice');
     }
     await _ensureConnected();
-    await _rpc.request<Object?>(
-      'approval.respond',
-      params: {
-        'session_id': runId,
-        'request_id': approvalId,
-        'choice': choice,
-        ..._runtimeScope(runId),
-      },
+    final result = _object(
+      await _rpc.request<Object?>(
+        'approval.respond',
+        params: {
+          'session_id': runId,
+          'request_id': approvalId,
+          'choice': choice,
+          ..._runtimeScope(runId),
+        },
+      ),
     );
+    if (result['resolved'] is num && (result['resolved'] as num) <= 0) {
+      throw StateError(
+        'This approval is no longer pending. Refresh the conversation.',
+      );
+    }
     await HermesPendingDecisionStore.resolve(
       origin: _origin,
       runtimeId: runId,
@@ -1050,7 +1057,10 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         );
         return;
       }
-      if (_desktopContract >= 7) {
+      // Contract knowledge is cached across reconnects. A rollback can emit
+      // legacy notification IDs even after this service has seen v8; only
+      // srq-* IDs belong to the new server-request proxy protocol.
+      if (_desktopContract >= 7 && requestId.startsWith('srq-')) {
         final result = _object(
           await _rpc.request<Object?>(
             'request.answer',

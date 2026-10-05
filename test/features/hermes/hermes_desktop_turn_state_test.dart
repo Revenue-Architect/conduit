@@ -631,7 +631,7 @@ void main() {
   );
 
   test(
-    'a batch clarify is answered per question id (not as a cancel-all)',
+    'a legacy batch clarify still works after newer contract knowledge',
     () async {
       SharedPreferences.setMockInitialValues({});
       PreferencesStore.debugOverride(await SharedPreferences.getInstance());
@@ -660,7 +660,7 @@ void main() {
         'session.resume' => {
           'session_id': 'runtime-bot',
           'stored_session_id': 'stored-bot',
-          'info': const {'running': false},
+          'info': const {'running': false, 'desktop_contract': 8},
           'running': false,
         },
         'clarify.respond' => {'status': 'ok', 'remaining': const <String>[]},
@@ -807,103 +807,116 @@ void main() {
     },
   );
 
-  for (final replay in [true, false]) {
-    test(
-      'v8 decision recovery ${replay ? 'replays the request' : 'reports expiry'}',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        PreferencesStore.debugOverride(await SharedPreferences.getInstance());
-        final harness = _GatewayHarness();
-        final service = HermesDesktopApiService(
-          config: HermesConfig(
-            enabled: true,
-            baseUrl: 'https://hermes.example',
-            mode: HermesBackendMode.desktopGateway,
-            desktopCredentials: HermesDesktopCredentials(
-              legacyToken: 'session-token',
-            ),
+  for (final scenario in ['replay', 'expiry', 'approval-expiry']) {
+    final replay = scenario == 'replay';
+    test('v8 decision recovery: $scenario', () async {
+      SharedPreferences.setMockInitialValues({});
+      PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+      final harness = _GatewayHarness();
+      final service = HermesDesktopApiService(
+        config: HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          mode: HermesBackendMode.desktopGateway,
+          desktopCredentials: HermesDesktopCredentials(
+            legacyToken: 'session-token',
           ),
-          dio: _statusDio(),
-          rpc: HermesDesktopRpcClient(
-            channelFactory: (_, _, {httpClient}) => harness.channel,
-          ),
-        );
-        addTearDown(() async {
-          service.close();
-          await harness.dispose();
-        });
-        harness.responder = (method) => switch (method) {
-          'session.resume' => {
-            'session_id': 'runtime-bot',
-            'stored_session_id': 'stored-bot',
-            'info': {'running': true, 'desktop_contract': 8},
-            'running': true,
-            if (replay)
-              'open_requests': [
-                {
-                  'id': 'srq-recovered',
-                  'method': 'clarify',
-                  'params': {
-                    'session_id': 'runtime-bot',
-                    'questions': [
-                      {
-                        'qid': 'q0',
-                        'question': 'Which color?',
-                        'choices': ['red', 'blue'],
-                      },
-                    ],
-                  },
+        ),
+        dio: _statusDio(),
+        rpc: HermesDesktopRpcClient(
+          channelFactory: (_, _, {httpClient}) => harness.channel,
+        ),
+      );
+      addTearDown(() async {
+        service.close();
+        await harness.dispose();
+      });
+      harness.responder = (method) => switch (method) {
+        'session.resume' => {
+          'session_id': 'runtime-bot',
+          'stored_session_id': 'stored-bot',
+          'info': {'running': true, 'desktop_contract': 8},
+          'running': true,
+          if (replay)
+            'open_requests': [
+              {
+                'id': 'srq-recovered',
+                'method': 'clarify',
+                'params': {
+                  'session_id': 'runtime-bot',
+                  'questions': [
+                    {
+                      'qid': 'q0',
+                      'question': 'Which color?',
+                      'choices': ['red', 'blue'],
+                    },
+                  ],
                 },
-              ],
-          },
-          'request.answer' => {'status': 'expired'},
-          _ => const {},
-        };
-        // Recovery after a cold socket uses the stored session's owning profile.
-        await service.openBotChat(
-          const HermesBot(
-            name: 'researcher',
-            title: 'Research',
-            chatSessionId: 'stored-bot',
-          ),
+              },
+            ],
+        },
+        'request.answer' => {'status': 'expired'},
+        'approval.respond' => {'resolved': 0},
+        _ => const {},
+      };
+      // Recovery after a cold socket uses the stored session's owning profile.
+      await service.openBotChat(
+        const HermesBot(
+          name: 'researcher',
+          title: 'Research',
+          chatSessionId: 'stored-bot',
+        ),
+      );
+      if (replay) {
+        await service.respondToDecision(
+          storedSessionId: 'stored-bot',
+          runtimeId: 'stale-runtime',
+          requestId: 'srq-recovered',
+          kind: HermesDecisionKind.clarification,
+          value: 'blue',
         );
-        if (replay) {
-          await service.respondToDecision(
+        final answer = harness.sent.singleWhere(
+          (f) => f['id'] == 'srq-recovered',
+        );
+        expect(answer['result'], {
+          'answers': {'q0': 'blue'},
+        });
+      } else if (scenario == 'approval-expiry') {
+        await expectLater(
+          service.resolveApprovalForSession(
+            'stored-bot',
+            approvalId: 'queue-expired',
+            approved: true,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        final answer = harness.sent.singleWhere(
+          (f) => f['method'] == 'approval.respond',
+        );
+        expect((answer['params'] as Map)['profile'], 'researcher');
+        expect((answer['params'] as Map)['request_id'], 'queue-expired');
+      } else {
+        await expectLater(
+          service.respondToDecision(
             storedSessionId: 'stored-bot',
             runtimeId: 'stale-runtime',
             requestId: 'srq-recovered',
             kind: HermesDecisionKind.clarification,
             value: 'blue',
-          );
-          final answer = harness.sent.singleWhere(
-            (f) => f['id'] == 'srq-recovered',
-          );
-          expect(answer['result'], {
-            'answers': {'q0': 'blue'},
-          });
-        } else {
-          await expectLater(
-            service.respondToDecision(
-              storedSessionId: 'stored-bot',
-              runtimeId: 'stale-runtime',
-              requestId: 'srq-recovered',
-              kind: HermesDecisionKind.clarification,
-              value: 'blue',
-            ),
-            throwsA(isA<StateError>()),
-          );
-          final answer = harness.sent.singleWhere(
-            (f) => f['method'] == 'request.answer',
-          );
-          expect((answer['params'] as Map)['profile'], 'researcher');
-        }
-        expect(
-          harness.sent.where((f) => f['method'] == 'clarify.respond'),
-          isEmpty,
+          ),
+          throwsA(isA<StateError>()),
         );
-        expect(harness.sent.first['method'], 'client.capabilities');
-      },
-    );
+        final answer = harness.sent.singleWhere(
+          (f) => f['method'] == 'request.answer',
+        );
+        expect((answer['params'] as Map)['profile'], 'researcher');
+      }
+      expect(
+        harness.sent.where((f) => f['method'] == 'clarify.respond'),
+        isEmpty,
+      );
+      expect(harness.sent.first['method'], 'client.capabilities');
+    });
   }
 
   test('bot sends keep the bot profile model settings', () async {
