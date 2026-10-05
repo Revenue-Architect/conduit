@@ -4415,10 +4415,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         ? hermezPalette.canvas
                         : null,
                     // The menu and bot badge float over the transcript:
-                    // a light frost under them, feathered out over the fade
-                    // so it never ends on a line.
-                    fadeHeight: 40,
+                    // a light frost under them that feathers out over
+                    // their lower half and is gone just below them.
                     blurSigma: 5,
+                    blurExtent:
+                        MediaQuery.viewPaddingOf(context).top +
+                        conduitAdaptiveToolbarHeightOf(context),
                   ),
                 ),
                 Positioned(

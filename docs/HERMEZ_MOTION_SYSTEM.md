@@ -123,9 +123,11 @@ Adapted from SwiftPieces designs (see `THIRD_PARTY_NOTICES.md`), rebuilt to thes
 
 ## Chat chrome frost
 
-`ConduitChromeGradientFade` takes an optional `blurSigma`. On the chat screen's top edge it is 9:
-- The transcript scrolling under the menu button and the bot badge is frosted at full strength behind the bar.
-- The frost eases off in three slices across the fade, under the existing gradient.
+`ConduitChromeGradientFade` takes an optional `blurSigma` and `blurExtent`. On the chat screen's top edge:
+- The transcript under the menu button and the bot badge is frosted lightly (sigma 5).
+- The frost is full strength from the top, then feathers out over 32 px, in twelve slices on a smoothstep.
+- It is gone at the bottom of the bar (`blurExtent`), just under the floating controls. It never ends on a line.
+- The colour gradient keeps its own default length.
 - One `BackdropGroup` pass serves all slices. Other edges stay gradient-only.
 
 ## Sensory feedback (sound and haptics)

@@ -24,6 +24,7 @@ class ConduitChromeGradientFade extends StatelessWidget {
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
     this.blurSigma = 0,
+    this.blurExtent,
   });
 
   const ConduitChromeGradientFade.top({
@@ -32,6 +33,7 @@ class ConduitChromeGradientFade extends StatelessWidget {
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
     this.blurSigma = 0,
+    this.blurExtent,
   }) : edge = ConduitChromeFadeEdge.top;
 
   const ConduitChromeGradientFade.bottom({
@@ -40,6 +42,7 @@ class ConduitChromeGradientFade extends StatelessWidget {
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
     this.blurSigma = 0,
+    this.blurExtent,
   }) : edge = ConduitChromeFadeEdge.bottom;
 
   final ConduitChromeFadeEdge edge;
@@ -50,6 +53,11 @@ class ConduitChromeGradientFade extends StatelessWidget {
   /// Frost under the chrome, as a Gaussian sigma at the outer edge. Zero
   /// keeps the edge gradient-only.
   final double blurSigma;
+
+  /// How far from the edge the frost has fully faded out. Defaults to the
+  /// whole edge (chrome plus fade); the chat screen ends it just under its
+  /// floating controls.
+  final double? blurExtent;
 
   @override
   Widget build(BuildContext context) {
@@ -91,8 +99,8 @@ class ConduitChromeGradientFade extends StatelessWidget {
                   _ProgressiveBlur(
                     edge: edge,
                     sigma: blurSigma,
-                    solid: contentHeight,
-                    fade: fadeHeight,
+                    extent: (blurExtent ?? height).clamp(0.0, height),
+                    total: height,
                   ),
                   gradient,
                 ],
@@ -102,28 +110,31 @@ class ConduitChromeGradientFade extends StatelessWidget {
   }
 }
 
-/// Full blur behind the chrome, then a feathered edge that dissolves like a
-/// cloud: thin slices whose blur eases to nothing on a smoothstep, starting
-/// a little inside the chrome, so the frost never stops on a line. One
-/// backdrop pass serves every slice.
+/// Full blur from the edge, then a feathered end that dissolves like a
+/// cloud: thin slices whose blur eases to nothing on a smoothstep, gone at
+/// the extent, so the frost never stops on a line. One backdrop pass serves
+/// every slice.
 class _ProgressiveBlur extends StatelessWidget {
   const _ProgressiveBlur({
     required this.edge,
     required this.sigma,
-    required this.solid,
-    required this.fade,
+    required this.extent,
+    required this.total,
   });
 
   final ConduitChromeFadeEdge edge;
   final double sigma;
-  final double solid;
-  final double fade;
+
+  /// Where the frost has fully faded, from the edge.
+  final double extent;
+  final double total;
 
   /// Slices in the feather: thin enough that no step between two shows.
   static const _slices = 12;
 
-  /// How far inside the chrome the feather begins.
-  static const _overlap = 16.0;
+  /// How long the feather is: the frost thins out over this distance and
+  /// is gone at [extent].
+  static const _feather = 32.0;
 
   @override
   Widget build(BuildContext context) {
@@ -143,13 +154,14 @@ class _ProgressiveBlur extends StatelessWidget {
       );
     }
 
-    final full = math.max(0.0, solid - _overlap);
-    final feather = solid + fade - full;
+    final feather = math.min(_feather, extent);
+    final full = extent - feather;
     double ease(double t) => 1 - t * t * (3 - 2 * t);
     final slices = [
       if (full > 0) slice(full, 1),
       for (var i = 0; i < _slices; i++)
         slice(feather / _slices, ease((i + 0.5) / _slices)),
+      if (total > extent) SizedBox(height: total - extent),
     ];
     return BackdropGroup(
       child: Column(

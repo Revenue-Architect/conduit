@@ -285,4 +285,36 @@ void main() {
     expect(blurs, greaterThan(6));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the frost is gone by its extent', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        const SizedBox(
+          height: 300,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: ConduitChromeGradientFade.top(
+                  contentHeight: 96,
+                  backgroundColor: Colors.white,
+                  blurSigma: 5,
+                  blurExtent: 96,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final top = tester.getTopLeft(find.byType(ConduitChromeGradientFade)).dy;
+    final lowest = tester
+        .widgetList<BackdropFilter>(find.byType(BackdropFilter))
+        .map((filter) => tester.getBottomLeft(find.byWidget(filter)).dy)
+        .reduce((a, b) => a > b ? a : b);
+    // Nothing blurs below the extent; the gradient still reaches further.
+    expect(lowest - top, lessThanOrEqualTo(96.01));
+  });
 }
