@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/widgets.dart';
@@ -101,8 +102,10 @@ class ConduitChromeGradientFade extends StatelessWidget {
   }
 }
 
-/// Full blur over the chrome, then slices of lessening blur across the fade
-/// so the frost has no hard edge. One backdrop pass serves every slice.
+/// Full blur behind the chrome, then a feathered edge that dissolves like a
+/// cloud: thin slices whose blur eases to nothing on a smoothstep, starting
+/// a little inside the chrome, so the frost never stops on a line. One
+/// backdrop pass serves every slice.
 class _ProgressiveBlur extends StatelessWidget {
   const _ProgressiveBlur({
     required this.edge,
@@ -116,25 +119,37 @@ class _ProgressiveBlur extends StatelessWidget {
   final double solid;
   final double fade;
 
-  static const _taper = [0.62, 0.34, 0.14];
+  /// Slices in the feather: thin enough that no step between two shows.
+  static const _slices = 12;
+
+  /// How far inside the chrome the feather begins.
+  static const _overlap = 16.0;
 
   @override
   Widget build(BuildContext context) {
-    Widget slice(double height, double strength) => SizedBox(
-      height: height,
-      child: ClipRect(
-        child: BackdropFilter.grouped(
-          filter: ImageFilter.blur(
-            sigmaX: sigma * strength,
-            sigmaY: sigma * strength,
-          ),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
+    Widget slice(double height, double strength) {
+      final blur = sigma * strength;
+      return SizedBox(
+        height: height,
+        // Past the point where blur is visible, nothing is drawn at all.
+        child: blur < 0.05
+            ? null
+            : ClipRect(
+                child: BackdropFilter.grouped(
+                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+      );
+    }
+
+    final full = math.max(0.0, solid - _overlap);
+    final feather = solid + fade - full;
+    double ease(double t) => 1 - t * t * (3 - 2 * t);
     final slices = [
-      slice(solid, 1),
-      for (final strength in _taper) slice(fade / _taper.length, strength),
+      if (full > 0) slice(full, 1),
+      for (var i = 0; i < _slices; i++)
+        slice(feather / _slices, ease((i + 0.5) / _slices)),
     ];
     return BackdropGroup(
       child: Column(

@@ -277,7 +277,12 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(BackdropFilter), findsNWidgets(4));
+    // Full frost behind the bar, then a feather that thins to nothing.
+    expect(find.byType(BackdropFilter), findsWidgets);
+    final blurs = tester
+        .widgetList<BackdropFilter>(find.byType(BackdropFilter))
+        .length;
+    expect(blurs, greaterThan(6));
     expect(tester.takeException(), isNull);
   });
 }
