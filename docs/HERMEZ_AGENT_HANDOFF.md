@@ -817,3 +817,55 @@ Upstream supersedes the hosted-room lease patch. It does NOT supersede the
 Hindsight cron/system auto-retain gate: stable removes the bundled provider and
 the exclusion must move to the selected external provider. No provider patch,
 model/profile changes or unrelated infrastructure changes were deployed.
+
+## 2026-10-05 — Production custom Hermes 0.21.5 deployed; APK updated
+
+This append supersedes the preceding **preflight BLOCKED** runtime status, not
+the listed unresolved defects. User subsequently requested minimum safe prep,
+then upgrade, recording future breakage. Primary reference:
+[deployment and rollback report](hermes-migration/2026-10-05/DEPLOYMENT.md).
+
+- **Production:** `hermes-agent_web_1` now runs
+  `hermes-agent-umbrel-teams:v2026.9.24-kai3`, image ID
+  `sha256:a7854c3635b65f3298e296ccb29519ccf38a24f177dddc1684b3ddd394800b09`,
+  Hermes 0.21.5/f97608f1, config 46, state schema 30, contract 8. Managed/root
+  compose and Umbrel regeneration hooks reference kai3. Old stable image retained.
+- **Custom image:** pinned official base; old Umbrel wrappers/context/Teams;
+  bundled Hindsight bridge + tracked system-prefix gate; pinned SDK and retry
+  dependency; nonexistent native skill-bundle override. Upstream supplies the
+  former hosted-room lease patch. Do not enable the dormant external Hindsight
+  provider blindly or use the failed new-release kai1 candidate.
+- **Recovery:** stopped-writer checkpoint at
+  `/home/umbrel/.jarvis/hermes-upgrade-20261005/cutover-checkpoint/`, 45 checked
+  SQLite copies and targeted private config archive, verified off-box. No fresh
+  privileged ZFS snapshot; not full cross-service recovery. The old `kind_gates`
+  SSH-owned writer was stopped/auto-removed; do not relaunch it on the old image
+  against upgraded shared state. Use new-image Desktop sessions.
+- **APK first, then handoff:** bb5521c9 build (source fixes 5c936334/3f21b5c7),
+  ARM64 debug build passed, installed `-r` at 17:00:46 Toronto on S25 Ultra.
+  App data folders preserved, Home loads real bots, no matching Flutter exception
+  in final PID-filtered log. APK hash is in the deployment report. No app reset.
+- **Verified:** 48 focused Flutter tests; 36 focused proactive tests; real
+  authenticated REST/WS seven-profile reads; six harmless model probes; real
+  Hindsight recall/SDK construction; native Steel create/CDP/blank-page/snapshot/
+  viewer/release; eleven session DB integrity checks. Model/memory strategy,
+  cron IDs/cadences/enable states and armed router compared against checkpoint.
+- **Incomplete, do not call all green:** contract-8 mobile connection consent;
+  Local 32K-versus-64K context mismatch already present before upgrade; stale
+  judge backlog (manual execution completed but no new judgment proved); five
+  failed mail items; Assurance canary/reconcile dependencies/SQL; duplicate Teams
+  credentials; pre-existing Hermes TextBee adapter failure. Standalone SMS poller
+  is healthy and overdue count returned to zero. Home bot count includes existing
+  state-only `*skills` directories; do not delete them to fix the count.
+- **QA boundaries:** broad Flutter analysis/tests not green/completed; full
+  real-device streamed decisions/notifications/deep links/Steer/Stop/Steel takeover
+  not performed. SDK memory writes were mocked; no test facts injected. No other
+  service upgraded. Rollback helper is prepared but not live-rehearsed.
+
+Build/rollback/smoke assets are tracked in Umbrel config at
+`hermes/migrations/2026-10-05/`. Private credentials/logs/DB backups are never Git
+inputs. A future agent should start with DEPLOYMENT.md, recheck live versions and
+scope, and tackle the typed connector adapter/device acceptance or baseline
+proactive repairs as distinct work, not redesign Conduit or change model strategy.
+Existing unrelated `graphify-out/` in Conduit and the pre-staged n8n workflow in
+Umbrel config were deliberately preserved outside migration commits.

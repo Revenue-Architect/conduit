@@ -1,5 +1,11 @@
 # Hermes stable migration preflight — 2026-10-05
 
+> **Historical preflight, superseded deployment status.** Production was later
+> upgraded to custom 0.21.5 `v2026.9.24-kai3`, and the fresh Conduit APK was
+> installed preserving data. Read [DEPLOYMENT.md](DEPLOYMENT.md) first for current
+> image IDs, actual QA, unresolved failures and rollback. The text below records
+> the earlier safety assessment, not current runtime state.
+
 ## Outcome: production upgrade blocked, old runtime preserved
 
 This is NOT a completed upgrade. No new production image/container/config was

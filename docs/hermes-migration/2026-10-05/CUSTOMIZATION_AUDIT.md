@@ -1,5 +1,24 @@
 # Hermes customization audit — 2026-10-05
 
+## Final disposition after deployment
+
+Read [DEPLOYMENT.md](DEPLOYMENT.md) for the current runtime and evidence.
+Production now uses custom 0.21.5 `v2026.9.24-kai3`. The old bundled Hindsight
+provider was deliberately carried as a compatibility bridge: discovery proves
+that exact provider is loaded, its system-session gate is applied during build,
+and its SDK loader uses pinned hindsight-client 0.6.1 / aiohttp-retry 2.9.1.
+External 1.1 remains dormant; no provider relocation was performed. Real recall
+passes; retain paths were tested with writes mocked, not new memory facts.
+
+Umbrel/Teams/context assets are preserved from the retained old image; hosted-room
+lease patches were not ported because upstream implements them. Frozen skills
+remain untouched and native sync uses a nonexistent bundle override. Actual
+model/memory/provider configuration, cron cadence/enable states and armed router
+were checked against the fresh recovery checkpoint. The deployment report lists
+remaining baseline and client issues explicitly.
+
+## Historical preflight audit (before custom image build)
+
 Status: preflight only. Production remains on 0.21.1. No patch was removed from
 the live server, no skill was changed, and no router state was changed.
 

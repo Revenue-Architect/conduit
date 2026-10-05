@@ -1,5 +1,24 @@
 # Conduit / Hermes stable compatibility — 2026-10-05
 
+## Current acceptance status
+
+The [deployment report](DEPLOYMENT.md) supersedes the **historical preflight**
+matrix below. Final custom 0.21.5 is running. Live authenticated REST/profile,
+session/job, Kanban/artifact/MCP/toolset and WS capability/ping/session-list
+checks pass; six cloud/profile model probes pass. 48 focused Flutter regressions
+pass and the ARM64 APK was installed on the S25 Ultra preserving data. Home
+loads real bots. Fresh mobile auth, streamed decisions, notifications/deep links
+and browser takeover have not received complete real-device acceptance.
+
+`connection.request/update/respond` and `pending_connection` remain unsupported
+new mobile consent surfaces. The earlier block-cutover assessment below identified
+this correctly; the user's later minimum-upgrade instruction changed deployment
+sequencing, **not its implementation status**. Do not claim MCP settings success
+is proof of connector-consent success. All other unresolved checks are itemized
+in DEPLOYMENT.md rather than marked green by inference.
+
+## Historical interface audit
+
 Audit baseline: `Revenue-Architect/conduit`, `feat/hermez-motion-foundation`,
 `dc689da386a511ad2dd381b79ed101dbfba0ea89` (also the fetched origin/main at start).
 Do not reset to the old handoff's `90c63b2c`. Concurrent unrelated work exists in
