@@ -7,7 +7,6 @@ import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../widgets/hermes_session_tile.dart';
-import '../widgets/hermez_relative_time.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
@@ -21,23 +20,6 @@ String hermesActiveWorkSummary(List<HermesLiveSession> sessions) {
     if (working > 0) '$working working',
     if (needs > 0) '$needs ${needs == 1 ? 'needs' : 'need'} you',
   ].join(' · ');
-}
-
-/// Runs on this connection that ended recently and are not running again,
-/// newest first. Hermes lists open idle sessions as active too, so only a
-/// working or waiting session means a run is not done.
-List<({String storedId, DateTime at, bool failed})> hermesFinishedWork(
-  HermesDesktopApiService service,
-  List<HermesLiveSession> sessions,
-) {
-  final running = {
-    for (final session in sessions)
-      if (session.working || session.needsYou) session.storedId,
-  };
-  return [
-    for (final done in service.recentlyFinished())
-      if (!running.contains(done.storedId)) done,
-  ];
 }
 
 /// Finds the chat a live session belongs to, so it opens in its own
@@ -95,13 +77,6 @@ class _HermesActiveWorkSheet extends ConsumerWidget {
     final sessions = work.value ?? const <HermesLiveSession>[];
     final needs = sessions.where((session) => session.needsYou).toList();
     final working = sessions.where((session) => session.working).toList();
-    final service = ref.watch(hermesApiServiceProvider);
-    final known = ref.watch(hermesSessionsProvider).value ?? const [];
-    final finished = service is HermesDesktopApiService
-        ? hermesFinishedWork(service, sessions)
-        : const <({String storedId, DateTime at, bool failed})>[];
-    String titleFor(String id) =>
-        known.where((session) => session.id == id).firstOrNull?.title ?? 'Chat';
 
     void open(String storedId, String title) =>
         Navigator.of(context)
@@ -123,7 +98,7 @@ class _HermesActiveWorkSheet extends ConsumerWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (needs.isEmpty && working.isEmpty && finished.isEmpty)
+                if (needs.isEmpty && working.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
@@ -159,21 +134,6 @@ class _HermesActiveWorkSheet extends ConsumerWidget {
                       meta: session.model,
                       live: true,
                       onTap: () => open(session.storedId, session.title),
-                    ),
-                ],
-                if (finished.isNotEmpty) ...[
-                  _Label('FINISHED RECENTLY'),
-                  for (final done in finished.take(6))
-                    _WorkRow(
-                      key: ValueKey('done-${done.storedId}'),
-                      state: done.failed
-                          ? HermezLiveState.failed
-                          : HermezLiveState.done,
-                      title: titleFor(done.storedId),
-                      detail: done.failed ? 'Run failed' : 'Done',
-                      meta: hermezRelativeLabel(done.at),
-                      live: false,
-                      onTap: () => open(done.storedId, titleFor(done.storedId)),
                     ),
                 ],
               ],

@@ -698,9 +698,8 @@ class _UtilityObject extends StatelessWidget {
 }
 
 /// What Hermes is doing right now, on any chat, bot or device: the first
-/// item and a count. Opens Active Work. When the work ends the card stays a
-/// while and says so in place, rather than vanishing from under a finger;
-/// it leaves once nothing has run recently.
+/// item and a count. Opens Active Work. Only chats that are running or need
+/// the user; it leaves when nothing is.
 class _ActiveWorkCard extends ConsumerWidget {
   const _ActiveWorkCard();
 
@@ -716,44 +715,23 @@ class _ActiveWorkCard extends ConsumerWidget {
         if (session.needsYou || session.working) session,
     ];
     final first = live.isEmpty ? null : live.first;
-    // Refreshed with every Active Work poll.
-    final finished = hermesFinishedWork(service, sessions);
-    final lastDone = first == null && finished.isNotEmpty
-        ? finished.first
-        : null;
-    final known =
-        ref.watch(hermesSessionsProvider).value ??
-        const <HermesSessionSummary>[];
-    final title =
-        first?.title ??
-        (lastDone == null
-            ? null
-            : known
-                      .where((session) => session.id == lastDone.storedId)
-                      .firstOrNull
-                      ?.title ??
-                  'Chat');
-    final summary = first != null
-        ? hermesActiveWorkSummary(live)
-        : finished.length == 1
-        ? 'finished'
-        : '${finished.length} finished';
+    final summary = hermesActiveWorkSummary(live);
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
     const light = Color(0xFFF6F5F2);
     return HermezReveal(
-      visible: title != null,
+      visible: first != null,
       weight: HermezMotionWeight.medium,
       revealKey: const ValueKey('home-active-work'),
-      child: title == null
+      child: first == null
           ? const SizedBox.shrink()
           : Padding(
               padding: const EdgeInsets.only(top: 12),
               child: HermezSurface(
                 kind: HermezSurfaceKind.technical,
                 motif: HermezMotif.arc,
-                semanticLabel: 'Active work: $summary. $title',
+                semanticLabel: 'Active work: $summary. ${first.title}',
                 feedbackCue: HermezFeedbackCue.objectOpen,
                 onOpen: (origin) =>
                     showHermesActiveWorkSheet(context, ref, origin: origin),
@@ -764,13 +742,9 @@ class _ActiveWorkCard extends ConsumerWidget {
                 child: Row(
                   children: [
                     HermezLiveDot(
-                      state: first != null
-                          ? (first.needsYou
-                                ? HermezLiveState.attention
-                                : HermezLiveState.working)
-                          : lastDone!.failed
-                          ? HermezLiveState.failed
-                          : HermezLiveState.done,
+                      state: first.needsYou
+                          ? HermezLiveState.attention
+                          : HermezLiveState.working,
                       size: 9,
                       // The card stays dark in both themes.
                       ink: light,
@@ -788,7 +762,7 @@ class _ActiveWorkCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            title,
+                            first.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -796,10 +770,10 @@ class _ActiveWorkCard extends ConsumerWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (first?.preview case final preview?)
+                          if (first.preview case final preview?)
                             HermezLiveText(
                               preview,
-                              live: first!.working,
+                              live: first.working,
                               style: TextStyle(
                                 color: light.withValues(alpha: 0.75),
                                 fontSize: 12,

@@ -2911,8 +2911,35 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     // starts an owner-bound retry. Live snapshots remain bound for later
     // deltas. Content is deliberately never an identity: repeated short
     // answers such as "OK" are common across independent turns.
+    //
+    // The one exception is a native Desktop session, whose server is
+    // authoritative and whose history rows carry no run id: a finished turn
+    // the transcript already ends with (same session, same visible text, the
+    // final row, not claimed above) is that turn, not a second reply.
+    final tailIndex = messages.length - 1;
+    var nativeTailFree =
+        isNativeHermesConversation(conversation) &&
+        tailIndex >= 0 &&
+        identical(restored[tailIndex], messages[tailIndex]);
     for (final projection in projections) {
       if (matched.contains(projection)) continue;
+      if (nativeTailFree &&
+          projection.finalized &&
+          projection.dispatchSettled &&
+          hermesNativeTranscriptEndsWithReply(
+            transcriptTail: messages[tailIndex],
+            reply: projection.message,
+          )) {
+        nativeTailFree = false;
+        store.markRecoveryDelivered(projection);
+        _retryHermesProjectionPersistenceAfterAdoption(
+          ref,
+          conversation: conversation,
+          projectionStore: store,
+          projection: projection,
+        );
+        continue;
+      }
       restored.add(projection.message);
       if (projection.finalized && projection.dispatchSettled) {
         store.markRecoveryDelivered(projection);
@@ -12515,6 +12542,34 @@ String? reusableHermesSessionId({
     candidateSessionId,
     sensitiveValues: sensitiveValues,
   );
+}
+
+/// Whether a native Hermes transcript ending with [transcriptTail] already
+/// holds [reply], a finished run's own copy. Native history rows carry no
+/// run or response id, so the anchor is the transcript's final row: an
+/// assistant reply from the same session with the same visible text.
+@visibleForTesting
+bool hermesNativeTranscriptEndsWithReply({
+  required ChatMessage transcriptTail,
+  required ChatMessage reply,
+}) {
+  if (transcriptTail.role != 'assistant' || reply.role != 'assistant') {
+    return false;
+  }
+  if (reply.isStreaming || reply.error != null) return false;
+  final tailSession = transcriptTail.metadata?['hermesSessionId'];
+  final replySession = reply.metadata?['hermesSessionId'];
+  if (tailSession is String &&
+      replySession is String &&
+      tailSession != replySession) {
+    return false;
+  }
+  String visible(String content) =>
+      stripRenderedSemanticDetails(content)
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+  final text = visible(reply.content);
+  return text.isNotEmpty && text == visible(transcriptTail.content);
 }
 
 String? _hermesMessageTransportId(ChatMessage message) {

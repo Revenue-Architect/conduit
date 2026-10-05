@@ -12,7 +12,6 @@ import 'package:conduit/features/hermes/services/hermes_backend_service.dart';
 import 'package:conduit/features/hermes/services/hermes_desktop_api_service.dart';
 import 'package:conduit/features/hermes/services/hermes_desktop_transport.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
-import 'package:conduit/features/hermes/sheets/hermes_active_work_sheet.dart';
 import 'package:conduit/features/spaces/services/hermes_spaces_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -374,27 +373,6 @@ void main() {
       check(service.recentlyFinished()).isEmpty();
     },
   );
-
-  test('a finished chat Hermes still lists as open is finished work', () async {
-    final (service, gateway) = await _connected();
-    final stored = await createSession(service, gateway);
-    gateway.event('message.complete', 'runtime-1', {'text': 'OK'});
-    await _settle();
-    HermesLiveSession session(String status) => HermesLiveSession(
-      runtimeId: 'runtime-1',
-      storedId: stored,
-      title: 'QA chat',
-      status: status,
-    );
-    // `session.active_list` keeps a finished chat as idle.
-    check(
-      hermesFinishedWork(service, [
-        session('idle'),
-      ]).map((done) => done.storedId),
-    ).deepEquals([stored]);
-    check(hermesFinishedWork(service, [session('working')])).isEmpty();
-    check(hermesFinishedWork(service, [session('waiting')])).isEmpty();
-  });
 
   test(
     'a bridged tool call is recorded as the tool that actually ran',
