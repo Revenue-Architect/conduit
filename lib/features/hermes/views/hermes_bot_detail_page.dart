@@ -26,6 +26,7 @@ import 'hermes_page_chrome.dart';
 import '../widgets/hermes_bot_knowledge.dart';
 import '../widgets/hermez_bot_presence.dart';
 import '../widgets/hermez_expandable_section.dart';
+import '../widgets/hermez_skeleton.dart';
 
 final class _BotData {
   const _BotData(this.sessions, this.skills, this.tools, this.jobs);
@@ -415,9 +416,9 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                         child: Text('Bot details unavailable. Pull to retry.'),
                       ),
                     )
-                  : const Padding(
-                      padding: EdgeInsets.all(28),
-                      child: Center(child: CircularProgressIndicator()),
+                  : Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: HermezSkeleton.rows(count: 3),
                     ),
             ),
           ],

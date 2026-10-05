@@ -9,6 +9,8 @@ import '../providers/hermes_providers.dart';
 import '../services/hermes_backend_service.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_segments.dart';
+import '../widgets/hermez_skeleton.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
@@ -210,18 +212,18 @@ class _HermesModelSheetState extends ConsumerState<_HermesModelSheet> {
               ),
             ],
             const SizedBox(height: 12),
-            _Tabs(
+            HermezSegments(
               index: _tab,
               labels: const ['Model', 'Effort'],
-              onSelect: (index) => setState(() => _tab = index),
+              onChanged: (index) => setState(() => _tab = index),
             ),
           ],
         ),
       ),
       body: catalog.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 48),
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: HermezSkeleton.rows(count: 5),
         ),
         error: (_, _) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -294,95 +296,6 @@ class _HermesModelSheetState extends ConsumerState<_HermesModelSheet> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({
-    required this.index,
-    required this.labels,
-    required this.onSelect,
-  });
-
-  final int index;
-  final List<String> labels;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = HermezChatPalette.forBrightness(
-      Theme.of(context).brightness,
-    );
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: palette.ink.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth / labels.length;
-          return Stack(
-            children: [
-              AnimatedPositioned(
-                duration: HermezMotion.settleFor(HermezMotionWeight.light),
-                curve: HermezMotion.curveMedium,
-                left: index * width,
-                top: 0,
-                bottom: 0,
-                width: width,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: palette.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: palette.border),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  for (final (i, label) in labels.indexed)
-                    Expanded(
-                      child: Semantics(
-                        selected: i == index,
-                        button: true,
-                        label: label,
-                        excludeSemantics: true,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            if (i == index) return;
-                            HermezFeedback.play(
-                              HermezFeedbackCue.controlSelect,
-                            );
-                            onSelect(i);
-                          },
-                          child: Center(
-                            child: AnimatedDefaultTextStyle(
-                              duration: HermezMotion.settleFor(
-                                HermezMotionWeight.light,
-                              ),
-                              style: TextStyle(
-                                color: i == index ? palette.ink : palette.muted,
-                                fontSize: 13.5,
-                                fontWeight: i == index
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
-                              ),
-                              child: Text(label),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          );
-        },
       ),
     );
   }

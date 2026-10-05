@@ -11,6 +11,7 @@ import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
+import '../widgets/hermez_skeleton.dart';
 
 /// "2 working · 1 needs you".
 String hermesActiveWorkSummary(List<HermesLiveSession> sessions) {
@@ -91,9 +92,9 @@ class _HermesActiveWorkSheet extends ConsumerWidget {
         style: HermezType.meta(palette),
       ),
       body: work.isLoading && work.value == null
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: HermezSkeleton.rows(count: 3),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

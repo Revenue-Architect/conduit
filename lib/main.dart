@@ -39,6 +39,7 @@ import 'features/chat/services/request_completion_runner.dart';
 import 'features/chat/providers/text_to_speech_provider.dart';
 import 'features/chat/providers/chat_providers.dart'
     show chatWakelockCoordinatorProvider, restoreDefaultModel;
+import 'features/hermes/motion/hermez_motion_tokens.dart';
 import 'features/release_notes/release_notes_bootstrap.dart';
 import 'features/release_notes/release_notes_coordinator.dart';
 import 'features/release_notes/data/release_notes_repository.dart';
@@ -127,6 +128,8 @@ void main() {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      // Every animation runs 10 % faster than authored (one global clock).
+      HermezMotion.applyAppSpeed();
       // Conduit intentionally owns separate direct-local and per-server files.
       driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
       RasterMediaPolicy.configureGlobalImageCache();

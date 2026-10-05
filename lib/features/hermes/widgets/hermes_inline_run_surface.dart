@@ -28,6 +28,8 @@ import 'hermes_run_actions.dart';
 import 'hermes_steel_live_view.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_live.dart';
+import 'hermez_skeleton.dart';
+import 'hermez_status_morph.dart';
 import 'hermez_surfaces.dart';
 import '../feedback/hermez_feedback.dart';
 
@@ -440,19 +442,18 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                     constraints: const BoxConstraints(minHeight: 48),
                     child: Row(
                       children: [
-                        HermezIconSwap(
-                          icon: attention
-                              ? Icons.priority_high_rounded
+                        // One object from working to its outcome: the arc
+                        // spins, closes, floods and draws its mark.
+                        HermezStatusMorph(
+                          state: attention
+                              ? HermezMorphState.attention
                               : finished
                               ? (run.failed
-                                    ? Icons.error_outline_rounded
-                                    : Icons.check_circle_rounded)
-                              : Icons.radio_button_checked_rounded,
-                          color: attention || working || run.failed
-                              ? palette.accent
-                              : finished
-                              ? palette.ink
-                              : palette.muted,
+                                    ? HermezMorphState.failed
+                                    : HermezMorphState.done)
+                              : working
+                              ? HermezMorphState.working
+                              : HermezMorphState.idle,
                           size: 22,
                         ),
                         const SizedBox(width: 10),
@@ -471,21 +472,26 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                               Row(
                                 children: [
                                   Expanded(
-                                    child: HermezLiveText(
-                                      attention
-                                          ? 'Review the request below'
-                                          : details.isNotEmpty
-                                          ? details
-                                          : 'Live activity',
-                                      live: working && !attention,
-                                      style: TextStyle(
-                                        color: working
-                                            ? palette.ink
-                                            : palette.muted,
-                                        fontSize: 12.5,
-                                        fontWeight: working
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
+                                    // A light band runs through the line
+                                    // while Hermes works.
+                                    child: HermezSheen(
+                                      active: working && !attention,
+                                      child: HermezLiveText(
+                                        attention
+                                            ? 'Review the request below'
+                                            : details.isNotEmpty
+                                            ? details
+                                            : 'Live activity',
+                                        live: working && !attention,
+                                        style: TextStyle(
+                                          color: working
+                                              ? palette.ink
+                                              : palette.muted,
+                                          fontSize: 12.5,
+                                          fontWeight: working
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ),

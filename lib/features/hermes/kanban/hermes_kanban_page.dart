@@ -21,6 +21,8 @@ import '../widgets/hermez_technical_background.dart';
 import '../motion/hermez_motion.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import 'hermes_kanban_client.dart';
+import '../widgets/hermez_commit_button.dart';
+import '../widgets/hermez_skeleton.dart';
 
 sealed class _KanbanLinkedSelection {
   const _KanbanLinkedSelection();
@@ -1000,50 +1002,50 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                           : () => Navigator.pop(panelContext, false),
                       child: const Text('Cancel'),
                     ),
-                    FilledButton(
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              if (title.text.trim().isEmpty) {
-                                setModalState(
-                                  () => errorText = 'Enter a task title.',
-                                );
-                                return;
-                              }
-                              setModalState(() {
-                                saving = true;
-                                errorText = null;
-                              });
-                              try {
-                                await _api().create(
-                                  board,
-                                  title.text.trim(),
-                                  body: body.text,
-                                  triage: selectedTriage,
-                                  assignee: assignee,
-                                  priority: priority,
-                                );
-                                if (panelContext.mounted) {
-                                  Navigator.pop(panelContext, true);
-                                }
-                              } catch (error) {
-                                if (panelContext.mounted) {
-                                  setModalState(
-                                    () => errorText = _message(error),
-                                  );
-                                }
-                              } finally {
-                                if (panelContext.mounted) {
-                                  setModalState(() => saving = false);
-                                }
-                              }
-                            },
-                      child: saving
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Create task'),
+                    // Draws in around a ring while Hermes creates the
+                    // task, checks, and the panel closes on the check.
+                    HermezCommitButton(
+                      label: 'Create task',
+                      successLabel: 'Created',
+                      hold: const Duration(milliseconds: 450),
+                      height: 44,
+                      onCommit: () async {
+                        if (title.text.trim().isEmpty) {
+                          setModalState(
+                            () => errorText = 'Enter a task title.',
+                          );
+                          return false;
+                        }
+                        setModalState(() {
+                          saving = true;
+                          errorText = null;
+                        });
+                        try {
+                          await _api().create(
+                            board,
+                            title.text.trim(),
+                            body: body.text,
+                            triage: selectedTriage,
+                            assignee: assignee,
+                            priority: priority,
+                          );
+                          return true;
+                        } catch (error) {
+                          if (panelContext.mounted) {
+                            setModalState(() => errorText = _message(error));
+                          }
+                          return false;
+                        } finally {
+                          if (panelContext.mounted) {
+                            setModalState(() => saving = false);
+                          }
+                        }
+                      },
+                      onCommitted: () {
+                        if (panelContext.mounted) {
+                          Navigator.pop(panelContext, true);
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -1314,7 +1316,15 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
   Widget _boardBody() {
     final snapshot = _snapshot;
     if (snapshot == null || snapshot.boardSlug != _board) {
-      if (_loading) return const Center(child: CircularProgressIndicator());
+      if (_loading) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: HermezSkeleton.rows(count: 4),
+          ),
+        );
+      }
       if (_error != null) return const SizedBox.shrink();
       return const Center(child: Text('No Kanban boards available.'));
     }

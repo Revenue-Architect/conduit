@@ -13,6 +13,7 @@ import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermez_modal_sheet.dart';
+import '../widgets/hermez_skeleton.dart';
 
 /// One step up close: what Hermes asked the tool, what came back, how long
 /// it took. Read from the stored transcript; nothing is re-run.
@@ -114,9 +115,9 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
         future: _transcript,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: HermezSkeleton.lines(count: 5),
             );
           }
           if (snapshot.hasError) {

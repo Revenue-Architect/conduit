@@ -34,3 +34,20 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+
+## SwiftPieces component designs
+
+Several Hermez widgets are Flutter reimplementations of the interaction
+designs of SwiftPieces' free SwiftUI components (https://swiftpieces.com),
+adapted to the Hermez motion rules (no opacity animation, Hermez springs and
+palette). No SwiftPieces source code or assets are included.
+
+- `HermezStatusMorph` after Status Morph
+- `HermezCommitButton` after Commit Button
+- `HermezSkeleton` after Skeleton Loader
+- `HermezSheen` after the text form of Thinking State
+- `HermezSegments` after Glass Segments
+- The plan timeline rail (`HermesPlanRow`) after Status Timeline
+
+SwiftPieces' free components are offered under the MIT License with the
+Commons Clause.

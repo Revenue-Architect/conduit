@@ -1,5 +1,6 @@
 import 'package:flutter/animation.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:nib_motion/nib_motion.dart';
 
 import '../models/hermes_config.dart';
@@ -29,6 +30,16 @@ enum HermezRouteMotion {
 /// physical motion does not go through those shortened duration helpers, and
 /// nothing in Hermez animates opacity: objects travel, grow, and recede.
 abstract final class HermezMotion {
+  /// Every animation in the app runs this much faster than its authored
+  /// timing: springs, routes, implicit animations and scroll settling alike.
+  /// It is one global clock ([timeDilation]), so nothing is missed and
+  /// nothing drifts out of step with anything else.
+  static const appSpeed = 1.1;
+
+  /// Applies [appSpeed] to the scheduler clock. Called once at startup,
+  /// before the first frame; never under `flutter test`.
+  static void applyAppSpeed() => timeDilation = 1 / appSpeed;
+
   static const springLight = NibSpringDescription(
     mass: 0.65,
     stiffness: 420,

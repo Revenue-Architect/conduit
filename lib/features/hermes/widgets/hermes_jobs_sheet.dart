@@ -19,6 +19,7 @@ import '../../../shared/widgets/themed_sheets.dart';
 import '../models/hermes_job.dart';
 import '../providers/hermes_providers.dart';
 import '../utils/hermes_schedule_format.dart';
+import 'hermez_skeleton.dart';
 
 const _nativeJobTogglePrefix = 'hermes-job-toggle:';
 const _nativeJobsSheetId = 'hermes-scheduled-agents';
@@ -294,7 +295,10 @@ class HermesJobsSheet extends ConsumerWidget {
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: HermezSkeleton.rows(count: 4),
+            ),
             error: (_, _) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(Spacing.xl),

@@ -20,6 +20,7 @@ import '../widgets/hermez_expandable_section.dart';
 import '../feedback/hermez_feedback.dart';
 import '../widgets/hermez_surfaces.dart';
 import '../widgets/hermez_relative_time.dart';
+import '../widgets/hermez_skeleton.dart';
 
 const _artifactRoot = '/opt/data/artifacts';
 
@@ -204,7 +205,10 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
             children: [
               if (widget.selectedKanbanAttachment != null)
                 _selectedAttachment(),
-              const Center(child: CircularProgressIndicator()),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: HermezSkeleton.rows(count: 4),
+              ),
             ],
           ),
           error: (error, _) => ListView(

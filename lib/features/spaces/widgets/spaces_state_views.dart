@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_surfaces.dart';
 import '../services/hermes_spaces_client.dart';
+import '../../hermes/widgets/hermez_skeleton.dart';
 
 HermezChatPalette _palette(BuildContext context) =>
     HermezChatPalette.forBrightness(Theme.of(context).brightness);
@@ -13,10 +14,8 @@ class SpacesLoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     physics: const AlwaysScrollableScrollPhysics(),
-    children: const [
-      SizedBox(height: 120),
-      Center(child: CircularProgressIndicator()),
-    ],
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+    children: [HermezSkeleton.rows(count: 5)],
   );
 }
 

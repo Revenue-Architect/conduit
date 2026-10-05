@@ -26,6 +26,7 @@ import '../widgets/page_chat_picker_sheet.dart';
 import '../widgets/page_conflict_banner.dart';
 import '../widgets/page_move_sheet.dart';
 import '../widgets/spaces_state_views.dart';
+import '../../hermes/widgets/hermez_status_morph.dart';
 
 enum _PageAction { subpage, move, source, visual, copy, delete }
 
@@ -430,9 +431,11 @@ class _SpacePageEditorPageState extends ConsumerState<SpacePageEditorPage> {
                     child: FilledButton.icon(
                       onPressed: _asking ? null : _ask,
                       icon: _asking
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                          ? HermezStatusMorph(
+                              state: HermezMorphState.working,
+                              size: 16,
+                              tint: Theme.of(context).colorScheme.onPrimary,
+                              ink: Theme.of(context).colorScheme.onPrimary,
                             )
                           : const Icon(Icons.auto_awesome_rounded, size: 18),
                       label: const Text('Ask Hermes'),

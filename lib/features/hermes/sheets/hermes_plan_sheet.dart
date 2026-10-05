@@ -211,11 +211,19 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final row in rows) ...[
+                for (final (i, row) in rows.indexed) ...[
                   HermesPlanRow(
                     key: ValueKey('plan-${row.item.id}'),
                     item: row.item,
                     depth: row.depth,
+                    // The plan as a timeline: each step joined to the next.
+                    railAbove: i == 0
+                        ? null
+                        : hermesPlanRailBetween(rows[i - 1], row),
+                    railBelow: hermesPlanRailBetween(
+                      row,
+                      i + 1 < rows.length ? rows[i + 1] : null,
+                    ),
                     live:
                         running &&
                         row.item.status == HermesTodoStatus.inProgress,

@@ -6,6 +6,7 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../motion/hermez_motion.dart';
 import 'hermes_run_actions.dart';
 import 'hermez_chat_palette.dart';
+import 'hermez_status_morph.dart';
 
 /// One pill in a row of run actions. A pill with [onSubmit] stretches into a
 /// field across its row, the way Steer does; one with [onTap] simply acts.
@@ -405,12 +406,11 @@ class _FieldControl extends StatelessWidget {
             dimension: 34,
             child: Center(
               child: sending
-                  ? SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: palette.onAccent,
-                      ),
+                  ? HermezStatusMorph(
+                      state: HermezMorphState.working,
+                      size: 16,
+                      tint: palette.onAccent,
+                      ink: palette.onAccent,
                     )
                   : HermezIconSwap(
                       icon: canSend

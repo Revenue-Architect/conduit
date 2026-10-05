@@ -4414,6 +4414,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     backgroundColor: hermezVisuals
                         ? hermezPalette.canvas
                         : null,
+                    // The menu and bot badge float over the transcript:
+                    // frost what scrolls under them so they never sit on
+                    // readable text.
+                    blurSigma: 9,
                   ),
                 ),
                 Positioned(

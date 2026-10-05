@@ -28,6 +28,7 @@ import 'hermes_bot_avatar.dart';
 import 'hermez_bot_mark.dart';
 import 'hermez_technical_background.dart';
 import 'hermes_session_tile.dart';
+import 'hermez_skeleton.dart';
 
 /// Sidebar tab listing the user's Hermes server-side conversations, with one
 /// compact entry point for scheduled agents when the server exposes jobs.
@@ -387,11 +388,11 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
           ),
         ];
       },
-      loading: () => const [
+      loading: () => [
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.only(top: 64),
-            child: Center(child: CircularProgressIndicator()),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: HermezSkeleton.rows(count: 6),
           ),
         ),
       ],

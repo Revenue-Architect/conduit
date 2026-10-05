@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../motion/hermez_motion.dart';
 import 'hermez_chat_palette.dart';
+import 'hermez_status_morph.dart';
 import 'hermez_surfaces.dart';
 
 const _onDark = Color(0xFFF6F5F2);
@@ -185,9 +186,11 @@ class HermezActionTile extends StatelessWidget {
               child: busy
                   ? Padding(
                       padding: const EdgeInsets.all(11),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: primary ? const Color(0xFF17181C) : palette.ink,
+                      child: HermezStatusMorph(
+                        state: HermezMorphState.working,
+                        size: 18,
+                        tint: primary ? const Color(0xFF17181C) : palette.ink,
+                        ink: primary ? const Color(0xFF17181C) : palette.ink,
                       ),
                     )
                   : Icon(

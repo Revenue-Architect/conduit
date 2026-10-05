@@ -11,6 +11,8 @@ Conduit's generic durations stay in `lib/core/services/animation_service.dart`. 
 
 ## Weights and springs
 
+**App speed.** Every animation runs 10 % faster than its authored timing (`HermezMotion.appSpeed = 1.1`). It is applied once at startup through Flutter's global animation clock (`timeDilation = 1 / appSpeed`, `HermezMotion.applyAppSpeed()` in `main.dart`). Springs, routes, implicit animations and scroll settling all speed up together and stay in step. Durations and springs below are authored values; never under `flutter test`.
+
 Screens pick a `HermezMotionWeight`, never raw spring values.
 
 | Weight | Use | Press scale | Spring (mass / stiffness / damping) | Settles in |
@@ -93,6 +95,38 @@ Agent work in progress (runs, plans, delegates, team members, Active Work) share
 - `HermezActionPills` (`widgets/hermez_action_pills.dart`): a row of run pills where a field pill grows into a one-line field across its row with the inline run's Steer geometry and springs (medium out, light mirrored back; the field laid out at full width and uncovered by the travelling edge; the send control scales in after 35 % of the way; close turns into send in place; Back folds it first). Plan steps (Comment, Add after, Change), Replan and a delegate's Steer use it, so every "say something to Hermes" control morphs the same way.
 - Every agent sheet grows out of what was tapped: the plan preview, the delegates row, an activity row (tool inspector), the context bar's pills (radius 17, the pill's own), and the Active Work card.
 - Home's bot roster arrives as one object: the loading line rolls away and the cards unroll in its place (`HermezPresence`), with no per-card stagger.
+
+## Status, loading and choice components
+
+Adapted from SwiftPieces designs (see `THIRD_PARTY_NOTICES.md`), rebuilt to these rules. Strokes trim, discs scale, blocks travel; nothing fades.
+
+- `HermezStatusMorph` (`widgets/hermez_status_morph.dart`): one object from waiting to outcome.
+  - Idle is a quiet track. While working, a 72 % arc spins at about 1.1 turns a second (a live-state motif, off under tests and reduced motion).
+  - For an outcome, the arc closes into a ring where it stopped, a disc floods out from the centre on the medium spring, and the mark strokes in: a check (ink disc), a cross (accent disc, with one sideways nudge), or a bang for attention.
+  - A new run collapses the disc back into the ring.
+  - Used for the run card's status mark, and for the busy ring in sheet action tiles, action pills and Spaces' Ask Hermes.
+- `HermezCommitButton` (`widgets/hermez_commit_button.dart`): an async capsule.
+  - On tap it draws in around the working ring. Success closes it into a check and shows the success label for `hold`; `onCommitted` then runs (Kanban's Create task closes its panel on the check), or the button returns.
+  - Failure turns the capsule accent with a cross and "Try again"; a tap retries.
+- `HermezSkeleton` (`widgets/hermez_skeleton.dart`): placeholder bones for content on its way. The bones are a mask; one 18-degree band sweeps through them every 1.6 s, and every skeleton on screen reads the same frame clock, so all bands move in phase.
+  - Presets `.rows` (lists) and `.lines` (paragraphs). Content replaces it in place.
+  - It replaces the loading spinners in Active Work, Model, the tool inspector, Jobs, Teams, Sessions, Kanban, Artifacts, bot detail and Spaces.
+- `HermezSheen`: the same band running through text while work is live, used on the run card's live line. When inactive it returns its child untouched.
+- `HermezSegments` (`widgets/hermez_segments.dart`): a segmented control (the Model sheet's Model / Effort).
+  - The block can be tapped to, or grabbed and dragged; past either end it resists like a rubber band, then settles on the medium spring with the flick's velocity.
+  - Label ink flips exactly under the block (two label layers, the top one clipped to the block).
+  - A selection cue fires each time the block's centre crosses into a new segment.
+- Plan timeline (`HermesPlanRow` rails in the Plan sheet): steps at the same depth are joined by a line in the mark column.
+  - Not reached yet: faint.
+  - After a finished step: solid, drawing itself down on the medium spring.
+  - After a cancelled step: dashed, the trail stopping.
+
+## Chat chrome frost
+
+`ConduitChromeGradientFade` takes an optional `blurSigma`. On the chat screen's top edge it is 9:
+- The transcript scrolling under the menu button and the bot badge is frosted at full strength behind the bar.
+- The frost eases off in three slices across the fade, under the existing gradient.
+- One `BackdropGroup` pass serves all slices. Other edges stay gradient-only.
 
 ## Sensory feedback (sound and haptics)
 

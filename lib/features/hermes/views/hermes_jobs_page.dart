@@ -19,6 +19,7 @@ import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_page_chrome.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
+import '../widgets/hermez_skeleton.dart';
 
 AppLocalizations _l10n(BuildContext context) =>
     AppLocalizations.of(context) ?? AppLocalizationsEn();
@@ -220,9 +221,9 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
             ),
           );
         },
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: Spacing.xl),
-          child: Center(child: CircularProgressIndicator()),
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          child: HermezSkeleton.rows(count: 4),
         ),
         error: (error, _) => Padding(
           padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
@@ -679,9 +680,9 @@ class _JobCardState extends ConsumerState<_JobCard> {
   Widget _buildRunHistory(ConduitThemeExtension theme) {
     final runs = ref.watch(hermesJobRunsProvider(job.id));
     return runs.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(Spacing.sm),
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => Padding(
+        padding: const EdgeInsets.all(Spacing.sm),
+        child: HermezSkeleton.rows(count: 2, leading: false),
       ),
       error: (_, _) => Text(
         'Could not load run history.',

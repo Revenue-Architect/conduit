@@ -22,6 +22,7 @@ import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_surfaces.dart';
 import 'hermes_page_chrome.dart';
+import '../widgets/hermez_skeleton.dart';
 
 /// Teams on this Hermes server, most recently active first. An error means
 /// the server does not offer Group Chat (or it is not running).
@@ -733,7 +734,13 @@ class _HermesTeamRoomPageState extends ConsumerState<HermesTeamRoomPage> {
             ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: HermezSkeleton.rows(count: 4),
+                    ),
+                  )
                 : team == null
                 ? Padding(
                     padding: const EdgeInsets.all(24),
