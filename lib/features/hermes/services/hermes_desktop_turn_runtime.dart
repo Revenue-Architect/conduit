@@ -1007,10 +1007,10 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     // Current Hermes asks clarify / sudo / secret as a server request on this
     // socket: the answer is the response frame for that request id (there is
     // no clarify.respond method any more).
-    final qids = kind == HermesDecisionKind.clarification
+    var qids = kind == HermesDecisionKind.clarification
         ? _clarifyQids[requestId]
         : null;
-    final Map<String, dynamic>? serverResult = switch (kind) {
+    Map<String, dynamic>? serverResult = switch (kind) {
       HermesDecisionKind.clarification =>
         qids == null
             ? {'answer': value}
@@ -1032,6 +1032,49 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
       runtimeId = (await _resume(storedSessionId)).runtimeId;
     }
     await _ensureConnected();
+    if (serverResult != null) {
+      // A reconnect/resume can restore open_requests after the first attempt.
+      // Recompute batch answers from the recovered question IDs, too.
+      qids = kind == HermesDecisionKind.clarification
+          ? _clarifyQids[requestId]
+          : null;
+      if (qids != null) {
+        serverResult = {'answers': hermesClarifyBatchAnswers(qids, value)};
+      }
+      if (_rpc.answerServerRequest(requestId, serverResult)) {
+        _clarifyQids.remove(requestId);
+        await HermesPendingDecisionStore.resolve(
+          origin: _origin,
+          runtimeId: runtimeId,
+          requestId: requestId,
+        );
+        return;
+      }
+      if (_desktopContract >= 7) {
+        final result = _object(
+          await _rpc.request<Object?>(
+            'request.answer',
+            params: {
+              'id': requestId,
+              'result': serverResult,
+              ..._runtimeScope(runtimeId),
+            },
+          ),
+        );
+        if (result['status'] != 'ok') {
+          throw StateError(
+            'This Hermes request has expired. Refresh the conversation.',
+          );
+        }
+        _clarifyQids.remove(requestId);
+        await HermesPendingDecisionStore.resolve(
+          origin: _origin,
+          runtimeId: runtimeId,
+          requestId: requestId,
+        );
+        return;
+      }
+    }
     if (kind == HermesDecisionKind.mcpSetup) {
       await _administration.respondToMcpSetup(
         runtimeId: runtimeId,

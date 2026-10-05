@@ -138,12 +138,14 @@ final class HermesDesktopRpcClient {
   /// Server-to-client requests this app answers (Hermes asks, the renderer
   /// replies with a response frame carrying the same id), by id -> method.
   /// Tied to the socket that received them.
-  final Map<String, String> _serverRequests = {};
+  final Map<String, ({String method, String decisionId, String? sessionId})>
+  _serverRequests = {};
+  Future<void>? _advertisingServerRequests;
 
-  /// Questions Hermes asks the user as JSON-RPC server requests. They reach
-  /// the decision UI as `<method>.request` events with `request_id` set to
-  /// the frame id, and are answered with [answerServerRequest].
+  /// Questions reach the existing decision UI as `<method>.request` events.
+  /// Approval retains its queue ID; other kinds use the server frame ID.
   static const Set<String> answerableServerRequests = {
+    'approval',
     'clarify',
     'sudo',
     'secret',
@@ -266,6 +268,34 @@ final class HermesDesktopRpcClient {
     return completer.future.then((value) => value as T);
   }
 
+  /// Hermes v7+ fails human prompts fast unless the client advertises this.
+  /// Older gateways return -32601; negotiation must not break their chat.
+  /// Send before session RPCs, once per socket, without delaying connection.
+  Future<void> advertiseServerRequests() =>
+      _advertisingServerRequests ??= _advertiseServerRequests();
+
+  Future<void> _advertiseServerRequests() async {
+    try {
+      await request<Object?>(
+        'client.capabilities',
+        params: const {'server_requests': true},
+        timeout: const Duration(seconds: 15),
+      );
+    } on HermesDesktopRpcException catch (error) {
+      if (error.code != -32601 && !error.disconnected) {
+        DebugLogger.warning(
+          'capability-negotiation-failed',
+          scope: 'hermes/desktop/ws',
+        );
+      }
+    } catch (_) {
+      DebugLogger.warning(
+        'capability-negotiation-failed',
+        scope: 'hermes/desktop/ws',
+      );
+    }
+  }
+
   void _handleFrame(
     Object? raw,
     WebSocketChannel channel,
@@ -313,7 +343,25 @@ final class HermesDesktopRpcClient {
             ),
           );
         } else {
-          pending.completer.complete(frame['result']);
+          // The server does not keep unanswered questions in the event ring.
+          // Restore them before returning a resume/replay result to its caller.
+          final result = frame['result'];
+          try {
+            if (result is Map && result['open_requests'] is List) {
+              for (final request in result['open_requests'] as List) {
+                if (request is Map) {
+                  _deliverServerRequest(
+                    Map<String, dynamic>.from(request),
+                    channel,
+                  );
+                }
+              }
+            }
+          } finally {
+            // A malformed replay must not strand an otherwise valid RPC
+            // after its timeout timer has already been cancelled.
+            pending.completer.complete(result);
+          }
         }
         return;
       }
@@ -330,13 +378,13 @@ final class HermesDesktopRpcClient {
         // down through the kind's existing expire path.
         if (type == 'request.cancel') {
           final id = payload['id']?.toString();
-          final method = id == null ? null : _serverRequests.remove(id);
-          if (method != null) {
+          final request = id == null ? null : _serverRequests.remove(id);
+          if (request != null) {
             _events.add(
               HermesDesktopEvent(
-                type: '$method.expire',
-                payload: {...payload, 'request_id': id},
-                sessionId: params['session_id']?.toString(),
+                type: '${request.method}.expire',
+                payload: {...payload, 'request_id': request.decisionId},
+                sessionId: request.sessionId,
               ),
             );
           }
@@ -355,43 +403,62 @@ final class HermesDesktopRpcClient {
         return;
       }
 
-      final method = frame['method'];
-      final requestParams = frame['params'];
-      if (method is String &&
-          frame['id'] is String &&
-          answerableServerRequests.contains(method) &&
-          requestParams is Map) {
-        final id = frame['id'] as String;
-        final params = Map<String, dynamic>.from(requestParams);
-        _serverRequests[id] = method;
-        _events.add(
-          HermesDesktopEvent(
-            type: '$method.request',
-            payload: {...params, 'request_id': id},
-            sessionId: params['session_id']?.toString(),
-          ),
-        );
-        return;
-      }
-
-      // Desktop-only host requests must never reach mobile platform features.
-      if (frame['method'] is String && frame['id'] != null) {
-        channel.sink.add(
-          jsonEncode({
-            'jsonrpc': '2.0',
-            'id': frame['id'],
-            'error': {
-              'code': -32601,
-              'message': 'Method not supported on mobile',
-            },
-          }),
-        );
-      }
+      _deliverServerRequest(frame, channel);
     } catch (error) {
       DebugLogger.warning(
         'invalid-frame-dropped',
         scope: 'hermes/desktop/ws',
         data: {'errorType': error.runtimeType.toString()},
+      );
+    }
+  }
+
+  void _deliverServerRequest(
+    Map<String, dynamic> frame,
+    WebSocketChannel channel,
+  ) {
+    final method = frame['method'];
+    final requestParams = frame['params'];
+    final id = frame['id'];
+    if (method is String &&
+        id is String &&
+        answerableServerRequests.contains(method) &&
+        requestParams is Map) {
+      if (_serverRequests.containsKey(id)) return;
+      final params = Map<String, dynamic>.from(requestParams);
+      // approval.respond still addresses the approval QUEUE id. It is not
+      // the srq-* frame id used by clarify/sudo/secret and request.cancel.
+      final queueId = params['request_id'];
+      final decisionId = method == 'approval' && queueId is String
+          ? queueId
+          : id;
+      final sessionId = params['session_id']?.toString();
+      _serverRequests[id] = (
+        method: method,
+        decisionId: decisionId,
+        sessionId: sessionId,
+      );
+      _events.add(
+        HermesDesktopEvent(
+          type: '$method.request',
+          payload: {...params, 'request_id': decisionId},
+          sessionId: sessionId,
+        ),
+      );
+      return;
+    }
+
+    // Desktop-only host requests must never reach mobile platform features.
+    if (frame['method'] is String && frame['id'] != null) {
+      channel.sink.add(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'id': frame['id'],
+          'error': {
+            'code': -32601,
+            'message': 'Method not supported on mobile',
+          },
+        }),
       );
     }
   }
@@ -404,6 +471,7 @@ final class HermesDesktopRpcClient {
     _ready = false;
     _channel = null;
     _serverRequests.clear();
+    _advertisingServerRequests = null;
     _rejectPending('Hermes gateway disconnected.');
     _disconnects.add(null);
   }
@@ -434,6 +502,7 @@ final class HermesDesktopRpcClient {
     _socketGeneration++;
     _ready = false;
     _serverRequests.clear();
+    _advertisingServerRequests = null;
     final subscription = _subscription;
     final channel = _channel;
     _subscription = null;

@@ -42,6 +42,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       await _rpc.disconnect();
       return;
     }
+    unawaited(_rpc.advertiseServerRequests());
     _stateSubscription ??= _rpc.events.listen((event) {
       final startedBuffering = _eventBuffer.add(event);
       _recordLiveActivity(event);
