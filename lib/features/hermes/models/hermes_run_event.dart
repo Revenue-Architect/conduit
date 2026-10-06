@@ -1,4 +1,5 @@
 import 'hermes_todo.dart';
+import 'hermes_connection_operation.dart';
 
 /// Typed events emitted by the Hermes Agent runs stream
 /// (`GET /v1/runs/{id}/events`) and the chat-completions
@@ -101,6 +102,13 @@ final class HermesDecisionRequested extends HermesRunEvent {
   final String requestId;
   final String? prompt;
   final Map<String, dynamic> raw;
+}
+
+/// Full typed contract-8 snapshot for an open multi-target consent operation.
+final class HermesConnectionOperationChanged extends HermesRunEvent {
+  const HermesConnectionOperationChanged(this.operation);
+
+  final HermesConnectionOperation operation;
 }
 
 /// A lifecycle transition (created / completed / failed / cancelled / stopping).

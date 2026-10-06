@@ -12,6 +12,7 @@ import '../../../core/utils/debug_logger.dart';
 import '../../../core/utils/semantic_details.dart';
 import '../../../core/utils/unicode_prefix.dart';
 import '../models/hermes_run_event.dart';
+import '../models/hermes_connection_operation.dart';
 import '../providers/hermes_providers.dart';
 import 'hermes_api_service.dart';
 import 'hermes_backend_service.dart';
@@ -25,6 +26,7 @@ export 'hermes_identifier.dart' show kMaxHermesOpaqueIdentifierCharacters;
 /// [ChatMessage]. The value is a map: `{state, approvalId, runId, summary}`.
 const String kHermesApprovalMeta = 'hermesApproval';
 const String kHermesDecisionMeta = 'hermesDecision';
+const String kHermesConnectionOperationMeta = 'hermesConnectionOperation';
 
 /// Transport metadata marker so the stop path can recognize a Hermes run.
 const String kHermesTransport = 'hermesRun';
@@ -1434,6 +1436,81 @@ void _handleEvent(
               .add(const Duration(hours: 24))
               .toUtc()
               .toIso8601String(),
+        };
+        return message.copyWith(metadata: metadata);
+      });
+
+    case HermesConnectionOperationChanged(:final operation):
+      final safeRuntimeId = _validatedHermesOpaqueIdentifier(
+        runId,
+        sensitiveValues: sensitiveValues,
+      );
+      final safeOperationJson = operation.safeJson();
+      if (_validatedHermesOpaqueIdentifier(
+            operation.opId,
+            sensitiveValues: sensitiveValues,
+          ) ==
+          null) {
+        break;
+      }
+      for (final target
+          in (safeOperationJson['targets'] as List)
+              .whereType<Map<String, dynamic>>()) {
+        for (final key in const ['name', 'detail', 'instructions']) {
+          final value = target[key];
+          if (value is String) {
+            target[key] =
+                _sanitizeHermesApprovalSummary(
+                  value,
+                  sensitiveValues: sensitiveValues,
+                ) ??
+                (key == 'name' ? 'Connector' : null);
+          }
+        }
+        final env = target['required_env'];
+        if (env is List) {
+          for (final field in env.whereType<Map<String, dynamic>>()) {
+            for (final key in const ['name', 'prompt']) {
+              final value = field[key];
+              if (value is String) {
+                field[key] =
+                    _sanitizeHermesApprovalSummary(
+                      value,
+                      sensitiveValues: sensitiveValues,
+                    ) ??
+                    (key == 'name' ? 'VARIABLE' : null);
+              }
+            }
+          }
+        }
+      }
+      final safeOperation = HermesConnectionOperation.parse(
+        safeOperationJson,
+        safeOnly: true,
+      );
+      if (safeRuntimeId == null || safeOperation == null) break;
+      updateMessage((message) {
+        final metadata = Map<String, dynamic>.from(
+          message.metadata ?? const {},
+        );
+        final previous = metadata[kHermesConnectionOperationMeta];
+        final previousOperation = previous is Map
+            ? HermesConnectionOperation.parse(
+                previous['operation'],
+                safeOnly: true,
+              )
+            : null;
+        if (previousOperation != null &&
+            previousOperation.opId == safeOperation.opId &&
+            previousOperation.seq >= safeOperation.seq) {
+          return message;
+        }
+        metadata[kHermesConnectionOperationMeta] = <String, dynamic>{
+          'state': safeOperation.settled ? 'resolved' : 'pending',
+          'runtimeId': safeRuntimeId,
+          'storedSessionId': ?storedSessionId,
+          'operation': safeOperation.safeJson(),
+          'expiresAt': safeOperation.deadlineAt.toIso8601String(),
         };
         return message.copyWith(metadata: metadata);
       });

@@ -14,6 +14,7 @@ import '../../../core/utils/debug_logger.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_chat_input.dart';
+import '../models/hermes_connection_operation.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_mcp.dart';
 import '../models/hermes_model.dart';
@@ -245,6 +246,7 @@ final class HermesDesktopApiService
   /// Batch clarify requests seen on this connection: request id -> question
   /// ids, so an answer can name each question (see hermes_clarify_form.dart).
   final Map<String, List<String>> _clarifyQids = {};
+  final Map<String, HermesConnectionOperation> _connectionOperations = {};
   late final _HermesDesktopAdministration _administration;
   HermesDashboardRestBridge? _dashboardBridge;
   final HermesDesktopCredentialsWriter? onCredentialsChanged;
@@ -411,8 +413,9 @@ final class HermesDesktopApiService
       Stream<List<HermesLiveActivityEvent>>.multi((controller) {
         final subscription = _activityChanges.stream.listen(
           (changedId) {
-            if (changedId == storedId)
+            if (changedId == storedId) {
               controller.add(activitySnapshotFor(storedId));
+            }
           },
           onError: controller.addError,
           onDone: controller.close,
@@ -949,6 +952,45 @@ final class HermesDesktopApiService
     mcpServer: mcpServer,
     mcpAction: mcpAction,
   );
+
+  HermesConnectionOperation? connectionOperationFor(
+    String runtimeId,
+    String operationId,
+  ) => _runtimeConnectionOperationFor(runtimeId, operationId);
+
+  Future<void> openConnectorAuthorization({
+    required String runtimeId,
+    required String operationId,
+    required String targetName,
+  }) => _runtimeOpenConnectorAuthorization(
+    runtimeId: runtimeId,
+    operationId: operationId,
+    targetName: targetName,
+  );
+
+  Future<void> wakeConnectorOperation({
+    required String runtimeId,
+    required String storedSessionId,
+    required String operationId,
+  }) => _runtimeWakeConnectorOperation(
+    runtimeId: runtimeId,
+    storedSessionId: storedSessionId,
+    operationId: operationId,
+  );
+
+  Future<bool> respondToConnectionOperation({
+    required String runtimeId,
+    required String storedSessionId,
+    required String operationId,
+    required List<Map<String, Object?>> targets,
+    bool continueOperation = false,
+  }) => _runtimeRespondToConnectionOperation(
+    runtimeId: runtimeId,
+    storedSessionId: storedSessionId,
+    operationId: operationId,
+    targets: targets,
+    continueOperation: continueOperation,
+  );
   @override
   void close() {
     if (_closed) return;
@@ -973,6 +1015,7 @@ final class HermesDesktopApiService
     _appliedSessionOptions.clear();
     _sessionTurnStates.clear();
     _activityHistory.clear();
+    _connectionOperations.clear();
   }
 
   void _emitTurnState(HermesDesktopTurnState state) {

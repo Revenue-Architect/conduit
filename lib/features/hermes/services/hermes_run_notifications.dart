@@ -467,5 +467,7 @@ String hermesDecisionAsk(HermesPendingDesktopDecision decision) {
           : 'Needs a secret: $prompt',
     HermesPendingDesktopDecisionKind.mcpSetup =>
       'Set up ${decision.mcpServer ?? 'an MCP server'} to continue.',
+    HermesPendingDesktopDecisionKind.connectorOperation =>
+      'Review connector access to continue.',
   };
 }

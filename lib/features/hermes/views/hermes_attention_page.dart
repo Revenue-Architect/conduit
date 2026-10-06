@@ -237,6 +237,8 @@ class HermesAttentionPage extends ConsumerWidget {
         HermesPendingDesktopDecisionKind.sudo => 'Admin access',
         HermesPendingDesktopDecisionKind.secret => 'Credentials',
         HermesPendingDesktopDecisionKind.mcpSetup => 'Connector setup',
+        HermesPendingDesktopDecisionKind.connectorOperation =>
+          'Connector access',
       };
 
   static String _title(HermesPendingDesktopDecisionKind kind) => switch (kind) {
@@ -245,17 +247,20 @@ class HermesAttentionPage extends ConsumerWidget {
     HermesPendingDesktopDecisionKind.sudo => 'Admin access required',
     HermesPendingDesktopDecisionKind.secret => 'Credential required',
     HermesPendingDesktopDecisionKind.mcpSetup => 'Connector needs setup',
+    HermesPendingDesktopDecisionKind.connectorOperation =>
+      'Connector access requested',
   };
 
-  static IconData _icon(HermesPendingDesktopDecisionKind kind) =>
-      switch (kind) {
-        HermesPendingDesktopDecisionKind.approval =>
-          Icons.verified_user_outlined,
-        HermesPendingDesktopDecisionKind.clarification =>
-          Icons.chat_bubble_outline_rounded,
-        HermesPendingDesktopDecisionKind.sudo =>
-          Icons.admin_panel_settings_outlined,
-        HermesPendingDesktopDecisionKind.secret => Icons.key_outlined,
-        HermesPendingDesktopDecisionKind.mcpSetup => Icons.link_rounded,
-      };
+  static IconData _icon(
+    HermesPendingDesktopDecisionKind kind,
+  ) => switch (kind) {
+    HermesPendingDesktopDecisionKind.approval => Icons.verified_user_outlined,
+    HermesPendingDesktopDecisionKind.clarification =>
+      Icons.chat_bubble_outline_rounded,
+    HermesPendingDesktopDecisionKind.sudo =>
+      Icons.admin_panel_settings_outlined,
+    HermesPendingDesktopDecisionKind.secret => Icons.key_outlined,
+    HermesPendingDesktopDecisionKind.mcpSetup => Icons.link_rounded,
+    HermesPendingDesktopDecisionKind.connectorOperation => Icons.link_rounded,
+  };
 }

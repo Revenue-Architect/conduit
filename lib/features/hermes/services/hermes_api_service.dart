@@ -315,6 +315,10 @@ int _hermesEventCharacters(
     requestId.length +
         (prompt?.length ?? 0) +
         min(jsonEncode(raw).length, maxCharacters),
+  HermesConnectionOperationChanged(:final operation) => min(
+    jsonEncode(operation.safeJson()).length,
+    maxCharacters + 1,
+  ),
   HermesLifecycle(:final status) => status.length,
   HermesFinalOutput(:final text) => text.length,
   HermesComposerPrefill(:final text) => text.length,

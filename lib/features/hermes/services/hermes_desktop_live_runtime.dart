@@ -62,7 +62,9 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
           event.type == 'clarify.request' ||
           event.type == 'sudo.request' ||
           event.type == 'secret.request' ||
-          event.type == 'mcp.setup.request') {
+          event.type == 'mcp.setup.request' ||
+          event.type == 'connection.request' ||
+          event.type == 'connection.update') {
         unawaited(_persistPendingDecisionEvent(event));
       }
       if (event.type == 'approval.responded' ||
@@ -151,7 +153,8 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       'clarify.request' ||
       'sudo.request' ||
       'secret.request' ||
-      'mcp.setup.request' => HermesLiveActivityKind.waitingForInput,
+      'mcp.setup.request' ||
+      'connection.request' => HermesLiveActivityKind.waitingForInput,
       'message.complete' => HermesLiveActivityKind.completed,
       'message.error' || 'session.error' => HermesLiveActivityKind.failed,
       _ => null,
@@ -234,7 +237,9 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
         // The request id, so a notification for it is raised once.
         HermesLiveActivityKind.waitingForInput =>
           validateHermesOpaqueIdentifier(
-            event.payload['request_id'] ?? event.payload['id'],
+            event.payload['op_id'] ??
+                event.payload['request_id'] ??
+                event.payload['id'],
             sensitiveValues: config.sensitiveValues,
           ),
         _ => null,
@@ -276,7 +281,9 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
   Future<void> _resolvePendingDecisionEvent(HermesDesktopEvent event) async {
     final runtimeId = validateHermesOpaqueIdentifier(event.sessionId);
     final requestId = validateHermesOpaqueIdentifier(
-      event.payload['request_id'] ?? event.payload['id'],
+      event.payload['op_id'] ??
+          event.payload['request_id'] ??
+          event.payload['id'],
       sensitiveValues: config.sensitiveValues,
     );
     if (runtimeId == null || requestId == null) return;
@@ -463,6 +470,20 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     Map<String, dynamic> result,
     HermesSessionBinding binding,
   ) async {
+    final pendingConnection = HermesConnectionOperation.parse(
+      result['pending_connection'],
+    );
+    if (pendingConnection != null) {
+      _cacheConnectionOperation(binding.runtimeId, pendingConnection);
+      await _rememberConnectionOperation(
+        binding,
+        _runtimeConnectionOperationFor(
+              binding.runtimeId,
+              pendingConnection.opId,
+            ) ??
+            pendingConnection,
+      );
+    }
     final approval = _object(result['pending_approval']);
     final approvalId = validateHermesOpaqueIdentifier(
       approval['request_id'],
@@ -503,6 +524,122 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
         profile: _sessionProfiles[binding.storedId],
       );
     }
+  }
+
+  bool _cacheConnectionOperation(
+    String runtimeId,
+    HermesConnectionOperation operation,
+  ) {
+    final key = '$runtimeId\u0000${operation.opId}';
+    final previous = _connectionOperations[key];
+    if (previous != null && previous.seq >= operation.seq) return false;
+    _connectionOperations[key] = operation;
+    return true;
+  }
+
+  Future<void> _rememberConnectionOperation(
+    HermesSessionBinding binding,
+    HermesConnectionOperation operation,
+  ) async {
+    if (operation.settled ||
+        !operation.deadlineAt.isAfter(DateTime.now().toUtc())) {
+      await HermesPendingDecisionStore.resolve(
+        origin: _origin,
+        runtimeId: binding.runtimeId,
+        requestId: operation.opId,
+      );
+      return;
+    }
+    final prompt = operation.targets.map((target) => target.name).join(', ');
+    await HermesPendingDecisionStore.upsert(
+      origin: _origin,
+      storedSessionId: binding.storedId,
+      runtimeId: binding.runtimeId,
+      requestId: operation.opId,
+      kind: HermesPendingDesktopDecisionKind.connectorOperation,
+      prompt: prompt,
+      connectionOperation: operation,
+      sensitiveValues: config.sensitiveValues,
+      profile: _sessionProfiles[binding.storedId],
+    );
+  }
+
+  HermesConnectionOperation? _runtimeConnectionOperationFor(
+    String runtimeId,
+    String operationId,
+  ) => _connectionOperations['$runtimeId\u0000$operationId'];
+
+  Future<void> _runtimeOpenConnectorAuthorization({
+    required String runtimeId,
+    required String operationId,
+    required String targetName,
+  }) async {
+    final target = _runtimeConnectionOperationFor(
+      runtimeId,
+      operationId,
+    )?.targets.where((item) => item.name == targetName).firstOrNull;
+    final source = target?.connectUrl;
+    final uri = source == null ? null : Uri.tryParse(source);
+    if (uri == null ||
+        (uri.scheme != 'https' &&
+            !(uri.scheme == 'http' &&
+                (uri.host == _root.host ||
+                    uri.host == 'localhost' ||
+                    uri.host == '127.0.0.1')))) {
+      throw StateError('Hermes returned an invalid authorization URL.');
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw StateError('Could not open the authorization page.');
+    }
+  }
+
+  Future<void> _runtimeWakeConnectorOperation({
+    required String runtimeId,
+    required String storedSessionId,
+    required String operationId,
+  }) async {
+    await _ensureConnected();
+    final result = _object(
+      await _rpc.request<Object?>(
+        'connectors.operation.wake',
+        params: {
+          'owner': {'type': 'session', 'session_id': runtimeId},
+          'op_id': operationId,
+          ..._sessionScope(storedSessionId),
+        },
+      ),
+    );
+    if (result['status'] != 'ok') {
+      throw StateError('Hermes could not resume connector authorization.');
+    }
+  }
+
+  Future<bool> _runtimeRespondToConnectionOperation({
+    required String runtimeId,
+    required String storedSessionId,
+    required String operationId,
+    required List<Map<String, Object?>> targets,
+    bool continueOperation = false,
+  }) async {
+    await _ensureConnected();
+    final result = _object(
+      await _rpc.request<Object?>(
+        'connection.respond',
+        params: {
+          'owner': {'type': 'session', 'session_id': runtimeId},
+          'op_id': operationId,
+          'result': {
+            'targets': targets,
+            if (continueOperation) 'settled_by': 'continue',
+          },
+          ..._sessionScope(storedSessionId),
+        },
+      ),
+    );
+    if (result['status'] != 'ok') {
+      throw StateError('Hermes did not accept the connector response.');
+    }
+    return result['settled'] == true;
   }
 
   Future<String> _runtimeCreateSession({

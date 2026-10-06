@@ -5,6 +5,7 @@ import '../../../core/persistence/persistence_keys.dart';
 import '../../../core/persistence/preferences_store.dart';
 import '../../../core/utils/unicode_prefix.dart';
 import '../models/hermes_run_event.dart';
+import '../models/hermes_connection_operation.dart';
 import '../models/hermes_config.dart';
 import 'hermes_identifier.dart';
 
@@ -14,6 +15,7 @@ enum HermesPendingDesktopDecisionKind {
   sudo,
   secret,
   mcpSetup,
+  connectorOperation,
 }
 
 final class HermesPendingDesktopDecision {
@@ -29,6 +31,7 @@ final class HermesPendingDesktopDecision {
     this.mcpAction,
     this.choices = const <String>[],
     this.multiSelect = false,
+    this.connectionOperation,
     this.profile,
   });
 
@@ -43,6 +46,7 @@ final class HermesPendingDesktopDecision {
   final String? mcpAction;
   final List<String> choices;
   final bool multiSelect;
+  final HermesConnectionOperation? connectionOperation;
 
   /// Profile that owns the session, when it is not the connection's own (a Bot
   /// Mode chat). Persisted because the in-memory session→profile map is empty
@@ -57,6 +61,7 @@ final class HermesPendingDesktopDecision {
     HermesPendingDesktopDecisionKind.sudo => HermesDecisionKind.sudo,
     HermesPendingDesktopDecisionKind.secret => HermesDecisionKind.secret,
     HermesPendingDesktopDecisionKind.mcpSetup => HermesDecisionKind.mcpSetup,
+    HermesPendingDesktopDecisionKind.connectorOperation => null,
   };
 
   String get identity => '$origin\u0000$storedSessionId\u0000$requestId';
@@ -74,6 +79,8 @@ final class HermesPendingDesktopDecision {
     if (choices.isNotEmpty) 'choices': choices,
     if (multiSelect) 'multi_select': true,
     if (profile != null) 'profile': profile,
+    if (connectionOperation != null)
+      'connection_operation': connectionOperation!.safeJson(),
   });
 
   static HermesPendingDesktopDecision? fromStorage(String source) {
@@ -112,6 +119,14 @@ final class HermesPendingDesktopDecision {
         _ => null,
       };
       final choices = _sanitizeChoices(value['choices']);
+      final operation = HermesConnectionOperation.parse(
+        value['connection_operation'],
+        safeOnly: true,
+      );
+      if (kind == HermesPendingDesktopDecisionKind.connectorOperation &&
+          operation == null) {
+        return null;
+      }
       return HermesPendingDesktopDecision(
         origin: origin,
         storedSessionId: storedId,
@@ -124,6 +139,7 @@ final class HermesPendingDesktopDecision {
         mcpAction: mcpAction,
         choices: choices,
         multiSelect: value['multi_select'] == true,
+        connectionOperation: operation,
         // Same validation the RPC layer applies before a profile can scope a
         // request, so a tampered store cannot redirect one.
         profile: switch (validateHermesBoundedString(
@@ -163,6 +179,7 @@ final class HermesPendingDecisionStore {
     String? prompt,
     String? mcpServer,
     String? mcpAction,
+    HermesConnectionOperation? connectionOperation,
     Iterable<Object?> choices = const <Object?>[],
     bool multiSelect = false,
     Iterable<String> sensitiveValues = const <String>[],
@@ -190,13 +207,24 @@ final class HermesPendingDecisionStore {
         .map((choice) => _sanitizePrompt(choice, sensitiveValues))
         .whereType<String>()
         .toList(growable: false);
+    final safeOperation =
+        kind == HermesPendingDesktopDecisionKind.connectorOperation
+        ? _sanitizeConnectionOperation(
+            connectionOperation ?? previous?.connectionOperation,
+            sensitiveValues,
+          )
+        : null;
+    if (kind == HermesPendingDesktopDecisionKind.connectorOperation &&
+        safeOperation == null) {
+      return;
+    }
     final record = HermesPendingDesktopDecision(
       origin: origin,
       storedSessionId: stored,
       runtimeId: runtime,
       requestId: request,
       kind: kind,
-      expiresAt: DateTime.now().toUtc().add(ttl),
+      expiresAt: safeOperation?.deadlineAt ?? DateTime.now().toUtc().add(ttl),
       // Keep a previously recorded profile when a refresh omits it, so an
       // update can never silently drop a bot chat back to the connection.
       profile: profile ?? previous?.profile,
@@ -217,6 +245,7 @@ final class HermesPendingDecisionStore {
           (sanitizedChoices.isEmpty
               ? previous?.multiSelect ?? multiSelect
               : multiSelect),
+      connectionOperation: safeOperation,
     );
     records
       ..removeWhere((candidate) => candidate.identity == record.identity)
@@ -270,6 +299,7 @@ final class HermesPendingDecisionStore {
               mcpAction: record.mcpAction,
               choices: record.choices,
               multiSelect: record.multiSelect,
+              connectionOperation: record.connectionOperation,
               // A rebind (compaction lineage) must not drop the owning bot
               // profile, or the rebound decision answers under the connection.
               profile: record.profile,
@@ -373,6 +403,45 @@ List<String> _sanitizeChoices(Object? value) {
     }
   }
   return List.unmodifiable(result);
+}
+
+HermesConnectionOperation? _sanitizeConnectionOperation(
+  HermesConnectionOperation? operation,
+  Iterable<String> sensitiveValues,
+) {
+  if (operation == null) return null;
+  String safe(String value, int limit) =>
+      _sanitizePrompt(value, sensitiveValues) ??
+      (value.length <= limit ? value : value.substring(0, limit));
+  return HermesConnectionOperation(
+    opId: operation.opId,
+    seq: operation.seq,
+    deadlineAt: operation.deadlineAt,
+    settled: operation.settled,
+    toolCallId: operation.toolCallId,
+    targets: List.unmodifiable([
+      for (final target in operation.targets)
+        HermesConnectionTarget(
+          name: safe(target.name, 128),
+          kind: target.kind,
+          action: target.action,
+          state: target.state,
+          detail: target.detail == null ? null : safe(target.detail!, 512),
+          instructions: target.instructions == null
+              ? null
+              : safe(target.instructions!, 1024),
+          requiredEnv: List.unmodifiable([
+            for (final field in target.requiredEnv)
+              HermesConnectionEnvField(
+                name: safe(field.name, 128),
+                required: field.required,
+                secret: field.secret,
+                prompt: field.prompt == null ? null : safe(field.prompt!, 256),
+              ),
+          ]),
+        ),
+    ]),
+  );
 }
 
 String? _sanitizePrompt(String? value, Iterable<String> sensitiveValues) {

@@ -14,11 +14,13 @@ import '../../chat/providers/chat_providers.dart'
         chatMessagesProvider,
         hermesRunKeyForConversation;
 import '../models/hermes_run_event.dart';
+import '../models/hermes_connection_operation.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_run_transport.dart';
 import 'hermes_approval_card.dart';
 import 'hermes_decision_card.dart';
+import 'hermes_connection_consent_card.dart';
 import '../feedback/hermez_feedback.dart';
 
 typedef _HermesApprovalBinding = ({
@@ -106,7 +108,89 @@ class _HermesComposerPromptOverlayState
   Widget? _buildPromptCard(ChatMessage message) =>
       message.metadata?['archivedVariant'] == true
       ? null
-      : _buildApprovalCard(message) ?? _buildDecisionCard(message);
+      : _buildApprovalCard(message) ??
+            _buildConnectionOperationCard(message) ??
+            _buildDecisionCard(message);
+
+  Widget? _buildConnectionOperationCard(ChatMessage message) {
+    if (message.metadata?['transport'] != kHermesTransport) return null;
+    final raw = message.metadata?[kHermesConnectionOperationMeta];
+    if (raw is! Map || raw['state'] != 'pending') return null;
+    final operation = HermesConnectionOperation.parse(
+      raw['operation'],
+      safeOnly: true,
+    );
+    final runtimeId = _nonEmptyString(raw['runtimeId']);
+    final storedId =
+        _nonEmptyString(raw['storedSessionId']) ??
+        _nonEmptyString(message.metadata?['hermesSessionId']);
+    final owner = ref.read(activeConversationProvider);
+    final ownerId = owner?.id;
+    if (operation == null ||
+        runtimeId == null ||
+        storedId == null ||
+        ownerId == null) {
+      return null;
+    }
+    final expiry = operation.deadlineAt;
+    _expiryTimer = Timer(expiry.difference(DateTime.now().toUtc()), () {
+      if (mounted) setState(() {});
+    });
+    final service = ref.read(hermesApiServiceProvider);
+    if (service is! HermesDesktopApiService ||
+        !_ownsDesktopDecision(
+          service: service,
+          ownerConversationId: ownerId,
+          storedSessionId: storedId,
+        )) {
+      return null;
+    }
+    final liveOperation =
+        service.connectionOperationFor(runtimeId, operation.opId) ?? operation;
+    return HermesConnectionConsentCard(
+      key: ValueKey('$runtimeId\u0000${operation.opId}'),
+      operation: liveOperation,
+      onRespond: (targets, continueOperation) async {
+        if (!_ownsDesktopDecision(
+          service: service,
+          ownerConversationId: ownerId,
+          storedSessionId: storedId,
+        )) {
+          return false;
+        }
+        try {
+          await service.respondToConnectionOperation(
+            runtimeId: runtimeId,
+            storedSessionId: storedId,
+            operationId: operation.opId,
+            targets: targets,
+            continueOperation: continueOperation,
+          );
+          return true;
+        } catch (_) {
+          return false;
+        }
+      },
+      onOpenAuthorization: (targetName) async {
+        try {
+          await service.openConnectorAuthorization(
+            runtimeId: runtimeId,
+            operationId: operation.opId,
+            targetName: targetName,
+          );
+        } catch (_) {}
+      },
+      onWake: () async {
+        try {
+          await service.wakeConnectorOperation(
+            runtimeId: runtimeId,
+            storedSessionId: storedId,
+            operationId: operation.opId,
+          );
+        } catch (_) {}
+      },
+    );
+  }
 
   Widget? _buildApprovalCard(ChatMessage message) {
     final approval = message.metadata?['hermesApproval'];

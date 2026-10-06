@@ -27,6 +27,15 @@ List<ChatMessage> hermesPendingDesktopDecisionMessages(
               'summary': ?record.prompt,
               if (record.choices.isNotEmpty) 'choices': record.choices,
             }
+          else if (record.kind ==
+              HermesPendingDesktopDecisionKind.connectorOperation)
+            kHermesConnectionOperationMeta: <String, dynamic>{
+              'state': 'pending',
+              'runtimeId': record.runtimeId,
+              'storedSessionId': record.storedSessionId,
+              'operation': record.connectionOperation!.safeJson(),
+              'expiresAt': record.expiresAt.toIso8601String(),
+            }
           else
             kHermesDecisionMeta: <String, dynamic>{
               'state': 'pending',

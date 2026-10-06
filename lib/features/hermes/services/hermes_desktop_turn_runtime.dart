@@ -36,6 +36,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     final controller = StreamController<HermesRunEvent>();
     var terminal = false;
     final seenEventIds = <String>{};
+    final seenConnectionSeqs = <String, int>{};
     final seenEventOrder = Queue<String>();
     var activeRuntimeId = binding.runtimeId;
     var promptAcknowledged = false;
@@ -103,6 +104,23 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         return;
       }
       switch (event.type) {
+        case 'connection.request':
+        case 'connection.update':
+          final operation = HermesConnectionOperation.parse(payload);
+          if (operation != null &&
+              operation.seq > (seenConnectionSeqs[operation.opId] ?? -1) &&
+              operation.seq >=
+                  (_runtimeConnectionOperationFor(
+                        binding.runtimeId,
+                        operation.opId,
+                      )?.seq ??
+                      -1)) {
+            seenConnectionSeqs[operation.opId] = operation.seq;
+            if (_cacheConnectionOperation(binding.runtimeId, operation)) {
+              unawaited(_rememberConnectionOperation(binding, operation));
+            }
+            controller.add(HermesConnectionOperationChanged(operation));
+          }
         case 'message.complete':
           final content = value('content').isNotEmpty
               ? value('content')
@@ -449,7 +467,8 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         payload['event_id'] ?? payload['sequence_id'] ?? payload['sequence'];
     if (explicit != null) return '${event.type}:$explicit';
     if (event.type.endsWith('.request')) {
-      final request = payload['request_id'] ?? payload['id'];
+      final request =
+          payload['op_id'] ?? payload['request_id'] ?? payload['id'];
       if (request != null) return '${event.type}:$request';
     }
     if (event.type == 'message.complete') {
@@ -480,6 +499,33 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
   Future<void> _persistPendingDecisionEvent(HermesDesktopEvent event) async {
     final storedId = _storedIdForRuntime(event.sessionId);
     final runtimeId = validateHermesOpaqueIdentifier(event.sessionId);
+    if (event.type == 'connection.request' ||
+        event.type == 'connection.update') {
+      final operation = HermesConnectionOperation.parse(event.payload);
+      if (storedId == null || runtimeId == null || operation == null) return;
+      if (!_cacheConnectionOperation(runtimeId, operation)) return;
+      if (operation.settled ||
+          !operation.deadlineAt.isAfter(DateTime.now().toUtc())) {
+        await HermesPendingDecisionStore.resolve(
+          origin: _origin,
+          runtimeId: runtimeId,
+          requestId: operation.opId,
+        );
+      } else {
+        await HermesPendingDecisionStore.upsert(
+          origin: _origin,
+          storedSessionId: storedId,
+          runtimeId: runtimeId,
+          requestId: operation.opId,
+          kind: HermesPendingDesktopDecisionKind.connectorOperation,
+          prompt: operation.targets.map((target) => target.name).join(', '),
+          connectionOperation: operation,
+          sensitiveValues: config.sensitiveValues,
+          profile: _sessionProfiles[storedId],
+        );
+      }
+      return;
+    }
     final requestId = validateHermesOpaqueIdentifier(
       event.payload['request_id'] ?? event.payload['id'],
       sensitiveValues: config.sensitiveValues,
