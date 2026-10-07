@@ -1,0 +1,119 @@
+diff --git a/lib/features/hermes/views/hermes_bot_detail_page.dart b/lib/features/hermes/views/hermes_bot_detail_page.dart
+index 20d5a758..bf5c5ff2 100644
+--- a/lib/features/hermes/views/hermes_bot_detail_page.dart
++++ b/lib/features/hermes/views/hermes_bot_detail_page.dart
+@@ -12,6 +12,7 @@ import '../models/hermes_job.dart';
+ import '../models/hermes_session.dart';
+ import '../providers/hermes_providers.dart';
+ import '../providers/hermes_session_totals_provider.dart';
++import '../settings/pages/hermes_tools_extensions_page.dart';
+ import '../services/hermes_desktop_api_service.dart';
+ import '../sheets/hermes_scheduled_agent_sheet.dart';
+ import '../utils/hermes_schedule_format.dart';
+@@ -408,7 +409,7 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
+               ),
+               weight: HermezMotionWeight.medium,
+               child: detail != null
+-                  ? _details(context, detail, palette, profile)
++                  ? _details(context, detail, palette, profile, title)
+                   : failed
+                   ? const Padding(
+                       padding: EdgeInsets.only(top: 14),
+@@ -432,7 +433,16 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
+     _BotData detail,
+     HermezChatPalette palette,
+     String profile,
++    String title,
+   ) {
++    // Toolset chips open this bot's editor; skills are not toolsets.
++    final toolsets = detail.tools.toSet();
++    void editTools() => ref.read(hermesToolsExtensionsOpenerProvider)(
++      context,
++      profile: profile,
++      tab: HermesToolsExtensionsTab.toolsets,
++      botTitle: title,
++    );
+     final curated = _curateCapabilities(
+       skills: detail.skills,
+       tools: detail.tools,
+@@ -446,7 +456,11 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
+           child: Column(
+             crossAxisAlignment: CrossAxisAlignment.start,
+             children: [
+-              Text('CAPABILITIES', style: HermezType.technical(palette.muted)),
++              HermezSectionBar(
++                label: 'CAPABILITIES',
++                actionLabel: 'Edit tools',
++                onAction: editTools,
++              ),
+               const SizedBox(height: 8),
+               if (curated.featured.isEmpty)
+                 Text(
+@@ -459,23 +473,10 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
+                   runSpacing: 8,
+                   children: [
+                     for (final name in curated.featured)
+-                      Container(
+-                        padding: const EdgeInsets.symmetric(
+-                          horizontal: 11,
+-                          vertical: 7,
+-                        ),
+-                        decoration: BoxDecoration(
+-                          color: palette.surface,
+-                          borderRadius: BorderRadius.circular(999),
+-                          border: Border.all(
+-                            color: palette.border.withValues(alpha: 0.7),
+-                          ),
+-                        ),
+-                        child: Text(
+-                          name.replaceAll('_', ' '),
+-                          style: HermezType.meta(palette)
+-                              .copyWith(color: palette.ink),
+-                        ),
++                      _capabilityChip(
++                        name,
++                        palette,
++                        onTap: toolsets.contains(name) ? editTools : null,
+                       ),
+                   ],
+                 ),
+@@ -635,6 +636,39 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
+     );
+   }
+ 
++  /// One capability. A toolset's chip is a button into the bot's tools editor.
++  Widget _capabilityChip(
++    String name,
++    HermezChatPalette palette, {
++    VoidCallback? onTap,
++  }) {
++    final label = name.replaceAll('_', ' ');
++    final chip = Container(
++      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
++      decoration: BoxDecoration(
++        color: palette.surface,
++        borderRadius: BorderRadius.circular(999),
++        border: Border.all(color: palette.border.withValues(alpha: 0.7)),
++      ),
++      child: Text(
++        label,
++        style: HermezType.meta(palette).copyWith(color: palette.ink),
++      ),
++    );
++    if (onTap == null) return chip;
++    return Semantics(
++      button: true,
++      label: 'Edit tools: $label',
++      excludeSemantics: true,
++      child: GestureDetector(
++        key: ValueKey('toolset-chip-$name'),
++        behavior: HitTestBehavior.opaque,
++        onTap: onTap,
++        child: chip,
++      ),
++    );
++  }
++
+   Widget _metric(String value, String label, HermezChatPalette palette) =>
+       Column(
+         children: [

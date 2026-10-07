@@ -1,0 +1,846 @@
+diff --git a/lib/features/hermes/views/hermes_mcp_page.dart b/lib/features/hermes/views/hermes_mcp_page.dart
+index ccb03670..fa3016d2 100644
+--- a/lib/features/hermes/views/hermes_mcp_page.dart
++++ b/lib/features/hermes/views/hermes_mcp_page.dart
+@@ -2,85 +2,50 @@ import 'dart:async';
+ 
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:material_ui/material_ui.dart';
++import 'package:url_launcher/url_launcher.dart';
+ 
+ import '../../../core/utils/debug_logger.dart';
++import '../../../shared/utils/external_link_launcher.dart';
++import '../admin/hermes_admin_client.dart';
++import '../admin/hermes_admin_models.dart';
++import '../admin/hermes_admin_providers.dart';
+ import '../models/hermes_mcp.dart';
+ import '../providers/hermes_providers.dart';
+ import '../services/hermes_desktop_api_service.dart';
+ import '../motion/hermez_motion.dart';
+ import '../sheets/hermez_modal_sheet.dart';
+ 
+-final class HermesMcpPage extends ConsumerStatefulWidget {
+-  const HermesMcpPage({super.key});
++/// What the "Add MCP server" sheet collected. [secret] is an API key or bearer
++/// token: hold it only as long as it takes to send it.
++final class HermesMcpServerDraft {
++  const HermesMcpServerDraft({
++    required this.name,
++    required this.url,
++    required this.command,
++    required this.arguments,
++    required this.secret,
++  });
+ 
+-  @override
+-  ConsumerState<HermesMcpPage> createState() => _HermesMcpPageState();
++  final String name;
++  final String url;
++  final String command;
++  final List<String> arguments;
++  final String secret;
+ }
+ 
+-final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+-  late Future<List<HermesMcpServer>> _servers;
+-  final Map<String, HermesMcpTestResult> _testResults = {};
+-  final Set<String> _oauthPending = {};
+-
+-  /// The server whose action tray is open under its row.
+-  String? _openActions;
+-
+-  /// The server whose removal is held open in its tray.
+-  String? _confirmingRemove;
+-
+-  @override
+-  void initState() {
+-    super.initState();
+-    _servers = _load();
+-  }
+-
+-  HermesDesktopApiService get _service {
+-    final service = ref.read(hermesApiServiceProvider);
+-    if (service is! HermesDesktopApiService) {
+-      throw StateError('Desktop Gateway is not connected.');
+-    }
+-    return service;
+-  }
+-
+-  Future<List<HermesMcpServer>> _load() async {
+-    try {
+-      return await _service.mcpServers();
+-    } catch (error) {
+-      DebugLogger.warning(
+-        'mcp-load-failed',
+-        scope: 'hermes/mcp',
+-        data: {'errorType': error.runtimeType.toString()},
+-      );
+-      rethrow;
+-    }
+-  }
+-
+-  void _refresh() {
+-    if (mounted) setState(() => _servers = _load());
+-  }
+-
+-  Future<void> _run(Future<void> Function() action) async {
+-    try {
+-      await action();
+-    } catch (error) {
+-      DebugLogger.warning(
+-        'mcp-action-failed',
+-        scope: 'hermes/mcp',
+-        data: {'errorType': error.runtimeType.toString()},
+-      );
+-      if (!mounted) return;
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        const SnackBar(content: Text('Hermes MCP action failed.')),
+-      );
+-    }
+-  }
+-
+-  Future<void> _add([HermezMorphOrigin? origin]) async {
+-    final name = TextEditingController();
+-    final url = TextEditingController();
+-    final command = TextEditingController();
+-    final args = TextEditingController();
+-    final secret = TextEditingController();
++/// Opens the "Add MCP server" sheet and returns what was entered, or null when
++/// it was cancelled or left without a name. Shared by this page and the
++/// per-bot tools editor, so both ask for the same things.
++Future<HermesMcpServerDraft?> showHermesMcpAddSheet(
++  BuildContext context, [
++  HermezMorphOrigin? origin,
++]) async {
++  final name = TextEditingController();
++  final url = TextEditingController();
++  final command = TextEditingController();
++  final args = TextEditingController();
++  final secret = TextEditingController();
++  try {
+     // The + grows into the editor and the editor contracts back into it.
+     final accepted = await pushHermezSheetRoute<bool>(
+       context,
+@@ -143,33 +108,190 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+         ),
+       ),
+     );
++    if (accepted != true || name.text.trim().isEmpty) return null;
++    return HermesMcpServerDraft(
++      name: name.text.trim(),
++      url: url.text.trim(),
++      command: command.text.trim(),
++      arguments: args.text
++          .split('\n')
++          .map((value) => value.trim())
++          .where((value) => value.isNotEmpty)
++          .toList(growable: false),
++      secret: secret.text,
++    );
++  } finally {
++    // Controllers (and so the only local copy of the MCP secret) are
++    // discarded as soon as the sheet has answered.
++    name.dispose();
++    url.dispose();
++    command.dispose();
++    args.dispose();
++    secret.dispose();
++  }
++}
++
++/// A bot's MCP servers, or the server's own when [profile] is null.
++///
++/// With a [profile] every read and write names that bot (the Hermes admin
++/// client, KTD6/KTD7) and a change reloads MCP afterwards. Hermes may ask
++/// before it reloads, because that clears the prompt cache of running chats;
++/// the question sits at the top of the page and nothing reloads until it is
++/// answered. Without a [profile] the page behaves as it always has.
++final class HermesMcpPage extends ConsumerStatefulWidget {
++  const HermesMcpPage({super.key, this.profile, this.botTitle});
++
++  /// The bot whose servers this page manages, or null for the server's own.
++  final String? profile;
++
++  /// What to call the bot, when it has a title besides its name.
++  final String? botTitle;
++
++  @override
++  ConsumerState<HermesMcpPage> createState() => _HermesMcpPageState();
++}
++
++final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
++  late Future<List<HermesMcpServer>> _servers;
++  final Map<String, HermesMcpTestResult> _testResults = {};
++  final Set<String> _oauthPending = {};
++
++  /// Hermes asked before reloading MCP; null when nothing is waiting.
++  HermesAdminConfirmation<void>? _reloadAsk;
++  bool _reloading = false;
++
++  /// The server whose action tray is open under its row.
++  String? _openActions;
++
++  /// The server whose removal is held open in its tray.
++  String? _confirmingRemove;
++
++  @override
++  void initState() {
++    super.initState();
++    _servers = _load();
++  }
++
++  HermesDesktopApiService get _service {
++    final service = ref.read(hermesApiServiceProvider);
++    if (service is! HermesDesktopApiService) {
++      throw StateError('Desktop Gateway is not connected.');
++    }
++    return service;
++  }
++
++  /// The bot this page is scoped to, or null for the server's own servers.
++  String? get _profile => widget.profile;
++
++  /// The admin client a scoped page talks through.
++  HermesAdminClient get _admin {
++    final client = ref.read(hermesAdminClientProvider);
++    if (client == null) throw StateError('Desktop Gateway is not connected.');
++    return client;
++  }
++
++  Future<List<HermesMcpServer>> _load() async {
+     try {
+-      if (accepted != true || name.text.trim().isEmpty) return;
++      final profile = _profile;
++      return profile == null
++          ? await _service.mcpServers()
++          : await _admin.mcpServers(profile);
++    } catch (error) {
++      DebugLogger.warning(
++        'mcp-load-failed',
++        scope: 'hermes/mcp',
++        data: {'errorType': error.runtimeType.toString()},
++      );
++      rethrow;
++    }
++  }
++
++  void _refresh() {
++    if (mounted) setState(() => _servers = _load());
++  }
++
++  Future<void> _run(Future<void> Function() action) async {
++    try {
++      await action();
++    } catch (error) {
++      DebugLogger.warning(
++        'mcp-action-failed',
++        scope: 'hermes/mcp',
++        data: {'errorType': error.runtimeType.toString()},
++      );
++      if (!mounted) return;
++      // Hermes' own reason is already scrubbed; anything else stays generic.
++      final reason = error is HermesAdminException && error.message.isNotEmpty
++          ? error.message
++          : 'Hermes MCP action failed.';
++      ScaffoldMessenger.of(context)
++          .showSnackBar(SnackBar(content: Text(reason)));
++    }
++  }
++
++  /// Reloads MCP in the running gateway after a change to a bot's servers.
++  /// Hermes may want a yes first: that is kept for the banner, not decided
++  /// here, because the reload clears every running chat's prompt cache.
++  Future<void> _reloadAfterChange() async {
++    if (_profile == null) return; // the unscoped calls reload on their own
++    if (mounted) setState(() => _reloading = true);
++    try {
++      final result = await _admin.reloadMcp();
++      if (mounted) setState(() => _reloadAsk = result.confirmation);
++    } finally {
++      if (mounted) setState(() => _reloading = false);
++    }
++  }
++
++  Future<void> _confirmReload() async {
++    final ask = _reloadAsk;
++    if (ask == null) return;
++    if (mounted) {
++      setState(() {
++        _reloadAsk = null;
++        _reloading = true;
++      });
++    }
++    try {
++      await ask.confirm();
++    } finally {
++      if (mounted) setState(() => _reloading = false);
++    }
++  }
++
++  Future<void> _add([HermezMorphOrigin? origin]) async {
++    final draft = await showHermesMcpAddSheet(context, origin);
++    if (draft == null) return;
++    final profile = _profile;
++    if (profile == null) {
+       await _service.addMcpServer(
+-        name: name.text.trim(),
+-        url: url.text.trim(),
+-        command: command.text.trim(),
+-        arguments: args.text
+-            .split('\n')
+-            .map((value) => value.trim())
+-            .where((value) => value.isNotEmpty)
+-            .toList(),
+-        bearerToken: secret.text,
++        name: draft.name,
++        url: draft.url,
++        command: draft.command,
++        arguments: draft.arguments,
++        bearerToken: draft.secret,
++      );
++    } else {
++      await _admin.addMcpServer(
++        profile,
++        name: draft.name,
++        url: draft.url,
++        command: draft.command,
++        arguments: draft.arguments,
++        bearerToken: draft.secret,
+       );
+       _refresh();
+-    } finally {
+-      // Controllers—and therefore the only local copy of the MCP secret—are
+-      // discarded immediately after the RPC settles.
+-      name.dispose();
+-      url.dispose();
+-      command.dispose();
+-      args.dispose();
+-      secret.dispose();
++      await _reloadAfterChange();
++      return;
+     }
++    _refresh();
+   }
+ 
+   Future<void> _test(String name) async {
+-    final result = await _service.testMcpServer(name);
++    final profile = _profile;
++    final result = profile == null
++        ? await _service.testMcpServer(name)
++        : await _admin.testMcpServer(profile, name);
+     if (!mounted) return;
+     setState(() => _testResults[name] = result);
+     ScaffoldMessenger.of(context).showSnackBar(
+@@ -184,7 +306,18 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+   }
+ 
+   Future<void> _addPreset([HermezMorphOrigin? origin]) async {
+-    final entries = await _service.mcpCatalog();
++    final profile = _profile;
++    final entries = profile == null
++        ? await _service.mcpCatalog()
++        : [
++            for (final entry in await _admin.mcpCatalog(profile))
++              if (!entry.installed)
++                HermesMcpCatalogEntry(
++                  name: entry.name,
++                  description: entry.description,
++                  installed: false,
++                ),
++          ];
+     if (!mounted) return;
+     final selected = await pushHermezSheetRoute<HermesMcpCatalogEntry>(
+       context,
+@@ -227,8 +360,14 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+     if (selected == null) return;
+     final name = selected.name;
+     if (name.isEmpty) return;
+-    await _service.addMcpPreset(name);
++    if (profile == null) {
++      await _service.addMcpPreset(name);
++      _refresh();
++      return;
++    }
++    await _admin.addMcpServer(profile, name: name, preset: name);
+     _refresh();
++    await _reloadAfterChange();
+   }
+ 
+   Future<void> _setApiKey(String name, [HermezMorphOrigin? origin]) async {
+@@ -272,8 +411,15 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+     );
+     try {
+       if (accepted != true || value.text.isEmpty) return;
+-      await _service.setMcpApiKey(name, value.text);
++      final profile = _profile;
++      if (profile == null) {
++        await _service.setMcpApiKey(name, value.text);
++        _refresh();
++        return;
++      }
++      await _admin.setMcpApiKey(profile, name, value.text);
+       _refresh();
++      await _reloadAfterChange();
+     } finally {
+       value.dispose();
+     }
+@@ -282,22 +428,63 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+   Future<void> _setEnabled(HermesMcpServer server, bool enabled) async {
+     final name = server.name;
+     if (name.isEmpty) return;
+-    await _service.setMcpServerEnabled(name, enabled);
++    final profile = _profile;
++    if (profile == null) {
++      await _service.setMcpServerEnabled(name, enabled);
++      _refresh();
++      return;
++    }
++    // A plugin-provided server answers 409; the message says so.
++    await _admin.setMcpServerEnabled(profile, name, enabled);
+     _refresh();
++    await _reloadAfterChange();
+   }
+ 
+   Future<void> _oauth(String name) async {
+     if (mounted) setState(() => _oauthPending.add(name));
+     try {
+-      if (!await _service.authenticateMcpServer(name)) {
+-        throw StateError('MCP authentication failed.');
+-      }
++      final profile = _profile;
++      final signedIn = profile == null
++          ? await _service.authenticateMcpServer(name)
++          : await _signInScoped(profile, name);
++      if (!signedIn) throw StateError('MCP authentication failed.');
+       _refresh();
++      if (profile != null) await _reloadAfterChange();
+     } finally {
+       if (mounted) setState(() => _oauthPending.remove(name));
+     }
+   }
+ 
++  /// A bot's MCP sign-in: open the provider's page, then wait for Hermes to
++  /// say it is done (up to two minutes).
++  Future<bool> _signInScoped(String profile, String name) async {
++    final client = _admin;
++    final started = await client.startMcpOAuth(profile, name);
++    final url = parseAllowedExternalLink(started.authUrl);
++    if (url == null ||
++        !const {'http', 'https'}.contains(url.scheme) ||
++        !await launchUrl(url, mode: LaunchMode.externalApplication)) {
++      await client.cancelMcpOAuth(profile, name, started.sessionId);
++      return false;
++    }
++    for (var attempt = 0; attempt < 60; attempt++) {
++      await Future<void>.delayed(const Duration(seconds: 2));
++      if (!mounted) break;
++      final poll = await client.pollMcpOAuth(profile, name, started.sessionId);
++      switch (poll.state) {
++        case HermesAdminSignInState.approved:
++          return true;
++        case HermesAdminSignInState.failed:
++        case HermesAdminSignInState.expired:
++          return false;
++        case HermesAdminSignInState.pending:
++          break;
++      }
++    }
++    await client.cancelMcpOAuth(profile, name, started.sessionId);
++    return false;
++  }
++
+   Future<void> _remove(String name) async {
+     if (mounted) {
+       setState(() {
+@@ -305,8 +492,15 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+         _openActions = null;
+       });
+     }
+-    await _service.removeMcpServer(name);
++    final profile = _profile;
++    if (profile == null) {
++      await _service.removeMcpServer(name);
++      _refresh();
++      return;
++    }
++    await _admin.removeMcpServer(profile, name);
+     _refresh();
++    await _reloadAfterChange();
+   }
+ 
+   String _serverSubtitle(HermesMcpServer server) {
+@@ -322,15 +516,40 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+     ].join('\n');
+   }
+ 
++  /// [child] with the reload question (or its progress) above it, on a page
++  /// that is scoped to a bot. The unscoped page has none.
++  Widget _withReloadBanner(Widget child) {
++    final ask = _reloadAsk;
++    if (_profile == null || (ask == null && !_reloading)) return child;
++    return Column(
++      crossAxisAlignment: CrossAxisAlignment.stretch,
++      children: [
++        _ReloadBanner(
++          message: ask?.message,
++          onReload: ask == null ? null : () => unawaited(_run(_confirmReload)),
++          onLater: ask == null ? null : () => setState(() => _reloadAsk = null),
++        ),
++        Expanded(child: child),
++      ],
++    );
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     final connectedService = ref.watch(hermesApiServiceProvider);
++    // A bot's key goes through the admin client, which has no capability
++    // flag: a Hermes without it answers "not supported".
+     final supportsCredentialUpdate =
+-        connectedService is HermesDesktopApiService &&
+-        connectedService.supportsMcpCredentialUpdate;
++        _profile != null ||
++        (connectedService is HermesDesktopApiService &&
++            connectedService.supportsMcpCredentialUpdate);
+     return Scaffold(
+       appBar: AppBar(
+-        title: const Text('Hermes MCP'),
++        title: Text(
++          _profile == null
++              ? 'Hermes MCP'
++              : '${widget.botTitle ?? _profile} MCP',
++        ),
+         actions: [
+           Builder(
+             builder: (iconContext) => RepaintBoundary(
+@@ -353,131 +572,141 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+           ),
+         ],
+       ),
+-      body: FutureBuilder<List<HermesMcpServer>>(
+-        future: _servers,
+-        builder: (context, snapshot) {
+-          if (!snapshot.hasData) {
+-            if (snapshot.hasError) {
+-              return const Center(child: Text('Could not load MCP servers.'));
++      body: _withReloadBanner(
++        FutureBuilder<List<HermesMcpServer>>(
++          future: _servers,
++          builder: (context, snapshot) {
++            if (!snapshot.hasData) {
++              if (snapshot.hasError) {
++                return const Center(child: Text('Could not load MCP servers.'));
++              }
++              return const Center(child: CircularProgressIndicator.adaptive());
+             }
+-            return const Center(child: CircularProgressIndicator.adaptive());
+-          }
+-          final servers = snapshot.data!;
+-          if (servers.isEmpty) {
+-            return const Center(child: Text('No MCP servers configured.'));
+-          }
+-          return ListView(
+-            padding: const EdgeInsets.only(bottom: 96),
+-            children: [
+-              for (final server in servers)
+-                Builder(
+-                  builder: (rowContext) {
+-                    final name = server.name;
+-                    final open = _openActions == name;
+-                    HermezMorphOrigin? rowOrigin() => HermezMorphOrigin.of(
+-                      rowContext,
+-                      radius: 14,
+-                      color: Theme.of(rowContext).colorScheme.surface,
+-                    );
+-                    return RepaintBoundary(
+-                      child: Column(
+-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+-                        children: [
+-                          ListTile(
+-                            title: Text(name),
+-                            subtitle: Text(
+-                              _serverSubtitle(server),
+-                              maxLines: 5,
+-                              overflow: TextOverflow.ellipsis,
++            final servers = snapshot.data!;
++            if (servers.isEmpty) {
++              return const Center(child: Text('No MCP servers configured.'));
++            }
++            return ListView(
++              padding: const EdgeInsets.only(bottom: 96),
++              children: [
++                for (final server in servers)
++                  Builder(
++                    builder: (rowContext) {
++                      final name = server.name;
++                      final open = _openActions == name;
++                      HermezMorphOrigin? rowOrigin() => HermezMorphOrigin.of(
++                        rowContext,
++                        radius: 14,
++                        color: Theme.of(rowContext).colorScheme.surface,
++                      );
++                      return RepaintBoundary(
++                        child: Column(
++                          crossAxisAlignment: CrossAxisAlignment.stretch,
++                          children: [
++                            ListTile(
++                              title: Text(name),
++                              subtitle: Text(
++                                _serverSubtitle(server),
++                                maxLines: 5,
++                                overflow: TextOverflow.ellipsis,
++                              ),
++                              isThreeLine: true,
++                              trailing: _oauthPending.contains(name)
++                                  ? const CircularProgressIndicator.adaptive()
++                                  : IconButton(
++                                      tooltip: 'Server actions',
++                                      isSelected: open,
++                                      onPressed: () => setState(() {
++                                        _openActions = open ? null : name;
++                                        _confirmingRemove = null;
++                                      }),
++                                      icon: const Icon(
++                                        Icons.more_horiz_rounded,
++                                      ),
++                                    ),
+                             ),
+-                            isThreeLine: true,
+-                            trailing: _oauthPending.contains(name)
+-                                ? const CircularProgressIndicator.adaptive()
+-                                : IconButton(
+-                                    tooltip: 'Server actions',
+-                                    isSelected: open,
+-                                    onPressed: () => setState(() {
+-                                      _openActions = open ? null : name;
+-                                      _confirmingRemove = null;
+-                                    }),
+-                                    icon: const Icon(Icons.more_horiz_rounded),
++                            // Actions open in place under the server's row and
++                            // push the list down.
++                            HermezReveal(
++                              visible: open,
++                              weight: HermezMotionWeight.medium,
++                              revealKey: ValueKey('mcp-actions-$name'),
++                              child: _ActionTray(
++                                children: [
++                                  _TrayAction(
++                                    icon: Icons.network_check_rounded,
++                                    label: 'Test',
++                                    onTap: () =>
++                                        unawaited(_run(() => _test(name))),
+                                   ),
+-                          ),
+-                          // Actions open in place under the server's row and
+-                          // push the list down.
+-                          HermezReveal(
+-                            visible: open,
+-                            weight: HermezMotionWeight.medium,
+-                            revealKey: ValueKey('mcp-actions-$name'),
+-                            child: _ActionTray(
+-                              children: [
+-                                _TrayAction(
+-                                  icon: Icons.network_check_rounded,
+-                                  label: 'Test',
+-                                  onTap: () =>
+-                                      unawaited(_run(() => _test(name))),
+-                                ),
+-                                _TrayAction(
+-                                  icon: Icons.login_rounded,
+-                                  label: 'Authenticate',
+-                                  onTap: () =>
+-                                      unawaited(_run(() => _oauth(name))),
+-                                ),
+-                                if (supportsCredentialUpdate)
+                                   _TrayAction(
+-                                    icon: Icons.key_rounded,
+-                                    label: 'Set API key',
++                                    icon: Icons.login_rounded,
++                                    label: 'Authenticate',
++                                    onTap: () =>
++                                        unawaited(_run(() => _oauth(name))),
++                                  ),
++                                  if (supportsCredentialUpdate)
++                                    _TrayAction(
++                                      icon: Icons.key_rounded,
++                                      label: 'Set API key',
++                                      onTap: () => unawaited(
++                                        _run(
++                                          () => _setApiKey(name, rowOrigin()),
++                                        ),
++                                      ),
++                                    ),
++                                  _TrayAction(
++                                    icon: server.enabled
++                                        ? Icons.toggle_off_outlined
++                                        : Icons.toggle_on_outlined,
++                                    label: server.enabled
++                                        ? 'Disable tools'
++                                        : 'Enable tools',
+                                     onTap: () => unawaited(
+-                                      _run(() => _setApiKey(name, rowOrigin())),
++                                      _run(
++                                        () => _setEnabled(
++                                          server,
++                                          !server.enabled,
++                                        ),
++                                      ),
+                                     ),
+                                   ),
+-                                _TrayAction(
+-                                  icon: server.enabled
+-                                      ? Icons.toggle_off_outlined
+-                                      : Icons.toggle_on_outlined,
+-                                  label: server.enabled
+-                                      ? 'Disable tools'
+-                                      : 'Enable tools',
+-                                  onTap: () => unawaited(
+-                                    _run(
+-                                      () =>
+-                                          _setEnabled(server, !server.enabled),
++                                  _TrayAction(
++                                    icon: Icons.delete_outline_rounded,
++                                    label: 'Remove',
++                                    destructive: true,
++                                    onTap: () => setState(
++                                      () => _confirmingRemove =
++                                          _confirmingRemove == name
++                                          ? null
++                                          : name,
+                                     ),
+                                   ),
+-                                ),
+-                                _TrayAction(
+-                                  icon: Icons.delete_outline_rounded,
+-                                  label: 'Remove',
+-                                  destructive: true,
+-                                  onTap: () => setState(
+-                                    () => _confirmingRemove =
+-                                        _confirmingRemove == name ? null : name,
+-                                  ),
+-                                ),
+-                                HermezReveal(
+-                                  visible: _confirmingRemove == name,
+-                                  weight: HermezMotionWeight.medium,
+-                                  revealKey: ValueKey('mcp-remove-$name'),
+-                                  child: _RemoveGuard(
+-                                    name: name,
+-                                    onCancel: () => setState(
+-                                      () => _confirmingRemove = null,
++                                  HermezReveal(
++                                    visible: _confirmingRemove == name,
++                                    weight: HermezMotionWeight.medium,
++                                    revealKey: ValueKey('mcp-remove-$name'),
++                                    child: _RemoveGuard(
++                                      name: name,
++                                      onCancel: () => setState(
++                                        () => _confirmingRemove = null,
++                                      ),
++                                      onRemove: () =>
++                                          unawaited(_run(() => _remove(name))),
+                                     ),
+-                                    onRemove: () =>
+-                                        unawaited(_run(() => _remove(name))),
+                                   ),
+-                                ),
+-                              ],
++                                ],
++                              ),
+                             ),
+-                          ),
+-                        ],
+-                      ),
+-                    );
+-                  },
+-                ),
+-            ],
+-          );
+-        },
++                          ],
++                        ),
++                      );
++                    },
++                  ),
++              ],
++            );
++          },
++        ),
+       ),
+       floatingActionButton: Builder(
+         builder: (fabContext) => RepaintBoundary(
+@@ -502,6 +731,75 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
+   }
+ }
+ 
++/// Where Hermes' "reload MCP?" question, or the reload under way, shows on a
++/// bot's MCP page.
++class _ReloadBanner extends StatelessWidget {
++  const _ReloadBanner({
++    required this.message,
++    required this.onReload,
++    required this.onLater,
++  });
++
++  /// Hermes' own wording; null while a reload is running.
++  final String? message;
++  final VoidCallback? onReload;
++  final VoidCallback? onLater;
++
++  @override
++  Widget build(BuildContext context) {
++    final scheme = Theme.of(context).colorScheme;
++    final asking = message != null;
++    return Semantics(
++      container: true,
++      liveRegion: true,
++      child: Container(
++        key: const ValueKey('mcp-reload-banner'),
++        margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
++        padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
++        decoration: BoxDecoration(
++          borderRadius: BorderRadius.circular(14),
++          border: Border.all(color: scheme.outlineVariant),
++        ),
++        child: asking
++            ? Column(
++                crossAxisAlignment: CrossAxisAlignment.stretch,
++                children: [
++                  Text(
++                    'Reload MCP to apply this? ${message!} '
++                    'It applies to every running chat, not only this bot.',
++                  ),
++                  OverflowBar(
++                    alignment: MainAxisAlignment.end,
++                    spacing: 8,
++                    children: [
++                      TextButton(
++                        onPressed: onLater,
++                        child: const Text('Later'),
++                      ),
++                      FilledButton(
++                        onPressed: onReload,
++                        child: const Text('Reload'),
++                      ),
++                    ],
++                  ),
++                ],
++              )
++            : const Row(
++                children: [
++                  SizedBox(
++                    width: 16,
++                    height: 16,
++                    child: CircularProgressIndicator(strokeWidth: 2),
++                  ),
++                  SizedBox(width: 10),
++                  Text('Reloading MCP…'),
++                ],
++              ),
++      ),
++    );
++  }
++}
++
+ /// A server's actions, opened in place under its row.
+ class _ActionTray extends StatelessWidget {
+   const _ActionTray({required this.children});

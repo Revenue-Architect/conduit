@@ -1,0 +1,79 @@
+diff --git a/lib/features/hermes/views/hermes_page_chrome.dart b/lib/features/hermes/views/hermes_page_chrome.dart
+index e86a40b1..d67d4ae0 100644
+--- a/lib/features/hermes/views/hermes_page_chrome.dart
++++ b/lib/features/hermes/views/hermes_page_chrome.dart
+@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
+ import 'package:nib_motion/nib_motion.dart';
+ 
+ import '../../../shared/theme/theme_extensions.dart';
++import '../../desktop/shell/desktop_nav_scope.dart';
+ import '../feedback/hermez_feedback.dart';
+ import '../motion/hermez_motion.dart';
+ import '../widgets/hermez_chat_palette.dart';
+ import '../widgets/hermez_technical_background.dart';
+ import '../widgets/hermez_visual_theme.dart';
++import '../../desktop/desktop_reading_width.dart';
+ 
+ /// Shared native chrome for Hermes-owned destinations. Content is always real
+ /// Hermes data; this widget owns presentation only.
+@@ -24,6 +26,7 @@ class HermesPageChrome extends StatefulWidget {
+     this.showHeader = true,
+     this.titleMorphId,
+     this.leading,
++    this.desktopMaxWidth = kDesktopListMaxWidth,
+   });
+ 
+   final String title;
+@@ -38,9 +41,14 @@ class HermesPageChrome extends StatefulWidget {
+   /// Lets the page title arrive as the title of the object that opened it.
+   final String? titleMorphId;
+ 
+-  /// The app bar's leading control, such as Home's navigation button.
++  /// The app bar's leading control, such as Home's navigation button. On the
++  /// desktop a drawer destination with none of its own gets the shell's menu
++  /// button here (see [desktopNavMenuLeading]).
+   final Widget? leading;
+ 
++  /// How wide the page reads on the desktop; a board passes infinity.
++  final double desktopMaxWidth;
++
+   static TextStyle titleStyle(HermezChatPalette palette) => TextStyle(
+     color: palette.ink,
+     fontSize: 34,
+@@ -106,7 +114,7 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
+               backgroundColor: Colors.transparent,
+               surfaceTintColor: Colors.transparent,
+               scrolledUnderElevation: 0,
+-              leading: widget.leading,
++              leading: widget.leading ?? desktopNavMenuLeading(context),
+               actions: widget.actions,
+               centerTitle: true,
+               flexibleSpace: widget.showHeader
+@@ -161,15 +169,18 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
+             ),
+             body: SafeArea(
+               top: false,
+-              child: widget.showHeader
+-                  ? NestedScrollView(
+-                      controller: _outer,
+-                      headerSliverBuilder: (context, _) => [
+-                        SliverToBoxAdapter(child: header),
+-                      ],
+-                      body: widget.child,
+-                    )
+-                  : widget.child,
++              child: DesktopReadingWidth(
++                maxWidth: widget.desktopMaxWidth,
++                child: widget.showHeader
++                    ? NestedScrollView(
++                        controller: _outer,
++                        headerSliverBuilder: (context, _) => [
++                          SliverToBoxAdapter(child: header),
++                        ],
++                        body: widget.child,
++                      )
++                    : widget.child,
++              ),
+             ),
+           ),
+         ),

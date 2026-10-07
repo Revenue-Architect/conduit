@@ -1,0 +1,127 @@
+diff --git a/lib/features/hermes/views/hermes_settings_page.dart b/lib/features/hermes/views/hermes_settings_page.dart
+index 0ecf2e46..af3fa47b 100644
+--- a/lib/features/hermes/views/hermes_settings_page.dart
++++ b/lib/features/hermes/views/hermes_settings_page.dart
+@@ -14,24 +14,35 @@ import '../../../shared/theme/theme_extensions.dart';
+ import '../../../shared/widgets/conduit_components.dart';
+ import '../../../shared/widgets/connection_components.dart';
+ import '../../../shared/widgets/utility_components.dart';
++import '../../desktop/hermez_desktop.dart';
++import '../../desktop/shell/desktop_nav_scope.dart';
+ import '../controllers/hermes_connection_controller.dart';
+ import '../models/hermes_capabilities.dart';
+ import '../models/hermes_config.dart';
+ import '../providers/hermes_providers.dart';
+ import '../services/hermes_connection_service.dart';
+ import '../services/hermes_steel_viewer.dart';
++import '../settings/hermes_settings_categories.dart';
+ import 'hermes_desktop_connection_section.dart';
+ import 'hermes_settings_sections.dart';
+ 
+ /// Settings for the optional direct Hermes Agent backend: enable toggle, server
+ /// URL, API key, long-term memory key, and a connection test.
+ class HermesSettingsPage extends ConsumerStatefulWidget {
+-  const HermesSettingsPage({super.key, this.isOnboarding = false});
++  const HermesSettingsPage({
++    super.key,
++    this.isOnboarding = false,
++    this.embedded = false,
++  });
+ 
+   /// When true, the page is shown as a first-run setup step: the enable toggle
+   /// is implicit, and a "Finish setup" button completes onboarding into the app.
+   final bool isOnboarding;
+ 
++  /// When true, the page is the "Connection & app" pane of the desktop
++  /// settings shell: just its sections, with no page chrome of its own.
++  final bool embedded;
++
+   @override
+   ConsumerState<HermesSettingsPage> createState() => _HermesSettingsPageState();
+ }
+@@ -565,17 +576,70 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
+         ],
+         const SizedBox(height: Spacing.lg),
+         const HermesServerStatusSection(),
++        // The phone reaches the per-bot settings from here; the desktop
++        // shell lists them beside this pane instead.
++        if (config.mode == HermesBackendMode.desktopGateway &&
++            !HermezDesktop.isActive) ...[
++          const SizedBox(height: Spacing.lg),
++          InsetGroupedList(
++            title: 'Bots and server',
++            children: [
++              for (final category in HermesSettingsCategory.values)
++                if (category.isBotScoped)
++                  UtilityRow(
++                    key: ValueKey<String>(
++                      'hermes-settings-entry-${category.slug}',
++                    ),
++                    leading: _badge(context, category.icon),
++                    title: category.label,
++                    subtitle: category.subtitle,
++                    showChevron: true,
++                    onTap: () => context.pushNamed(
++                      RouteNames.hermesSettingsCategory,
++                      pathParameters: {'category': category.slug},
++                    ),
++                  ),
++            ],
++          ),
++        ],
+       ],
+     ];
+ 
++    if (widget.embedded && !widget.isOnboarding) {
++      return ListView(
++        padding: const EdgeInsets.fromLTRB(
++          Spacing.lg,
++          Spacing.sm,
++          Spacing.lg,
++          Spacing.xl,
++        ),
++        children: [
++          Center(
++            child: ConstrainedBox(
++              constraints: const BoxConstraints(maxWidth: 640),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.stretch,
++                children: content,
++              ),
++            ),
++          ),
++        ],
++      );
++    }
++
+     if (widget.isOnboarding) {
+       return UtilityPageScaffold.auth(
+         title: l10n.backendChooserHermesTitle,
+-        backNavigation: UtilityBackNavigation(
+-          label: l10n.back,
+-          buttonKey: const ValueKey<String>('hermes-onboarding-back-button'),
+-          onPressed: _leaveOnboarding,
+-        ),
++        // The desktop is Hermes only: there is no chooser to go back to.
++        backNavigation: HermezDesktop.isActive
++            ? null
++            : UtilityBackNavigation(
++                label: l10n.back,
++                buttonKey: const ValueKey<String>(
++                  'hermes-onboarding-back-button',
++                ),
++                onPressed: _leaveOnboarding,
++              ),
+         bottomAction: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+@@ -605,6 +669,9 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
+ 
+     return UtilityPageScaffold.settings(
+       title: l10n.hermesAgentSettingsTitle,
++      // Settings is the drawer's foot entry: on the desktop it carries the
++      // drawer's menu button where a phone page carries Back.
++      leadingOverride: desktopNavMenuLeading(context),
+       trailing: PlatformInfo.isIOS
+           ? CupertinoButton(
+               key: const ValueKey<String>('hermes-save-toolbar-button'),

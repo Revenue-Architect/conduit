@@ -1,0 +1,70 @@
+diff --git a/lib/core/services/navigation_service.dart b/lib/core/services/navigation_service.dart
+index cd038b34..8e20cab5 100644
+--- a/lib/core/services/navigation_service.dart
++++ b/lib/core/services/navigation_service.dart
+@@ -2,6 +2,7 @@ import 'package:conduit/l10n/app_localizations.dart';
+ import 'package:material_ui/material_ui.dart';
+ import 'package:go_router/go_router.dart';
+ 
++import '../../features/desktop/hermez_desktop.dart';
+ import '../../shared/widgets/themed_dialogs.dart';
+ 
+ /// Marks routes opened after a native sheet dismisses so Flutter does not
+@@ -136,23 +137,33 @@ class NavigationService {
+     return result;
+   }
+ 
++  /// The desktop is Hermes only: Open WebUI destinations open [desktop]
++  /// there instead of reaching an Open WebUI screen through a redirect.
++  static String _openWebUiRoute(String route, {required String desktop}) =>
++      HermezDesktop.isActive ? desktop : route;
++
+   static void navigateToChannel(String channelId) {
+-    router.go('/channel/$channelId');
++    router.go(
++      _openWebUiRoute('/channel/$channelId', desktop: Routes.hermesHome),
++    );
+   }
+ 
+   static Future<void> navigateToChat() => navigateTo(Routes.chat);
+   static Future<void> navigateToFolder(String folderId) =>
+       navigateTo(Routes.folderPath(folderId));
+-  static Future<void> navigateToLogin() => navigateTo(Routes.serverConnection);
++  static Future<void> navigateToLogin() => navigateToServerConnection();
+   static Future<void> navigateToProfile() => navigateTo(Routes.profile);
+-  static Future<void> navigateToServerConnection() =>
+-      navigateTo(Routes.serverConnection);
++  static Future<void> navigateToServerConnection() => navigateTo(
++    _openWebUiRoute(Routes.serverConnection, desktop: Routes.hermesSettings),
++  );
+ 
+   /// Clear navigation history. With GoRouter this becomes a simple go call.
+   static void clearNavigationStack() {
+     final router = _router;
+     if (router == null) return;
+-    router.go(Routes.serverConnection);
++    router.go(
++      _openWebUiRoute(Routes.serverConnection, desktop: Routes.hermesSettings),
++    );
+   }
+ }
+ 
+@@ -191,6 +202,9 @@ class Routes {
+   static const String hermesAttention = '/profile/hermes/attention';
+   static const String hermesArtifacts = '/profile/hermes/artifacts';
+   static const String hermesMcp = '/profile/hermes/mcp';
++  static const String hermesSettingsCategory =
++      '/profile/hermes/settings/:category';
++  static const String hermesBotRoster = '/profile/hermes/roster';
+   static const String hermesTeams = '/profile/hermes/teams';
+   static const String hermesTeamRoom = '/profile/hermes/teams/:roomId';
+   static const String about = '/profile/about';
+@@ -250,6 +264,8 @@ class RouteNames {
+   static const String hermesAttention = 'hermes-attention';
+   static const String hermesArtifacts = 'hermes-artifacts';
+   static const String hermesMcp = 'hermes-mcp';
++  static const String hermesSettingsCategory = 'hermes-settings-category';
++  static const String hermesBotRoster = 'hermes-bot-roster';
+   static const String hermesTeams = 'hermes-teams';
+   static const String hermesTeamRoom = 'hermes-team-room';
+   static const String about = 'about';

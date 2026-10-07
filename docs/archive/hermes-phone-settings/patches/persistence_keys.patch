@@ -1,0 +1,23 @@
+diff --git a/lib/core/persistence/persistence_keys.dart b/lib/core/persistence/persistence_keys.dart
+index 0558880f..30fa4225 100644
+--- a/lib/core/persistence/persistence_keys.dart
++++ b/lib/core/persistence/persistence_keys.dart
+@@ -97,6 +97,18 @@ final class PreferenceKeys {
+       'hermes_notify_prompt_dismissed_v1';
+   static const String hermesDashboardCookieIdentities =
+       'hermes_dashboard_cookie_identities_v1';
++  // Masked copies of Hermes configs, kept before each advanced-editor save.
++  // One key per scope: this prefix, then the bot name (or `~root`).
++  static const String hermesConfigBackups = 'hermes_config_backups_v1';
++
++  // The bot the Hermes settings categories apply to ("Applies to").
++  static const String hermesSettingsScope = 'hermes_settings_scope_v1';
++
++  // Desktop: where the window was and whether it was maximised.
++  static const String desktopWindowBounds = 'desktop_window_bounds_v1';
++
++  // Desktop: whether the one-time "still running in the tray" tip was shown.
++  static const String desktopTrayTipShown = 'desktop_tray_tip_shown_v1';
+ 
+   /// Which backend onboarding completed against
+   /// ('owui' | 'direct' | 'hermes' | unset).

@@ -1,0 +1,23 @@
+diff --git a/lib/features/hermes/services/hermes_desktop_api_service.dart b/lib/features/hermes/services/hermes_desktop_api_service.dart
+index 23db30cf..538f9753 100644
+--- a/lib/features/hermes/services/hermes_desktop_api_service.dart
++++ b/lib/features/hermes/services/hermes_desktop_api_service.dart
+@@ -505,6 +505,18 @@ final class HermesDesktopApiService
+   void didChangeAppLifecycleState(AppLifecycleState state) =>
+       _runtimeDidChangeAppLifecycleState(state);
+ 
++  /// Re-checks the link and resumes every attached chat, as returning to the
++  /// app does. The desktop connection keeper calls it after an outage.
++  Future<void> reconcileNow() {
++    _reconciliationStale = true;
++    return _foregroundReconciliation ??= _reconcileForeground().whenComplete(
++      () => _foregroundReconciliation = null,
++    );
++  }
++
++  /// Whether this app has [storedId] attached, so its own events notify.
++  bool isAttached(String storedId) => _bindings.containsKey(storedId);
++
+   @override
+   Future<String> createSession({String? title, CancelToken? cancelToken}) =>
+       _runtimeCreateSession(title: title, cancelToken: cancelToken);

@@ -1,0 +1,145 @@
+diff --git a/lib/features/hermes/views/hermes_settings_sections.dart b/lib/features/hermes/views/hermes_settings_sections.dart
+index ad6c8a79..6b22325e 100644
+--- a/lib/features/hermes/views/hermes_settings_sections.dart
++++ b/lib/features/hermes/views/hermes_settings_sections.dart
+@@ -11,11 +11,13 @@ import '../../../shared/theme/theme_extensions.dart';
+ import '../../../shared/widgets/conduit_components.dart';
+ import '../../../shared/widgets/utility_components.dart';
+ import '../controllers/hermes_connection_controller.dart';
++import '../models/hermes_bot.dart';
+ import '../models/hermes_capabilities.dart';
+ import '../models/hermes_config.dart';
+ import '../providers/hermes_providers.dart';
+ import '../services/hermes_desktop_api_service.dart';
+ import '../motion/hermez_motion.dart';
++import '../settings/pages/hermes_tools_extensions_page.dart';
+ 
+ class HermesCapabilitiesSection extends ConsumerWidget {
+   const HermesCapabilitiesSection({super.key});
+@@ -80,6 +82,10 @@ class _CapabilityChip extends StatelessWidget {
+   }
+ }
+ 
++/// Toolsets. On a Desktop Gateway connection they are set for each bot, so
++/// this lists the bots and links each to its own editor (a server-wide switch
++/// would change the default bot only). Other connections keep the read-only
++/// list of what the server reports.
+ class HermesToolsetsSection extends ConsumerStatefulWidget {
+   const HermesToolsetsSection({super.key});
+ 
+@@ -89,37 +95,66 @@ class HermesToolsetsSection extends ConsumerStatefulWidget {
+ }
+ 
+ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
+-  final Set<String> _pending = {};
+-
+   /// Toolsets whose details are open in place.
+   final Set<String> _open = {};
+ 
+-  Future<void> _configure(String name, bool enabled) async {
+-    if (!_pending.add(name)) return;
+-    setState(() {});
+-    try {
+-      final service = ref.read(hermesApiServiceProvider);
+-      if (service is! HermesDesktopApiService) return;
+-      await service.configureTools([name], enabled: enabled);
+-      ref.invalidate(hermesToolsetsProvider);
+-    } catch (error) {
+-      DebugLogger.warning(
+-        'toolset-update-failed',
+-        scope: 'hermes/settings',
+-        data: {'errorType': error.runtimeType.toString()},
++  void _edit(String profile, String title) =>
++      ref.read(hermesToolsExtensionsOpenerProvider)(
++        context,
++        profile: profile,
++        tab: HermesToolsExtensionsTab.toolsets,
++        botTitle: title,
+       );
+-      if (mounted) {
+-        ScaffoldMessenger.of(context).showSnackBar(
+-          SnackBar(
+-            content: Text(
+-              AppLocalizations.of(context)!.hermesToolsetUpdateFailed,
++
++  /// The Desktop Gateway view: one row per bot, each opening that bot's
++  /// editor on its Toolsets tab.
++  Widget _perBot(BuildContext context) {
++    final theme = context.conduitTheme;
++    final l10n = AppLocalizations.of(context)!;
++    final bots = ref.watch(hermesBotsProvider);
++    final listed = bots.asData?.value ?? const <HermesBot>[];
++    return InsetGroupedSection(
++      title: l10n.hermesCapabilityToolsets,
++      child: Column(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          Text(
++            'Toolsets, skills, MCP servers and plugins are set for each bot. '
++            'Pick a bot to edit them.',
++            key: const ValueKey<String>('hermes-toolsets-per-bot-note'),
++            style: AppTypography.bodyMediumStyle.copyWith(
++              color: theme.textSecondary,
+             ),
+           ),
+-        );
+-      }
+-    } finally {
+-      if (mounted) setState(() => _pending.remove(name));
+-    }
++          if (bots.isLoading && listed.isEmpty)
++            const Padding(
++              padding: EdgeInsets.only(top: Spacing.sm),
++              child: SizedBox(
++                height: 18,
++                width: 18,
++                child: CircularProgressIndicator(strokeWidth: 2),
++              ),
++            )
++          else if (listed.isEmpty)
++            // Hermes always has its default bot, even when it lists none.
++            UtilityRow(
++              key: const ValueKey<String>('hermes-toolsets-bot-default'),
++              title: 'Default bot',
++              showChevron: true,
++              onTap: () => _edit('default', 'Default bot'),
++            )
++          else
++            for (final bot in listed)
++              UtilityRow(
++                key: ValueKey<String>('hermes-toolsets-bot-${bot.name}'),
++                title: bot.title,
++                subtitle: bot.title == bot.name ? null : bot.name,
++                showChevron: true,
++                onTap: () => _edit(bot.name, bot.title),
++              ),
++        ],
++      ),
++    );
+   }
+ 
+   @override
+@@ -129,6 +164,7 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
+     final desktop =
+         ref.watch(hermesConfigProvider).mode ==
+         HermesBackendMode.desktopGateway;
++    if (desktop) return _perBot(context);
+     return InsetGroupedSection(
+       title: l10n.hermesCapabilityToolsets,
+       child: ref
+@@ -170,15 +206,6 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
+                           _open.add(toolset.name);
+                         }
+                       }),
+-                      trailing: desktop
+-                          ? AdaptiveSwitch(
+-                              value: toolset.enabled,
+-                              onChanged: _pending.contains(toolset.name)
+-                                  ? null
+-                                  : (enabled) =>
+-                                        _configure(toolset.name, enabled),
+-                            )
+-                          : null,
+                     ),
+                     HermezReveal(
+                       visible: _open.contains(toolset.name),

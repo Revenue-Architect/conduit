@@ -1,0 +1,230 @@
+diff --git a/lib/features/hermes/services/hermes_desktop_administration.dart b/lib/features/hermes/services/hermes_desktop_administration.dart
+index 69af44f7..97e353cb 100644
+--- a/lib/features/hermes/services/hermes_desktop_administration.dart
++++ b/lib/features/hermes/services/hermes_desktop_administration.dart
+@@ -1,5 +1,148 @@
+ part of 'hermes_desktop_api_service.dart';
+ 
++/// The only REST routes [HermesDesktopAdminRequests.requestAdminJson] will
++/// call, each with the methods allowed on it. Everything the admin client
++/// needs is here; anything else (`/api/shell`, `/api/env/reveal`, a typo'd
++/// path) is refused before a request is built (KTD6, KTD8).
++///
++/// Names in a path are percent-encoded segments. `..` and encoded dots or
++/// slashes are rejected separately, so a segment can never climb out.
++final List<({Set<String> methods, RegExp path})> _hermesAdminRoutes = [
++  (
++    methods: {'DELETE'},
++    path: RegExp(r'^/api/profiles/[a-z0-9][a-z0-9_-]{0,63}$'),
++  ),
++  (
++    methods: {'GET', 'PUT'},
++    path: RegExp(r'^/api/profiles/[a-z0-9][a-z0-9_-]{0,63}/soul$'),
++  ),
++  // Never `/api/env/reveal`: keys are write-only (KTD8).
++  (methods: {'GET', 'PUT', 'DELETE'}, path: RegExp(r'^/api/env$')),
++  (methods: {'GET'}, path: RegExp(r'^/api/providers/oauth$')),
++  (
++    methods: {'POST'},
++    path: RegExp(r'^/api/providers/oauth/[A-Za-z0-9_.~%-]{1,128}/start$'),
++  ),
++  (
++    methods: {'GET'},
++    path: RegExp(
++      r'^/api/providers/oauth/[A-Za-z0-9_.~%-]{1,128}/poll/[A-Za-z0-9_.~%-]{1,256}$',
++    ),
++  ),
++  (
++    methods: {'DELETE'},
++    path: RegExp(r'^/api/providers/oauth/sessions/[A-Za-z0-9_.~%-]{1,256}$'),
++  ),
++  (
++    methods: {'DELETE'},
++    path: RegExp(r'^/api/providers/oauth/[A-Za-z0-9_.~%-]{1,128}$'),
++  ),
++  (methods: {'POST'}, path: RegExp(r'^/api/providers/validate$')),
++  (methods: {'POST'}, path: RegExp(r'^/api/model/set$')),
++  (methods: {'GET', 'PUT'}, path: RegExp(r'^/api/config$')),
++  (methods: {'GET', 'PUT'}, path: RegExp(r'^/api/config/raw$')),
++  (methods: {'GET'}, path: RegExp(r'^/api/config/(schema|defaults)$')),
++  (methods: {'GET'}, path: RegExp(r'^/api/tools/toolsets$')),
++  (
++    methods: {'PUT'},
++    path: RegExp(r'^/api/tools/toolsets/[A-Za-z0-9_.~%-]{1,128}$'),
++  ),
++  (methods: {'PUT'}, path: RegExp(r'^/api/skills/toggle$')),
++  (
++    methods: {'PUT'},
++    path: RegExp(r'^/api/mcp/servers/[A-Za-z0-9_.~%-]{1,256}/enabled$'),
++  ),
++  (methods: {'GET', 'PUT', 'DELETE'}, path: RegExp(r'^/api/learning/node$')),
++  (methods: {'POST'}, path: RegExp(r'^/api/gateway/restart$')),
++];
++
++final RegExp _hermesAdminPathEscape = RegExp(
++  r'%2e|%2f|%5c|\.\.|[\\?#\s]',
++  caseSensitive: false,
++);
++
++/// Whether the admin client may send [method] to [path]. Pure, so the
++/// allowlist can be tested without a connection.
++bool hermesAdminRouteAllowed(String method, String path) {
++  if (_hermesAdminPathEscape.hasMatch(path)) return false;
++  final upper = method.toUpperCase();
++  return _hermesAdminRoutes.any(
++    (route) => route.methods.contains(upper) && route.path.hasMatch(path),
++  );
++}
++
++/// MCP gateway methods [HermesDesktopAdminRequests.requestAdminMcp] forwards.
++const Set<String> _hermesAdminMcpMethods = {
++  'mcp.catalog',
++  'mcp.servers.list',
++  'mcp.servers.status',
++  'mcp.servers.add',
++  'mcp.servers.set_api_key',
++  'mcp.servers.test',
++  'mcp.servers.remove',
++  'mcp.servers.oauth.start',
++  'mcp.servers.oauth.poll',
++  'mcp.servers.oauth.cancel',
++};
++
++/// The Hermes admin client's way into this service (KTD6): REST through the
++/// service's own auth path (native bearer with refresh, or the dashboard
++/// cookie bridge), and the existing MCP wrapper with a profile.
++///
++/// It never reaches `cli.exec` or `shell.exec`, and the REST side accepts only
++/// [hermesAdminRouteAllowed] routes.
++extension HermesDesktopAdminRequests on HermesDesktopApiService {
++  /// Opens the Desktop Gateway if it is not open yet.
++  Future<void> ensureAdminConnected() => _ensureConnected();
++
++  /// A JSON request to an allowlisted admin route. Error bodies are kept on
++  /// the [DioException] so the client can tell a missing route from a missing
++  /// profile. Every call names its profile in [query] (or [body] where Hermes
++  /// reads it there); nothing here adds one.
++  Future<Object?> requestAdminJson(
++    String method,
++    String path, {
++    Map<String, dynamic>? query,
++    Map<String, Object?>? body,
++    CancelToken? cancelToken,
++  }) async {
++    if (_closed) throw StateError('Hermes service is closed.');
++    if (!hermesAdminRouteAllowed(method, path)) {
++      throw StateError('Invalid Hermes admin request.');
++    }
++    return _requestJson(
++      method.toUpperCase(),
++      path,
++      query: query,
++      body: body,
++      cancelToken: cancelToken,
++      receiveErrorBody: true,
++    );
++  }
++
++  /// An `mcp.*` gateway call that carries `profile` in [params], with the
++  /// REST fallback the MCP page already uses when the gateway predates the
++  /// method. Does not reload MCP; the admin client does that on request.
++  Future<Map<String, dynamic>> requestAdminMcp(
++    String method, {
++    Map<String, dynamic> params = const {},
++  }) async {
++    if (!_hermesAdminMcpMethods.contains(method)) {
++      throw StateError('Invalid Hermes admin MCP request.');
++    }
++    try {
++      return await _administration.mcpRequest(method, params: params);
++    } on StateError catch (error) {
++      // The fallback has no REST twin for this method: report it as the
++      // unknown-method error the client already treats as "unavailable".
++      if (error.message.startsWith('Upgrade Hermes Desktop Gateway')) {
++        throw HermesDesktopRpcException(error.message, code: -32601);
++      }
++      rethrow;
++    }
++  }
++}
++
+ final class _HermesDesktopAdministration {
+   const _HermesDesktopAdministration(this._owner);
+ 
+@@ -270,14 +413,20 @@ final class _HermesDesktopAdministration {
+   ) async {
+     final name = params['name']?.toString() ?? '';
+     final encodedName = Uri.encodeComponent(name);
++    // A caller that names a profile (the admin client) gets REST calls scoped
++    // to it; without one `_requestJson` falls back to the connection profile.
++    final profile = params['profile']?.toString();
++    final scope = profile == null || profile.isEmpty
++        ? null
++        : <String, dynamic>{'profile': profile};
+     switch (method) {
+       case 'mcp.servers.list':
+         return _owner._object(
+-          await _owner._requestJson('GET', '/api/mcp/servers'),
++          await _owner._requestJson('GET', '/api/mcp/servers', query: scope),
+         );
+       case 'mcp.catalog':
+         final result = _owner._object(
+-          await _owner._requestJson('GET', '/api/mcp/catalog'),
++          await _owner._requestJson('GET', '/api/mcp/catalog', query: scope),
+         );
+         return {...result, 'servers': result['entries'] ?? const []};
+       case 'mcp.servers.add':
+@@ -287,6 +436,7 @@ final class _HermesDesktopAdministration {
+             await _owner._requestJson(
+               'POST',
+               '/api/mcp/catalog/install',
++              query: scope,
+               body: {'name': preset, 'enable': true},
+             ),
+           );
+@@ -296,6 +446,7 @@ final class _HermesDesktopAdministration {
+           await _owner._requestJson(
+             'POST',
+             '/api/mcp/servers',
++            query: scope,
+             body: {
+               'name': name,
+               ...config,
+@@ -309,17 +460,23 @@ final class _HermesDesktopAdministration {
+           await _owner._requestJson(
+             'POST',
+             '/api/mcp/servers/$encodedName/test',
++            query: scope,
+           ),
+         );
+       case 'mcp.servers.remove':
+         return _owner._object(
+-          await _owner._requestJson('DELETE', '/api/mcp/servers/$encodedName'),
++          await _owner._requestJson(
++            'DELETE',
++            '/api/mcp/servers/$encodedName',
++            query: scope,
++          ),
+         );
+       case 'mcp.servers.oauth.start':
+         final result = _owner._object(
+           await _owner._requestJson(
+             'POST',
+             '/api/mcp/servers/$encodedName/auth',
++            query: scope,
+           ),
+         );
+         return {
+@@ -332,7 +489,11 @@ final class _HermesDesktopAdministration {
+           params['session_id']?.toString() ?? '',
+         );
+         return _owner._object(
+-          await _owner._requestJson('GET', '/api/mcp/oauth/flows/$flowId'),
++          await _owner._requestJson(
++            'GET',
++            '/api/mcp/oauth/flows/$flowId',
++            query: scope,
++          ),
+         );
+       default:
+         throw StateError(

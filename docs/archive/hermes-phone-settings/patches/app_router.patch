@@ -1,0 +1,186 @@
+diff --git a/lib/core/router/app_router.dart b/lib/core/router/app_router.dart
+index 50d00653..7b6f0088 100644
+--- a/lib/core/router/app_router.dart
++++ b/lib/core/router/app_router.dart
+@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
+ import '../auth/auth_state_manager.dart';
+ import '../providers/app_providers.dart';
+ import '../providers/backend_mode_providers.dart';
++import '../../features/desktop/hermez_desktop.dart';
++import '../../features/desktop/shell/desktop_nav_scope.dart';
+ import '../../features/hermes/models/hermes_config.dart';
+ import '../../features/hermes/providers/hermes_providers.dart';
+ import '../services/navigation_service.dart';
+@@ -37,6 +39,9 @@ import '../../features/profile/views/account_settings_page.dart';
+ import '../../features/profile/views/app_customization_page.dart';
+ import '../../features/profile/views/audio_settings_page.dart';
+ import '../../features/hermes/views/hermes_settings_page.dart';
++import '../../features/hermes/bots/hermes_bot_screen.dart';
++import '../../features/hermes/settings/hermes_settings_categories.dart';
++import '../../features/hermes/settings/hermes_settings_shell.dart';
+ import '../../features/hermes/views/hermes_jobs_page.dart';
+ import '../../features/hermes/kanban/hermes_kanban_page.dart';
+ import '../../features/hermes/views/hermes_home_page.dart';
+@@ -89,6 +94,8 @@ bool _isAccountlessBackendLocation(String location) {
+       isDirectConnectionsLocation(location) ||
+       location == Routes.hermesSettings ||
+       location == Routes.hermesMcp ||
++      location.startsWith('/profile/hermes/settings/') ||
++      location == Routes.hermesBotRoster ||
+       location == Routes.hermesJobs ||
+       location == Routes.hermesKanban ||
+       location == Routes.hermesHome ||
+@@ -115,6 +122,10 @@ bool isDirectConnectionsLocation(String location) {
+ bool isDirectOnlyAppLocation(String location) =>
+     _isAccountlessBackendLocation(location);
+ 
++/// Hermes settings in onboarding mode. A redirect cannot carry `extra`, so the
++/// desktop boot uses this query flag; the chooser's `extra: true` still works.
++const _hermesOnboardingLocation = '${Routes.hermesSettings}?onboarding=true';
++
+ @visibleForTesting
+ String incompleteHermesDestination({
+   required bool secretsLoading,
+@@ -168,6 +179,12 @@ class RouterNotifier extends ChangeNotifier {
+ 
+   String? redirect(BuildContext context, GoRouterState state) {
+     final location = state.uri.path.isEmpty ? Routes.splash : state.uri.path;
++    // Hermez for the desktop never shows Open WebUI. This runs first so no
++    // later branch (reviewer mode, chooser, OWUI auth) can claim the route.
++    if (HermezDesktop.isActive) {
++      final destination = _desktopRedirect(location);
++      if (destination != null) return destination;
++    }
+     final reviewerMode = ref.read(reviewerModeProvider);
+     if (reviewerMode) {
+       // Stay on whatever route if already in chat; otherwise go to chat.
+@@ -430,6 +447,45 @@ class RouterNotifier extends ChangeNotifier {
+     return null;
+   }
+ 
++  /// Desktop boot policy (U1, R1). Returns where desktop must go instead of
++  /// [location], or null to let the shared Hermes-only policy decide, which
++  /// already sends a usable Hermes from splash to Hermez home.
++  ///
++  /// - Hermes settings always renders: it is the desktop's setup surface.
++  /// - With Hermes not set up, every other location opens Hermes onboarding.
++  /// - The backend chooser, every Open WebUI auth route and every Open
++  ///   WebUI-only page open Hermez home, or Hermes setup while it is unusable.
++  /// - Phone-only pages (audio settings: dictation and spoken replies, U2, R3)
++  ///   redirect the same way, so a stale deep link never lands on them.
++  String? _desktopRedirect(String location) {
++    if (location == Routes.hermesSettings) return null;
++    final hermesConfig = ref.read(hermesConfigProvider);
++    final String destination;
++    if (!hermesConfig.enabled) {
++      destination = _hermesOnboardingLocation;
++    } else if (!_isDesktopOpenWebUiLocation(location)) {
++      return null;
++    } else if (hermesConfig.isUsable) {
++      destination = Routes.hermesHome;
++    } else {
++      destination = incompleteHermesDestination(
++        secretsLoading: ref.read(hermesSecretsLoadingProvider),
++      );
++    }
++    return Uri.parse(destination).path == location ? null : destination;
++  }
++
++  bool _isDesktopOpenWebUiLocation(String location) =>
++      location == Routes.backendChooser ||
++      _isAuthLocation(location) ||
++      _isDesktopPhoneOnlyLocation(location) ||
++      (location != Routes.splash && !isHermesOnlyAppLocation(location));
++
++  /// Pages that stay in the Hermes-only route set for the phone but have no
++  /// Windows counterpart.
++  bool _isDesktopPhoneOnlyLocation(String location) =>
++      location == Routes.audioSettings;
++
+   bool _isAuthLocation(String location) {
+     return location == Routes.serverConnection ||
+         location == Routes.login ||
+@@ -716,9 +772,43 @@ final goRouterProvider = Provider<GoRouter>((ref) {
+       pageBuilder: (context, state) => _buildHermezPage(
+         context: context,
+         state: state,
+-        child: HermesSettingsPage(isOnboarding: state.extra == true),
++        child:
++            HermezDesktop.isActive &&
++                state.extra != true &&
++                state.uri.queryParameters['onboarding'] != 'true'
++            ? const HermesSettingsShell()
++            : HermesSettingsPage(
++                isOnboarding:
++                    state.extra == true ||
++                    state.uri.queryParameters['onboarding'] == 'true',
++              ),
+       ),
+     ),
++    GoRoute(
++      path: Routes.hermesBotRoster,
++      name: RouteNames.hermesBotRoster,
++      pageBuilder: (context, state) => _buildHermezPage(
++        context: context,
++        state: state,
++        child: const HermesBotScreen(),
++      ),
++    ),
++    GoRoute(
++      path: Routes.hermesSettingsCategory,
++      name: RouteNames.hermesSettingsCategory,
++      pageBuilder: (context, state) {
++        final category =
++            HermesSettingsCategory.fromSlug(state.pathParameters['category']) ??
++            HermesSettingsCategory.connection;
++        return _buildHermezPage(
++          context: context,
++          state: state,
++          child: HermezDesktop.isActive
++              ? HermesSettingsShell(initial: category)
++              : HermesSettingsCategoryPage(category: category),
++        );
++      },
++    ),
+     GoRoute(
+       path: Routes.hermesJobs,
+       name: RouteNames.hermesJobs,
+@@ -1025,6 +1115,11 @@ class NavigationLoggingObserver extends NavigatorObserver {
+   }
+ }
+ 
++/// Every page the router builds goes through [desktopPageGate] on desktop (the
++/// three builders below), so a page is inert while the desktop drawer is up and
++/// a click on it closes the drawer. Dialogs are separate routes and are not
++/// gated.
++///
+ /// Hermes destinations use the Hermez motion shell. A destination opened from
+ /// a visible object receives that object's [HermezMorphOrigin] as `extra` and
+ /// grows out of it; anything else slides in as a sibling. Nothing fades.
+@@ -1042,7 +1137,7 @@ Page<void> _buildHermezPage({
+   return buildHermezMotionPage(
+     pageKey: state.pageKey,
+     name: state.name,
+-    child: child,
++    child: desktopPageGate(child),
+     motion: origin == null
+         ? HermezRouteMotion.standard
+         : HermezRouteMotion.expand,
+@@ -1058,7 +1153,7 @@ Page<void> _buildNoTransitionPage({
+   return NoTransitionPage<void>(
+     key: state.pageKey,
+     name: state.name,
+-    child: child,
++    child: desktopPageGate(child),
+   );
+ }
+ 
+@@ -1082,7 +1177,7 @@ Page<void> _buildPlatformPage({
+       return MaterialPage<void>(
+         key: state.pageKey,
+         name: state.name,
+-        child: child,
++        child: desktopPageGate(child),
+       );
+   }
+ }

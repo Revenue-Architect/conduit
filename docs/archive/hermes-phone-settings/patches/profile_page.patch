@@ -1,0 +1,55 @@
+diff --git a/lib/features/profile/views/profile_page.dart b/lib/features/profile/views/profile_page.dart
+index a962f556..a9a6ae02 100644
+--- a/lib/features/profile/views/profile_page.dart
++++ b/lib/features/profile/views/profile_page.dart
+@@ -19,6 +19,7 @@ import '../../../core/providers/app_providers.dart';
+ import '../../../core/providers/backend_mode_providers.dart';
+ import '../../../core/services/navigation_service.dart';
+ import '../../auth/providers/unified_auth_providers.dart';
++import '../../desktop/hermez_desktop.dart';
+ import '../../workspace/providers/workspace_capabilities_provider.dart';
+ import '../../../core/services/api_service.dart';
+ import '../../../core/models/user.dart' as models;
+@@ -277,16 +278,20 @@ class ProfilePage extends ConsumerWidget {
+         subtitle: l10n.settingsChatSubtitle,
+         onTap: () => context.pushNamed(RouteNames.chatSettings),
+       ),
+-      _buildAccountOption(
+-        context,
+-        icon: UiUtils.platformIcon(
+-          ios: CupertinoIcons.waveform,
+-          android: Icons.graphic_eq,
++      // Dictation and spoken replies are phone-only, so the desktop has no
++      // audio settings to open (R3).
++      if (!HermezDesktop.isActive)
++        _buildAccountOption(
++          context,
++          key: const Key('audio-settings-entry'),
++          icon: UiUtils.platformIcon(
++            ios: CupertinoIcons.waveform,
++            android: Icons.graphic_eq,
++          ),
++          title: l10n.audioSettingsTitle,
++          subtitle: l10n.audioSettingsSubtitle,
++          onTap: () => context.pushNamed(RouteNames.audioSettings),
+         ),
+-        title: l10n.audioSettingsTitle,
+-        subtitle: l10n.audioSettingsSubtitle,
+-        onTap: () => context.pushNamed(RouteNames.audioSettings),
+-      ),
+       // Hermes runs notify too, so this is not an Open WebUI-only setting.
+       _buildAccountOption(
+         context,
+@@ -352,9 +357,11 @@ class ProfilePage extends ConsumerWidget {
+         subtitle: l10n.directConnectionsSubtitle,
+         onTap: () => context.pushNamed(RouteNames.directConnections),
+       ),
+-      if (!hasOpenWebUiAccount)
++      // The desktop is Hermes only and never offers Open WebUI.
++      if (!hasOpenWebUiAccount && !HermezDesktop.isActive)
+         _buildAccountOption(
+           context,
++          key: const Key('connect-open-webui-entry'),
+           icon: UiUtils.platformIcon(
+             ios: CupertinoIcons.add_circled,
+             android: Icons.add_circle_outline,
