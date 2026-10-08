@@ -20,7 +20,7 @@ Official references:
 - https://a2ui.org/concepts/components/ — Basic Catalog and application-defined catalogs.
 - https://a2ui.org/guides/authoring-components/ — custom component authoring.
 
-Implementation status: all 15 component types are installed and verified in build 151. Installation and live verification are recorded in HERMEZ_AGENT_HANDOFF.md. Native testing caught a missing Material ancestor in build 150; build 151 corrects it.
+Implementation status: all 15 component types are installed in build 152 with shared Hermez surfaces, typography, outlines and motion. DataTable includes local Records and Compare columns views; CitationCard, DataTable and DraftReview optionally embed an explicit conversational Button via actionChild. Installation and live verification are recorded in HERMEZ_AGENT_HANDOFF.md. Native testing caught a missing Material ancestor in build 150; build 151 corrected it and build 152 uses the existing Material-backed Hermez surface.
 
 ## Additional exploratory components
 

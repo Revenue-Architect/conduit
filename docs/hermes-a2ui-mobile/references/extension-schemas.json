@@ -26,6 +26,12 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 2000
+      },
+      "actionChild": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Optional existing Button/Column component ID for an explicit conversational reply. Never automatically submits."
       }
     },
     "required": [
@@ -100,6 +106,12 @@
         },
         "minItems": 1,
         "maxItems": 30
+      },
+      "actionChild": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Optional existing Button/Column component ID for an explicit conversational reply. Never automatically submits."
       }
     },
     "required": [
@@ -131,6 +143,12 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 8000
+      },
+      "actionChild": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Optional existing Button/Column component ID for an explicit conversational reply. Never automatically submits."
       }
     },
     "required": [

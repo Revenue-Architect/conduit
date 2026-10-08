@@ -4,6 +4,8 @@ Order: complete and install the InfoRow recovery APK first; then implement the a
 
 Extend the existing native Flutter/GenUI catalog. All components are bounded data displays. Local expansion, selection and scenario controls never send a Hermes turn. Explicit existing Button actions retain current consent/approval behavior. No new backend, queue, transport, external image fetch or credential authority.
 
+Build 152 aligns every extension with HermezSurface, HermezType, palette, full outlines and HermezExpandableSection motion. CitationCard, DataTable and DraftReview optionally reference an existing Button/Column through actionChild. These children start ordinary conversation turns, identify their target through event context, and restore busy/read-only locking beneath the local-control boundary. Local exploration values are not submitted; use the existing form bindings or fixed-option Buttons when a chosen value is needed in a reply. DataTable has selectable full cells in stacked Records and horizontally scrollable Compare columns views.
+
 Components requested across the recommendation groups:
 1. CitationCard: source title, page/location, excerpt, optional finding; explicit provenance.
 2. SourceExcerpt: cited passage with source and location.

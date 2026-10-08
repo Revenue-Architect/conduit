@@ -9,6 +9,11 @@ import 'package:json_schema_builder/json_schema_builder.dart';
 import 'hermes_visual_extension_schemas.dart';
 import 'hermes_a2ui_media_scope.dart';
 import 'hermes_a2ui_interaction_lock.dart';
+import '../motion/hermez_motion.dart';
+import 'hermez_chat_palette.dart';
+import 'hermez_surfaces.dart';
+import 'hermez_expandable_section.dart';
+import 'hermes_visual_structure.dart' show hermezOutline;
 
 final hermesVisualExtensionSchemas = (jsonDecode(
   hermesVisualExtensionSchemasJson,
@@ -27,6 +32,9 @@ final List<CatalogItem> hermesExtensionCatalogItems = [
           key: ValueKey('${entry.key}:${jsonEncode(data)}'),
           kind: entry.key,
           data: data,
+          action: data['actionChild'] is String
+              ? ctx.buildChild(data['actionChild'] as String)
+              : null,
         );
       },
     ),
@@ -116,9 +124,15 @@ bool validExtensionSemantics(String kind, Map<String, dynamic> d) {
 }
 
 class ExtensionVisual extends StatefulWidget {
-  const ExtensionVisual({super.key, required this.kind, required this.data});
+  const ExtensionVisual({
+    super.key,
+    required this.kind,
+    required this.data,
+    this.action,
+  });
   final String kind;
   final Map<String, dynamic> data;
+  final Widget? action;
   @override
   State<ExtensionVisual> createState() => _ExtensionVisualState();
 }
@@ -128,6 +142,9 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
   double? scenario;
   String? branch;
   bool after = false;
+  bool columnView = false;
+  HermezChatPalette get palette =>
+      HermezChatPalette.forBrightness(Theme.of(context).brightness);
   Map<String, dynamic> get d => widget.data;
   List<Map<String, dynamic>> rows(String key) =>
       (d[key] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -135,14 +152,42 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
     padding: const EdgeInsets.only(bottom: 8),
     child: Text(
       '$value',
-      style: strong ? Theme.of(context).textTheme.titleSmall : null,
+      style: strong ? HermezType.section(palette) : HermezType.body(palette),
     ),
   );
-  Widget detail(String title, String body) => ExpansionTile(
-    tilePadding: EdgeInsets.zero,
-    childrenPadding: const EdgeInsets.only(bottom: 12),
-    title: Text(title),
-    children: [Align(alignment: Alignment.centerLeft, child: Text(body))],
+  Widget detail(String title, String body) =>
+      _ExtensionDetail(title: title, body: body);
+  Widget field(String label, Object? value) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: HermezType.technical(palette.muted)),
+        const SizedBox(height: 4),
+        SelectableText('$value', style: HermezType.body(palette)),
+      ],
+    ),
+  );
+  Widget choice(String label, bool active, VoidCallback onTap) => Semantics(
+    button: true,
+    selected: active,
+    child: HermezMotionSurface(
+      onTap: onTap,
+      semanticLabel: label,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: hermezOutline(
+          palette,
+          active ? palette.accent : null,
+          radius: 12,
+        ),
+        child: Text(
+          label,
+          style: HermezType.body(palette).copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+    ),
   );
   @override
   Widget build(BuildContext context) {
@@ -150,20 +195,27 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
       return const Text('Visual unavailable: inconsistent data');
     }
     return HermesA2uiLocalControl(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Container(
+      child: HermezSurface(
+        kind: HermezSurfaceKind.utility,
+        motif: HermezMotif.etched,
+        border: Border.all(color: palette.border),
+        child: SizedBox(
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [text(d['title'], strong: true), ...body()],
+            children: [
+              text(d['title'], strong: true),
+              ...body(),
+              if (widget.action != null) ...[
+                const SizedBox(height: 12),
+                // Local controls bypass the surface pointer lock. A conversational
+                // child must explicitly restore it, including while busy/read-only.
+                IgnorePointer(
+                  ignoring: HermesA2uiInteractionLock.lockedOf(context),
+                  child: widget.action!,
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -175,36 +227,101 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
       case 'CitationCard':
       case 'SourceExcerpt':
         return [
-          text('${d['source']} · ${d['location']}', strong: true),
-          SelectableText(d['excerpt'] as String),
-          if (d['finding'] != null) ...[const Divider(), text(d['finding'])],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.description_outlined, color: palette.accent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: field('Source · ${d['location']}', d['source'])),
+            ],
+          ),
+          field('Source excerpt', d['excerpt']),
+          if (d['finding'] != null) ...[
+            const Divider(),
+            field('Finding', d['finding']),
+          ],
         ];
       case 'DraftReview':
         return [
-          text('DRAFT · Not sent', strong: true),
-          text('To: ${d['recipient']}'),
-          text('Subject: ${d['subject']}'),
-          SelectableText(d['body'] as String),
+          Text('DRAFT / NOT SENT', style: HermezType.technical(palette.muted)),
+          const SizedBox(height: 16),
+          field('To', d['recipient']),
+          field('Subject', d['subject']),
+          const Divider(),
+          field('Message', d['body']),
         ];
       case 'DataTable':
         final columns = (d['columns'] as List).cast<String>();
         return [
-          for (final row in d['rows'] as List)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(8),
+          Text(
+            '${(d['rows'] as List).length} RECORDS / ${columns.length} FIELDS',
+            style: HermezType.technical(palette.muted),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              choice(
+                'Records',
+                !columnView,
+                () => setState(() => columnView = false),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              choice(
+                'Compare columns',
+                columnView,
+                () => setState(() => columnView = true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (columnView)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Table(
+                defaultColumnWidth: const FixedColumnWidth(160),
+                border: TableBorder.all(color: palette.border),
                 children: [
-                  for (var i = 0; i < columns.length; i++)
-                    text('${columns[i]}: ${row[i]}'),
+                  TableRow(
+                    decoration: BoxDecoration(color: palette.canvas),
+                    children: [
+                      for (final label in columns)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            label,
+                            style: HermezType.section(palette),
+                          ),
+                        ),
+                    ],
+                  ),
+                  for (final row in d['rows'] as List)
+                    TableRow(
+                      children: [
+                        for (final value in row as List)
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: SelectableText(
+                              '$value',
+                              style: HermezType.body(palette),
+                            ),
+                          ),
+                      ],
+                    ),
                 ],
               ),
-            ),
+            )
+          else
+            for (var r = 0; r < (d['rows'] as List).length; r++) ...[
+              if (r != 0) const Divider(height: 24),
+              Text(
+                'RECORD ${r + 1}',
+                style: HermezType.technical(palette.muted),
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < columns.length; i++)
+                field(columns[i], d['rows'][r][i]),
+            ],
         ];
       case 'ChangeDiff':
         final before = (d['before'] as String).split('\n'),
@@ -238,22 +355,17 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
           Wrap(
             spacing: 8,
             children: [
-              ChoiceChip(
-                label: const Text('Before'),
-                selected: !after,
-                onSelected: (_) => setState(() => after = false),
-              ),
-              ChoiceChip(
-                label: const Text('After'),
-                selected: after,
-                onSelected: (_) => setState(() => after = true),
-              ),
+              choice('Before', !after, () => setState(() => after = false)),
+              choice('After', after, () => setState(() => after = true)),
             ],
           ),
           const SizedBox(height: 8),
           if (d[after ? 'afterMedia' : 'beforeMedia'] case final String path)
             HermesA2uiMediaScope.image(context, path),
-          SelectableText(d[after ? 'after' : 'before'] as String),
+          SelectableText(
+            d[after ? 'after' : 'before'] as String,
+            style: HermezType.body(palette),
+          ),
         ];
       case 'Agenda':
       case 'CalendarGrid':
@@ -276,10 +388,10 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
             spacing: 6,
             children: [
               for (var i = 0; i < choices.length; i++)
-                ChoiceChip(
-                  label: Text(choices[i]),
-                  selected: selected == i,
-                  onSelected: (_) => setState(() => selected = i),
+                choice(
+                  choices[i],
+                  selected == i,
+                  () => setState(() => selected = i),
                 ),
             ],
           ),
@@ -339,14 +451,25 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
         ];
         final minV = values.reduce(math.min).toDouble(),
             maxV = values.reduce(math.max).toDouble();
-        final colors = [Colors.blue, Colors.orange, Colors.purple, Colors.teal];
+        final colors = [
+          palette.accent,
+          palette.ink,
+          palette.muted,
+          Theme.of(context).colorScheme.tertiary,
+        ];
         return [
           text('${labels.first} → ${labels.last} · ${d['unit']}'),
           SizedBox(
             height: 160,
             width: double.infinity,
             child: CustomPaint(
-              painter: _SeriesPainter(series, minV, maxV, colors),
+              painter: _SeriesPainter(
+                series,
+                minV,
+                maxV,
+                colors,
+                palette.border,
+              ),
             ),
           ),
           text('Scale: $minV – $maxV ${d['unit']}'),
@@ -380,7 +503,8 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
               painter: _RelationshipPainter(
                 nodes,
                 edges,
-                Theme.of(context).colorScheme.primary,
+                palette.accent,
+                palette.onAccent,
               ),
             ),
           ),
@@ -388,10 +512,10 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
             spacing: 6,
             children: [
               for (var i = 0; i < nodes.length; i++)
-                ChoiceChip(
-                  label: Text('${i + 1}. ${nodes[i]['label']}'),
-                  selected: selected == i,
-                  onSelected: (_) => setState(() => selected = i),
+                choice(
+                  '${i + 1}. ${nodes[i]['label']}',
+                  selected == i,
+                  () => setState(() => selected = i),
                 ),
             ],
           ),
@@ -426,15 +550,19 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
                           onTap: () => setState(() => selected = i),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainer,
+                              color: palette.surface,
                               border: Border.all(
-                                color: Theme.of(context).colorScheme.outline,
+                                color: selected == i
+                                    ? palette.accent
+                                    : palette.border,
+                                width: selected == i ? 1.4 : 1,
                               ),
                             ),
                             alignment: Alignment.center,
-                            child: Text('${i + 1}'),
+                            child: Text(
+                              '${i + 1}',
+                              style: HermezType.section(palette),
+                            ),
                           ),
                         ),
                       ),
@@ -447,10 +575,10 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
             spacing: 6,
             children: [
               for (var i = 0; i < rooms.length; i++)
-                ChoiceChip(
-                  label: Text('${i + 1}. ${rooms[i]['label']}'),
-                  selected: selected == i,
-                  onSelected: (_) => setState(() => selected = i),
+                choice(
+                  '${i + 1}. ${rooms[i]['label']}',
+                  selected == i,
+                  () => setState(() => selected = i),
                 ),
             ],
           ),
@@ -477,17 +605,57 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
   }
 }
 
+class _ExtensionDetail extends StatefulWidget {
+  const _ExtensionDetail({required this.title, required this.body});
+  final String title, body;
+  @override
+  State<_ExtensionDetail> createState() => _ExtensionDetailState();
+}
+
+class _ExtensionDetailState extends State<_ExtensionDetail> {
+  bool expanded = false;
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: HermezExpandableSection(
+        expanded: expanded,
+        onExpansionChanged: (value) => setState(() => expanded = value),
+        semanticLabel: widget.title,
+        header: Text(
+          widget.title,
+          style: HermezType.body(palette).copyWith(fontWeight: FontWeight.w700),
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: SelectableText(widget.body, style: HermezType.body(palette)),
+        ),
+      ),
+    );
+  }
+}
+
 class _SeriesPainter extends CustomPainter {
-  _SeriesPainter(this.series, this.minV, this.maxV, this.colors);
+  _SeriesPainter(
+    this.series,
+    this.minV,
+    this.maxV,
+    this.colors,
+    this.axisColor,
+  );
   final List<Map<String, dynamic>> series;
   final double minV, maxV;
   final List<Color> colors;
+  final Color axisColor;
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawLine(
       Offset(0, size.height),
       Offset(size.width, size.height),
-      Paint()..color = Colors.grey,
+      Paint()..color = axisColor,
     );
     for (var i = 0; i < series.length; i++) {
       final values = (series[i]['values'] as List).cast<num>(), path = Path();
@@ -520,9 +688,9 @@ class _SeriesPainter extends CustomPainter {
 }
 
 class _RelationshipPainter extends CustomPainter {
-  _RelationshipPainter(this.nodes, this.edges, this.color);
+  _RelationshipPainter(this.nodes, this.edges, this.color, this.onColor);
   final List<Map<String, dynamic>> nodes, edges;
-  final Color color;
+  final Color color, onColor;
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2),
@@ -551,7 +719,11 @@ class _RelationshipPainter extends CustomPainter {
       final t = TextPainter(
         text: TextSpan(
           text: '${i + 1}',
-          style: const TextStyle(color: Colors.white, fontSize: 12),
+          style: TextStyle(
+            color: onColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

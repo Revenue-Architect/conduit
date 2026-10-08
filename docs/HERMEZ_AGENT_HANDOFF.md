@@ -981,3 +981,67 @@ return the MEDIA lines plus complete A2UI fence unchanged. Specify synthetic
 examples only and no emails, reminders or commitments. Diagnostics/screenshots
 remain outside Git. A helper's inventory output exposed a Composio key; the
 affected Hermuse key needs rotation separately, without copying it into reports.
+
+## 2026-10-08 — Hermez design alignment and real conversational actions (APK 152)
+
+Corrected the extension catalog's design drift: all 15 now use the existing
+HermezSurface utility object, HermezType typography, palette, full outlines,
+press motion and HermezExpandableSection spring compartments. Charts use the
+app palette, and room/relationship selections keep the active signal treatment.
+No new design system, package, backend or transport.
+
+Document citations retain distinct source, page/location, full selectable excerpt
+and finding. DataTable now has local Records and horizontally scrollable Compare
+columns modes, with complete selectable cells and shared column headers. DraftReview
+separates To, Subject and Message and keeps the DRAFT / NOT SENT label.
+
+CitationCard, DataTable and DraftReview optionally accept actionChild, an existing
+Button/Column component reference. These children use the ordinary A2UI interaction
+flow and explicitly restore busy/read-only locking beneath the local-control
+boundary. Exploration controls do not send turns or submit selected values. Use
+existing form bindings or fixed-option Buttons if a next turn needs a chosen value.
+A review/edit request grants no permission to send a draft.
+
+Installed version 4.1.7/152 in place on S25 Ultra around 14:11 Toronto. Credential
+and settings files again matched pre-install SHA256 fingerprints byte-for-byte.
+APK SHA256: `6036574be172cbb44b853424761036bfe0a08a49a85f7e898857558e71292d3b`.
+Build 151 rollback is at `work/diagnostics/hermez-before-a2ui-152.apk`, outside Git.
+
+**Validation:** 95 focused extension/surface/normalizer regressions passed, then
+six additional light/dark Hermez Red style cases passed (51 extension-file checks).
+Targeted analysis: no issues. Full guide/demo payloads validate with zero errors.
+Native screenshots confirm Hermez object/type treatment; on the phone, Records
+and Compare columns switch correctly, horizontal scrolling reveals Notes, and
+local table operations do not add a user turn.
+
+Actual conversational checks in synthetic session `20261008_181846_e4a298`:
+
+- draft.request_edit: exactly one event for synthetic-draft-152; Hermes returned
+  a shorter unsent DraftReview, retaining the recipient and subject (message 7683).
+- table.compare_options: exactly one event for synthetic-services-152; reply
+  correctly compared $10 basic service with $20 including review, a $10 difference
+  (message 7685).
+- document.explain_citation: exactly one event for synthetic-reference-152/Page 8;
+  reply preserved the exact excerpt, source and page (message 7687).
+
+Final session count is four user turns: the demo request and those three actions.
+Post-demo tools were only write_file and terminal for draft payload validation;
+no email tool or external delivery occurred. Six post-recovery UI captures showed
+no error tiles; current-process logs showed zero Material, fatal, widget-exception
+or RenderFlex-overflow markers. This is representative end-to-end acceptance;
+future model responses still depend on supplied evidence and the requested action.
+
+**Test interruption:** the Hermes container restarted at 14:13 Toronto during the
+first demo generation, interrupting the turn and causing HTTP 502. No app/skill
+deployment command requested a service restart. Existing Stop/Retry recovered
+the synthetic demo in a new branch; the subsequent three actions completed.
+The initiating actor for that concurrent restart was not established. Do not
+misreport it as an extension-rendering failure or hide it as a flawless first run.
+
+Skill 0.12.0, matching schemas, checker and review-response-demo deployed and loaded
+through native skill_view in all seven profiles. No SOUL/config/auth/model changes.
+Backup: `/opt/data/backups/a2ui-catalog152-20261008T181134Z`.
+Skill SHA256: `8abe13d12c2fd3f2b632f7083ab175726a2eef7a76d0f1fa9908c27999a1a783`.
+Ask Hermes to load a2ui-mobile and show references/review-response-demo.md for the
+synthetic citation/table/draft flow. Screenshots, replay payloads and diagnostic
+logs stay outside Git. Stremio/TorBox were not touched.

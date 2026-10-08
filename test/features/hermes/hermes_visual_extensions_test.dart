@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:conduit/features/hermes/widgets/hermes_a2ui_media_scope.dart';
 import 'package:conduit/features/hermes/widgets/hermes_artifact_view.dart';
 import 'package:conduit/features/hermes/services/hermes_media_parser.dart';
+import 'package:conduit/features/hermes/widgets/hermez_surfaces.dart';
+import 'package:conduit/features/hermes/widgets/hermez_expandable_section.dart';
+import 'package:conduit/features/hermes/widgets/hermez_chat_palette.dart';
 
 String fixture(String kind) =>
     File('test/fixtures/hermes/a2ui/extensions/$kind.jsonl').readAsStringSync();
@@ -27,12 +30,14 @@ Map<String, dynamic> data(String kind) =>
 Future<void> pump(
   WidgetTester tester,
   String payload,
-  List<String> turns,
-) async {
+  List<String> turns, {
+  Brightness brightness = Brightness.light,
+}) async {
   await tester.binding.setSurfaceSize(const Size(320, 1400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     MaterialApp(
+      theme: ThemeData(brightness: brightness),
       home: MediaQuery(
         data: const MediaQueryData(
           size: Size(320, 1400),
@@ -123,7 +128,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(image, '/opt/data/artifacts/before.png');
-      await tester.tap(find.widgetWithText(ChoiceChip, 'After'));
+      await tester.tap(find.text('After'));
       await tester.pumpAndSettle();
       expect(image, '/opt/data/artifacts/after.png');
       expect(tester.takeException(), isNull);
@@ -139,6 +144,7 @@ void main() {
       expect(find.text(name), findsOneWidget);
       expect(find.textContaining('Visual unavailable'), findsNothing);
       expect(find.byType(ExtensionVisual), findsOneWidget);
+      expect(find.byType(HermezSurface), findsWidgets);
       expect(tester.takeException(), isNull);
       expect(turns, isEmpty);
     });
@@ -157,7 +163,7 @@ void main() {
   testWidgets('local selection controls never send a turn', (tester) async {
     final turns = <String>[];
     await pump(tester, fixture('BeforeAfterViewer'), turns);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'After'));
+    await tester.tap(find.text('After'));
     await tester.pumpAndSettle();
     expect(find.text('Revised description'), findsOneWidget);
     expect(turns, isEmpty);
@@ -179,16 +185,16 @@ void main() {
     final turns = <String>[];
     for (final kind in ['Agenda', 'CalendarGrid']) {
       await pump(tester, fixture(kind), turns);
-      await tester.tap(find.widgetWithText(ChoiceChip, '2026-10-09'));
+      await tester.tap(find.text('2026-10-09'));
       await tester.pumpAndSettle();
       expect(find.text('10:00 · Review'), findsOneWidget);
     }
     await pump(tester, fixture('RelationshipMap'), turns);
-    await tester.tap(find.widgetWithText(ChoiceChip, '2. Client'));
+    await tester.tap(find.text('2. Client'));
     await tester.pumpAndSettle();
     expect(find.text('Provided client context'), findsOneWidget);
     await pump(tester, fixture('RoomMap'), turns);
-    await tester.tap(find.widgetWithText(ChoiceChip, '2. Office'));
+    await tester.tap(find.text('2. Office'));
     await tester.pumpAndSettle();
     expect(find.text('No further finding supplied.'), findsOneWidget);
     expect(turns, isEmpty);
@@ -247,6 +253,134 @@ void main() {
     slider['min'] = 10;
     expect(validExtensionSemantics('ScenarioSlider', slider), isFalse);
   });
+  testWidgets(
+    'table switches from readable records to full column comparison locally',
+    (tester) async {
+      final turns = <String>[];
+      await pump(tester, fixture('DataTable'), turns);
+      expect(find.text('ITEM'), findsNWidgets(2));
+      await tester.tap(find.text('Compare columns'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Table), findsOneWidget);
+      expect(find.text('Item'), findsOneWidget);
+      expect(find.text('Option A'), findsOneWidget);
+      await tester.tap(find.text('Records'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Table), findsNothing);
+      expect(turns, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  for (final kind in ['CitationCard', 'DataTable', 'DraftReview']) {
+    for (final brightness in Brightness.values) {
+      testWidgets('$kind uses shared Hermez Red surface/type in $brightness', (
+        tester,
+      ) async {
+        final previous = HermezChatPalette.signal;
+        addTearDown(() => HermezChatPalette.signal = previous);
+        HermezChatPalette.useThemeId('hermez_red');
+        await pump(tester, fixture(kind), [], brightness: brightness);
+        final palette = HermezChatPalette.forBrightness(brightness);
+        final surface = tester.widget<HermezSurface>(
+          find.byType(HermezSurface).first,
+        );
+        expect(surface.kind, HermezSurfaceKind.utility);
+        expect(surface.motif, HermezMotif.etched);
+        expect((surface.border as Border).top.color, palette.border);
+        final title = tester.widget<Text>(find.text(kind));
+        expect(title.style?.color, palette.ink);
+        expect(title.style?.fontSize, HermezType.section(palette).fontSize);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  testWidgets(
+    'evidence uses the existing Hermez compartment and preserves full content',
+    (tester) async {
+      await pump(tester, fixture('EvidenceTrail'), []);
+      expect(find.byType(HermezExpandableSection), findsOneWidget);
+      await tester.tap(find.text('Inspection report · Page 8'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('FACT\nObserved staining.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  for (final kind in ['CitationCard', 'DataTable', 'DraftReview']) {
+    String actionPayload() {
+      final messages = fixture(kind)
+          .trim()
+          .split('\n')
+          .map(jsonDecode)
+          .toList();
+      final components = messages[1]['updateComponents']['components'] as List;
+      components[0]['actionChild'] = 'reply';
+      components.addAll([
+        {
+          'id': 'reply',
+          'component': 'Button',
+          'child': 'reply-label',
+          'action': {
+            'event': {
+              'name': 'review.request_edit',
+              'context': {
+                'draftId': 'synthetic-152',
+                'request': 'Reply in chat only',
+              },
+            },
+          },
+        },
+        {
+          'id': 'reply-label',
+          'component': 'Text',
+          'text': 'Request edit in chat',
+        },
+      ]);
+      return messages.map(jsonEncode).join('\n');
+    }
+
+    testWidgets('$kind explicit action carries the correct target once', (
+      tester,
+    ) async {
+      final turns = <String>[];
+      await pump(tester, actionPayload(), turns);
+      await tester.ensureVisible(find.text('Request edit in chat'));
+      await tester.tap(find.text('Request edit in chat'));
+      await tester.pumpAndSettle();
+      expect(turns, hasLength(1));
+      final packet = jsonDecode(
+        turns.single.substring('[A2UI_INTERACTION]\n'.length),
+      );
+      expect(packet['action']['name'], 'review.request_edit');
+      expect(packet['action']['context'], {
+        'draftId': 'synthetic-152',
+        'request': 'Reply in chat only',
+      });
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('$kind explicit action remains locked while busy', (
+      tester,
+    ) async {
+      final turns = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SingleChildScrollView(
+            child: HermesA2uiSurface(
+              payload: actionPayload(),
+              isBusy: true,
+              onInteraction: turns.add,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.ensureVisible(find.text('Request edit in chat'));
+      await tester.tap(find.text('Request edit in chat'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(turns, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
   test('Dart schema and generation schema stay identical', () {
     final file = jsonDecode(
       File('docs/hermes-a2ui-mobile/references/extension-schemas.json')

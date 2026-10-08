@@ -1,8 +1,10 @@
-# Extended native components (build 150+)
+# Extended native components (build 152+)
 
 Put rich objects in a Column, never a Row. Each object requires title (1–120 chars). Controls are local only. Existing Button actions remain separate and require ordinary consent. No arbitrary URL fields are accepted. Optional BeforeAfterViewer beforeMedia + afterMedia and RoomMap backgroundMedia must exactly match image MEDIA directives supplied outside the A2UI fence in this same message. Those previews reuse authenticated downloads; undeclared paths display an unavailable notice and never fetch. The room reference image and geometry diagram are separate.
 
 These fixtures are complete valid examples. Field names and bounds are exact; do not abbreviate them.
+
+Hermez styling is renderer-owned: shared surfaces, type, full outlines and spring compartments. CitationCard, DataTable and DraftReview accept an optional `actionChild` (existing Button/Column component ID, 1–128 chars). This explicitly starts a normal Hermes reply; it never automatically sends or approves a draft. Buttons stay locked on busy/read-only surfaces. Local table/date/branch/slider choices are presentation only and are not sent as action context. Use existing form bindings or distinct Buttons when Hermes needs a selection. See `review-response-demo.md` for a complete example.
 
 ## CitationCard
 
@@ -26,6 +28,8 @@ Required: title, source, location, excerpt.
 
 Required: title, columns, rows.
 
+All cells remain selectable and untruncated. Records is the mobile-friendly stacked view; Compare columns opens a horizontally scrollable table with shared column headers. Both controls are local.
+
 ```a2ui
 {"version": "v0.9", "createSurface": {"surfaceId": "extension-DataTable", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
 {"version": "v0.9", "updateComponents": {"surfaceId": "extension-DataTable", "components": [{"id": "root", "component": "DataTable", "title": "DataTable", "columns": ["Item", "Cost"], "rows": [["Option A", "$10"], ["Option B", "$20"]]}]}}
@@ -34,6 +38,8 @@ Required: title, columns, rows.
 ## DraftReview
 
 Required: title, recipient, subject, body.
+
+Displays separate To, Subject and Message fields with a DRAFT / NOT SENT label. An optional `actionChild` can request an edit or review in chat; sending still requires explicit consent and the normal Hermes tool path.
 
 ```a2ui
 {"version": "v0.9", "createSurface": {"surfaceId": "extension-DraftReview", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
