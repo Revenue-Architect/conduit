@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-DraftReview", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-DraftReview", "components": [{"id": "root", "component": "DraftReview", "title": "DraftReview", "recipient": "client@example.test", "subject": "Checking in", "body": "Hello, would you like to discuss the proposal?"}]}}

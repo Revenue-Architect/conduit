@@ -15,7 +15,7 @@ Source of truth: `catalog-v0_9-basic.json` and `common-types-v0_9.json` in this 
 |---|---|---|---|
 | Text | text | variant: h1 h2 h3 h4 h5 caption body | Keep short; no paragraphs in cards |
 | Icon | name | | Enum list below |
-| Image | url | fit, variant, description | NOT for Hermes-delivered images — use `MEDIA:` instead |
+| Image | url | fit, variant, description | Unsupported in the no-asset catalog — use authenticated `MEDIA:` instead |
 | Divider | — | axis: horizontal vertical | |
 | Card | child | | Single child id; wrap multiples in a Column |
 | Column | children | justify: start center end spaceBetween spaceAround spaceEvenly stretch; align | `weight` allowed on direct children only |
@@ -80,3 +80,7 @@ In a Row, every structure component needs a positive integer `weight`; they are 
 ## Phone rules recap
 
 - ~300 logical px usable width; keep labels short, stack multiple actions, and keep each action target unambiguous. Use `Row` only for genuinely short, comparable values; use `List` or `Tabs` when that better matches the information. Do not force every question into a status card.
+
+## Extended components
+
+For the 15 additional build-150+ types, read `extended-component-guide.md` and `extension-schemas.json`. The generation checker rejects unsupported properties and inconsistent shapes.

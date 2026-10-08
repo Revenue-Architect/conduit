@@ -27,6 +27,12 @@ import json
 import math
 import re
 import sys
+from pathlib import Path
+
+_EXTENSION_FILE = Path(__file__).parent / "references" / "extension-schemas.json"
+if not _EXTENSION_FILE.exists():
+    _EXTENSION_FILE = Path("/opt/data/skills/software-development/a2ui-mobile/references/extension-schemas.json")
+EXTENSION_SCHEMAS = json.loads(_EXTENSION_FILE.read_text())
 
 CATALOG = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 ACTION_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$")
@@ -92,6 +98,9 @@ STEP_STATES = {"done", "current", "upcoming", "warning", "error"}
 # These supported component types need a bounded, allocated share of horizontal
 # space when placed directly in a Row. MetricTile-only rows remain comparable
 # when each tile has a positive weight; otherwise the client repairs old data.
+ROW_NEVER.update(EXTENSION_SCHEMAS)
+KNOWN.update(EXTENSION_SCHEMAS)
+
 ROW_WIDTH_DEPENDENT = {
     "MetricTile", "MiniChart", "StatusBadge", "Slider", "TextField",
     "ChoicePicker", "DateTimeInput", "Card", "Column", "Row", "List", "Tabs",
@@ -146,6 +155,50 @@ ENUMS = {
         "displayStyle": {"checkbox", "chips"},
     },
 }
+
+
+def _validate_extension(value, schema, path="data"):
+    kind=schema["type"]
+    if kind=="object":
+        if not isinstance(value,dict): raise ValueError(f"{path} must be an object")
+        if set(schema["required"])-set(value): raise ValueError(f"{path} missing required fields")
+        if set(value)-set(schema["properties"]): raise ValueError(f"{path} has unsupported fields")
+        for k,v in value.items(): _validate_extension(v,schema["properties"][k],path+"."+k)
+    elif kind=="array":
+        if not isinstance(value,list) or not schema.get("minItems",0)<=len(value)<=schema["maxItems"]: raise ValueError(f"{path} invalid item count")
+        for i,v in enumerate(value): _validate_extension(v,schema["items"],f"{path}[{i}]")
+    elif kind=="string":
+        if not isinstance(value,str) or not value.strip() or not schema["minLength"]<=len(value)<=schema["maxLength"]: raise ValueError(f"{path} invalid text length")
+    elif kind=="number":
+        if not _num(value) or not schema["minimum"]<=value<=schema["maximum"]: raise ValueError(f"{path} invalid numeric range")
+
+def _extension_semantics(kind,d):
+    from datetime import date
+    if kind=="DataTable" and any(len(r)!=len(d["columns"]) for r in d["rows"]): raise ValueError("row/column counts differ")
+    if kind=="MultiSeriesChart" and any(len(s["values"])!=len(d["labels"]) for s in d["series"]): raise ValueError("series/label counts differ")
+    if kind=="ScenarioSlider" and (not d["min"]<d["max"] or not d["min"]<=d["value"]<=d["max"]): raise ValueError("invalid slider bounds")
+    if kind in {"Agenda","CalendarGrid"}:
+        dates=[date.fromisoformat(e["date"]) for e in d["events"]]
+        if any(not re.fullmatch(r"\d{4}-\d{2}-\d{2}",e["date"]) for e in d["events"]): raise ValueError("date requires YYYY-MM-DD")
+        if kind=="CalendarGrid" and (max(dates)-min(dates)).days>6: raise ValueError("calendar must fit one supplied seven-day window")
+    if kind in {"DecisionTree","RelationshipMap"}:
+        nodes={n["id"]:n for n in d["nodes"]}
+        if len(nodes)!=len(d["nodes"]): raise ValueError("duplicate node ids")
+        if kind=="RelationshipMap":
+            if any(e["source"] not in nodes or e["target"] not in nodes for e in d["edges"]): raise ValueError("missing edge endpoint")
+        else:
+            visited=set()
+            def walk(node,active,depth):
+                if node not in nodes or node in active or depth>12: raise ValueError("missing node, cycle or excessive tree depth")
+                if node in visited:return
+                for o in nodes[node]["options"]: walk(o["target"],active|{node},depth+1)
+                visited.add(node)
+            walk(d["start"],set(),0)
+            if len(visited)!=len(nodes):raise ValueError("unreachable decision nodes")
+    if kind=="BeforeAfterViewer" and (("beforeMedia" in d)!=("afterMedia" in d)): raise ValueError("both image references are required together")
+    if kind=="RoomMap":
+        if len({r["id"] for r in d["rooms"]})!=len(d["rooms"]): raise ValueError("duplicate room ids")
+        if any(r["x"]+r["width"]>1.000001 or r["y"]+r["height"]>1.000001 for r in d["rooms"]): raise ValueError("room outside supplied geometry")
 
 
 def _num(v):
@@ -241,6 +294,13 @@ def check_components(name, comps, errors, warnings):
                         for k, v in context.items()
                     ):
                         errors.append(f"{name}: Button {cid!r} event context contains an unsafe value")
+        if ctype in EXTENSION_SCHEMAS:
+            data = {k:v for k,v in c.items() if k not in {"id", "component", "weight"}}
+            try:
+                _validate_extension(data, EXTENSION_SCHEMAS[ctype])
+                _extension_semantics(ctype, data)
+            except (ValueError, KeyError, TypeError) as e:
+                errors.append(f"{name}: {ctype} {cid!r}: {e}")
         if ctype in STRUCTURE_PROPS:
             spec = STRUCTURE_PROPS[ctype]
             for prop in set(c) - {"id", "component", "weight"} - set(spec):

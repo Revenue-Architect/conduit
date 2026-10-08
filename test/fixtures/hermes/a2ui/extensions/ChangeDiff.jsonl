@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-ChangeDiff", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-ChangeDiff", "components": [{"id": "root", "component": "ChangeDiff", "title": "ChangeDiff", "before": "Listen on LAN\nKeep logs", "after": "Listen locally\nKeep logs"}]}}

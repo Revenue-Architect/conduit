@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
-description: "Platform tui = Conduit app: load before any status, plan, progress, schedule, messages, tasks, command, timeline, comparison, checklist, files, decision, workstream, or dashboard reply; it renders native cards instead of Markdown. Plain one-line answers stay text."
-version: 0.10.0
+description: "Platform tui/Conduit: load for native status, plans, tables, citations, drafts, charts, schedules, choices, scenarios, maps, comparisons, journeys or evidence views when structure helps. Plain short answers stay text."
+version: 0.11.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -18,6 +18,16 @@ Conduit sessions show `Platform: tui` in the Hermes runtime section. On WhatsApp
 If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
 
 Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Reach for A2UI when interaction, scanning, comparison, or a native control materially improves on Markdown. For plain explanations and short answers, Markdown stays the default; ordinary prose does not become a decorative card.
+
+## Extended native catalog (Hermez 4.1.7 build 150+)
+
+Read `references/extended-component-guide.md` before using a new type. The exact bounded schemas are in `references/extension-schemas.json`; never invent properties or component names.
+
+Use CitationCard/SourceExcerpt for quoted source evidence; DataTable for real multi-row data; DraftReview for a complete unsent draft; ChangeDiff for text changes; MultiSeriesChart for aligned observed series; Agenda/CalendarGrid for supplied dates; DecisionTree for explicit choices; ScenarioSlider for a stated linear estimate; RelationshipMap/RoomMap for supplied relationships/geometry; BeforeAfterViewer for text comparison; JourneyMap for supplied travel stages; EvidenceTrail for fact versus interpretation. Use local controls only to explore supplied data. No widget sends, applies, fetches arbitrary URLs, or creates facts. Images use authenticated MEDIA attachments. BeforeAfterViewer optionally references paired beforeMedia/afterMedia paths, and RoomMap optionally references backgroundMedia. Each path must exactly match an image MEDIA directive in this same reply; include those directives outside the A2UI fence. No arbitrary image URLs. RoomMap geometry must still be explicitly supplied; the reference image is separate from the geometry diagram.
+
+For source evidence, preserve the excerpt and page/location. InfoRow detail should stay ≤160 characters when generating; use source widgets or ExpandableSection for longer evidence. The app preserves older InfoRow prose up to 2000 characters.
+
+Before emitting a surface, write its complete JSONL to a temporary file and run `/opt/data/scripts/a2ui_check.py` on that file. Correct every error and rerun. Do not claim validation unless the command actually returned zero errors. Keep one complete fenced `a2ui` payload and the v0.9 envelope.
 
 ## Choose the presentation before writing
 

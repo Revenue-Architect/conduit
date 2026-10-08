@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-RelationshipMap", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-RelationshipMap", "components": [{"id": "root", "component": "RelationshipMap", "title": "RelationshipMap", "nodes": [{"id": "a", "label": "Project", "detail": "Provided project context"}, {"id": "b", "label": "Client", "detail": "Provided client context"}], "edges": [{"source": "a", "target": "b", "label": "owned by"}]}]}}

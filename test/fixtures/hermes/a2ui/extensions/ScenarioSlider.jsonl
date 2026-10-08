@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-ScenarioSlider", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-ScenarioSlider", "components": [{"id": "root", "component": "ScenarioSlider", "title": "ScenarioSlider", "inputLabel": "Hours", "unit": "USD", "min": 0, "max": 10, "value": 2, "multiplier": 20, "offset": 5, "assumptions": "Estimate = hours \u00d7 $20 + $5. No taxes included."}]}}

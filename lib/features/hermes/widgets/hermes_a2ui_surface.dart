@@ -6,6 +6,7 @@ import 'package:genui/genui.dart';
 import '../services/hermes_a2ui_layout_normalizer.dart';
 import 'hermes_a2ui_interaction_lock.dart';
 import 'hermes_visual_catalog.dart';
+import 'hermes_a2ui_media_scope.dart';
 import 'hermez_visual_theme.dart';
 
 /// Renders the completed body of one Hermes `a2ui` fence as native widgets.
@@ -16,11 +17,13 @@ class HermesA2uiSurface extends StatefulWidget {
     required this.payload,
     this.onInteraction,
     this.isBusy = false,
+    this.mediaPreview,
   });
 
   final String payload;
   final FutureOr<void> Function(String interactionPrompt)? onInteraction;
   final bool isBusy;
+  final Widget Function(String path)? mediaPreview;
 
   @override
   State<HermesA2uiSurface> createState() => _HermesA2uiSurfaceState();
@@ -62,7 +65,8 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
     final generation = ++_renderGeneration;
     // Keep the built-in asset widgets unavailable: they can fetch arbitrary
     // agent-supplied URLs. Hermes MEDIA uses Conduit's authenticated client.
-    // The added visual items render bounded data only and do no I/O.
+    // The added builders render bounded data. Optional MEDIA previews are
+    // scoped by the parent to images declared in this same message.
     final catalog = createHermesVisualCatalog();
     final normalized = normalizeHermesA2uiPayload(payload, catalog: catalog);
     if (!normalized.isReady) {
@@ -201,6 +205,9 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
         ),
       ),
     );
-    return Theme(data: hermezVisualTheme(Theme.of(context)), child: surface);
+    return HermesA2uiMediaScope(
+      preview: widget.mediaPreview,
+      child: Theme(data: hermezVisualTheme(Theme.of(context)), child: surface),
+    );
   }
 }

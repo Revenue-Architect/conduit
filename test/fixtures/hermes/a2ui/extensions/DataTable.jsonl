@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-DataTable", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-DataTable", "components": [{"id": "root", "component": "DataTable", "title": "DataTable", "columns": ["Item", "Cost"], "rows": [["Option A", "$10"], ["Option B", "$20"]]}]}}

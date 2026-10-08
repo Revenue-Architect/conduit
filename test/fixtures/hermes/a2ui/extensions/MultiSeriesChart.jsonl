@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-MultiSeriesChart", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-MultiSeriesChart", "components": [{"id": "root", "component": "MultiSeriesChart", "title": "MultiSeriesChart", "labels": ["Mon", "Tue", "Wed"], "unit": "ms", "series": [{"label": "A", "values": [5, 8, 6]}, {"label": "B", "values": [8, 4, 9]}]}]}}

@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-DecisionTree", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-DecisionTree", "components": [{"id": "root", "component": "DecisionTree", "title": "DecisionTree", "start": "a", "nodes": [{"id": "a", "label": "Choose a route", "detail": "Two supplied choices.", "options": [{"label": "Explore", "target": "b"}]}, {"id": "b", "label": "Selected route", "detail": "This is a local choice only.", "options": []}]}]}}

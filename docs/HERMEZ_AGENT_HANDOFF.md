@@ -925,3 +925,59 @@ Verified the previous 204-character failure first, then 51 focused structure/nor
 ARM64 debug APK built and installed in place at 12:29 Toronto. Version 4.1.7/149, unchanged package/signing configuration. SHA256 d0386128368a7d05630b166d247b0cf4685b785762e03d3de4940f722c770057. On the actual phone, reopened the saved inspection conversation and observed water-intrusion and attic details with full page references; credentials and chats remain available. Existing KGP and untranslated-message warnings remain unrelated build warnings.
 
 Private reply and device UI diagnostics stay outside Git. Prior APK 148 preserved in work/diagnostics/hermez-before-a2ui-149.apk.
+
+## 2026-10-08 — Expanded A2UI catalog and wireless device acceptance (APK 151)
+
+Added all 15 requested component types: CitationCard, SourceExcerpt, DataTable,
+DraftReview, ChangeDiff, MultiSeriesChart, Agenda, CalendarGrid, DecisionTree,
+ScenarioSlider, RelationshipMap, RoomMap, BeforeAfterViewer, JourneyMap and
+EvidenceTrail. Existing components and v0.9 transport remain intact. No new
+dependencies, backend, database or service restart. Payload/component/depth bounds
+remain enforced; schemas and the authoring checker share a canonical definition.
+
+Selections, sliders and expansions are local controls. Drafts remain unsent;
+ChangeDiff is a changed-span preview, not an applicable patch. ScenarioSlider
+supports only supplied input × multiplier + offset. RoomMap uses supplied geometry
+and optional separate reference imagery, not inferred measurements or image overlays.
+Images must match image MEDIA directives outside the A2UI fence in the same reply
+and use the existing authenticated attachment client. Unmatched references show
+an unavailable notice rather than opening an arbitrary URL.
+
+**Actual native finding and correction:** build 150 passed 158 focused checks but
+failed inside the phone's real chat bubble: ChoiceChip/ExpansionTile lacked a
+Material ancestor. Build 151 supplies one at the extension boundary. The 37
+extension checks now also run without a Scaffold/Material parent, matching that
+embedding. Targeted analysis is clean; prior attachment, event-lock, layout and
+saved-reply regression checks passed. Existing KGP/i18n build warnings remain.
+
+**Wireless S25 Ultra acceptance:** installed version 4.1.7/151 in place around
+13:50 Toronto. Both saved settings and encrypted credential files matched their
+pre-install SHA256 fingerprints byte-for-byte. Reopened the existing synthetic
+demo reply, without rewriting stored messages. Verified Agenda and CalendarGrid
+date selection (Planning → Review), Before/After image and description switching,
+DecisionTree select/reset, ScenarioSlider recomputation, RelationshipMap client
+selection, RoomMap office selection, EvidenceTrail expansion and document/page
+citations. Blue/green synthetic images loaded through the authenticated client.
+Eighteen captured UI states had zero error tiles; current-process logs had zero
+Material, fatal, widget-exception or RenderFlex-overflow markers. Server counts
+stayed at 16 messages / one user turn throughout the local interactions. This is
+representative device acceptance, not exhaustive production-data certification.
+
+APK SHA256: `60b34aac28102796455d9c753ff6ca102aafd1552d5186943085a622a13cf3df`.
+Known-good prior build 149 is preserved outside Git at
+`work/diagnostics/hermez-before-a2ui-150.apk`; do not use build 150 as rollback.
+
+**Profile guidance:** skill 0.11.0 and its schemas, checker, detailed guide and
+synthetic demos deployed and loaded through native skill_view in all seven actual
+profiles: default, kai, local, strong, fast, autopilot and hermuse. Only Hermuse's
+SOUL required an appended Conduit platform/skill-loading instruction; the other
+six SOUL files are byte-identical to their backups. Model, routing, auth and
+Composio configuration were preserved. Backup:
+`/opt/data/backups/a2ui-catalog150-20261008T165720Z`.
+
+To reproduce in the app: ask Hermes to load `a2ui-mobile`, read its
+`references/catalog-demo.md`, validate the matching `catalog-demo.jsonl`, and
+return the MEDIA lines plus complete A2UI fence unchanged. Specify synthetic
+examples only and no emails, reminders or commitments. Diagnostics/screenshots
+remain outside Git. A helper's inventory output exposed a Composio key; the
+affected Hermuse key needs rotation separately, without copying it into reports.

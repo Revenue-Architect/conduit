@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-JourneyMap", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-JourneyMap", "components": [{"id": "root", "component": "JourneyMap", "title": "JourneyMap", "stages": [{"label": "Arrival", "time": "09:00", "place": "Station", "cost": "$5", "detail": "Walk to the meeting."}]}]}}

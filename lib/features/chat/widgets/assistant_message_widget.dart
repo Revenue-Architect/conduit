@@ -60,6 +60,7 @@ import '../../hermes/services/hermes_media_parser.dart';
 import '../../hermes/services/hermes_rich_output_parser.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/widgets/hermes_a2ui_surface.dart';
+import '../../hermes/widgets/hermes_a2ui_media_scope.dart';
 import '../../hermes/widgets/hermes_artifact_view.dart';
 import '../../hermes/widgets/hermez_bot_mark.dart';
 
@@ -696,6 +697,15 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final sessionId = validateHermesOpaqueIdentifier(
       _chatMessage?.metadata?['hermesSessionId'],
     );
+    // Only image directives already supplied in this same assistant message
+    // may be referenced by a comparison/room visual. Never parse file paths
+    // from an A2UI object's fields into a new download authority.
+    final declaredImages = <String, HermesMediaArtifact>{
+      if (_shouldRenderHermesArtifacts)
+        for (final segment in richSegments.whereType<MarkdownSegment>())
+          for (final artifact in parseHermesMedia(segment.content).artifacts)
+            if (artifact.kind == HermesMediaKind.image) artifact.path: artifact,
+    };
     var segmentIndex = 0;
     for (final segment in richSegments) {
       if (segment is MarkdownSegment) {
@@ -756,6 +766,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           HermesA2uiSurface(
             key: ValueKey<String>('hermes-a2ui:$_messageId:$segmentIndex'),
             payload: segment.content,
+            mediaPreview: (path) => hermesDeclaredImagePreview(
+              path,
+              declaredImages: declaredImages,
+              sessionId: sessionId,
+            ),
             onInteraction: widget.readOnly ? null : _handleFollowUpTap,
             isBusy: _uiTreatsAsStreaming,
           ),
@@ -2167,8 +2182,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               : null,
           sfSymbol: 'chevron.right',
         ),
-      if (_responseCompleted &&
-          ref.watch(spacesConfirmedProvider))
+      if (_responseCompleted && ref.watch(spacesConfirmedProvider))
         _AssistantFooterAction(
           id: 'save_page',
           icon: Icons.post_add_rounded,

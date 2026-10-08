@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-CalendarGrid", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-CalendarGrid", "components": [{"id": "root", "component": "CalendarGrid", "title": "CalendarGrid", "timezone": "America/Toronto", "events": [{"date": "2026-10-08", "time": "09:00", "label": "Planning", "detail": "Review supplied tasks."}, {"date": "2026-10-09", "time": "10:00", "label": "Review", "detail": "Discuss findings."}]}]}}

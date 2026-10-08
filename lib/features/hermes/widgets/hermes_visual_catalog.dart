@@ -8,13 +8,15 @@ import 'package:genui/genui.dart';
 import 'package:json_schema_builder/json_schema_builder.dart';
 
 import 'hermes_visual_personal.dart';
+import 'hermes_visual_extensions.dart';
 import 'hermes_visual_structure.dart';
 import 'hermes_visual_technical.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_visual_theme.dart';
 
 /// Extends GenUI's safe, no-asset basic catalog with app-owned data widgets.
-/// No component in this catalog performs network or filesystem access.
+/// Builders do no I/O; declared MEDIA previews delegate to the existing
+/// authenticated attachment UI through a message-scoped allowlist.
 Catalog createHermesVisualCatalog() {
   return BasicCatalogItems.asNoAssetCatalog().copyWith(
     newItems: [
@@ -26,6 +28,7 @@ Catalog createHermesVisualCatalog() {
       ...hermesStructureCatalogItems,
       ...hermesPersonalCatalogItems,
       ...hermesTechnicalCatalogItems,
+      ...hermesExtensionCatalogItems,
     ],
   );
 }

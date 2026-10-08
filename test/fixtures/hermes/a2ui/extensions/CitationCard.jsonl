@@ -1,0 +1,2 @@
+{"version": "v0.9", "createSurface": {"surfaceId": "extension-CitationCard", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version": "v0.9", "updateComponents": {"surfaceId": "extension-CitationCard", "components": [{"id": "root", "component": "CitationCard", "title": "CitationCard", "source": "Inspection report", "location": "Page 8", "excerpt": "Observed staining.", "finding": "Ask an inspector about the source."}]}}
