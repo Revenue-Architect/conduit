@@ -869,3 +869,49 @@ scope, and tackle the typed connector adapter/device acceptance or baseline
 proactive repairs as distinct work, not redesign Conduit or change model strategy.
 Existing unrelated `graphify-out/` in Conduit and the pre-staged n8n workflow in
 Umbrel config were deliberately preserved outside migration commits.
+
+## 2026-10-08 — LiteLLM choices in the chat model picker
+
+- **Scope:** surgical fix on `feat/hermez-motion-foundation`, based on
+  `7b1fa73b`. No selector redesign, new transport, model-default change or image
+  upgrade. `hermes_desktop_agentic.dart` now sends `refresh: true` with the existing
+  profile/session-scoped `model.options` request. The existing provider retains
+  its one-minute cache; this is not per-frame discovery or polling.
+- **Root cause:** cache-only catalog reads could omit proxy models. The bare
+  custom-endpoint discovery also lacked the credential needed to enumerate this
+  authenticated LiteLLM endpoint. User explicitly approved adding the minimal
+  named provider entry in Hermes.
+- **Runtime configuration, not Git:** added `providers.litellm` to the root and
+  `autopilot`, `fast`, `hermuse`, `kai`, `local`, `strong` configs, using the
+  existing `http://core-litellm:4000/v1` endpoint and existing scoped credentials.
+  Each already-proxied profile retains its own key; root/autopilot reuse the
+  existing Fast-scoped key, never the master key. Parsed config comparisons
+  verified every other setting unchanged. No restart was needed. Private,
+  adjacent originals are named `config.yaml.before-litellm-<UTC stamp>`;
+  credentials and backups must not enter Git. If keys are rotated later, update
+  this named provider too. Rollback can remove only this new provider entry
+  without restoring an entire stale config.
+- **Live checks:** real `model.options` RPC and runtime-provider resolution
+  passed for all seven profiles. Kai/Hermuse expose their permitted
+  `spark-contributor`; the other profiles expose `deepseek-flash`,
+  `mimo-v2.6-pro`, `mimo-v2.6-flash`, `qwen3-30b-a3b`, `glm-flash`. Defaults and
+  fallback chains remain unchanged. No test inference or default-model mutation.
+- **Client QA:** 41 focused agentic-service/transport tests pass, including new
+  discovery and live-session ownership regressions. Targeted Dart analysis and
+  `git diff --check` pass. The device picker showed Strong's LiteLLM group before
+  the APK update. The fresh app launches with an active Hermes chat; final
+  post-update picker inspection was interrupted by concurrent phone use.
+- **APK:** ARM64 debug build passed; installed with `adb install -r` on S25 Ultra
+  at 01:17:44 Toronto, 2026-10-08. Version 4.1.7/148; one Conduit debug package,
+  existing preferences/database/app folders preserved. SHA256:
+  `0cf8e896dff85313ae6ee6e34c9e0dc85fae266b3ae4ac8323cfe6546886e6e0`.
+- **Build caveat:** Windows memory pressure caused failed native/JVM builds.
+  The successful invocation used task-local Gradle options: heap 1536m,
+  metaspace 512m, code cache 192m, `ActiveProcessorCount=2`, one worker,
+  no parallelism, Kotlin in-process, and
+  `-Dorg.gradle.project.android.jetifier.ignorelist=arm64_v8a_debug.*`.
+  The ignored engine archive contains only two native `.so` files, no Java to
+  rewrite. No project/toolchain properties were edited. Existing KGP-plugin
+  future-compatibility warnings remain. Fresh app logs also contain
+  `capability-negotiation-failed`; no matching Flutter/fatal exception was found
+  in the scoped launch check. This is not full-suite or broad device acceptance.

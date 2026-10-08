@@ -134,6 +134,9 @@ extension _HermesDesktopAgentic on HermesDesktopApiService {
         'model.options',
         params: {
           'explicit_only': true,
+          // Probe configured proxies (including LiteLLM), not just the
+          // cache-only row that can contain only the profile's current model.
+          'refresh': true,
           if (live) 'session_id': binding.runtimeId,
           ...scope,
         },

@@ -218,6 +218,94 @@ void main() {
     );
   }
 
+  test('chat picker discovers fresh LiteLLM models for its profile', () async {
+    final (service, gateway) = await _connected();
+    gateway.responder = (method, params) => switch (method) {
+      'model.options' => {
+        'model': 'spark-contributor',
+        'provider': 'custom',
+        'providers': [
+          {
+            'slug': 'litellm',
+            'name': 'LiteLLM',
+            'authenticated': true,
+            // Hermes' normal cache-only read can be empty on first open.
+            'models': params['refresh'] == true
+                ? ['spark-contributor', 'mimo-v2.6-pro']
+                : <String>[],
+          },
+          {
+            'slug': 'unconfigured',
+            'authenticated': false,
+            'models': ['not-selectable'],
+          },
+        ],
+      },
+      _ => const {},
+    };
+
+    final catalog = await service.modelCatalog(profile: 'kai');
+    check(catalog.options.map((option) => option.id))
+        .deepEquals(['spark-contributor', 'mimo-v2.6-pro']);
+    check(catalog.options.every((option) => option.provider == 'litellm'))
+        .isTrue();
+    check(catalog.providerLabel('litellm')).equals('LiteLLM');
+    final request = gateway.calls('model.options').last;
+    check(request['profile']).equals('kai');
+    check(request['explicit_only']).equals(true);
+    check(request.containsKey('session_id')).isFalse();
+    check(gateway.calls('config.set')).isEmpty();
+  });
+
+  test('LiteLLM catalog keeps the live session and owning profile', () async {
+    final (service, gateway) = await _connected();
+    gateway.responder = (method, _) => switch (method) {
+      'session.create' => {
+        'session_id': 'runtime-strong',
+        'stored_session_id': 'stored-strong',
+        'running': false,
+        'info': const {},
+      },
+      'model.options' => {
+        'providers': [
+          {
+            'slug': 'litellm',
+            'name': 'LiteLLM',
+            'authenticated': true,
+            'models': ['mimo-v2.6-pro'],
+          },
+        ],
+      },
+      _ => const {},
+    };
+    final stored = await service.createDesktopSession(
+      options: const HermesDesktopSessionOptions(),
+    );
+    service.bindSessionProfile(stored, 'strong');
+    final catalog = await service.modelCatalog(
+      storedId: stored,
+      profile:
+          'kai', // A stale picker hint must never override session ownership.
+    );
+    check(catalog.options.single.provider).equals('litellm');
+    final request = gateway.calls('model.options').last;
+    check(request['profile']).equals('strong');
+    check(request['session_id']).equals('runtime-strong');
+    check(request['refresh']).equals(true);
+    await service.switchSessionModel(
+      stored,
+      const HermesSessionModelChoice(
+        model: 'mimo-v2.6-pro',
+        provider: 'litellm',
+      ),
+    );
+    final selection = gateway.calls('config.set').single;
+    check(selection['value'])
+        .equals('mimo-v2.6-pro --provider litellm --session');
+    check(selection['session_id']).equals('runtime-strong');
+    check(selection['profile']).equals('strong');
+  });
+
   test(
     'todo.updated keeps the newest plan and ignores stale revisions',
     () async {
