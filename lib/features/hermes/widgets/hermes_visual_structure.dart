@@ -32,6 +32,10 @@ final List<CatalogItem> hermesStructureCatalogItems = [
 
 // ── Schemas ──────────────────────────────────────────────────────────────
 
+// Generation favors compact rows; saved replies may contain longer evidence.
+// Preserve bounded prose verbatim rather than replacing the whole row.
+const _infoRowDisplayDetailLimit = 2000;
+
 const _stateValues = ['ok', 'warning', 'error', 'unknown'];
 const _iconValues = [
   'check',
@@ -58,7 +62,9 @@ final _infoRow = CatalogItem(
         'observed state (icon + word). Use instead of small Markdown tables.',
     properties: {
       'title': S.string(description: 'Short title (≤ 80 chars).'),
-      'detail': S.string(description: 'Optional one-line detail (≤ 160).'),
+      'detail': S.string(
+        description: 'Optional detail; prefer ≤ 160 characters. Wraps up to 2000 characters.',
+      ),
       'meta': S.string(description: 'Optional technical label (≤ 60).'),
       'icon': S.string(enumValues: _iconValues),
       'state': S.string(
@@ -241,14 +247,14 @@ Widget _buildInfoRow(CatalogItemContext context) {
   final data = _props(context);
   final title = _text(data['title'], 80);
   if (title == null ||
-      !_optionalText(data, 'detail', 160) ||
+      !_optionalText(data, 'detail', _infoRowDisplayDetailLimit) ||
       !_optionalText(data, 'meta', 60) ||
       !_optionalEnum(data, 'icon', _iconValues) ||
       !_optionalEnum(data, 'state', _stateValues) ||
       (data.containsKey('compact') && data['compact'] is! bool)) {
     return _invalid(context.buildContext);
   }
-  final detail = _text(data['detail'], 160);
+  final detail = _text(data['detail'], _infoRowDisplayDetailLimit);
   final meta = _text(data['meta'], 60);
   final state = _RowState.parse(data['state']);
   final icon = _iconFor(data['icon']);

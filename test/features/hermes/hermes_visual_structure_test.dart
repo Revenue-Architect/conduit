@@ -149,8 +149,66 @@ void main() {
     }
   });
 
+  for (final length in [177, 204, 2000]) {
+    testWidgets('InfoRow wraps all $length detail characters', (tester) async {
+      final detail = 'Evidence with a complete explanation. '.padRight(
+        length,
+        'x',
+      );
+      await _pump(
+        tester,
+        _payload([
+          {
+            'id': 'root',
+            'component': 'InfoRow',
+            'title': 'Finding',
+            'detail': detail,
+          },
+        ]),
+        width: 320,
+        textScale: 1.5,
+      );
+      expect(find.text('Finding'), findsOneWidget);
+      expect(find.text(detail), findsOneWidget);
+      expect(find.textContaining('Visual unavailable'), findsNothing);
+      final rendered = tester.widget<Text>(find.text(detail));
+      expect(rendered.maxLines, isNull);
+      expect(rendered.overflow, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  final replayPath = Platform.environment['HERMEZ_A2UI_REPLAY'];
+  testWidgets('saved real reply preserves every InfoRow detail', (
+    tester,
+  ) async {
+    final markdown = File(replayPath!).readAsStringSync();
+    final payload = RegExp(
+      r'```a2ui\n(.*?)\n```',
+      dotAll: true,
+    ).firstMatch(markdown)!.group(1)!;
+    final components = payload
+        .split('\n')
+        .map(jsonDecode)
+        .where((message) => message['updateComponents'] != null)
+        .expand((message) => message['updateComponents']['components'] as List)
+        .where((component) => component['component'] == 'InfoRow')
+        .toList();
+    expect(components.length, 6);
+    await _pump(tester, payload, width: 320, textScale: 1.5);
+    for (final component in components) {
+      expect(find.text(component['title'] as String), findsOneWidget);
+      expect(find.text(component['detail'] as String), findsOneWidget);
+    }
+    expect(find.textContaining('Visual unavailable'), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, skip: replayPath == null);
   group('invalid values fall back to a readable notice', () {
     for (final entry in <String, Map<String, Object?>>{
+      'InfoRow detail exceeds display budget': {
+        'component': 'InfoRow',
+        'title': 'x',
+        'detail': 'x' * 2001,
+      },
       'InfoRow missing title': {'component': 'InfoRow', 'detail': 'x'},
       'InfoRow bad state': {
         'component': 'InfoRow',

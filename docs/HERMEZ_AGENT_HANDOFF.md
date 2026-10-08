@@ -915,3 +915,13 @@ Umbrel config were deliberately preserved outside migration commits.
   future-compatibility warnings remain. Fresh app logs also contain
   `capability-negotiation-failed`; no matching Flutter/fatal exception was found
   in the scoped launch check. This is not full-suite or broad device acceptance.
+
+## 2026-10-08 — Preserve long A2UI row evidence (APK 149)
+
+InfoRow details prefer 160 characters for generation but now display up to 2,000 characters verbatim, wrapping without ellipsis. This restores existing saved replies as well as future ones; no message/database rewrite. Other component validation and total payload bounds stay in place.
+
+Verified the previous 204-character failure first, then 51 focused structure/normalizer checks passed, including the exact private saved reply with all six rows, 177/204/2000-character details, 2001 rejection, 320px width and 1.5 text scale. Targeted Dart analysis: no issues.
+
+ARM64 debug APK built and installed in place at 12:29 Toronto. Version 4.1.7/149, unchanged package/signing configuration. SHA256 d0386128368a7d05630b166d247b0cf4685b785762e03d3de4940f722c770057. On the actual phone, reopened the saved inspection conversation and observed water-intrusion and attic details with full page references; credentials and chats remain available. Existing KGP and untranslated-message warnings remain unrelated build warnings.
+
+Private reply and device UI diagnostics stay outside Git. Prior APK 148 preserved in work/diagnostics/hermez-before-a2ui-149.apk.
