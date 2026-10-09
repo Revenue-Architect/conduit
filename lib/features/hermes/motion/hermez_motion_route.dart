@@ -400,8 +400,11 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
     return math.max(0, card.top - top);
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _dragSettle?.dispose();
     _dragOffset.dispose();
     super.dispose();
@@ -452,6 +455,12 @@ mixin HermezRouteTransitions<T> on PageRoute<T> {
         ),
       ),
     };
+    // Flutter announces `didPopNext`, never `didChangeNext(null)`, when the
+    // route above is popped, so a closed sheet stays referenced here. Its push
+    // is still wanted while it closes; once it is disposed its drag notifier
+    // is too, and listening to it threw during layout (seen on device as
+    // `_dependents.isEmpty` after toggling a job or leaving the screen).
+    if (_nextSheet?._disposed ?? false) _nextSheet = null;
     final sheet = _nextSheet;
     return HermezCoveredTransition(
       kind: reducedMotion ? HermezCoverKind.none : _nextCover,
