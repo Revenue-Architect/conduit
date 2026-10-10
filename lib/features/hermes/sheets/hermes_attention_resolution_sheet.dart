@@ -175,6 +175,7 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
             children: [
               HermezBotMark(
                 identity: hermezIdentityForName(profile),
+                botName: profile,
                 size: 48,
                 label: botName,
               ),

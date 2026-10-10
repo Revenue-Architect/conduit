@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/hermes_bot.dart';
+import 'hermez_bot_icons.dart';
 
 /// Visual identity only. Derived from the profile name, not from capabilities.
 enum HermezBotIdentity { neutral, kai, local, autopilot, fast, strong }
@@ -35,9 +36,14 @@ class HermezBotMark extends StatelessWidget {
     required this.identity,
     this.size = 44,
     this.label,
+    this.botName,
   });
 
   final HermezBotIdentity identity;
+
+  /// The bot's profile name: picks up a custom icon set for it, and a long
+  /// press opens the icon picker.
+  final String? botName;
   final double size;
   final String? label;
 
@@ -47,15 +53,35 @@ class HermezBotMark extends StatelessWidget {
     final pixels = (size * MediaQuery.devicePixelRatioOf(context)).round();
     return Semantics(
       label: label == null ? 'Bot' : 'Bot $label',
-      child: SizedBox.square(
-        dimension: size,
-        child: Image.asset(
-          hermezBotMarkAssets[identity]!,
-          fit: BoxFit.contain,
-          cacheWidth: pixels > 0 ? pixels : null,
-          filterQuality: FilterQuality.medium,
-          gaplessPlayback: true,
-          excludeFromSemantics: true,
+      child: GestureDetector(
+        onLongPress: botName == null
+            ? null
+            : () => HermezBotIcons.showPicker(context, botName!),
+        child: SizedBox.square(
+          dimension: size,
+          child: ValueListenableBuilder(
+            valueListenable: HermezBotIcons.assigned,
+            builder: (context, _, _) {
+              final custom = HermezBotIcons.iconFor(botName);
+              return custom != null
+                  ? Image.file(
+                      custom,
+                      fit: BoxFit.contain,
+                      cacheWidth: pixels > 0 ? pixels : null,
+                      filterQuality: FilterQuality.medium,
+                      gaplessPlayback: true,
+                      excludeFromSemantics: true,
+                    )
+                  : Image.asset(
+                      hermezBotMarkAssets[identity]!,
+                      fit: BoxFit.contain,
+                      cacheWidth: pixels > 0 ? pixels : null,
+                      filterQuality: FilterQuality.medium,
+                      gaplessPlayback: true,
+                      excludeFromSemantics: true,
+                    );
+            },
+          ),
         ),
       ),
     );

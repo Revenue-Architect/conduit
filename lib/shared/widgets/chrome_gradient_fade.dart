@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 
@@ -59,6 +59,22 @@ class ConduitChromeGradientFade extends StatelessWidget {
   /// floating controls.
   final double? blurExtent;
 
+  /// The frost shader, once loaded. Until then, and where shader filters are
+  /// unsupported (widget tests), the frost falls back to sliced blurs.
+  static final ValueNotifier<ui.FragmentProgram?> _frostProgram = ValueNotifier(
+    null,
+  );
+  static bool _frostRequested = false;
+
+  /// Starts loading the frost shader; safe to call more than once.
+  static void precacheFrost() {
+    if (_frostRequested || !ui.ImageFilter.isShaderFilterSupported) return;
+    _frostRequested = true;
+    ui.FragmentProgram.fromAsset(
+      'shaders/hermez_progressive_blur.frag',
+    ).then((program) => _frostProgram.value = program, onError: (Object _) {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final baseColor = backgroundColor ?? context.conduitTheme.surfaceBackground;
@@ -93,18 +109,92 @@ class ConduitChromeGradientFade extends StatelessWidget {
         width: double.infinity,
         child: blurSigma <= 0
             ? gradient
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  _ProgressiveBlur(
-                    edge: edge,
-                    sigma: blurSigma,
-                    extent: (blurExtent ?? height).clamp(0.0, height),
-                    total: height,
-                  ),
-                  gradient,
-                ],
-              ),
+            : Stack(fit: StackFit.expand, children: [_frost(height), gradient]),
+      ),
+    );
+  }
+
+  Widget _frost(double height) {
+    final extent = (blurExtent ?? height).clamp(0.0, height);
+    Widget sliced() => _ProgressiveBlur(
+      edge: edge,
+      sigma: blurSigma,
+      extent: extent,
+      total: height,
+    );
+    // The shader measures from the screen's top edge, so it serves a top
+    // edge only; a bottom frost keeps the sliced version.
+    if (edge != ConduitChromeFadeEdge.top) return sliced();
+    precacheFrost();
+    return ValueListenableBuilder<ui.FragmentProgram?>(
+      valueListenable: _frostProgram,
+      builder: (context, program, _) => program == null
+          ? sliced()
+          : _ShaderFrost(program: program, sigma: blurSigma, extent: extent),
+    );
+  }
+}
+
+/// One continuous frost: a separable Gaussian whose radius eases from full
+/// at the edge to nothing at [extent], with no slices and no visible line.
+/// Two passes (horizontal, vertical) whatever its size.
+class _ShaderFrost extends StatefulWidget {
+  const _ShaderFrost({
+    required this.program,
+    required this.sigma,
+    required this.extent,
+  });
+
+  final ui.FragmentProgram program;
+  final double sigma;
+  final double extent;
+
+  /// How long the frost takes to dissolve, ending at [extent].
+  static const feather = 56.0;
+
+  @override
+  State<_ShaderFrost> createState() => _ShaderFrostState();
+}
+
+class _ShaderFrostState extends State<_ShaderFrost> {
+  late final ui.FragmentShader _horizontal = widget.program.fragmentShader();
+  late final ui.FragmentShader _vertical = widget.program.fragmentShader();
+
+  @override
+  void dispose() {
+    _horizontal.dispose();
+    _vertical.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final end = widget.extent * dpr;
+    final full = math.max(0.0, widget.extent - _ShaderFrost.feather) * dpr;
+    // Uniform 0-1 is the texture size, set by the engine.
+    void configure(ui.FragmentShader shader, double dx, double dy) => shader
+      ..setFloat(2, widget.sigma * dpr)
+      ..setFloat(3, full)
+      ..setFloat(4, end)
+      ..setFloat(5, dx)
+      ..setFloat(6, dy);
+    configure(_horizontal, 1, 0);
+    configure(_vertical, 0, 1);
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        height: widget.extent,
+        width: double.infinity,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.compose(
+              outer: ui.ImageFilter.shader(_vertical),
+              inner: ui.ImageFilter.shader(_horizontal),
+            ),
+            child: const SizedBox.expand(),
+          ),
+        ),
       ),
     );
   }
@@ -150,7 +240,7 @@ class _ProgressiveBlur extends StatelessWidget {
             ? null
             : ClipRect(
                 child: BackdropFilter.grouped(
-                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                  filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                   child: const SizedBox.expand(),
                 ),
               ),

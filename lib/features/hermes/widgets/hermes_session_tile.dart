@@ -103,6 +103,7 @@ class HermesSessionTile extends ConsumerWidget {
                 children: [
                   HermezBotMark(
                     identity: hermezIdentityForName(session.profile),
+                    botName: session.profile,
                     size: 32,
                     label: session.profile,
                   ),

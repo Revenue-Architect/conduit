@@ -212,6 +212,7 @@ class HermesBotKnowledgeSection extends ConsumerWidget {
     dimension: 44,
     child: HermezBotMark(
       identity: hermezIdentityForName(profile),
+      botName: profile,
       size: 44,
       label: botTitle,
     ),

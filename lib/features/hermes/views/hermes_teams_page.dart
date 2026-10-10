@@ -89,6 +89,7 @@ class HermesTeamMarks extends StatelessWidget {
               left: step * i,
               child: HermezBotMark(
                 identity: hermezIdentityForName(shown[i].profile),
+                botName: shown[i].profile,
                 size: size,
                 label: shown[i].label,
               ),
@@ -382,6 +383,7 @@ class _BotChoice extends StatelessWidget {
           children: [
             HermezBotMark(
               identity: hermezIdentityForName(bot.name),
+              botName: bot.name,
               size: 34,
               label: bot.title,
             ),
@@ -1035,6 +1037,7 @@ class _MemberLine extends StatelessWidget {
         children: [
           HermezBotMark(
             identity: hermezIdentityForName(member?.profile),
+            botName: member?.profile,
             size: 30,
             label: member?.label,
           ),
@@ -1114,6 +1117,7 @@ class _ThinkingRow extends StatelessWidget {
         children: [
           HermezBotMark(
             identity: hermezIdentityForName(member.profile),
+            botName: member.profile,
             size: 30,
             label: member.label,
           ),
@@ -1188,6 +1192,7 @@ class _MemberLiveCardState extends State<_MemberLiveCard> {
         children: [
           HermezBotMark(
             identity: hermezIdentityForName(widget.member.profile),
+            botName: widget.member.profile,
             size: 30,
             label: widget.member.label,
           ),

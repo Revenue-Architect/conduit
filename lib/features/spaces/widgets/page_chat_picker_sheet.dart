@@ -68,6 +68,7 @@ Widget _pickerRow(
     children: [
       HermezBotMark(
         identity: hermezIdentityForBot(bot),
+        botName: bot.name,
         size: 36,
         label: bot.title,
       ),

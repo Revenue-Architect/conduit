@@ -75,6 +75,7 @@ class _CompletedRunSheet extends StatelessWidget {
               _Fact(
                 leading: HermezBotMark(
                   identity: hermezIdentityForName(profile),
+                  botName: profile,
                   size: 40,
                   label: profile ?? 'Hermes',
                 ),

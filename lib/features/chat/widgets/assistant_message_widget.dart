@@ -958,6 +958,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final Widget leading = _isHermesAssistantMessage
         ? HermezBotMark(
             identity: hermezIdentityForName(modelName),
+            botName: modelName,
             size: 22,
             label: modelName,
           )

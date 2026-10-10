@@ -139,6 +139,7 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
         alignment: Alignment.center,
         child: HermezBotMark(
           identity: hermezIdentityForName(widget.profile),
+          botName: widget.profile,
           size: 52,
           label: widget.profile,
         ),

@@ -236,6 +236,7 @@ class _BotGroup extends StatelessWidget {
               if (bot != null) ...[
                 HermezBotMark(
                   identity: hermezIdentityForBot(bot),
+                  botName: bot.name,
                   size: 24,
                   label: bot.title,
                 ),

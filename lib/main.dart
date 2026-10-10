@@ -45,6 +45,9 @@ import 'features/release_notes/release_notes_coordinator.dart';
 import 'features/release_notes/data/release_notes_repository.dart';
 import 'features/release_notes/release_notes_presenter.dart';
 import 'l10n/conduit_localizations.dart';
+import 'features/hermes/widgets/hermez_bot_icons.dart';
+import 'shared/widgets/chrome_gradient_fade.dart';
+import 'shared/widgets/hermez_stretch_overscroll.dart';
 import 'shared/widgets/legacy_design_compatibility.dart';
 import 'features/tools/providers/tools_providers.dart';
 import 'features/workspace/providers/workspace_capabilities_provider.dart';
@@ -133,6 +136,9 @@ void main() {
       // Conduit intentionally owns separate direct-local and per-server files.
       driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
       RasterMediaPolicy.configureGlobalImageCache();
+      // Load the frost shader before the chat's first frame needs it.
+      ConduitChromeGradientFade.precacheFrost();
+      unawaited(HermezBotIcons.load());
       // Measure the complete Dart-side startup path, including the first plugin
       // calls. Package metadata is not required to paint the auth/theme shell;
       // ConduitUserAgent has a safe fallback until this best-effort update lands.
@@ -995,8 +1001,11 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
         final resolved = _resolveSupportedLocale(deviceLocales, supported);
         return resolved ?? supported.first;
       },
-      material: (_, _) =>
-          const MaterialAppData(debugShowCheckedModeBanner: false),
+      material: (_, _) => const MaterialAppData(
+        debugShowCheckedModeBanner: false,
+        // Android stretch overscroll without the offscreen layer.
+        scrollBehavior: HermezScrollBehavior(),
+      ),
       cupertino: (_, _) =>
           const CupertinoAppData(debugShowCheckedModeBanner: false),
       builder: (context, child) {

@@ -615,6 +615,7 @@ class _BotChoice extends StatelessWidget {
         children: [
           HermezBotMark(
             identity: hermezIdentityForBot(bot),
+            botName: bot.name,
             size: 40,
             label: bot.title,
           ),

@@ -85,6 +85,7 @@ class _HermesBotAvatarState extends State<HermesBotAvatar>
       child: RepaintBoundary(
         child: HermezBotMark(
           identity: hermezIdentityForName(widget.label),
+          botName: widget.label,
           size: widget.size,
           label: widget.label,
         ),

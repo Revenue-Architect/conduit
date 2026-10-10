@@ -184,6 +184,7 @@ class _AwayCard extends ConsumerWidget {
               _AwayRow(
                 leading: HermezBotMark(
                   identity: hermezIdentityForName(session.profile),
+                  botName: session.profile,
                   size: 26,
                   label: session.profile,
                 ),
