@@ -202,6 +202,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Input needed'), findsOneWidget);
+    expect(
+      tester.widget<ThinkingOrb>(find.byType(ThinkingOrb)).state,
+      OrbState.listening,
+    );
     expect(find.text('Which city?'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
     await tester.pumpAndSettle();

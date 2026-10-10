@@ -1152,3 +1152,29 @@ Pre-existing A2UI skill edits and probe/graphify files were left untouched.
   is automated. This young package uses a display-rate painter unlike the old
   low-frequency orbit; assess device performance if future changes enlarge it
   or add multiple instances. Existing plugin/translation warnings remain.
+
+## 2026-10-10 — all nine Thinking Orbs variants, profile build 161
+
+- Added pure `hermesThinkingOrbState` selection in the inline surface. It uses
+  existing paired activity rows and structured tool names/families, never titles,
+  prompts, time-based cycling or another transport. Unknown activity is working;
+  an active run between closed tools is breathing; recovery is connecting.
+- Retrieval/search/read tools use searching; command/code tools use solving;
+  delegation/memory use weaving; file/page/message writes use composing;
+  plan/image/schedule tools use shaping; browser tools use connecting.
+  Pending session decisions take precedence with orange listening, while the
+  visible Input needed label and existing resolution flow remain intact.
+  Listening here means awaiting input, not claiming microphone capture. These
+  are visual treatments of activity families, not authoritative new run phases.
+- All nine modes are reachable, not forcibly displayed on every run. Existing
+  compact tap target, session ownership, lifecycle/reduced-motion behavior,
+  completion hiding, non-Hermes UI and run controls are unchanged.
+- 68 focused tests passed, including all-mode reachability, structured tool
+  mappings, attention/recovery precedence, closed-tool fallback and existing
+  action/browser/decision/streaming regressions. Focused analysis of three files
+  reports no issues; formatting and diff checks passed.
+- ARM64 profile APK 161 built and installed using wireless ADB `install -r`;
+  app reopened and version code 161 verified. Icon assignment hash is unchanged.
+  APK SHA256: `91511e40a3dfbed3b8f9e633d5bbbd061e9ca73a9572cc3412f5f39115d78e8a`.
+  No live chat was sent and no all-variant phone visual acceptance was performed;
+  mode/interaction validation is automated. No backend/dependency changes.

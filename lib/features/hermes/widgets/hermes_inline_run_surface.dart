@@ -42,6 +42,55 @@ bool hermesRunUsedBrowser(HermesRunSummary run) => run.tools.any(
   (tool) => RegExp('browser|steel', caseSensitive: false).hasMatch(tool.name),
 );
 
+/// Animation treatments, not additional backend states. Only structured tool
+/// names/families and paired live rows select a mode; never prompt/title text.
+@visibleForTesting
+OrbState hermesThinkingOrbState({
+  required HermesDesktopTurnState turnState,
+  required bool attention,
+  required List<HermesActivityRow> rows,
+}) {
+  if (attention) return OrbState.listening;
+  if (turnState != HermesDesktopTurnState.running) return OrbState.connecting;
+  final active = rows.where(
+    (row) => row.state == HermesActivityRowState.running,
+  );
+  if (active.isEmpty) {
+    return rows.isEmpty ? OrbState.working : OrbState.breathing;
+  }
+  final row = active.last;
+  return switch (row.family) {
+    HermesActivityFamily.search ||
+    HermesActivityFamily.web ||
+    HermesActivityFamily.tools => OrbState.searching,
+    HermesActivityFamily.command ||
+    HermesActivityFamily.code ||
+    HermesActivityFamily.review => OrbState.solving,
+    HermesActivityFamily.delegate ||
+    HermesActivityFamily.memory => OrbState.weaving,
+    HermesActivityFamily.plan ||
+    HermesActivityFamily.image ||
+    HermesActivityFamily.schedule => OrbState.shaping,
+    HermesActivityFamily.message => OrbState.composing,
+    HermesActivityFamily.ask => OrbState.listening,
+    HermesActivityFamily.browser => OrbState.connecting,
+    HermesActivityFamily.file =>
+      const {
+            'write_file',
+            'patch',
+            'file_edit',
+            'edit_file',
+          }.contains(row.toolName)
+          ? OrbState.composing
+          : OrbState.searching,
+    HermesActivityFamily.page =>
+      const {'spaces_create_page', 'spaces_edit_page'}.contains(row.toolName)
+          ? OrbState.composing
+          : OrbState.searching,
+    HermesActivityFamily.other => OrbState.working,
+  };
+}
+
 class HermesInlineRunSurface extends ConsumerStatefulWidget {
   const HermesInlineRunSurface({
     super.key,
@@ -486,21 +535,21 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                                 SizedBox.square(
                                   dimension: 48,
                                   child: Center(
-                                    child: attention
-                                        ? HermezStatusMorph(
-                                            state: HermezMorphState.attention,
-                                            size: 28,
-                                          )
-                                        : ThinkingOrb(
-                                            size: OrbSize.size20,
-                                            state: working
-                                                ? OrbState.working
-                                                : OrbState.connecting,
-                                            color: palette.muted,
-                                            paused:
-                                                !_appForeground ||
-                                                !HermezLiveMotion.on(context),
-                                          ),
+                                    child: ThinkingOrb(
+                                      size: OrbSize.size20,
+                                      state: hermesThinkingOrbState(
+                                        turnState: widget.turnState,
+                                        attention: attention,
+                                        rows: rows,
+                                      ),
+                                      semanticLabel: title,
+                                      color: attention
+                                          ? palette.accent
+                                          : palette.muted,
+                                      paused:
+                                          !_appForeground ||
+                                          !HermezLiveMotion.on(context),
+                                    ),
                                   ),
                                 ),
                                 if (attention || !working)
