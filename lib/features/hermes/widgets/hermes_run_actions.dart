@@ -15,6 +15,7 @@ class HermezRunPill extends StatelessWidget {
     required this.label,
     required this.icon,
     this.onTap,
+    this.onOpen,
     this.emphasized = false,
     this.quiet = false,
     this.busy = false,
@@ -23,6 +24,7 @@ class HermezRunPill extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
+  final ValueChanged<HermezMorphOrigin?>? onOpen;
   final bool emphasized;
   final bool quiet;
   final bool busy;
@@ -44,7 +46,7 @@ class HermezRunPill extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final enabled = onTap != null && !busy;
+    final enabled = (onTap != null || onOpen != null) && !busy;
     final dark = emphasized;
     final foreground = dark
         ? const Color(0xFFF6F5F2)
@@ -56,6 +58,10 @@ class HermezRunPill extends StatelessWidget {
       semanticLabel: label,
       enabled: enabled,
       onTap: onTap,
+      onOpen: onOpen,
+      originRadius: 999,
+      originColor: dark ? const Color(0xFF17181C) : palette.canvas,
+      originBorderColor: quiet ? null : palette.border,
       child: Container(
         constraints: const BoxConstraints(minHeight: minHeight),
         padding: padding,

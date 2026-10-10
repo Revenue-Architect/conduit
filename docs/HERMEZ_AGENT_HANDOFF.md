@@ -1178,3 +1178,73 @@ Pre-existing A2UI skill edits and probe/graphify files were left untouched.
   APK SHA256: `91511e40a3dfbed3b8f9e633d5bbbd061e9ca73a9572cc3412f5f39115d78e8a`.
   No live chat was sent and no all-variant phone visual acceptance was performed;
   mode/interaction validation is automated. No backend/dependency changes.
+
+## 2026-10-10 — saved conversation Run details and shared panel morph, build 162
+
+### What changed
+
+- Run details still uses `HermesLiveRunPage`; there is no second detail screen,
+  activity store or transport. The previous view relied on the connection's
+  bounded 100-event buffer and selected only the latest turn. After reconnecting,
+  or for a response without tools, that could leave the page effectively empty.
+- Added `HermesDesktopApiService.readRunDetailsMessages`: authenticated,
+  profile-scoped GET of the stored session transcript, oldest-first with
+  `include_compacted=true`, using the existing adaptive transcript pager and its
+  10,000-message safety guard. Inspection does not call `session.resume`.
+- `hermes_run_history.dart` projects stored tool calls/results, unwraps deferred
+  tool bridges, redacts previews and merges live copies by session/call/kind.
+  The detail timeline and counts now retain earlier turns. Unknown historical
+  timestamps do not produce fabricated durations; multi-turn wall time is not
+  presented as execution duration.
+- Added expandable saved user/assistant responses to the existing page. It
+  initially presents the latest eight and allows earlier messages to be shown.
+  Sections remain usable when the saved transcript fails, with a Retry control.
+  Session-scoped keys prevent old history from remaining visible on a session
+  change. Pending decisions are read from the existing local exact-session store.
+  Completion inspection and tool-inspector fallback also use the read-only API.
+- `HermesRunDetailsButton` reuses Kanban New task's `pushHermezPanel` motion.
+  It freezes the actual trigger bounds/radius/color, hides the source until the
+  reverse transition lands, and embeds the same detail page. Chat now has a
+  compact 48 dp header control that remains available after completion; expanded
+  orb controls use the same component instead of a separate navigation action.
+  Continuity/reduced-motion guidance drove this reuse, not a new animation system.
+- The old named route remains for notifications and the native iOS toolbar
+  callback, which cannot supply a Flutter RenderBox origin. Android's Flutter
+  toolbar and the inline pill use the morph. Existing nine-mode orb selection,
+  run visibility, Steel access, steering/stopping, approvals and non-Hermes chat
+  behavior are unchanged.
+
+### Verification and installed artifact
+
+- 107 distinct focused tests verified across runs: transcript projection and
+  exact-profile pagination, historical response visibility, retry, source bounds
+  and panel round trips at 320/412 dp and 100/200% text (including the modal route),
+  existing inline controls/browser/decision cases, destination routing, activity
+  presentation, shared panel mechanics, Desktop turn ownership, run summaries
+  and streaming-footer lifecycle. An initial test assertion mistakenly inspected
+  the `elapsed` method rather than calling it; it was corrected and rerun.
+- Initial focused analysis covered all 12 changed Dart/test paths. Its unused
+  imports and lint findings were fixed; the three affected production files were
+  reanalyzed with **No issues found**. Formatting and diff checks passed.
+- Built ARM64 **profile** APK 162 using the existing private Steel dart-define;
+  installed over the existing app with wireless ADB `install -r`, reopened it,
+  and verified version code 162. APK SHA256:
+  `1d9a1a2768836ae22418e94b27609d4605563e8ed38af1514857eab67556511e`.
+- Bot icon assignments retain SHA256
+  `efe586c6f4a400d7ebb875cb0fcaeecb32f6b32257e4d40c03ee7cfdc5cc3796`.
+  Device captures confirm Home's six-bot roster and saved conversations load;
+  the installed completed-chat panel shows persisted tool actions and earlier
+  user/assistant excerpts with the earlier-message expansion control. No Flutter
+  Material, RenderFlex overflow or fatal markers appeared in the Conduit process
+  log after install. Captures are outside git at
+  `work/diagnostics/hermez-run-details-20261010`.
+- No chat prompt was sent during this pass. Full motion/close geometry was tested
+  automatically; live approvals, Steer/Stop submission and Steel playback were
+  not re-exercised on the device. Do not claim recovery of ephemeral subagent
+  events that Hermes never persisted. Very long histories retain the pager's
+  safety guard; the existing per-tool inspector initially searches the latest
+  1,000 messages, with full read-only fallback on request failure.
+- Existing Kotlin-plugin and incomplete-translation warnings remain. No app-data
+  clear, uninstall, dependency/backend/config changes, or edits to the unrelated
+  A2UI skill/probe/graphify work occurred. Commit locally on
+  `feat/hermez-motion-foundation`; no push was requested for this change.

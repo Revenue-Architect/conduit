@@ -28,12 +28,14 @@ final class HermesLiveActivityEvent {
     this.failed = false,
     this.subagentId,
     this.page,
+    this.timestampKnown = true,
   });
 
   final String sessionId;
   final HermesLiveActivityKind kind;
   final String title;
   final DateTime timestamp;
+  final bool timestampKnown;
 
   /// The tool name for tool events, when Hermes reported a safe one.
   final String? detail;
@@ -93,6 +95,12 @@ final class HermesRunSummary {
   final List<HermesLiveActivityEvent> events;
   final bool running;
 
+  /// Detail inspection keeps every turn, unlike the active chat footer.
+  factory HermesRunSummary.conversation(
+    List<HermesLiveActivityEvent> history, {
+    required bool running,
+  }) => HermesRunSummary._(history, running: running);
+
   bool get isEmpty => events.isEmpty;
 
   bool get failed =>
@@ -138,6 +146,7 @@ final class HermesRunSummary {
 
   /// Time from [startedAt] (or the first event) to the last event.
   Duration? elapsed({DateTime? startedAt, DateTime? now}) {
+    if (events.any((event) => !event.timestampKnown)) return null;
     if (events.isEmpty && startedAt == null) return null;
     final first = events.isEmpty
         ? startedAt!

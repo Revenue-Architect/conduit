@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:thinking_orbs/thinking_orbs.dart';
 
-import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../motion/hermez_motion.dart';
 import '../models/hermes_config.dart';
@@ -26,6 +24,7 @@ import 'hermes_activity_view.dart';
 import 'hermes_plan_view.dart';
 import 'hermes_run_action_dialogs.dart';
 import 'hermes_run_actions.dart';
+import 'hermes_run_details_button.dart';
 import 'hermes_steel_live_view.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_live.dart';
@@ -868,15 +867,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                                     )
                                   : null,
                             ),
-                          HermezRunPill(
-                            label: 'Full activity',
-                            icon: Icons.chevron_right_rounded,
-                            quiet: true,
-                            onTap: () => context.pushNamed(
-                              RouteNames.hermesLiveRun,
-                              pathParameters: {'sessionId': widget.sessionId},
-                            ),
-                          ),
+                          HermesRunDetailsButton(sessionId: widget.sessionId),
                         ],
                       ),
                       HermesStopGuard(

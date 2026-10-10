@@ -63,7 +63,7 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
         // Older gateways: fall back to the chat's own history.
       }
     }
-    return service.getSessionMessages(widget.sessionId);
+    return service.readRunDetailsMessages(widget.sessionId);
   }
 
   @override

@@ -66,6 +66,7 @@ import '../../hermes/widgets/hermes_message_interactions.dart';
 import '../../hermes/widgets/hermes_live_activity_disclosure.dart';
 import '../../hermes/widgets/hermes_chat_context_bar.dart';
 import '../../hermes/widgets/hermes_inline_run_surface.dart';
+import '../../hermes/widgets/hermes_run_details_button.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -4714,6 +4715,30 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
+    final storedHermesId = activeConversation?.metadata['hermesSessionId']
+        ?.toString();
+    if (isNativeHermesConversation(activeConversation) &&
+        storedHermesId != null &&
+        storedHermesId.isNotEmpty &&
+        ref.read(hermesApiServiceProvider) is HermesDesktopApiService) {
+      actions.add(
+        _ChatToolbarActionDescriptor(
+          widget: HermesRunDetailsButton(
+            sessionId: storedHermesId,
+            compact: true,
+          ),
+          nativeAction: ConduitNativeToolbarAction(
+            iosSymbol: 'list.bullet',
+            accessibilityLabel: 'Run details',
+            tintColor: defaultTint,
+            onPressed: () => context.pushNamed(
+              RouteNames.hermesLiveRun,
+              pathParameters: {'sessionId': storedHermesId},
+            ),
+          ),
+        ),
+      );
+    }
     final overflowButton = _buildChatToolbarOverflowAction(
       context: context,
       activeConversation: activeConversation,
@@ -4850,26 +4875,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         onSelected: () async {
           action.onBeforeClose?.call();
           await action.onSelected();
-        },
-      );
-    }
-
-    final storedHermesId = activeConversation?.metadata['hermesSessionId']
-        ?.toString();
-    if (isNativeHermesConversation(activeConversation) &&
-        storedHermesId != null &&
-        storedHermesId.isNotEmpty &&
-        ref.read(hermesApiServiceProvider) is HermesDesktopApiService) {
-      addItem(
-        label: 'Run details',
-        icon: Icons.timeline_rounded,
-        iosSymbol: 'list.bullet',
-        onSelected: () async {
-          if (!mounted) return;
-          context.pushNamed(
-            RouteNames.hermesLiveRun,
-            pathParameters: {'sessionId': storedHermesId},
-          );
         },
       );
     }

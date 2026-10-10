@@ -476,7 +476,7 @@ void main() {
     // A finished run cannot be steered or stopped.
     expect(find.text('Steer'), findsNothing);
     expect(find.text('Stop'), findsNothing);
-    expect(find.text('Full activity'), findsOneWidget);
+    expect(find.text('Run details'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

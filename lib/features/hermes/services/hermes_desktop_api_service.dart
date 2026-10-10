@@ -582,6 +582,31 @@ final class HermesDesktopApiService
     String id, {
     CancelToken? cancelToken,
   }) => _runtimeGetSessionMessages(id, cancelToken: cancelToken);
+
+  /// Inspection only: read persisted tool calls/results without resuming the
+  /// runtime (Bot Mode socket history omits tool-call IDs).
+  Future<List<Map<String, dynamic>>> readRunDetailsMessages(String storedId) {
+    if (validateHermesOpaqueIdentifier(storedId) == null) {
+      throw ArgumentError.value(storedId, 'storedId');
+    }
+    return loadHermesDesktopTranscriptPages(
+      (offset, limit) async => _objects(
+        await _requestJson(
+          'GET',
+          '/api/sessions/${Uri.encodeComponent(storedId)}/messages',
+          query: {
+            'limit': limit,
+            'offset': offset,
+            'order': 'oldest',
+            'include_compacted': true,
+            ..._sessionScope(storedId),
+          },
+        ),
+        'messages',
+      ),
+    );
+  }
+
   Future<List<HermesPendingDesktopDecision>> pendingDecisionsForSession(
     String storedId,
   ) => _runtimePendingDecisionsForSession(storedId);
