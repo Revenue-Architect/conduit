@@ -80,6 +80,7 @@ class HermezEmptyChatGreeting extends StatelessWidget {
                         ),
                         HermezBotPresence(
                           identity: hermezIdentityForName(botName),
+                          botName: botName,
                           size: 64,
                           label: botName,
                         ),

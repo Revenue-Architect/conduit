@@ -250,6 +250,7 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                         id: hermezMorphPart(morphId, 'mark'),
                         child: HermezBotPresence(
                           identity: hermezIdentityForName(bot?.name ?? profile),
+                          botName: bot?.name ?? profile,
                           size: 88,
                           label: title,
                           service: switch (ref.watch(

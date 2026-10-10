@@ -948,6 +948,7 @@ class _BotCard extends ConsumerWidget {
                   id: hermezMorphPart(morphId, 'mark'),
                   child: HermezBotPresence(
                     identity: hermezIdentityForBot(bot),
+                    botName: bot.name,
                     size: 46,
                     label: bot.title,
                     service: service is HermesDesktopApiService

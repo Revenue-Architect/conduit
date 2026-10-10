@@ -48,6 +48,7 @@ class HermezBotPresence extends StatefulWidget {
     required this.identity,
     required this.size,
     this.label,
+    this.botName,
     this.service,
     this.sessionId,
   });
@@ -55,6 +56,7 @@ class HermezBotPresence extends StatefulWidget {
   final HermezBotIdentity identity;
   final double size;
   final String? label;
+  final String? botName;
 
   /// The already-created Desktop connection, when there is one. Presence
   /// only reads its local broadcasts.
@@ -248,6 +250,7 @@ class _HermezBotPresenceState extends State<HermezBotPresence>
     final mark = RepaintBoundary(
       child: HermezBotMark(
         identity: widget.identity,
+        botName: widget.botName,
         size: widget.size,
         label: widget.label,
       ),

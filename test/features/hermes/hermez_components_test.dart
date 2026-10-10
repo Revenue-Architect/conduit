@@ -1,5 +1,8 @@
 import 'package:conduit/features/hermes/models/hermes_todo.dart';
 import 'package:conduit/features/hermes/widgets/hermes_plan_view.dart';
+import 'package:conduit/features/hermes/widgets/hermez_bot_mark.dart';
+import 'package:conduit/features/hermes/widgets/hermez_bot_presence.dart';
+import 'package:conduit/features/hermes/widgets/hermez_empty_chat_greeting.dart';
 import 'package:conduit/features/hermes/widgets/hermez_commit_button.dart';
 import 'package:conduit/features/hermes/widgets/hermez_live.dart';
 import 'package:conduit/features/hermes/widgets/hermez_segments.dart';
@@ -16,6 +19,53 @@ Widget _app(Widget child) => MaterialApp(
 );
 
 void main() {
+  testWidgets('empty greeting forwards the profile to the bot mark', (
+    tester,
+  ) async {
+    for (final name in [
+      'default',
+      'kai',
+      'strong',
+      'hermuse',
+      'fast',
+      'local',
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          HermezEmptyChatGreeting(greeting: 'Start chatting', botName: name),
+        ),
+      );
+      final mark = tester.widget<HermezBotMark>(find.byType(HermezBotMark));
+      expect(mark.botName, name);
+      expect(mark.identity, hermezIdentityForName(name));
+      final gesture = tester.widget<GestureDetector>(
+        find.descendant(
+          of: find.byType(HermezBotMark),
+          matching: find.byType(GestureDetector),
+        ),
+      );
+      expect(gesture.onLongPress, isNotNull);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('presence without a profile keeps the default artwork', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(const HermezBotPresence(identity: HermezBotIdentity.kai, size: 46)),
+    );
+    final mark = tester.widget<HermezBotMark>(find.byType(HermezBotMark));
+    expect(mark.botName, isNull);
+    expect(mark.identity, HermezBotIdentity.kai);
+    final image = tester.widget<Image>(find.byType(Image)).image;
+    expect(
+      image is ResizeImage ? image.imageProvider : image,
+      isA<AssetImage>(),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   group('status morph', () {
     testWidgets('moves through every state without losing itself', (
       tester,
