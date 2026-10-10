@@ -93,14 +93,38 @@ class ConduitChromeGradientFade extends StatelessWidget {
             baseColor.withValues(alpha: 0.92),
           ];
 
+    // A frosted top edge is the app's own background behind the chrome,
+    // then thins out with the frost through the fade, so it blends in with
+    // no line.
+    final frostedTop = blurSigma > 0 && edge == ConduitChromeFadeEdge.top;
+    final solid = height <= 0 ? 0.0 : (contentHeight / height).clamp(0.0, 1.0);
     final gradient = DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: colors,
-          stops: const [0.0, 0.3, 0.65, 1.0],
-        ),
+        gradient: frostedTop
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  baseColor.withValues(alpha: 0.97),
+                  baseColor.withValues(alpha: 0.9),
+                  baseColor.withValues(alpha: 0.55),
+                  baseColor.withValues(alpha: 0.18),
+                  baseColor.withValues(alpha: 0.0),
+                ],
+                stops: [
+                  0.0,
+                  solid * 0.85,
+                  solid + (1 - solid) * 0.3,
+                  solid + (1 - solid) * 0.7,
+                  1.0,
+                ],
+              )
+            : LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: colors,
+                stops: const [0.0, 0.3, 0.65, 1.0],
+              ),
       ),
     );
     return IgnorePointer(

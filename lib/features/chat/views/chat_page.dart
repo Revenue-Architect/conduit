@@ -4419,10 +4419,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     // The menu and bot badge float over the transcript:
                     // a light frost under them that feathers out over
                     // their lower half and is gone just below them.
-                    blurSigma: 5,
-                    blurExtent:
-                        MediaQuery.viewPaddingOf(context).top +
-                        conduitAdaptiveToolbarHeightOf(context),
+                    // The background colour holds behind the controls, then
+                    // thins out with the frost over a longer fade.
+                    fadeHeight: 44,
+                    blurSigma: 6,
                   ),
                 ),
                 Positioned(
