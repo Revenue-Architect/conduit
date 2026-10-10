@@ -1045,3 +1045,84 @@ Skill SHA256: `8abe13d12c2fd3f2b632f7083ab175726a2eef7a76d0f1fa9908c27999a1a783`
 Ask Hermes to load a2ui-mobile and show references/review-response-demo.md for the
 synthetic citation/table/draft flow. Screenshots, replay payloads and diagnostic
 logs stay outside Git. Stremio/TorBox were not touched.
+
+## 2026-10-10 — compact live-run orb, phone profile build 159
+
+The active Hermes chat now uses its thinking orb as the entry point to run
+controls, rather than showing a bordered working card by default. This is a
+presentation consolidation, not a new run protocol or backend change.
+
+### Implementation map
+
+- `chat_page.dart`: opts into `HermesInlineRunSurface(compact: true)` inside the
+  existing `ChatTimelineViewport.liveFooter`. Exact native-Hermes session ownership
+  checks remain in place. The generic streaming footer stays mounted for its
+  queued-completion and haptic lifecycle, but its indicator is suppressed while
+  the Hermes surface is visible, avoiding two spinners.
+- `hermes_inline_run_surface.dart`: compact mode is opt-in; other callers retain
+  the previous detailed-card presentation. The collapsed surface is transparent,
+  with a 28 dp orbit and a minimum 48 dp tap target. Tapping expands the existing
+  timeline, tool inspection, plan/delegates, Steer, confirmed Stop, pending-request
+  handling and Steel Watch/expanded browser. Browser availability gets a small
+  glyph; no WebView is instantiated just to display the collapsed orb.
+- Pending decisions remain session-scoped and use the existing resolution sheet
+  and composer prompts. `Input needed` stays visible even when the turn is idle.
+  Dismissing a resolution sheet is not denial. Existing request content below the
+  transcript is not duplicated in the compact row.
+- Running, reconnecting and synchronizing states remain discoverable. Ordinary
+  idle/completed turns do not keep the orb alive because of historical events.
+  Event history is not deleted. Chat's overflow menu now has `Run details`, opening
+  the existing session-specific Live Run page for historical inspection.
+- The collapsed run clock no longer rebuilds the surface every second. Session
+  changes reset expansion, browser visibility, stop confirmation and clock state.
+  The existing orbit respects lifecycle/reduced motion; existing reveal motion
+  is reused, with no additional fades or nested size animations.
+- `streaming_turn_footer.dart` adds `showIndicator` (default true); non-Hermes
+  callers retain their existing behavior and running haptics still fire once.
+
+### Validation and delivered APK
+
+- Four changed production files passed focused Flutter analysis with no issues.
+- Focused live surface/disclosure/orbit/footer/pending-store/Steel checks: 50
+  tests passed. A subsequent run including the updated completion and haptic
+  tests, decision projection, approval ownership and chat timeline viewport:
+  98 tests passed. These runs overlap; do not report 148 distinct tests.
+- Compact, expanded, pending and recovery widget layouts cover 320 dp at 200%
+  text scale. Tests verify exact-session Steer/Stop, Stop confirmation, rejected
+  steering, pending-sheet dismissal, watch-only viewer behavior and authoritative
+  completion hiding. `git diff --check` passed.
+- ARM64 **profile**, not debug, APK built successfully with build number **159**
+  and the private Steel viewer dart define. The first attempted build used a
+  pre-import-fix snapshot and was stopped; the delivered build was rebuilt from
+  corrected source. Final APK SHA256:
+  `aa68af61dc2ca039bf6840a09d9a7006011bbeab662a534d071a73d0041622f5`.
+- Installed successfully using wireless ADB `install -r` on the S25 Ultra.
+  Package `app.cogwheel.conduit.debug` now reports version 4.1.7 / code 159;
+  this package suffix is intentional for the daily-use profile build.
+  No uninstall, app-data clear or bot-icon replacement occurred. All 21 icon
+  files remain; assignment JSON SHA256 before/after is identical:
+  `efe586c6f4a400d7ebb875cb0fcaeecb32f6b32257e4d40c03ee7cfdc5cc3796`.
+- App reopened after installation. A disposable `default` chat titled
+  `Read heading example.com` performed two read-only browser smoke requests.
+  Device captures confirm one compact orb, expansion into real browser/tool
+  activity with Watch browser/Steer/Stop available, disappearance after completion,
+  normal transcript retention, and the overflow Run details destination showing
+  the correct completed run. No Material, Flutter exception, RenderFlex overflow
+  or fatal-exception markers appeared in the captured post-install log scan.
+- **QA boundary:** the short browser run finished before Watch could be tapped;
+  this pass confirms its real availability, not an embedded-stream/full-screen
+  playback acceptance test. Real approvals, secret entry, and server-side
+  Steer/Stop submission were not exercised on the phone in this pass; their
+  unchanged paths have automated coverage. No browser takeover protocol was added.
+  Screenshots: `work/diagnostics/hermez-compact-orb-20261010` outside this repo.
+
+### Next-agent cautions
+
+Keep using the toolchain and private build define described above. Serialize
+heavy analysis/tests/builds on this 16 GB Windows host: running all three together
+caused paging and greatly slowed compilation. Existing build warnings remain:
+`flutter_callkit_incoming`, `flutter_image_compress_common`, and `home_widget`
+still apply older Kotlin Gradle integration, and several locale translations
+are incomplete. Neither warning was introduced or repaired by this UI change.
+Hermes/Steel/Umbrel configuration, auth, model routing and memory were unchanged.
+Pre-existing A2UI skill edits and probe/graphify files were left untouched.

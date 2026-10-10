@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../chat/widgets/conduit_streaming_orbit.dart';
 import '../motion/hermez_motion.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_subagent.dart';
@@ -51,12 +52,17 @@ class HermesInlineRunSurface extends ConsumerStatefulWidget {
     this.steerRun,
     this.interruptRun,
     this.requestShownBelow = false,
+    this.compact = false,
   });
 
   /// The pending request is already on screen as the composer's prompt card.
   /// The surface then says only that input is needed, and does not repeat the
   /// request text or a Review button for the same question.
   final bool requestShownBelow;
+
+  /// Chat uses a quiet orb until opened; other detail destinations can retain
+  /// the traditional card, including historical run summaries.
+  final bool compact;
 
   final HermesDesktopApiService service;
   final String sessionId;
@@ -102,7 +108,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
     _runStartedAt = DateTime.now().toUtc();
     _clock?.cancel();
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && (!widget.compact || _expanded)) setState(() {});
     });
   }
 
@@ -143,6 +149,12 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
       _expanded = false;
       _showBrowser = false;
       _busy = false;
+      _stopping = false;
+      _confirmingStop = false;
+      _clock?.cancel();
+      _clock = null;
+      _runStartedAt = null;
+      if (widget.turnState == HermesDesktopTurnState.running) _runStarted();
       _bindActivity();
       _refreshPendingAfterFrame();
     } else if (oldWidget.turnState != widget.turnState) {
@@ -318,6 +330,14 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
         pending.asData?.value ?? const <HermesPendingDesktopDecision>[];
     final attention = decisions.isNotEmpty;
     final working = widget.turnState == HermesDesktopTurnState.running;
+    if (widget.compact &&
+        widget.turnState == HermesDesktopTurnState.idle &&
+        !attention &&
+        pending.hasValue &&
+        !pending.hasError) {
+      return const SizedBox.shrink();
+    }
+    final quiet = widget.compact && !_expanded;
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
     final run = HermesRunSummary.latest(_events, running: working);
     final agentic =
@@ -400,11 +420,16 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
         key: _surfaceKey,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: palette.surface,
+            color: quiet ? Colors.transparent : palette.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: edge ?? palette.border,
-              width: attention ? 1.5 : 1,
+              width: quiet
+                  ? 0
+                  : attention
+                  ? 1.5
+                  : 1,
+              style: quiet ? BorderStyle.none : BorderStyle.solid,
             ),
           ),
           child: child,
@@ -418,12 +443,15 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
           // away on its own, and a second animated size around them trailed
           // behind and settled late.
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            padding: quiet
+                ? EdgeInsets.zero
+                : const EdgeInsets.fromLTRB(14, 10, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 HermezMotionSurface(
+                  key: const ValueKey('hermes-run-orb-toggle'),
                   weight: HermezMotionWeight.light,
                   semanticLabel: _expanded
                       ? '$title. Collapse activity'
@@ -438,100 +466,156 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                     _expanded = !_expanded;
                     if (!_expanded) _showBrowser = false;
                   }),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: Row(
-                      children: [
-                        // One object from working to its outcome: the arc
-                        // spins, closes, floods and draws its mark.
-                        HermezStatusMorph(
-                          state: attention
-                              ? HermezMorphState.attention
-                              : finished
-                              ? (run.failed
-                                    ? HermezMorphState.failed
-                                    : HermezMorphState.done)
-                              : working
-                              ? HermezMorphState.working
-                              : HermezMorphState.idle,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                title,
-                                style: TextStyle(
-                                  color: palette.ink,
-                                  fontWeight: FontWeight.w800,
+                  child: quiet
+                      ? Tooltip(
+                          message: attention
+                              ? 'Input needed. Open requests'
+                              : '$title. Open run details',
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Row(
+                              children: [
+                                SizedBox.square(
+                                  dimension: 48,
+                                  child: Center(
+                                    child: attention
+                                        ? HermezStatusMorph(
+                                            state: HermezMorphState.attention,
+                                            size: 28,
+                                          )
+                                        : ConduitStreamingOrbit(
+                                            size: 28,
+                                            color: palette.muted,
+                                            animate:
+                                                working &&
+                                                HermezLiveMotion.on(context),
+                                          ),
+                                  ),
                                 ),
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    // A light band runs through the line
-                                    // while Hermes works.
-                                    child: HermezSheen(
-                                      active: working && !attention,
-                                      child: HermezLiveText(
-                                        attention
-                                            ? 'Review the request below'
-                                            : details.isNotEmpty
-                                            ? details
-                                            : 'Live activity',
-                                        live: working && !attention,
-                                        style: TextStyle(
-                                          color: working
-                                              ? palette.ink
-                                              : palette.muted,
-                                          fontSize: 12.5,
-                                          fontWeight: working
-                                              ? FontWeight.w600
-                                              : FontWeight.w500,
-                                        ),
+                                if (attention || !working)
+                                  Flexible(
+                                    child: Text(
+                                      attention ? 'Input needed' : title,
+                                      style: TextStyle(
+                                        color: attention
+                                            ? palette.accent
+                                            : palette.muted,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  if (clock != null && !attention) ...[
-                                    const SizedBox(width: 8),
-                                    // Ticks in place: a clock, not news.
+                                if (browserAvailable) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.language_rounded,
+                                    size: 16,
+                                    color: palette.muted,
+                                  ),
+                                ],
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.expand_more_rounded,
+                                  size: 16,
+                                  color: palette.muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: Row(
+                            children: [
+                              // One object from working to its outcome: the arc
+                              // spins, closes, floods and draws its mark.
+                              HermezStatusMorph(
+                                state: attention
+                                    ? HermezMorphState.attention
+                                    : finished
+                                    ? (run.failed
+                                          ? HermezMorphState.failed
+                                          : HermezMorphState.done)
+                                    : working
+                                    ? HermezMorphState.working
+                                    : HermezMorphState.idle,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
                                     Text(
-                                      clock,
+                                      title,
                                       style: TextStyle(
-                                        color: palette.muted,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
+                                        color: palette.ink,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          // A light band runs through the line
+                                          // while Hermes works.
+                                          child: HermezSheen(
+                                            active: working && !attention,
+                                            child: HermezLiveText(
+                                              attention
+                                                  ? 'Review the request below'
+                                                  : details.isNotEmpty
+                                                  ? details
+                                                  : 'Live activity',
+                                              live: working && !attention,
+                                              style: TextStyle(
+                                                color: working
+                                                    ? palette.ink
+                                                    : palette.muted,
+                                                fontSize: 12.5,
+                                                fontWeight: working
+                                                    ? FontWeight.w600
+                                                    : FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        if (clock != null && !attention) ...[
+                                          const SizedBox(width: 8),
+                                          // Ticks in place: a clock, not news.
+                                          Text(
+                                            clock,
+                                            style: TextStyle(
+                                              color: palette.muted,
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
-                                ],
+                                ),
+                              ),
+
+                              const SizedBox(width: 6),
+                              AnimatedRotation(
+                                turns: _expanded ? 0.5 : 0,
+                                duration: settle,
+                                curve: HermezMotion.curveMedium,
+                                child: Icon(
+                                  Icons.expand_more_rounded,
+                                  color: palette.ink,
+                                ),
                               ),
                             ],
                           ),
                         ),
-
-                        const SizedBox(width: 6),
-                        AnimatedRotation(
-                          turns: _expanded ? 0.5 : 0,
-                          duration: settle,
-                          curve: HermezMotion.curveMedium,
-                          child: Icon(
-                            Icons.expand_more_rounded,
-                            color: palette.ink,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
                 HermezReveal(
-                  visible: plan != null && !_expanded,
+                  visible: plan != null && !_expanded && !widget.compact,
                   revealKey: const ValueKey('inline-plan-bar'),
                   child: plan == null
                       ? const SizedBox.shrink()
@@ -545,7 +629,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                         ),
                 ),
                 HermezReveal(
-                  visible: attention && !widget.requestShownBelow,
+                  visible: attention && !widget.requestShownBelow && !quiet,
                   weight: HermezMotionWeight.medium,
                   revealKey: const ValueKey('inline-attention'),
                   child: Padding(
@@ -598,7 +682,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                 // Browser watch stays exactly as before: plain presence and
                 // no animated clip or transform around the platform WebView,
                 // which can render blank inside one.
-                if (browserAvailable) ...[
+                if (browserAvailable && !quiet) ...[
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,

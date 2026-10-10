@@ -50,6 +50,7 @@ ProviderContainer _buildHapticsContainer({bool enabled = true}) {
 Widget _buildHarness({
   required ProviderContainer container,
   required ChatMessage message,
+  bool showIndicator = true,
 }) {
   return UncontrolledProviderScope(
     container: container,
@@ -57,7 +58,12 @@ Widget _buildHarness({
       theme: AppTheme.light(TweakcnThemes.t3Chat),
       home: MediaQuery(
         data: const MediaQueryData(disableAnimations: true),
-        child: Scaffold(body: StreamingTurnFooter(message: message)),
+        child: Scaffold(
+          body: StreamingTurnFooter(
+            message: message,
+            showIndicator: showIndicator,
+          ),
+        ),
       ),
     ),
   );
@@ -314,15 +320,17 @@ void main() {
       await tester.pump();
       expect(_lightImpactCalls(calls), hasLength(1));
 
-      // Same id, content arrives, still running: the fire-once guard holds.
+      // Hermes supplies its own orb; hiding this indicator preserves haptics.
       await tester.pumpWidget(
         _buildHarness(
           container: container,
           message: running.copyWith(content: 'Hi'),
+          showIndicator: false,
         ),
       );
       await tester.pump();
       expect(_lightImpactCalls(calls), hasLength(1));
+      expect(find.byType(ConduitStreamingOrbit), findsNothing);
 
       // A new running message id re-arms the haptic.
       final next = ChatMessage(

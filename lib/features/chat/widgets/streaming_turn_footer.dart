@@ -19,10 +19,15 @@ class StreamingTurnFooter extends ConsumerStatefulWidget {
     super.key,
     required this.message,
     this.suppressStreamingHaptics = false,
+    this.showIndicator = true,
   });
 
   final ChatMessage message;
   final bool suppressStreamingHaptics;
+
+  /// Hermes supplies its own interactive run orb, but still needs this
+  /// footer's queue suppression and deduplicated running haptic lifecycle.
+  final bool showIndicator;
 
   @override
   ConsumerState<StreamingTurnFooter> createState() =>
@@ -110,7 +115,7 @@ class _StreamingTurnFooterState extends ConsumerState<StreamingTurnFooter> {
         }
         return HermezSwitch.column(currentChild, previousChildren);
       },
-      child: shouldShow
+      child: shouldShow && widget.showIndicator
           ? KeyedSubtree(
               key: const ValueKey('typing'),
               child: SizedBox(

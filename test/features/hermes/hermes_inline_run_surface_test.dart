@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
+import 'package:conduit/features/chat/widgets/conduit_streaming_orbit.dart';
 
 HermesLiveActivityEvent _toolEvent(String tool) => HermesLiveActivityEvent(
   sessionId: 'session-1',
@@ -42,6 +43,7 @@ void main() {
     HermesDesktopTurnState state = HermesDesktopTurnState.running,
     List<HermesLiveActivityEvent> events = const [],
     bool requestShownBelow = false,
+    bool compact = false,
   }) async {
     tester.view.physicalSize = const Size(320, 820);
     tester.view.devicePixelRatio = 1;
@@ -64,6 +66,7 @@ void main() {
               body: SingleChildScrollView(
                 child: HermesInlineRunSurface(
                   service: service,
+                  compact: compact,
                   sessionId: 'session-1',
                   turnState: state,
                   requestShownBelow: requestShownBelow,
@@ -92,6 +95,129 @@ void main() {
     expect(find.text('Stop'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('compact run is one small orb; controls appear only on tap', (
+    tester,
+  ) async {
+    await mount(tester, compact: true);
+    expect(find.byType(ConduitStreamingOrbit), findsOneWidget);
+    expect(find.text('Hermes is working'), findsNothing);
+    expect(find.text('Steer'), findsNothing);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('hermes-run-orb-toggle')))
+          .height,
+      48,
+    );
+    await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Steer'), findsOneWidget);
+    expect(find.text('Stop'), findsOneWidget);
+    expect(find.text('ACTIVITY'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ConduitStreamingOrbit), findsOneWidget);
+    expect(find.text('Steer'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'compact browser availability is marked without mounting a preview',
+    (tester) async {
+      await mount(
+        tester,
+        compact: true,
+        viewerUrl: 'http://steel.example/v1/sessions/debug',
+        events: [_toolEvent('browser_navigate')],
+      );
+      expect(find.byIcon(Icons.language_rounded), findsOneWidget);
+      expect(find.text('Watch browser'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('Watch browser'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('compact pending question remains actionable even while idle', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      compact: true,
+      state: HermesDesktopTurnState.idle,
+      decisions: [
+        HermesPendingDesktopDecision(
+          origin: 'https://hermes.example',
+          storedSessionId: 'session-1',
+          runtimeId: 'run-1',
+          requestId: 'request-1',
+          kind: HermesPendingDesktopDecisionKind.clarification,
+          expiresAt: DateTime.utc(2030),
+          prompt: 'Which city?',
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Input needed'), findsOneWidget);
+    expect(find.text('Which city?'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Which city?'), findsOneWidget);
+    expect(find.text('Review'), findsOneWidget);
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Input needed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact surface disappears on authoritative completion', (
+    tester,
+  ) async {
+    await mount(tester, compact: true);
+    await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Stop'), findsOneWidget);
+    await mount(tester, compact: true, state: HermesDesktopTurnState.idle);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hermes-run-orb-toggle')), findsNothing);
+    expect(find.text('Stop'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact idle hides even when historical tools exist', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      compact: true,
+      state: HermesDesktopTurnState.idle,
+      events: [_toolEvent('web_search')],
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hermes-run-orb-toggle')), findsNothing);
+    expect(find.text('Done'), findsNothing);
+    expect(find.byType(ConduitStreamingOrbit), findsNothing);
+  });
+
+  testWidgets(
+    'compact recovery remains discoverable without a streaming message',
+    (tester) async {
+      await mount(
+        tester,
+        compact: true,
+        state: HermesDesktopTurnState.reconnecting,
+      );
+      expect(find.text('Reconnecting to Hermes'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('hermes-run-orb-toggle')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('browser is discoverable before expanding activity', (
     tester,

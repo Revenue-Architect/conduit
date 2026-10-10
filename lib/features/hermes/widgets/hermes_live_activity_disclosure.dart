@@ -6,9 +6,8 @@ import '../services/hermes_live_activity.dart';
 import 'hermez_chat_palette.dart';
 
 /// Show the run surface only for the selected Desktop session: while a turn
-/// is active or being recovered, while a decision is pending, and after a
-/// run this app watched has ended ([hasRecentActivity]), when it stays as a
-/// compact summary instead of disappearing.
+/// is active or being recovered, or while a decision is pending. Historical
+/// events remain available in run details but never keep the live UI mounted.
 bool shouldShowHermesLiveActivity({
   required bool nativeConversation,
   required String? conversationSessionId,
@@ -23,7 +22,6 @@ bool shouldShowHermesLiveActivity({
     conversationSessionId == activeSessionId &&
     desktopService &&
     (hasPendingDecision ||
-        hasRecentActivity ||
         turnState == HermesDesktopTurnState.running ||
         turnState == HermesDesktopTurnState.synchronizing ||
         turnState == HermesDesktopTurnState.reconnecting);

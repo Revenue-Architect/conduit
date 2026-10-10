@@ -107,28 +107,31 @@ void main() {
     },
   );
 
-  test('a watched run stays visible as a summary after it ends', () {
-    expect(
-      shouldShowHermesLiveActivity(
-        nativeConversation: true,
-        conversationSessionId: 'session-1',
-        activeSessionId: 'session-1',
-        desktopService: true,
-        turnState: HermesDesktopTurnState.idle,
-        hasRecentActivity: true,
-      ),
-      isTrue,
-    );
-    expect(
-      shouldShowHermesLiveActivity(
-        nativeConversation: true,
-        conversationSessionId: 'session-1',
-        activeSessionId: 'session-2',
-        desktopService: true,
-        turnState: HermesDesktopTurnState.idle,
-        hasRecentActivity: true,
-      ),
-      isFalse,
-    );
-  });
+  test(
+    'historical events do not keep the live orb visible after completion',
+    () {
+      expect(
+        shouldShowHermesLiveActivity(
+          nativeConversation: true,
+          conversationSessionId: 'session-1',
+          activeSessionId: 'session-1',
+          desktopService: true,
+          turnState: HermesDesktopTurnState.idle,
+          hasRecentActivity: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldShowHermesLiveActivity(
+          nativeConversation: true,
+          conversationSessionId: 'session-1',
+          activeSessionId: 'session-2',
+          desktopService: true,
+          turnState: HermesDesktopTurnState.idle,
+          hasRecentActivity: true,
+        ),
+        isFalse,
+      );
+    },
+  );
 }

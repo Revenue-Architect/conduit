@@ -18,6 +18,9 @@ import 'package:conduit/core/services/haptic_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/services/navigation_service.dart';
 
 import 'dart:io' show Platform;
 import 'dart:collection';
@@ -2975,10 +2978,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       desktopService: desktopService is HermesDesktopApiService,
       turnState: activeHermesTurn,
       hasPendingDecision: hasPendingHermesDecision,
-      // A run this app watched stays as a compact summary after it ends.
-      hasRecentActivity:
-          exactHermesSession &&
-          desktopService.activitySnapshotFor(activeHermesSessionId).isNotEmpty,
     );
     _scheduleMarkdownPrewarm(messages, layoutMetadata: layoutMetadata);
     _syncLayoutBottomAnchor();
@@ -3089,6 +3088,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       }
                       return StreamingTurnFooter(
                         message: latestMessage,
+                        showIndicator: !showHermesActivity,
                         suppressStreamingHaptics:
                             suppressAssistantStreamingHaptics,
                       );
@@ -3102,6 +3102,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     child: HermesInlineRunSurface(
                       key: ValueKey('hermes-live-$activeHermesSessionId'),
                       service: desktopService,
+                      compact: true,
                       sessionId: activeHermesSessionId,
                       turnState:
                           activeHermesTurn ?? HermesDesktopTurnState.idle,
@@ -4849,6 +4850,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         onSelected: () async {
           action.onBeforeClose?.call();
           await action.onSelected();
+        },
+      );
+    }
+
+    final storedHermesId = activeConversation?.metadata['hermesSessionId']
+        ?.toString();
+    if (isNativeHermesConversation(activeConversation) &&
+        storedHermesId != null &&
+        storedHermesId.isNotEmpty &&
+        ref.read(hermesApiServiceProvider) is HermesDesktopApiService) {
+      addItem(
+        label: 'Run details',
+        icon: Icons.timeline_rounded,
+        iosSymbol: 'list.bullet',
+        onSelected: () async {
+          if (!mounted) return;
+          context.pushNamed(
+            RouteNames.hermesLiveRun,
+            pathParameters: {'sessionId': storedHermesId},
+          );
         },
       );
     }
