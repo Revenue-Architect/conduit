@@ -62,6 +62,7 @@ dependencies:
   
   # Modern Animations
   flutter_animate: ^4.5.0
+  thinking_orbs: 0.2.0
   stupid_simple_sheet: ^0.9.1+1
   
   # Platform Features

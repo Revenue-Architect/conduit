@@ -1126,3 +1126,29 @@ still apply older Kotlin Gradle integration, and several locale translations
 are incomplete. Neither warning was introduced or repaired by this UI change.
 Hermes/Steel/Umbrel configuration, auth, model routing and memory were unchanged.
 Pre-existing A2UI skill edits and probe/graphify files were left untouched.
+
+## 2026-10-10 — native Thinking Orbs, profile build 160
+
+- Surgical follow-up to the compact-orb change: pinned `thinking_orbs: 0.2.0`
+  and replaced only the compact Hermes surface's `ConduitStreamingOrbit`.
+  Uses the package's native 20 dp preset, working while running and connecting
+  during recovery, tinted from the existing Hermez palette. The 48 dp tap target,
+  attention mark, expansion, decisions, Steel access, Steer/Stop and completion
+  ownership/visibility logic remain unchanged. Non-Hermes indicators are untouched.
+- Reduced motion and TickerMode remain respected. Explicit foreground state
+  pauses the orb when the app backgrounds; resume retains existing decision
+  invalidation. Do not map decorative orb modes to fabricated tool progress.
+- 47 focused tests passed: inline surface, streaming footer, legacy orbit,
+  pending-decision store and Steel viewer. Coverage includes native orb selection,
+  background/resume, 320 dp/200% text, controls and authoritative completion.
+  Focused analysis reports no issues; formatting and diff checks passed.
+- ARM64 profile APK 160 built successfully and installed with wireless ADB
+  `install -r`. App reopened; installed version code verified as 160. Icon
+  assignments retain the identical SHA256 recorded for build 159. No app data
+  clear, uninstall, backend changes or unrelated dependency upgrades occurred.
+  APK SHA256: `1321d91efec92e66647b7e10098dce6b4a8f01fa636761881ad214ca1171c5e9`.
+- QA boundary: no new real chat request or live-run visual acceptance was
+  performed on the phone for this replacement; interaction/lifecycle validation
+  is automated. This young package uses a display-rate painter unlike the old
+  low-frequency orbit; assess device performance if future changes enlarge it
+  or add multiple instances. Existing plugin/translation warnings remain.

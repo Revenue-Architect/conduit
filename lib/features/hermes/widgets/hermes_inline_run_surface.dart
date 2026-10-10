@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:thinking_orbs/thinking_orbs.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
-import '../../chat/widgets/conduit_streaming_orbit.dart';
 import '../motion/hermez_motion.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_subagent.dart';
@@ -90,6 +90,7 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
 
   /// The Stop guard is open under the run's controls.
   bool _confirmingStop = false;
+  bool _appForeground = true;
   DateTime? _runStartedAt;
   Timer? _clock;
   final GlobalKey _surfaceKey = GlobalKey();
@@ -99,6 +100,9 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _appForeground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _bindActivity();
     if (widget.turnState == HermesDesktopTurnState.running) _runStarted();
   }
@@ -184,6 +188,10 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final foreground = state == AppLifecycleState.resumed;
+    if (mounted && foreground != _appForeground) {
+      setState(() => _appForeground = foreground);
+    }
     if (state == AppLifecycleState.resumed && mounted) {
       ref.invalidate(hermesPendingSessionDecisionsProvider(widget.sessionId));
     }
@@ -483,12 +491,15 @@ class _HermesInlineRunSurfaceState extends ConsumerState<HermesInlineRunSurface>
                                             state: HermezMorphState.attention,
                                             size: 28,
                                           )
-                                        : ConduitStreamingOrbit(
-                                            size: 28,
+                                        : ThinkingOrb(
+                                            size: OrbSize.size20,
+                                            state: working
+                                                ? OrbState.working
+                                                : OrbState.connecting,
                                             color: palette.muted,
-                                            animate:
-                                                working &&
-                                                HermezLiveMotion.on(context),
+                                            paused:
+                                                !_appForeground ||
+                                                !HermezLiveMotion.on(context),
                                           ),
                                   ),
                                 ),

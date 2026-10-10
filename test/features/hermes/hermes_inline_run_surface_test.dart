@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
-import 'package:conduit/features/chat/widgets/conduit_streaming_orbit.dart';
+import 'package:thinking_orbs/thinking_orbs.dart';
+import 'package:conduit/features/hermes/widgets/hermez_live.dart';
 
 HermesLiveActivityEvent _toolEvent(String tool) => HermesLiveActivityEvent(
   sessionId: 'session-1',
@@ -44,6 +45,7 @@ void main() {
     List<HermesLiveActivityEvent> events = const [],
     bool requestShownBelow = false,
     bool compact = false,
+    bool disableAnimations = true,
   }) async {
     tester.view.physicalSize = const Size(320, 820);
     tester.view.devicePixelRatio = 1;
@@ -61,7 +63,10 @@ void main() {
         ],
         child: MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            data: MediaQueryData(
+              textScaler: const TextScaler.linear(2),
+              disableAnimations: disableAnimations,
+            ),
             child: Scaffold(
               body: SingleChildScrollView(
                 child: HermesInlineRunSurface(
@@ -100,7 +105,11 @@ void main() {
     tester,
   ) async {
     await mount(tester, compact: true);
-    expect(find.byType(ConduitStreamingOrbit), findsOneWidget);
+    expect(find.byType(ThinkingOrb), findsOneWidget);
+    final orb = tester.widget<ThinkingOrb>(find.byType(ThinkingOrb));
+    expect(orb.size, OrbSize.size20);
+    expect(orb.state, OrbState.working);
+    expect(orb.paused, isTrue);
     expect(find.text('Hermes is working'), findsNothing);
     expect(find.text('Steer'), findsNothing);
     expect(
@@ -116,10 +125,43 @@ void main() {
     expect(find.text('ACTIVITY'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
     await tester.pumpAndSettle();
-    expect(find.byType(ConduitStreamingOrbit), findsOneWidget);
+    expect(find.byType(ThinkingOrb), findsOneWidget);
     expect(find.text('Steer'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'native orb pauses in background and resumes without losing controls',
+    (tester) async {
+      final previousMotion = HermezLiveMotion.enabled;
+      HermezLiveMotion.enabled = true;
+      addTearDown(() => HermezLiveMotion.enabled = previousMotion);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await mount(tester, compact: true, disableAnimations: false);
+      expect(
+        tester.widget<ThinkingOrb>(find.byType(ThinkingOrb)).paused,
+        isFalse,
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(
+        tester.widget<ThinkingOrb>(find.byType(ThinkingOrb)).paused,
+        isTrue,
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(
+        tester.widget<ThinkingOrb>(find.byType(ThinkingOrb)).paused,
+        isFalse,
+      );
+      await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('Steer'), findsOneWidget);
+      expect(find.text('Stop'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'compact browser availability is marked without mounting a preview',
@@ -199,7 +241,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('hermes-run-orb-toggle')), findsNothing);
     expect(find.text('Done'), findsNothing);
-    expect(find.byType(ConduitStreamingOrbit), findsNothing);
+    expect(find.byType(ThinkingOrb), findsNothing);
   });
 
   testWidgets(
