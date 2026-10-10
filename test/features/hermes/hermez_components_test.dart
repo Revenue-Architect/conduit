@@ -277,12 +277,13 @@ void main() {
         ),
       ),
     );
-    // Full frost behind the bar, then a feather that thins to nothing.
+    // Full frost behind the bar, then a short feather that thins to nothing.
+    // Each blur is a pass on every scroll frame: keep the count small.
     expect(find.byType(BackdropFilter), findsWidgets);
     final blurs = tester
         .widgetList<BackdropFilter>(find.byType(BackdropFilter))
         .length;
-    expect(blurs, greaterThan(6));
+    expect(blurs, inInclusiveRange(2, 4));
     expect(tester.takeException(), isNull);
   });
 

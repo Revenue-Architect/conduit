@@ -129,8 +129,11 @@ class _ProgressiveBlur extends StatelessWidget {
   final double extent;
   final double total;
 
-  /// Slices in the feather: thin enough that no step between two shows.
-  static const _slices = 12;
+  /// Slices in the feather. Every slice is its own blur pass, redrawn on
+  /// each scroll frame, so keep this small: 12 slices cost a fifth of the
+  /// chat's frames at 120 Hz (S25, profile build). Under the gradient a
+  /// 3-step feather reads the same.
+  static const _slices = 3;
 
   /// How long the feather is: the frost thins out over this distance and
   /// is gone at [extent].
