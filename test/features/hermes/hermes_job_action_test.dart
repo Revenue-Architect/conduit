@@ -167,6 +167,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey<String>('job-1')), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('hermes-job-row-job-1')),
+    );
+    await tester.pumpAndSettle();
     final runButton = find.byKey(
       const ValueKey<String>('hermes-job-run-job-1'),
     );

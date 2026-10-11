@@ -273,7 +273,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(tester.takeException(), isNull);
-        expect(find.text('Actions'), findsOneWidget);
+        expect(find.text('Rename'), findsOneWidget);
         await tester.scrollUntilVisible(
           find.text('No private data.'),
           250,
@@ -441,7 +441,7 @@ void main() {
 
     await tester.tap(find.text('QA sprint'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit title'));
+    await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'Updated QA sprint');
     await tester.tap(find.text('Save'));
@@ -477,11 +477,16 @@ void main() {
     );
     expect(find.text('Reviewed in QA'), findsOneWidget);
 
+    // Status is a chip; its menu holds the stages.
     await tester.scrollUntilVisible(
-      find.widgetWithText(ActionChip, 'Todo'),
-      180,
+      find.byKey(const ValueKey('kanban-task-status')),
+      -180,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.tap(find.byKey(const ValueKey('kanban-task-status')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(ActionChip, 'Todo'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ActionChip, 'Todo'));
     await tester.pumpAndSettle();
     // The move is held open in a guard under the status controls.
@@ -542,7 +547,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('A task'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Assignee'));
+    await tester.tap(find.text('Assign'));
     await tester.pumpAndSettle();
     expect(find.text('autopilot'), findsOneWidget);
     expect(tester.takeException(), isNull);

@@ -89,15 +89,26 @@ class HermesAwayDigest extends ConsumerWidget {
     final moved = since == null || sessions == null
         ? const <HermesSessionSummary>[]
         : ([
+            // Your conversations, not the automated runs behind them.
             ...sessions.where(
-              (session) => session.updatedAt?.toUtc().isAfter(since) ?? false,
+              (session) =>
+                  !const {
+                    'cron',
+                    'webhook',
+                    'subagent',
+                    'api_server',
+                  }.contains(session.source) &&
+                  (session.updatedAt?.toUtc().isAfter(since) ?? false),
             ),
           ]..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!)));
     final ran = since == null
         ? const <(String, HermesJob)>[]
         : ([
+            // A schedule that simply ran is not news; one that failed is.
             ...?jobs?.where(
-              (item) => item.$2.lastRun?.toUtc().isAfter(since) ?? false,
+              (item) =>
+                  _AwayCard._failed(item.$2) &&
+                  (item.$2.lastRun?.toUtc().isAfter(since) ?? false),
             ),
           ]..sort((a, b) => b.$2.lastRun!.compareTo(a.$2.lastRun!)));
     final visible =

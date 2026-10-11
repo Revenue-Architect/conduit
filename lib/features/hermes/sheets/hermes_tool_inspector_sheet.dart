@@ -371,17 +371,23 @@ class _CodeSectionState extends State<_CodeSection> {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final long = widget.text.length > _collapsed;
+    // The server fences tool output as untrusted for the model; people only
+    // need the output itself.
+    final text = widget.text
+        .replaceAll(RegExp(r'<untrusted_tool_result[^>]*>\s*'), '')
+        .replaceAll(RegExp(r'\s*</untrusted_tool_result>'), '')
+        .trim();
+    final long = text.length > _collapsed;
     final shown = !long || _expanded
-        ? widget.text
-        : '${widget.text.substring(0, _collapsed)}…';
+        ? text
+        : '${text.substring(0, _collapsed)}…';
     return _Section(
       label: widget.label,
       trailing: HermezMotionSurface(
         weight: HermezMotionWeight.light,
         semanticLabel: 'Copy ${widget.label.toLowerCase()}',
         onTap: () {
-          Clipboard.setData(ClipboardData(text: widget.text));
+          Clipboard.setData(ClipboardData(text: text));
           HermezFeedback.play(HermezFeedbackCue.controlSelect);
           ScaffoldMessenger.maybeOf(context)
               ?.showSnackBar(const SnackBar(content: Text('Copied')));

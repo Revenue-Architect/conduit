@@ -129,6 +129,9 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
     final desktop =
         ref.watch(hermesConfigProvider).mode ==
         HermesBackendMode.desktopGateway;
+    // A server without toolsets gets no section, not an endless spinner.
+    final caps = ref.watch(hermesCapabilitiesProvider).asData?.value;
+    if (caps != null && !caps.toolsets) return const SizedBox.shrink();
     return InsetGroupedSection(
       title: l10n.hermesCapabilityToolsets,
       child: ref
@@ -212,10 +215,13 @@ class _HermesToolsetsSectionState extends ConsumerState<HermesToolsetsSection> {
                 ],
               );
             },
-            loading: () => const SizedBox(
-              height: 18,
-              width: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            loading: () => const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
             error: (_, _) => Text(
               l10n.directConnectionUnavailableLabel,
@@ -402,7 +408,7 @@ class _HermesDesktopManagementSectionState
         UtilityRow(
           title: l10n.hermesReloadSkills,
           subtitle: skills.isEmpty
-              ? l10n.hermesNoInstalledSkills
+              ? 'Picks up skills you added or edited on the server'
               : skills.map((skill) => '/${skill['name']}').join(', '),
           leading: const _SettingsBadge(Icons.refresh),
           onTap: _pending
@@ -421,15 +427,44 @@ class _HermesDesktopManagementSectionState
           showChevron: true,
           onTap: () => context.pushNamed(RouteNames.hermesMcp),
         ),
+      ],
+    );
+  }
+}
+
+/// Signing out stands apart from everyday tools, styled as destructive.
+class HermesSignOutSection extends ConsumerStatefulWidget {
+  const HermesSignOutSection({super.key});
+
+  @override
+  ConsumerState<HermesSignOutSection> createState() =>
+      _HermesSignOutSectionState();
+}
+
+class _HermesSignOutSectionState extends ConsumerState<HermesSignOutSection> {
+  bool _pending = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = context.conduitTheme;
+    return InsetGroupedList(
+      children: [
         UtilityRow(
           title: l10n.hermesSignOut,
-          leading: const _SettingsBadge(Icons.logout),
+          leading: Icon(Icons.logout, color: theme.error),
           onTap: _pending
               ? null
-              : () => _run(
-                  () =>
-                      ref.read(hermesConfigProvider.notifier).signOutDesktop(),
-                ),
+              : () async {
+                  setState(() => _pending = true);
+                  try {
+                    await ref
+                        .read(hermesConfigProvider.notifier)
+                        .signOutDesktop();
+                  } finally {
+                    if (mounted) setState(() => _pending = false);
+                  }
+                },
         ),
       ],
     );
@@ -465,26 +500,21 @@ class HermesServerStatusSection extends ConsumerWidget {
                   ),
                 );
               }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              return _ServerStatusSummary(
+                status: status,
+                details: [
                   for (final entry in entries)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: Spacing.xs),
-                      child: Text(
-                        '${_humanize(entry.key)}: ${entry.value}',
-                        style: AppTypography.bodyMediumStyle.copyWith(
-                          color: theme.textPrimary,
-                        ),
-                      ),
-                    ),
+                    '${_humanize(entry.key)}: ${entry.value}',
                 ],
               );
             },
-            loading: () => const SizedBox(
-              height: 18,
-              width: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            loading: () => const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
             error: (_, _) => Text(
               l10n.directConnectionUnavailableLabel,
@@ -520,6 +550,82 @@ class _SettingsBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       ),
       child: Icon(icon, size: 18, color: theme.buttonPrimary),
+    );
+  }
+}
+
+/// "Healthy · v0.21.5 · 2 sessions", with every raw field behind Details.
+class _ServerStatusSummary extends StatefulWidget {
+  const _ServerStatusSummary({required this.status, required this.details});
+
+  final Map<String, dynamic> status;
+  final List<String> details;
+
+  @override
+  State<_ServerStatusSummary> createState() => _ServerStatusSummaryState();
+}
+
+class _ServerStatusSummaryState extends State<_ServerStatusSummary> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.conduitTheme;
+    final status = widget.status;
+    final overall = status['overall']?.toString().toLowerCase();
+    final running = status['gateway_running'];
+    final healthy =
+        (overall == null || overall == 'ok' || overall == 'healthy') &&
+        running != false;
+    final version = status['version']?.toString();
+    final sessions = status['active_sessions'];
+    final summary = [
+      healthy ? 'Healthy' : 'Needs attention',
+      if (version != null && version.isNotEmpty) 'v$version',
+      if (sessions is num)
+        '${sessions.toInt()} active session${sessions == 1 ? '' : 's'}',
+    ].join(' · ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: healthy ? const Color(0xFF17A46A) : theme.error,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                summary,
+                style: AppTypography.bodyMediumStyle.copyWith(
+                  color: theme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() => _open = !_open),
+              child: Text(_open ? 'Hide details' : 'Details'),
+            ),
+          ],
+        ),
+        if (_open)
+          for (final line in widget.details)
+            Padding(
+              padding: const EdgeInsets.only(top: Spacing.xs),
+              child: SelectableText(
+                line,
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: theme.textSecondary,
+                ),
+              ),
+            ),
+      ],
     );
   }
 }

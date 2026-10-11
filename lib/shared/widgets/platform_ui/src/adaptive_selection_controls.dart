@@ -50,11 +50,18 @@ class AdaptiveSwitch extends StatelessWidget {
         ),
       );
     }
+    final scheme = Theme.of(context).colorScheme;
     return Switch(
       value: value,
       onChanged: effectiveOnChanged,
+      // On reads as on: a white thumb on the accent track, never a dark
+      // thumb that looks like the off state.
       thumbColor: thumbColor == null
-          ? null
+          ? WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? Colors.white
+                  : scheme.outline,
+            )
           : WidgetStatePropertyAll<Color?>(thumbColor),
       trackColor: activeColor == null
           ? null

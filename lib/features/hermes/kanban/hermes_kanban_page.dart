@@ -659,13 +659,13 @@ class _LanePlus extends StatelessWidget {
     // A round object, not a bare glyph: the panel grows out of it and folds
     // back into it. With only a glyph, the panel landed as a tile that was
     // not there and vanished on the last frame.
+    // Sized to sit inside the stage header instead of hanging off its edge.
     return SizedBox.square(
-      dimension: 48,
+      dimension: 36,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: palette.surface,
+          color: palette.accent.withValues(alpha: 0.12),
           shape: BoxShape.circle,
-          border: Border.all(color: palette.border),
         ),
         child: Center(
           child: _turningPlus(Icons.add_rounded, palette.accent, turn),
@@ -1369,9 +1369,12 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                 textAlign: TextAlign.center,
               ),
             ),
-          for (final lane in occupied) _laneSection(lane, visibleByLane[lane]!),
-          if (query.isEmpty)
-            for (final lane in entryLanes) _laneSection(lane, const []),
+          // Workflow order, so the board reads left to right as work moves:
+          // Triage and Ready stay as entry points, Done always comes last.
+          for (final lane in kanbanLanes)
+            if (occupied.contains(lane) ||
+                (query.isEmpty && entryLanes.contains(lane)))
+              _laneSection(lane, visibleByLane[lane]!),
           if (query.isEmpty && otherEmpty.isNotEmpty) ...[
             Align(
               alignment: Alignment.centerLeft,
@@ -1464,7 +1467,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
         trailing: lane == 'triage' || lane == 'ready'
             ? _MorphTrigger(
                 hidden: _creatingFrom == 'lane:$lane',
-                radius: 24,
+                radius: 18,
                 color: HermezChatPalette.forBrightness(
                   Theme.of(context).brightness,
                 ).surface,
@@ -1473,7 +1476,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                   triage: lane == 'triage',
                   origin: origin,
                   source: 'lane:$lane',
-                  originRadius: 24,
+                  originRadius: 18,
                   face: (context, turn) => _LanePlus(turn: turn),
                 ),
                 child: Tooltip(
@@ -1572,15 +1575,6 @@ class _KanbanTaskCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 4,
-                        backgroundColor: task.status == 'done'
-                            ? const Color(0xFF18704B)
-                            : HermezChatPalette.forBrightness(
-                                Theme.of(context).brightness,
-                              ).accent,
-                      ),
-                      const SizedBox(width: 7),
                       Expanded(
                         child: HermezMorphText(
                           task.title,
@@ -1613,8 +1607,8 @@ class _KanbanTaskCard extends StatelessWidget {
                     children: [
                       if (task.assignee != null)
                         _TaskMeta(Icons.person_outline_rounded, task.assignee!),
-                      if (task.priority != null)
-                        _TaskMeta(Icons.flag_outlined, '${task.priority}'),
+                      if ((task.priority ?? 0) > 0)
+                        _TaskMeta(Icons.flag_outlined, 'P${task.priority}'),
                       if (task.commentCount != null && task.commentCount! > 0)
                         _TaskMeta(
                           Icons.mode_comment_outlined,
@@ -1708,6 +1702,9 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
 
   /// A status change held open for confirmation, if any.
   String? _pendingStatus;
+
+  /// The status menu under the status chip.
+  bool _moving = false;
   bool _foreground = true;
   bool _pollInFlight = false;
   Timer? _refreshTimer;
@@ -1782,6 +1779,13 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
   void _toggleEdit(_TaskEdit edit) => setState(() {
     _editing = _editing == edit ? null : edit;
     _pendingStatus = null;
+    _moving = false;
+  });
+
+  void _toggleMove() => setState(() {
+    _moving = !_moving;
+    _pendingStatus = null;
+    _editing = null;
   });
 
   Future<void> _saveEdit(Future<void> Function() action) async {
@@ -1930,14 +1934,7 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
           ),
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  task.id,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ),
+              const Spacer(),
               IconButton(
                 tooltip: 'Close task details',
                 onPressed: () => Navigator.pop(context),
@@ -1967,22 +1964,196 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
             spacing: 8,
             runSpacing: 8,
             children: [
-              Chip(
-                avatar: const CircleAvatar(
+              // Each fact is its own control: tap to change it in place.
+              ActionChip(
+                key: const ValueKey('kanban-task-status'),
+                avatar: CircleAvatar(
                   radius: 5,
-                  backgroundColor: Color(0xFF666765),
+                  backgroundColor: task.status == 'done'
+                      ? const Color(0xFF18704B)
+                      : HermezChatPalette.forBrightness(
+                          Theme.of(context).brightness,
+                        ).accent,
                 ),
                 label: Text(_label(task.status)),
+                onPressed: _busy ? null : _toggleMove,
               ),
-              Chip(
+              ActionChip(
                 avatar: const Icon(Icons.person_outline, size: 17),
-                label: Text(task.assignee ?? 'Unassigned'),
+                label: Text(task.assignee ?? 'Assign'),
+                onPressed: _busy ? null : () => _toggleEdit(_TaskEdit.assignee),
               ),
-              Chip(
+              ActionChip(
                 avatar: const Icon(Icons.flag_outlined, size: 17),
-                label: Text('Priority ${task.priority?.toString() ?? '—'}'),
+                label: Text(
+                  (task.priority ?? 0) > 0
+                      ? 'Priority ${task.priority}'
+                      : 'Set priority',
+                ),
+                onPressed: _busy ? null : () => _toggleEdit(_TaskEdit.priority),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.edit_outlined, size: 17),
+                label: const Text('Rename'),
+                onPressed: _busy ? null : () => _toggleEdit(_TaskEdit.title),
               ),
             ],
+          ),
+          HermezReveal(
+            visible:
+                _editing == _TaskEdit.title ||
+                _editing == _TaskEdit.assignee ||
+                _editing == _TaskEdit.priority,
+            weight: HermezMotionWeight.medium,
+            revealKey: ValueKey('task-edit-$_editing'),
+            child: switch (_editing) {
+              _TaskEdit.title => _InlineField(
+                label: 'Title',
+                initial: task.title,
+                maxLength: 1000,
+                onCancel: () => setState(() => _editing = null),
+                onSave: (value) {
+                  if (value.isEmpty) return;
+                  _saveEdit(
+                    () => widget.client.patchTask(widget.board, task.id, {
+                      'title': value,
+                    }),
+                  );
+                },
+              ),
+              _TaskEdit.priority => _InlineField(
+                label: 'Priority',
+                initial: task.priority?.toString(),
+                maxLength: 4,
+                numeric: true,
+                onCancel: () => setState(() => _editing = null),
+                onSave: (value) {
+                  final priority = int.tryParse(value);
+                  if (priority == null) return;
+                  _saveEdit(
+                    () => widget.client.patchTask(widget.board, task.id, {
+                      'priority': priority,
+                    }),
+                  );
+                },
+              ),
+              _TaskEdit.assignee => _ProfileChoices(
+                client: widget.client,
+                current: task.assignee,
+                enabled: !_busy,
+                onSelected: (value) => _saveEdit(
+                  () => widget.client.patchTask(widget.board, task.id, {
+                    'assignee': value,
+                  }),
+                ),
+              ),
+              _ => const SizedBox.shrink(),
+            },
+          ),
+          HermezReveal(
+            visible: _moving,
+            weight: HermezMotionWeight.medium,
+            revealKey: const ValueKey('task-move'),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final scale = MediaQuery.textScalerOf(context).scale(1);
+                      final columns = scale > 1.5
+                          ? 1
+                          : scale > 1.1 || constraints.maxWidth < 315
+                          ? 2
+                          : 3;
+                      final width =
+                          (constraints.maxWidth - (columns - 1) * 8) / columns;
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final lane in kanbanLanes)
+                            if (lane != 'running' && lane != task.status)
+                              SizedBox(
+                                width: width,
+                                child: ActionChip(
+                                  label: SizedBox(
+                                    width: double.infinity,
+                                    child: Text(
+                                      _label(lane),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  side: _pendingStatus == lane
+                                      ? BorderSide(
+                                          color:
+                                              HermezChatPalette.forBrightness(
+                                                Theme.of(context).brightness,
+                                              ).accent,
+                                          width: 2,
+                                        )
+                                      : null,
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _askStatus(lane),
+                                ),
+                              ),
+                          if (task.status != 'archived')
+                            SizedBox(
+                              width: width,
+                              child: ActionChip(
+                                label: const SizedBox(
+                                  width: double.infinity,
+                                  child: Text(
+                                    'Archive',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                side: _pendingStatus == 'archived'
+                                    ? BorderSide(
+                                        color: HermezChatPalette.forBrightness(
+                                          Theme.of(context).brightness,
+                                        ).accent,
+                                        width: 2,
+                                      )
+                                    : null,
+                                onPressed: _busy
+                                    ? null
+                                    : () => _askStatus('archived'),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                  HermezReveal(
+                    visible: _pendingStatus != null,
+                    weight: HermezMotionWeight.medium,
+                    revealKey: ValueKey('task-status-$_pendingStatus'),
+                    child: _pendingStatus == null
+                        ? const SizedBox.shrink()
+                        : _GuardPanel(
+                            title:
+                                'MOVE TO ${_label(_pendingStatus!).toUpperCase()}?',
+                            message:
+                                _pendingStatus == 'done' ||
+                                    _pendingStatus == 'blocked' ||
+                                    _pendingStatus == 'archived' ||
+                                    task.status == 'running'
+                                ? 'This may stop active work, hide the task, or affect dependencies. Hermes will validate the transition.'
+                                : 'Hermes will validate this transition.',
+                            keepLabel: 'Keep current',
+                            confirmLabel: 'Move',
+                            onKeep: () => setState(() => _pendingStatus = null),
+                            onConfirm: _busy
+                                ? null
+                                : () => _changeStatus(_pendingStatus!),
+                          ),
+                  ),
+                ],
+              ),
+            ),
           ),
           if (task.childTotal != null && task.childTotal! > 0) ...[
             const SizedBox(height: 12),
@@ -2006,6 +2177,54 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
             TextButton(onPressed: _load, child: const Text('Retry')),
           ],
           const SizedBox(height: 16),
+          // What the task produced comes first; controls and history after.
+          if (task.body != null || task.summary != null) ...[
+            const SizedBox(height: 16),
+            _section(
+              task.status == 'done' ? 'Result' : 'Details',
+              task.summary != null
+                  ? 'Latest summary from the agent'
+                  : 'What this task asks for',
+              Icons.notes_rounded,
+              [
+                if (task.body != null) ...[
+                  Text(
+                    'Description',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    task.body!,
+                    maxLines: _descriptionExpanded ? null : 2,
+                    overflow: _descriptionExpanded
+                        ? null
+                        : TextOverflow.ellipsis,
+                  ),
+                ],
+                if (task.summary != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Latest summary',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    task.summary!,
+                    maxLines: _descriptionExpanded ? null : 8,
+                    overflow: _descriptionExpanded
+                        ? null
+                        : TextOverflow.ellipsis,
+                  ),
+                ],
+                TextButton(
+                  onPressed: () => setState(
+                    () => _descriptionExpanded = !_descriptionExpanded,
+                  ),
+                  child: Text(
+                    _descriptionExpanded ? 'Show less' : 'Read full details',
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (task.status == 'ready' && task.assignee == null)
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
@@ -2013,226 +2232,14 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
                 'This task needs a Hermes profile before an agent can start.',
               ),
             ),
-          _section(
-            'Actions',
-            'Edit key details for this task.',
-            Icons.edit_outlined,
-            [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(1);
-                  final columns = scale > 1.5
-                      ? 1
-                      : scale > 1.1 || constraints.maxWidth < 315
-                      ? 2
-                      : 3;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 8) / columns;
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      SizedBox(
-                        width: width,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            minimumSize: const Size(0, 46),
-                          ),
-                          onPressed: _busy
-                              ? null
-                              : () => _toggleEdit(_TaskEdit.title),
-                          icon: const Icon(Icons.edit_outlined, size: 17),
-                          label: const Text('Edit title'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            minimumSize: const Size(0, 46),
-                          ),
-                          onPressed: _busy
-                              ? null
-                              : () => _toggleEdit(_TaskEdit.assignee),
-                          icon: const Icon(Icons.person_outline, size: 17),
-                          label: const Text('Assignee'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            minimumSize: const Size(0, 46),
-                          ),
-                          onPressed: _busy
-                              ? null
-                              : () => _toggleEdit(_TaskEdit.priority),
-                          icon: const Icon(Icons.flag_outlined, size: 17),
-                          label: const Text('Priority'),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              // The chosen field opens here, under its control, and pushes
-              // the rest of the task down.
-              HermezReveal(
-                visible:
-                    _editing == _TaskEdit.title ||
-                    _editing == _TaskEdit.assignee ||
-                    _editing == _TaskEdit.priority,
-                weight: HermezMotionWeight.medium,
-                revealKey: ValueKey('task-edit-$_editing'),
-                child: switch (_editing) {
-                  _TaskEdit.title => _InlineField(
-                    label: 'Title',
-                    initial: task.title,
-                    maxLength: 1000,
-                    onCancel: () => setState(() => _editing = null),
-                    onSave: (value) {
-                      if (value.isEmpty) return;
-                      _saveEdit(
-                        () => widget.client.patchTask(widget.board, task.id, {
-                          'title': value,
-                        }),
-                      );
-                    },
-                  ),
-                  _TaskEdit.priority => _InlineField(
-                    label: 'Priority',
-                    initial: task.priority?.toString(),
-                    maxLength: 4,
-                    numeric: true,
-                    onCancel: () => setState(() => _editing = null),
-                    onSave: (value) {
-                      final priority = int.tryParse(value);
-                      if (priority == null) return;
-                      _saveEdit(
-                        () => widget.client.patchTask(widget.board, task.id, {
-                          'priority': priority,
-                        }),
-                      );
-                    },
-                  ),
-                  _TaskEdit.assignee => _ProfileChoices(
-                    client: widget.client,
-                    current: task.assignee,
-                    enabled: !_busy,
-                    onSelected: (value) => _saveEdit(
-                      () => widget.client.patchTask(widget.board, task.id, {
-                        'assignee': value,
-                      }),
-                    ),
-                  ),
-                  _ => const SizedBox.shrink(),
-                },
-              ),
-            ],
-          ),
-          _section(
-            'Move task',
-            'Change the status of this task.',
-            Icons.swap_horiz_rounded,
-            [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(1);
-                  final columns = scale > 1.5
-                      ? 1
-                      : scale > 1.1 || constraints.maxWidth < 315
-                      ? 2
-                      : 3;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 8) / columns;
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final lane in kanbanLanes)
-                        if (lane != 'running' && lane != task.status)
-                          SizedBox(
-                            width: width,
-                            child: ActionChip(
-                              label: SizedBox(
-                                width: double.infinity,
-                                child: Text(
-                                  _label(lane),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              side: _pendingStatus == lane
-                                  ? BorderSide(
-                                      color: HermezChatPalette.forBrightness(
-                                        Theme.of(context).brightness,
-                                      ).accent,
-                                      width: 2,
-                                    )
-                                  : null,
-                              onPressed: _busy ? null : () => _askStatus(lane),
-                            ),
-                          ),
-                      if (task.status != 'archived')
-                        SizedBox(
-                          width: width,
-                          child: ActionChip(
-                            label: const SizedBox(
-                              width: double.infinity,
-                              child: Text(
-                                'Archive',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            side: _pendingStatus == 'archived'
-                                ? BorderSide(
-                                    color: HermezChatPalette.forBrightness(
-                                      Theme.of(context).brightness,
-                                    ).accent,
-                                    width: 2,
-                                  )
-                                : null,
-                            onPressed: _busy
-                                ? null
-                                : () => _askStatus('archived'),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-              HermezReveal(
-                visible: _pendingStatus != null,
-                weight: HermezMotionWeight.medium,
-                revealKey: ValueKey('task-status-$_pendingStatus'),
-                child: _pendingStatus == null
-                    ? const SizedBox.shrink()
-                    : _GuardPanel(
-                        title:
-                            'MOVE TO ${_label(_pendingStatus!).toUpperCase()}?',
-                        message:
-                            _pendingStatus == 'done' ||
-                                _pendingStatus == 'blocked' ||
-                                _pendingStatus == 'archived' ||
-                                task.status == 'running'
-                            ? 'This may stop active work, hide the task, or affect dependencies. Hermes will validate the transition.'
-                            : 'Hermes will validate this transition.',
-                        keepLabel: 'Keep current',
-                        confirmLabel: 'Move',
-                        onKeep: () => setState(() => _pendingStatus = null),
-                        onConfirm: _busy
-                            ? null
-                            : () => _changeStatus(_pendingStatus!),
-                      ),
-              ),
-            ],
-          ),
           if (detail != null) ...[
             _section(
               'Live activity',
-              '${detail.runs.length} runs · ${detail.events.length} events · ${detail.comments.length} comments · refreshes while open',
+              [
+                _count(detail.runs.length, 'run'),
+                _count(detail.events.length, 'event'),
+                _count(detail.comments.length, 'comment'),
+              ].join(' · '),
               Icons.schedule_rounded,
               [
                 if (detail.runs.isEmpty &&
@@ -2463,11 +2470,11 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
               ],
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 54),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
               onPressed: _busy ? null : () => _toggleEdit(_TaskEdit.comment),
@@ -2491,53 +2498,10 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
               ),
             ),
           ],
-          if (task.body != null || task.summary != null) ...[
-            const SizedBox(height: 16),
-            _section(
-              'Details',
-              'Task description and latest agent summary',
-              Icons.notes_rounded,
-              [
-                if (task.body != null) ...[
-                  Text(
-                    'Description',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                  Text(
-                    task.body!,
-                    maxLines: _descriptionExpanded ? null : 2,
-                    overflow: _descriptionExpanded
-                        ? null
-                        : TextOverflow.ellipsis,
-                  ),
-                ],
-                if (task.summary != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Latest summary',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                  Text(
-                    task.summary!,
-                    maxLines: _descriptionExpanded ? null : 2,
-                    overflow: _descriptionExpanded
-                        ? null
-                        : TextOverflow.ellipsis,
-                  ),
-                ],
-                TextButton(
-                  onPressed: () => setState(
-                    () => _descriptionExpanded = !_descriptionExpanded,
-                  ),
-                  child: Text(
-                    _descriptionExpanded ? 'Show less' : 'Read full details',
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 }
+
+String _count(int n, String noun) => '$n $noun${n == 1 ? '' : 's'}';

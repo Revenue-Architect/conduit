@@ -79,8 +79,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          builder: (context, child) =>
-              LegacyDesignCompatibility(child: child!),
+          builder: (context, child) => LegacyDesignCompatibility(child: child!),
           home: HermesKanbanPage(client: client),
         ),
       ),
@@ -95,7 +94,7 @@ void main() {
     }
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Actions'), findsOneWidget);
+    expect(find.text('Rename'), findsOneWidget);
     await tester.tap(find.byTooltip('Close task details'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

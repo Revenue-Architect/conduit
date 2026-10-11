@@ -257,7 +257,10 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
       return ColoredBox(color: palette.canvas, child: const SizedBox.expand());
     }
     return HermesPageChrome(
-      title: current.title,
+      // A new chat has no server title yet; never headline a placeholder.
+      title: current.title == 'Untitled session'
+          ? 'Run details'
+          : current.title,
       subtitle: 'CONVERSATION ACTIVITY · ${current.profile ?? 'Hermes'}',
       leading: widget.embedded
           ? IconButton(

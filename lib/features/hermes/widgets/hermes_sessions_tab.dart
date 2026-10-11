@@ -12,6 +12,7 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
 import '../../../shared/widgets/conduit_loading.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
+import '../../navigation/providers/sidebar_search_providers.dart';
 import '../../navigation/providers/sidebar_tab_scroll_registry.dart';
 import '../../navigation/models/sidebar_navigation_model.dart';
 import '../../navigation/widgets/chats_drawer.dart'
@@ -52,6 +53,9 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
   final Set<String> _expandedBots = <String>{};
   final Map<String, int> _visibleBotSessions = <String, int>{};
 
+  /// Cron, webhook and scout runs, folded under your own chats.
+  bool _showAutomated = false;
+
   @override
   SidebarTabId get sidebarTabId => SidebarTabId.hermes;
 
@@ -69,6 +73,15 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.standalone) return _buildTab(context, '');
+    final search = ref.watch(sidebarSearchFieldControllerProvider);
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: search,
+      builder: (context, value, _) => _buildTab(context, value.text.trim()),
+    );
+  }
+
+  Widget _buildTab(BuildContext context, String query) {
     final caps = ref.watch(hermesCapabilitiesProvider).asData?.value;
     final showJobs = caps?.jobs ?? true;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
@@ -90,19 +103,29 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                 : sidebarTabContentTopPadding(context),
           ),
         ),
-        const SliverToBoxAdapter(child: _HermesHomeEntry()),
-        ..._botSlivers(
-          context,
-          ref.watch(hermesBotsProvider).asData?.value,
-          sessionsAsync.asData?.value ?? const [],
-          profileTotals,
-        ),
-        if (ref.watch(hermesConfigProvider).mode ==
-            HermesBackendMode.desktopGateway)
-          const SliverToBoxAdapter(child: _KanbanEntry()),
-        const SliverToBoxAdapter(child: _SpacesEntry()),
-        if (showJobs) const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
-        ..._sessionSlivers(context, sessionsAsync),
+        // While searching, results replace the drawer, starting at the top.
+        if (query.isNotEmpty)
+          ..._searchSlivers(
+            context,
+            query,
+            ref.watch(hermesBotsProvider).asData?.value ?? const [],
+            sessionsAsync,
+          )
+        else ...[
+          const SliverToBoxAdapter(child: _HermesHomeEntry()),
+          ..._botSlivers(
+            context,
+            ref.watch(hermesBotsProvider).asData?.value,
+            sessionsAsync.asData?.value ?? const [],
+            profileTotals,
+          ),
+          if (ref.watch(hermesConfigProvider).mode ==
+              HermesBackendMode.desktopGateway)
+            const SliverToBoxAdapter(child: _KanbanEntry()),
+          const SliverToBoxAdapter(child: _SpacesEntry()),
+          if (showJobs) const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
+          ..._sessionSlivers(context, sessionsAsync),
+        ],
         SliverToBoxAdapter(
           child: SizedBox(
             height: sidebarTabContentBottomPadding(
@@ -332,6 +355,130 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
     );
   }
 
+  /// Scheduled jobs, webhooks, scouts and delegated sub-runs: work Hermes did
+  /// on its own, not a conversation you had.
+  static bool _isAutomated(HermesSessionSummary session) => const {
+    'cron',
+    'webhook',
+    'subagent',
+    'api_server',
+  }.contains(session.source);
+
+  /// Rows with the bot's portrait, profile and time, so a chat is
+  /// recognisable without opening it.
+  Widget _sessionList(
+    List<HermesSessionSummary> sessions, {
+    String? highlight,
+  }) => SliverPadding(
+    padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+    sliver: SliverList.builder(
+      itemCount: sessions.length,
+      itemBuilder: (context, index) => HermesSessionTile(
+        session: sessions[index],
+        compact: true,
+        highlight: highlight,
+      ),
+    ),
+  );
+
+  List<Widget> _searchSlivers(
+    BuildContext context,
+    String query,
+    List<HermesBot> bots,
+    AsyncValue<List<HermesSessionSummary>> sessionsAsync,
+  ) {
+    final theme = context.conduitTheme;
+    final needle = query.toLowerCase();
+    bool hit(String? text) =>
+        text != null && text.toLowerCase().contains(needle);
+    final botHits = bots
+        .where((bot) => hit(bot.name) || hit(bot.title) || hit(bot.description))
+        .toList();
+    final sessions = sessionsAsync.asData?.value ?? const [];
+    final sessionHits = sessions
+        .where((s) => hit(s.title) || hit(s.preview) || hit(s.profile))
+        .toList();
+    // Your own chats before automated runs.
+    sessionHits.sort(
+      (a, b) => (_isAutomated(a) ? 1 : 0).compareTo(_isAutomated(b) ? 1 : 0),
+    );
+    if (botHits.isEmpty && sessionHits.isEmpty) {
+      return [
+        SliverToBoxAdapter(
+          child: sessionsAsync.isLoading
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: HermezSkeleton.rows(count: 4),
+                )
+              : _message(
+                  theme,
+                  Icons.search_off_rounded,
+                  'Nothing matches \u201c$query\u201d in your recent chats.',
+                  theme.textSecondary,
+                ),
+        ),
+      ];
+    }
+    return [
+      if (botHits.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: _SectionHeader(title: 'Bots', count: botHits.length),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+          sliver: SliverList.builder(
+            itemCount: botHits.length,
+            itemBuilder: (context, index) {
+              final bot = botHits[index];
+              return InkWell(
+                onTap: () => context.pushNamed(
+                  RouteNames.hermesBotDetail,
+                  pathParameters: {'profile': bot.name},
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      HermezBotMark(
+                        identity: hermezIdentityForName(bot.name),
+                        botName: bot.name,
+                        size: 32,
+                        label: bot.title,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          bot.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodyLargeStyle.copyWith(
+                            color: theme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: theme.iconSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+      if (sessionHits.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: _SectionHeader(title: 'Chats', count: sessionHits.length),
+        ),
+        _sessionList(sessionHits, highlight: query),
+      ],
+    ];
+  }
+
   List<Widget> _sessionSlivers(
     BuildContext context,
     AsyncValue<List<HermesSessionSummary>> sessionsAsync,
@@ -352,41 +499,28 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
             ),
           ];
         }
+        final chats = sessions.where((s) => !_isAutomated(s)).toList();
+        final automated = sessions.where(_isAutomated).toList();
         return [
           SliverToBoxAdapter(
             child: _SectionHeader(
               title: l10n.hermesConversationsTitle,
-              count: sessions.length,
+              count: chats.length,
             ),
           ),
-          SliverPadding(
-            // The shared conversation tile supplies the 4.0.3 Hermes 8pt row
-            // gutter. Keep list padding vertical to avoid doubling that inset
-            // only in this tab.
-            padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-            sliver: SliverList.builder(
-              itemCount: sessions.length,
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  Spacing.sm,
-                  0,
-                  Spacing.sm,
-                  Spacing.xs,
-                ),
-                child: widget.standalone
-                    ? HermesSessionTile(session: sessions[index], compact: true)
-                    : DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: theme.surfaceBackground,
-                          borderRadius: BorderRadius.circular(
-                            AppBorderRadius.card,
-                          ),
-                        ),
-                        child: HermesSessionTile(session: sessions[index]),
-                      ),
+          _sessionList(chats),
+          if (automated.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                title: 'Automated runs',
+                count: automated.length,
+                expanded: _showAutomated,
+                onToggle: () =>
+                    setState(() => _showAutomated = !_showAutomated),
               ),
             ),
-          ),
+            if (_showAutomated) _sessionList(automated),
+          ],
         ];
       },
       loading: () => [

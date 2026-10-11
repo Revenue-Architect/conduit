@@ -565,6 +565,10 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
         ],
         const SizedBox(height: Spacing.lg),
         const HermesServerStatusSection(),
+        if (config.mode == HermesBackendMode.desktopGateway) ...[
+          const SizedBox(height: Spacing.lg),
+          const HermesSignOutSection(),
+        ],
       ],
     ];
 

@@ -64,12 +64,16 @@ class HermesSessionTile extends ConsumerWidget {
     required this.session,
     this.nested = false,
     this.compact = false,
+    this.highlight,
     super.key,
   });
 
   final HermesSessionSummary session;
   final bool nested;
   final bool compact;
+
+  /// A search query: the compact row then shows where it matched.
+  final String? highlight;
 
   String get _localConversationId => 'local:hermes_${session.id}';
 
@@ -112,13 +116,31 @@ class HermesSessionTile extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _displayTitle(context),
+                        Text.rich(
+                          _highlighted(
+                            _displayTitle(context),
+                            highlight ?? '',
+                            HermezType.section(palette).copyWith(fontSize: 15),
+                            HermezType.section(palette)
+                                .copyWith(fontSize: 15, color: palette.accent),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: HermezType.section(palette)
-                              .copyWith(fontSize: 15),
                         ),
+                        if (_matchSnippet() case final snippet?)
+                          Text.rich(
+                            _highlighted(
+                              snippet,
+                              highlight!,
+                              HermezType.meta(palette),
+                              HermezType.meta(palette).copyWith(
+                                color: palette.ink,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         Text(
                           [
                             ?session.profile,
@@ -211,6 +233,21 @@ class HermesSessionTile extends ConsumerWidget {
               onTap: () => openHermesSession(context, ref, session),
             ),
     );
+  }
+
+  /// The words around the first match in the preview, or null when only the
+  /// title matched (the title already shows it) or there is no query.
+  String? _matchSnippet() {
+    final query = highlight?.trim().toLowerCase();
+    if (query == null || query.isEmpty) return null;
+    final preview = session.preview?.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (preview == null || preview.isEmpty) return null;
+    final at = preview.toLowerCase().indexOf(query);
+    if (at < 0) return null;
+    final start = (at - 40).clamp(0, preview.length);
+    final end = (at + query.length + 80).clamp(0, preview.length);
+    return '${start > 0 ? '…' : ''}${preview.substring(start, end)}'
+        '${end < preview.length ? '…' : ''}';
   }
 
   /// Single-line label: the title, falling back to the transcript preview when
@@ -617,4 +654,29 @@ Future<void> openHermesSession(
     NavigationService.router.go(Routes.chat);
     closeSidebarDrawerIfOverlay(context);
   }
+}
+
+/// [text] with every case-insensitive occurrence of [query] in [match] style.
+TextSpan _highlighted(
+  String text,
+  String query,
+  TextStyle base,
+  TextStyle match,
+) {
+  final needle = query.trim().toLowerCase();
+  if (needle.isEmpty) return TextSpan(text: text, style: base);
+  final lower = text.toLowerCase();
+  final spans = <TextSpan>[];
+  var from = 0;
+  while (true) {
+    final at = lower.indexOf(needle, from);
+    if (at < 0) break;
+    if (at > from) spans.add(TextSpan(text: text.substring(from, at)));
+    spans.add(
+      TextSpan(text: text.substring(at, at + needle.length), style: match),
+    );
+    from = at + needle.length;
+  }
+  if (from < text.length) spans.add(TextSpan(text: text.substring(from)));
+  return TextSpan(style: base, children: spans);
 }

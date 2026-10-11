@@ -126,6 +126,8 @@ void main() {
     tester,
   ) async {
     await _pumpJobs(tester);
+    await tester.tap(find.byIcon(Icons.expand_more_rounded).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Edit scheduled job'));
     await tester.pumpAndSettle();
     expect(find.byType(HermezModalSheet), findsOneWidget);
@@ -139,6 +141,8 @@ void main() {
   testWidgets('delete opens a guard inside the card; Cancel closes it; '
       'Delete removes once', (tester) async {
     await _pumpJobs(tester);
+    await tester.tap(find.byIcon(Icons.expand_more_rounded).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Delete scheduled job'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);

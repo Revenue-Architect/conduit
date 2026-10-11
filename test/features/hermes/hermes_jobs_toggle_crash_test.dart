@@ -109,6 +109,8 @@ void main() {
     await tester.tap(find.text('Card'));
     await _settle(tester);
     // Open the job's edit sheet and close it.
+    await tester.tap(find.byIcon(Icons.expand_more_rounded).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.edit_outlined));
     await _settle(tester);
     await tester.binding.handlePopRoute();

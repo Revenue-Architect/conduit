@@ -2,11 +2,13 @@ import '../../spaces/providers/spaces_providers.dart';
 import '../../spaces/widgets/save_as_page_sheet.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:io' show Platform;
 
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
@@ -428,6 +430,12 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       _applyDisplayedContent(raw);
       return;
     }
+    if (_shouldPaceStreamingContent(raw)) {
+      _pacedStreamingTarget = raw;
+      _startStreamingPace();
+      return;
+    }
+    _pacedStreamingTarget = null;
 
     _pendingDisplayedContent = raw;
     if (_displayedContentFrameScheduled) {
@@ -451,6 +459,61 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       }
       _applyDisplayedContent(pending);
     });
+  }
+
+  // Fast models deliver text in bursts of whole sentences. While streaming,
+  // a burst is revealed over a few frames, word by word, catching up within
+  // roughly a fifth of a second, so the answer reads as written rather than
+  // popping in paragraph by paragraph. Completion always shows everything.
+  String? _pacedStreamingTarget;
+  bool _streamingPaceScheduled = false;
+
+  bool _shouldPaceStreamingContent(String raw) =>
+      // The first words land at once; only later bursts are paced.
+      _displayedContent.trim().isNotEmpty &&
+      widget.isStreaming &&
+      !(MediaQuery.maybeDisableAnimationsOf(context) ?? false) &&
+      raw.length - _displayedContent.length > 24 &&
+      raw.startsWith(_displayedContent);
+
+  void _startStreamingPace() {
+    if (_streamingPaceScheduled) return;
+    _streamingPaceScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback(_paceStreamingStep);
+    SchedulerBinding.instance.scheduleFrame();
+  }
+
+  void _paceStreamingStep(Duration _) {
+    _streamingPaceScheduled = false;
+    final target = _pacedStreamingTarget;
+    if (!mounted || target == null) return;
+    if (!widget.isStreaming || !target.startsWith(_displayedContent)) {
+      _pacedStreamingTarget = null;
+      _applyDisplayedContent(target);
+      return;
+    }
+    final shown = _displayedContent.length;
+    final backlog = target.length - shown;
+    if (backlog <= 0) {
+      _pacedStreamingTarget = null;
+      return;
+    }
+    var end = shown + math.max<int>(3, (backlog / 12).ceil());
+    if (end >= target.length) {
+      end = target.length;
+    } else {
+      // Whole words, and never half of a surrogate pair.
+      final space = target.indexOf(' ', end);
+      if (space != -1 && space - end < 12) end = space;
+      final unit = target.codeUnitAt(end - 1);
+      if (unit >= 0xD800 && unit <= 0xDBFF) end++;
+    }
+    _applyDisplayedContent(target.substring(0, end));
+    if (end < target.length) {
+      _startStreamingPace();
+    } else {
+      _pacedStreamingTarget = null;
+    }
   }
 
   void _applyDisplayedContent(String raw) {

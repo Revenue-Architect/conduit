@@ -48,6 +48,10 @@ import '../providers/chat_providers.dart';
 import '../providers/openwebui_chat_prompt_provider.dart';
 import '../../hermes/models/hermes_model.dart';
 import '../../hermes/models/hermes_bot.dart';
+
+import 'package:go_router/go_router.dart';
+
+import '../../../core/services/navigation_service.dart';
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
@@ -266,17 +270,20 @@ class _HermesBotToolbarTitle extends StatelessWidget {
     required this.bot,
     required this.maxWidth,
     required this.active,
+    this.onTap,
   });
 
   final HermesBotChatPresentation bot;
   final double maxWidth;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
+    final title = Semantics(
       label: bot.title,
       header: true,
+      button: onTap != null,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
@@ -309,6 +316,19 @@ class _HermesBotToolbarTitle extends StatelessWidget {
               const _HermesBotActivityDot(),
             ],
           ],
+        ),
+      ),
+    );
+    if (onTap == null) return title;
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        key: const ValueKey('hermes-bot-toolbar-open'),
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: title,
         ),
       ),
     );
@@ -3940,14 +3960,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ref.watch(pageForSessionProvider(sessionId)).value;
   }
 
-  /// The bot this chat talks to. Chats opened from a bot carry it in their
-  /// metadata; a chat started from "+" falls back to the profile it runs on,
-  /// so it never shows a generic "Hermes Agent" with no face.
-  HermesBotChatPresentation? _hermesBotPresentation(
-    Conversation? conversation,
-  ) {
-    final bot = chatHermesBotPresentation(conversation);
-    if (bot != null) return bot;
+  /// The Hermes profile this chat runs on, or null outside Hermes.
+  String? _hermesChatProfile(Conversation? conversation) {
     final service = ref.read(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return null;
     final selected = ref.read(selectedModelProvider);
@@ -3963,7 +3977,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ? service.config.desktopProfile
                 : service.profileForSession(sessionId))
             .trim();
-    if (name.isEmpty) return null;
+    return HermesConfig.isValidDesktopProfile(name) ? name : null;
+  }
+
+  /// The bot this chat talks to. Chats opened from a bot carry it in their
+  /// metadata; a chat started from "+" falls back to the profile it runs on,
+  /// so it never shows a generic "Hermes Agent" with no face.
+  HermesBotChatPresentation? _hermesBotPresentation(
+    Conversation? conversation,
+  ) {
+    final bot = chatHermesBotPresentation(conversation);
+    if (bot != null) return bot;
+    final name = _hermesChatProfile(conversation);
+    if (name == null) return null;
     return (
       title: name,
       avatar: null,
@@ -4666,10 +4692,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool hermezVisuals,
   }) {
     if (hermesBot != null) {
+      final profile = _hermesChatProfile(ref.read(activeConversationProvider));
       return _HermesBotToolbarTitle(
         bot: hermesBot,
         maxWidth: maxModelWidth,
         active: hermesBotActive,
+        // The bot's own page: what it knows, its skills and schedules.
+        onTap: profile == null
+            ? null
+            : () => context.pushNamed(
+                RouteNames.hermesBotDetail,
+                pathParameters: {'profile': profile},
+              ),
       );
     }
     return ConduitAdaptiveAppBarModelSelector(
