@@ -613,9 +613,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       models: models,
       apiService: apiService,
       directModelRegistry: ref.read(directModelRegistryProvider),
-      hermesBot: chatHermesBotPresentation(
-        ref.read(activeConversationProvider),
-      ),
+      hermesBot: _hermesBotPresentation(ref.read(activeConversationProvider)),
     );
   }
 
@@ -3734,7 +3732,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Widget _buildEmptyState(ThemeData theme) {
     final l10n = AppLocalizations.of(context)!;
-    final hermesBot = chatHermesBotPresentation(
+    final hermesBot = _hermesBotPresentation(
       ref.watch(activeConversationProvider),
     );
     final authUser = ref.watch(currentUserProvider2);
@@ -3940,6 +3938,39 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     if (sessionId == null) return null;
     return ref.watch(pageForSessionProvider(sessionId)).value;
+  }
+
+  /// The bot this chat talks to. Chats opened from a bot carry it in their
+  /// metadata; a chat started from "+" falls back to the profile it runs on,
+  /// so it never shows a generic "Hermes Agent" with no face.
+  HermesBotChatPresentation? _hermesBotPresentation(
+    Conversation? conversation,
+  ) {
+    final bot = chatHermesBotPresentation(conversation);
+    if (bot != null) return bot;
+    final service = ref.read(hermesApiServiceProvider);
+    if (service is! HermesDesktopApiService) return null;
+    final selected = ref.read(selectedModelProvider);
+    final hermes = conversation == null
+        ? selected != null && isHermesModel(selected)
+        : isNativeHermesConversation(conversation);
+    if (!hermes) return null;
+    final sessionId = validateHermesOpaqueIdentifier(
+      conversation?.metadata['hermesSessionId'],
+    );
+    final name =
+        (sessionId == null
+                ? service.config.desktopProfile
+                : service.profileForSession(sessionId))
+            .trim();
+    if (name.isEmpty) return null;
+    return (
+      title: name,
+      avatar: null,
+      shape: 'squircle',
+      color: '#8b5cf6',
+      imageKind: null,
+    );
   }
 
   Widget? _hermesContextBar(WidgetRef ref, Conversation? conversation) {
@@ -4153,9 +4184,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   return ModernChatInput(
                     onSendMessage: _handleMessageSend,
                     hermezStyle: _useHermezChatVisuals,
-                    placeholder: _useHermezChatVisuals
-                        ? 'Message Hermez'
-                        : null,
+                    // Name who answers: "Message default", never the app.
+                    placeholder: switch (_hermesBotPresentation(
+                      activeConversation,
+                    )) {
+                      final bot? => 'Message ${bot.title}',
+                      _ when _useHermezChatVisuals => 'Message Hermez',
+                      _ => null,
+                    },
                     enabled: debugCanSubmitChatMessageForTesting(
                       isLoadingConversation: isLoadingConversation,
                       isSavingTemporary: _isSavingTemporary,
@@ -4283,7 +4319,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
-    final hermesBot = chatHermesBotPresentation(activeConversation);
+    final hermesBot = _hermesBotPresentation(activeConversation);
     final hermezVisuals = _useHermezChatVisuals;
     final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);
     final formattedModelName = selectedModel != null
@@ -4399,6 +4435,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   right: 0,
                   bottom: 0,
                   child: ConduitChromeGradientFade.bottom(
+                    // Solid from the model chip down (the composer's top
+                    // Spacing.xl is air), then a short feather above it. No
+                    // blur: a bottom frost would need the sliced multi-pass
+                    // version that costs frames.
                     contentHeight: math.max(
                       0,
                       math.max(
@@ -4406,7 +4446,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         MediaQuery.viewPaddingOf(context).bottom + Spacing.xxl,
                       ),
                     ),
-                    fadeHeight: Spacing.md,
+                    fadeHeight: Spacing.lg,
                     backgroundColor: hermezVisuals
                         ? hermezPalette.canvas
                         : null,

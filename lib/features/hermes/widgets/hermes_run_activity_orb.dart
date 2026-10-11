@@ -57,7 +57,12 @@ class HermesMessageActivity extends ConsumerWidget {
     final statuses = [for (final message in messages) ...message.statusHistory];
     final running = state == HermesDesktopTurnState.running;
     final run = HermesRunSummary.latest(events, running: running);
-    final summary = hermesStatusSummary(context, statuses, running: running);
+    final summary = hermesActivityLabel(
+      HermesActivityPresenter.rows(run.events, running: running),
+      statuses,
+      running: running,
+      fallback: hermesStatusSummary(context, statuses, running: running),
+    );
     final failed =
         messages.any((message) => message.error != null) || run.failed;
     // A plain answer with no tools, plan or request has nothing to open: show
@@ -68,7 +73,9 @@ class HermesMessageActivity extends ConsumerWidget {
         state == HermesDesktopTurnState.idle &&
         !attention &&
         !failed &&
-        run.events.isEmpty &&
+        // Lifecycle events (started, completed) alone are not activity.
+        run.subagents == 0 &&
+        HermesActivityPresenter.rows(run.events, running: false).isEmpty &&
         statuses.where((s) => s.hidden != true).isEmpty) {
       return const SizedBox.shrink();
     }
@@ -85,6 +92,40 @@ class HermesMessageActivity extends ConsumerWidget {
       currentAnswer: currentAnswer,
     );
   }
+}
+
+/// The run's label in plain words: "Ran code 4 times", "Read web page and 2
+/// more". Raw tool names ("Explored execute_code (4)") never reach the chat.
+String hermesActivityLabel(
+  List<HermesActivityRow> rows,
+  List<ChatStatusUpdate> statuses, {
+  required bool running,
+  String fallback = '',
+}) {
+  final steps = <({String verb, int count})>[
+    for (final row in rows) (verb: row.verb, count: row.count),
+  ];
+  if (steps.isEmpty) {
+    // Saved answers carry status updates, not live events.
+    final counts = <String, int>{};
+    for (final status in statuses) {
+      if (status.hidden == true) continue;
+      final name = hermesStatusToolName(status);
+      if (name == null || name.isEmpty) continue;
+      final verb = HermesActivityPresenter.verb(name, running: running);
+      counts[verb] = (counts[verb] ?? 0) + 1;
+    }
+    steps.addAll([
+      for (final entry in counts.entries) (verb: entry.key, count: entry.value),
+    ]);
+  }
+  if (steps.isEmpty) return fallback;
+  // While running, say what is happening now; afterwards, what happened.
+  final lead = running ? steps.last : steps.first;
+  if (steps.length == 1) {
+    return lead.count > 1 ? '${lead.verb} ${lead.count} times' : lead.verb;
+  }
+  return '${lead.verb} and ${steps.length - 1} more';
 }
 
 /// The orb and its label are one touch target and one morph origin. It remains

@@ -119,6 +119,21 @@ class ConduitChromeGradientFade extends StatelessWidget {
                   1.0,
                 ],
               )
+            : edge == ConduitChromeFadeEdge.bottom
+            // Bottom: the fade happens above the composer and the colour then
+            // holds behind it, so its floating chips never sit on half-
+            // visible text.
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  baseColor.withValues(alpha: 0.0),
+                  baseColor.withValues(alpha: 0.45),
+                  baseColor.withValues(alpha: 0.92),
+                  baseColor.withValues(alpha: 0.97),
+                ],
+                stops: [0.0, (1 - solid) * 0.5, 1 - solid, 1.0],
+              )
             : LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,

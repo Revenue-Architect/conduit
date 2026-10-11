@@ -250,7 +250,7 @@ void main() {
         );
         expect(find.byType(StreamingStatusWidget), findsNothing);
         expect(find.byType(ThinkingOrb), findsNothing);
-        expect(find.text('Explored read_file'), findsOneWidget);
+        expect(find.text('Read file'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
         await tester.pumpAndSettle();
         expect(find.byType(HermesLiveRunPage), findsOneWidget);
