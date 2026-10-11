@@ -17,7 +17,6 @@ import 'hermes_inline_run_surface.dart' show hermesThinkingOrbState;
 import 'hermes_run_details_button.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_live.dart';
-import 'hermez_status_morph.dart';
 
 /// One answer's activity entry, beside its bot mark. Old answers never subscribe
 /// to a new turn's controls or pending requests. The existing sheet owns details.
@@ -59,13 +58,29 @@ class HermesMessageActivity extends ConsumerWidget {
     final running = state == HermesDesktopTurnState.running;
     final run = HermesRunSummary.latest(events, running: running);
     final summary = hermesStatusSummary(context, statuses, running: running);
+    final failed =
+        messages.any((message) => message.error != null) || run.failed;
+    // A plain answer with no tools, plan or request has nothing to open: show
+    // no activity control rather than a "Done" that leads to an empty sheet.
+    // Only the current answer's activity is known here; an older answer's
+    // saved run loads when opened, so it always keeps its entry point.
+    if (currentAnswer &&
+        state == HermesDesktopTurnState.idle &&
+        !attention &&
+        !failed &&
+        run.events.isEmpty &&
+        statuses.where((s) => s.hidden != true).isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final toolCount = run.tools.fold<int>(0, (n, t) => n + t.count);
     return HermesRunActivityOrb(
       sessionId: sessionId,
       state: state,
       attention: attention,
       events: run.events,
       summary: summary,
-      failed: messages.any((message) => message.error != null) || run.failed,
+      toolCount: toolCount,
+      failed: failed,
       answerMessages: messages,
       currentAnswer: currentAnswer,
     );
@@ -82,6 +97,7 @@ class HermesRunActivityOrb extends StatefulWidget {
     this.attention = false,
     this.failed = false,
     this.summary = '',
+    this.toolCount = 0,
     this.events = const [],
     this.answerMessages,
     this.currentAnswer = false,
@@ -92,6 +108,9 @@ class HermesRunActivityOrb extends StatefulWidget {
   final bool attention;
   final bool failed;
   final String summary;
+
+  /// Tool calls in this run, for the quiet finished label.
+  final int toolCount;
   final List<HermesLiveActivityEvent> events;
   final List<ChatMessage>? answerMessages;
   final bool currentAnswer;
@@ -146,7 +165,17 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
       widget.events,
       running: widget.state == HermesDesktopTurnState.running,
     );
-    final label = widget.summary.isNotEmpty ? widget.summary : title;
+    // Finished: say what happened in plain words, not raw tool names.
+    final finishedLabel = widget.failed
+        ? 'Run failed'
+        : widget.summary.isNotEmpty
+        ? widget.summary
+        : widget.toolCount > 0
+        ? 'Used ${widget.toolCount} tool${widget.toolCount == 1 ? '' : 's'}'
+        : 'Run details';
+    final label = done
+        ? finishedLabel
+        : (widget.summary.isNotEmpty ? widget.summary : title);
     return HermesRunDetailsButton(
       key: ValueKey('run-activity-${widget.sessionId}'),
       sessionId: widget.sessionId,
@@ -168,15 +197,21 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox.square(
-                  dimension: 48,
+                SizedBox(
+                  width: done ? 28 : 40,
+                  height: 48,
                   child: Center(
                     child: done
-                        ? HermezStatusMorph(
-                            size: 20,
-                            state: widget.failed
-                                ? HermezMorphState.failed
-                                : HermezMorphState.done,
+                        // Finished is the quietest state: a small muted mark,
+                        // not a filled disc that outweighs the answer.
+                        ? Icon(
+                            widget.failed
+                                ? Icons.error_outline_rounded
+                                : Icons.check_rounded,
+                            size: 16,
+                            color: widget.failed
+                                ? Theme.of(context).colorScheme.error
+                                : palette.muted,
                           )
                         : ThinkingOrb(
                             size: OrbSize.size20,
@@ -197,6 +232,7 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                 Flexible(
                   child: Text(
                     widget.attention ? 'Input needed' : label,
+                    key: const ValueKey('hermes-run-orb-label'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -206,7 +242,13 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                     ),
                   ),
                 ),
-                Icon(Icons.expand_more_rounded, size: 16, color: palette.muted),
+                const SizedBox(width: 2),
+                // Opens a sheet: a forward chevron, not an inline-expand one.
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: palette.muted,
+                ),
               ],
             ),
           ),

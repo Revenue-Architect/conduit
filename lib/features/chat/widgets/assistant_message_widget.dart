@@ -988,6 +988,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         bottom: _isHermesAssistantMessage ? 0 : Spacing.md,
       ),
       child: Row(
+        // Hug the name so a header item can follow it directly.
+        mainAxisSize: MainAxisSize.min,
         children: [
           leading,
           const SizedBox(width: Spacing.xs),
@@ -1266,7 +1268,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 children: [
                   Flexible(child: _cachedAvatar ?? const SizedBox.shrink()),
                   const SizedBox(width: 6),
-                  Expanded(
+                  // Loose, so it sits right after the bot's name instead of
+                  // starting at a fixed share of the row.
+                  Flexible(
                     flex: 2,
                     child: HermesMessageActivity(
                       key: ValueKey('message-run-$_messageId'),

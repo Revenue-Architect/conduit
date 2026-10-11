@@ -25,6 +25,8 @@ class HermesUnifiedActivityTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final remaining = [...statuses.where((status) => status.hidden != true)];
     final entries = <Widget>[];
+    // One rail. A tool's matching status updates belong to its row; their raw
+    // output stays folded under it until asked for, never a wall of results.
     for (final row in rows) {
       final details = <ChatStatusUpdate>[];
       for (var i = 0; i < row.count; i++) {
@@ -45,19 +47,13 @@ class HermesUnifiedActivityTimeline extends StatelessWidget {
                   : null,
             ),
             if (details.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 42),
-                child: StreamingStatusTimeline(
-                  updates: details,
-                  isStreaming: running,
-                  showHeaders: false,
-                ),
-              ),
+              _FoldedOutput(updates: details, running: running),
           ],
         ),
       );
     }
-    if (remaining.isNotEmpty) {
+    // Statuses with no tool row (web search, notes) only when nothing else ran.
+    if (remaining.isNotEmpty && rows.isEmpty) {
       entries.add(
         StreamingStatusTimeline(updates: remaining, isStreaming: running),
       );
@@ -67,6 +63,73 @@ class HermesUnifiedActivityTimeline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: entries,
+      ),
+    );
+  }
+}
+
+/// A tool's output, folded to one quiet line under its row until opened.
+class _FoldedOutput extends StatefulWidget {
+  const _FoldedOutput({required this.updates, required this.running});
+  final List<ChatStatusUpdate> updates;
+  final bool running;
+
+  @override
+  State<_FoldedOutput> createState() => _FoldedOutputState();
+}
+
+class _FoldedOutputState extends State<_FoldedOutput> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      // Aligned with the row's text, inside the same rail.
+      padding: const EdgeInsets.only(left: 42, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      _open ? 'Hide output' : 'Show output',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: muted,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _open
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 16,
+                    color: muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Inside the sheet's lazy list a size animation can't resize
+          // mid-layout, so the fold opens in place.
+          if (_open)
+            StreamingStatusTimeline(
+              updates: widget.updates,
+              isStreaming: widget.running,
+              showHeaders: false,
+            ),
+        ],
       ),
     );
   }

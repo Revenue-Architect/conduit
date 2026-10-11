@@ -372,12 +372,18 @@ class StreamingStatusTimeline extends StatelessWidget {
                   for (final detail in detailItems)
                     Padding(
                       padding: const EdgeInsets.only(bottom: Spacing.xs),
-                      child: SelectableText(
-                        '${detail.title}: ${detail.snippet}',
-                        style: AppTypography.bodySmallStyle.copyWith(
-                          color: theme.textSecondary,
-                        ),
-                      ),
+                      child: showHeaders
+                          ? SelectableText(
+                              '${detail.title}: ${detail.snippet}',
+                              style: AppTypography.bodySmallStyle.copyWith(
+                                color: theme.textSecondary,
+                              ),
+                            )
+                          : _CompactDetail(
+                              title: detail.title ?? '',
+                              snippet: detail.snippet ?? '',
+                              color: theme.textSecondary,
+                            ),
                     ),
                 ],
               ],
@@ -411,6 +417,57 @@ class StreamingStatusTimeline extends StatelessWidget {
           children: items,
         ),
       ),
+    );
+  }
+}
+
+/// Raw tool output under an activity row: a small, capped monospace block so
+/// a JSON result reads as output, not as a wall of body text.
+class _CompactDetail extends StatelessWidget {
+  const _CompactDetail({
+    required this.title,
+    required this.snippet,
+    required this.color,
+  });
+  final String title;
+  final String snippet;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: AppTypography.bodySmallStyle.copyWith(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            snippet.replaceAll(r'\n', '\n'),
+            maxLines: 8,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppTypography.monospaceFontFamily,
+              fontSize: 11,
+              height: 1.45,
+              color: color,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -265,6 +265,16 @@ void main() {
               matching: find.byType(Scrollable),
             )
             .first;
+        // Tool output is folded under its row until asked for.
+        await tester.scrollUntilVisible(
+          find.text('Show output').first,
+          150,
+          scrollable: scroll,
+        );
+        await tester.ensureVisible(find.text('Show output').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Show output').first);
+        await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
           find.textContaining('Actual saved file result'),
           150,

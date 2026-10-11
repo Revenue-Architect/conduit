@@ -442,42 +442,48 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                                   ],
                                 ),
                               ),
-                            const HermesSectionTitle('Activity'),
-                            const SizedBox(height: 8),
-                            HermesPanel(
-                              child: Builder(
-                                builder: (context) {
-                                  final rows = HermesActivityPresenter.rows(
-                                    events,
-                                    running: running,
-                                  );
-                                  if (rows.isEmpty && statuses.isEmpty) {
-                                    return const Text(
-                                      'No tool steps were recorded. Conversation responses are below.',
+                            if (HermesActivityPresenter.rows(
+                                  events,
+                                  running: running,
+                                ).isNotEmpty ||
+                                statuses.isNotEmpty) ...[
+                              const HermesSectionTitle('Activity'),
+                              const SizedBox(height: 8),
+                              HermesPanel(
+                                child: Builder(
+                                  builder: (context) {
+                                    final rows = HermesActivityPresenter.rows(
+                                      events,
+                                      running: running,
                                     );
-                                  }
-                                  return HermesUnifiedActivityTimeline(
-                                    rows: rows,
-                                    statuses: filterVisibleStatusUpdates(
-                                      hermesSafeRunStatuses(
-                                        statuses,
-                                        service.config.sensitiveValues,
-                                      ),
-                                      isStreaming: running,
-                                    ),
-                                    running: running,
-                                    onInspect: (row, origin) =>
-                                        showHermesToolInspector(
-                                          context,
-                                          sessionId: widget.sessionId,
-                                          row: row,
-                                          origin: origin,
+                                    if (rows.isEmpty && statuses.isEmpty) {
+                                      return const Text(
+                                        'No tool steps were recorded. Conversation responses are below.',
+                                      );
+                                    }
+                                    return HermesUnifiedActivityTimeline(
+                                      rows: rows,
+                                      statuses: filterVisibleStatusUpdates(
+                                        hermesSafeRunStatuses(
+                                          statuses,
+                                          service.config.sensitiveValues,
                                         ),
-                                  );
-                                },
+                                        isStreaming: running,
+                                      ),
+                                      running: running,
+                                      onInspect: (row, origin) =>
+                                          showHermesToolInspector(
+                                            context,
+                                            sessionId: widget.sessionId,
+                                            row: row,
+                                            origin: origin,
+                                          ),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 14),
+                              const SizedBox(height: 14),
+                            ],
                             for (final message
                                 in answerMessages ?? const <ChatMessage>[])
                               if (message.error != null)
@@ -492,7 +498,9 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                                         'This run reported an error.',
                                   ),
                                 ),
-                            if (messages.isNotEmpty)
+                            // Opened from an answer, the conversation is right
+                            // behind this sheet; don't repeat it here.
+                            if (messages.isNotEmpty && answerMessages == null)
                               _SavedConversationResults(
                                 key: ValueKey('results-${widget.sessionId}'),
                                 messages: messages,
@@ -707,7 +715,7 @@ class _LiveHero extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              if (elapsed != null)
+              if (elapsed != null && elapsed.inSeconds > 0)
                 Text(
                   formatHermesRunDuration(elapsed),
                   style: HermezType.meta(palette).copyWith(
@@ -728,7 +736,8 @@ class _LiveHero extends ConsumerWidget {
             headline,
             live: running,
             maxLines: 2,
-            style: HermezType.display(palette).copyWith(fontSize: 30),
+            style: HermezType.display(palette)
+                .copyWith(fontSize: running ? 30 : 22),
           ),
           if (current?.object != null) ...[
             const SizedBox(height: 6),
@@ -739,17 +748,21 @@ class _LiveHero extends ConsumerWidget {
               style: HermezType.body(palette).copyWith(color: palette.muted),
             ),
           ],
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 16,
-            runSpacing: 6,
-            children: [
-              _Stat(label: 'steps', value: '${run.steps}'),
-              _Stat(label: 'tools', value: '${run.tools.length}'),
-              if (workers.isNotEmpty)
-                _Stat(label: 'delegates', value: '${workers.length}'),
-            ],
-          ),
+          // Only real counts: "0 steps · 0 tools" says nothing.
+          if (run.steps > 0 || run.tools.isNotEmpty || workers.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 16,
+              runSpacing: 6,
+              children: [
+                if (run.steps > 0) _Stat(label: 'steps', value: '${run.steps}'),
+                if (run.tools.isNotEmpty)
+                  _Stat(label: 'tools', value: '${run.tools.length}'),
+                if (workers.isNotEmpty)
+                  _Stat(label: 'delegates', value: '${workers.length}'),
+              ],
+            ),
+          ],
           if (plan != null) ...[
             const SizedBox(height: 14),
             HermesPlanPreview(
