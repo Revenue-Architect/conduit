@@ -2,6 +2,7 @@ import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/services/hermes_desktop_api_service.dart';
 import 'package:conduit/features/hermes/services/hermes_live_activity.dart';
 import 'package:conduit/features/hermes/widgets/hermes_live_activity_disclosure.dart';
+import 'package:conduit/features/hermes/widgets/hermes_run_activity_orb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -33,7 +34,7 @@ void main() {
     );
   });
 
-  testWidgets('expanded activity fits a narrow chat at 200% text', (
+  testWidgets('single completed orb fits a narrow chat at 200% text', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 820);
@@ -57,11 +58,12 @@ void main() {
           child: Scaffold(
             body: SizedBox(
               width: 320,
-              child: HermesLiveActivityDisclosure(
-                service: service,
+              child: HermesRunActivityOrb(
                 sessionId: 'session-1',
-                expanded: true,
-                onToggle: () {},
+                state: HermesDesktopTurnState.idle,
+                summary: 'Explored skill_view (2), read_file',
+                detailsBuilder: (_) =>
+                    const Material(child: Text('Saved tools')),
               ),
             ),
           ),
@@ -69,7 +71,8 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Live activity'), findsOneWidget);
+    expect(find.byKey(const ValueKey('hermes-run-orb-toggle')), findsOneWidget);
+    expect(find.text('Explored skill_view (2), read_file'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

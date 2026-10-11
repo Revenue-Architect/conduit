@@ -18,9 +18,6 @@ import 'package:conduit/core/services/haptic_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../../core/services/navigation_service.dart';
 
 import 'dart:io' show Platform;
 import 'dart:collection';
@@ -53,7 +50,7 @@ import '../../hermes/models/hermes_model.dart';
 import '../../hermes/models/hermes_bot.dart';
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
-import '../../hermes/providers/hermes_live_run_providers.dart';
+import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/services/hermes_decision_projection.dart';
 import '../../hermes/services/hermes_desktop_api_service.dart';
 import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
@@ -63,10 +60,7 @@ import '../../hermes/services/hermes_pending_decision_store.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
-import '../../hermes/widgets/hermes_live_activity_disclosure.dart';
 import '../../hermes/widgets/hermes_chat_context_bar.dart';
-import '../../hermes/widgets/hermes_inline_run_surface.dart';
-import '../../hermes/widgets/hermes_run_details_button.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -2948,38 +2942,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final activeHermesConversation = watchRef.watch(activeConversationProvider);
     final activeHermesSessionId = watchRef.watch(hermesActiveSessionProvider);
     final desktopService = watchRef.watch(hermesApiServiceProvider);
-    final activeHermesTurn = watchRef
-        .watch(hermesDesktopTurnStateProvider)
-        .asData
-        ?.value;
     final exactHermesSession =
         isNativeHermesConversation(activeHermesConversation) &&
         activeHermesSessionId != null &&
         activeHermesConversation?.metadata['hermesSessionId']?.toString() ==
             activeHermesSessionId &&
         desktopService is HermesDesktopApiService;
-    final hasPendingHermesDecision = exactHermesSession
-        ? watchRef
-                  .watch(
-                    hermesPendingSessionDecisionsProvider(
-                      activeHermesSessionId,
-                    ),
-                  )
-                  .asData
-                  ?.value
-                  .isNotEmpty ??
-              false
-        : false;
-    final showHermesActivity = shouldShowHermesLiveActivity(
-      nativeConversation: isNativeHermesConversation(activeHermesConversation),
-      conversationSessionId: activeHermesConversation
-          ?.metadata['hermesSessionId']
-          ?.toString(),
-      activeSessionId: activeHermesSessionId,
-      desktopService: desktopService is HermesDesktopApiService,
-      turnState: activeHermesTurn,
-      hasPendingDecision: hasPendingHermesDecision,
-    );
     _scheduleMarkdownPrewarm(messages, layoutMetadata: layoutMetadata);
     _syncLayoutBottomAnchor();
 
@@ -3071,7 +3039,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       onRowExtentMeasured: rememberRowExtent,
       initialAnchor: _initialScrollAnchor,
       pinnedUserMessageId: _wantsPinToTop ? _pinnedUserMessageId : null,
-      liveFooter: timeline.runningFooterHost == null && !showHermesActivity
+      liveFooter: timeline.runningFooterHost == null
           ? null
           : Column(
               mainAxisSize: MainAxisSize.min,
@@ -3089,27 +3057,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       }
                       return StreamingTurnFooter(
                         message: latestMessage,
-                        showIndicator: !showHermesActivity,
+                        showIndicator: !exactHermesSession,
                         suppressStreamingHaptics:
                             suppressAssistantStreamingHaptics,
                       );
                     },
-                  ),
-                if (showHermesActivity &&
-                    desktopService is HermesDesktopApiService &&
-                    activeHermesSessionId != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: HermesInlineRunSurface(
-                      key: ValueKey('hermes-live-$activeHermesSessionId'),
-                      service: desktopService,
-                      compact: true,
-                      sessionId: activeHermesSessionId,
-                      turnState:
-                          activeHermesTurn ?? HermesDesktopTurnState.idle,
-                      requestShownBelow:
-                          findPendingHermesComposerPrompt(messages) != null,
-                    ),
                   ),
               ],
             ),
@@ -3507,6 +3459,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       modelIconUrl: rowMetadata.modelIconUrl,
       showModelHeader: rowMetadata.showModelHeader,
       showActionBar: rowMetadata.showActionBar,
+      runMessages:
+          latestMessage.metadata?['transport'] == kHermesTransport &&
+              rowMetadata.showModelHeader
+          ? [
+              for (final id in groupIds)
+                ?rowRef.watch(chatMessageByIdProvider(id)),
+            ]
+          : null,
+      currentRunAnswer:
+          latestMessage.metadata?['transport'] == kHermesTransport &&
+          groupIds.contains(
+            rowRef.watch(
+              chatMessagesProvider.select(
+                (messages) => messages.lastOrNull?.id,
+              ),
+            ),
+          ),
       versionModelNames: rowMetadata.versionModelNames,
       versionModelIconUrls: rowMetadata.versionModelIconUrls,
       suppressStreamingHaptics: suppressStreamingHaptics,
@@ -4715,30 +4684,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
-    final storedHermesId = activeConversation?.metadata['hermesSessionId']
-        ?.toString();
-    if (isNativeHermesConversation(activeConversation) &&
-        storedHermesId != null &&
-        storedHermesId.isNotEmpty &&
-        ref.read(hermesApiServiceProvider) is HermesDesktopApiService) {
-      actions.add(
-        _ChatToolbarActionDescriptor(
-          widget: HermesRunDetailsButton(
-            sessionId: storedHermesId,
-            compact: true,
-          ),
-          nativeAction: ConduitNativeToolbarAction(
-            iosSymbol: 'list.bullet',
-            accessibilityLabel: 'Run details',
-            tintColor: defaultTint,
-            onPressed: () => context.pushNamed(
-              RouteNames.hermesLiveRun,
-              pathParameters: {'sessionId': storedHermesId},
-            ),
-          ),
-        ),
-      );
-    }
     final overflowButton = _buildChatToolbarOverflowAction(
       context: context,
       activeConversation: activeConversation,

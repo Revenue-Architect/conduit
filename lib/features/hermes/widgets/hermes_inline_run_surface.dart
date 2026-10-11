@@ -43,7 +43,6 @@ bool hermesRunUsedBrowser(HermesRunSummary run) => run.tools.any(
 
 /// Animation treatments, not additional backend states. Only structured tool
 /// names/families and paired live rows select a mode; never prompt/title text.
-@visibleForTesting
 OrbState hermesThinkingOrbState({
   required HermesDesktopTurnState turnState,
   required bool attention,

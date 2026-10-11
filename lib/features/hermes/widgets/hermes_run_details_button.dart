@@ -2,22 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../motion/hermez_motion.dart';
 import '../views/hermes_live_run_page.dart';
+import '../sheets/hermez_modal_sheet.dart' show pushHermezSheetRoute;
 import 'hermes_run_actions.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_visual_theme.dart';
+import '../../../core/models/chat_message.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/conduit_localizations.dart';
 
-/// The same button-to-panel route as Kanban's New task. The live page remains
-/// the single detail implementation; this only changes how chat opens it.
+/// Shared measured-source launch into the existing detail implementation.
+/// The unified orb uses the critically damped sheet; legacy pills retain the
+/// Kanban-style panel route. Neither adds a second run or activity store.
 class HermesRunDetailsButton extends StatefulWidget {
   const HermesRunDetailsButton({
     super.key,
     required this.sessionId,
     this.compact = false,
     this.detailsBuilder,
+    this.faceBuilder,
+    this.answerMessages,
+    this.currentAnswer = false,
   });
   final String sessionId;
   final bool compact;
   final WidgetBuilder? detailsBuilder;
+  final Widget Function(BuildContext, ValueChanged<HermezMorphOrigin?>)?
+  faceBuilder;
+  final List<ChatMessage>? answerMessages;
+  final bool currentAnswer;
   @override
   State<HermesRunDetailsButton> createState() => _HermesRunDetailsButtonState();
 }
@@ -26,6 +38,7 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
   bool _open = false;
 
   Widget _face(BuildContext context, ValueChanged<HermezMorphOrigin?> onOpen) {
+    if (widget.faceBuilder != null) return widget.faceBuilder!(context, onOpen);
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
@@ -63,6 +76,26 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
     if (_open || origin == null) return;
     final sessionId = widget.sessionId;
     final detailsBuilder = widget.detailsBuilder;
+    final answerMessages = widget.answerMessages;
+    final currentAnswer = widget.currentAnswer;
+    Widget details(BuildContext context) => Localizations.override(
+      context: context,
+      // Chat uses standalone Material UI; the existing detail page includes
+      // Flutter Material widgets. Both localization types must cross the route.
+      delegates: [
+        ...conduitLocalizationsDelegates,
+        ...AppLocalizations.localizationsDelegates,
+      ],
+      child:
+          detailsBuilder?.call(context) ??
+          HermesLiveRunPage(
+            key: ValueKey(sessionId),
+            sessionId: sessionId,
+            embedded: true,
+            answerMessages: answerMessages,
+            currentAnswer: currentAnswer,
+          ),
+    );
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
@@ -74,6 +107,15 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
     );
     setState(() => _open = true);
     try {
+      if (widget.faceBuilder != null) {
+        await pushHermezSheetRoute<void>(
+          context,
+          origin: origin,
+          heightFactor: 0.88,
+          builder: details,
+        );
+        return;
+      }
       await pushHermezPanel<void>(
         context,
         origin: fixed,
@@ -83,13 +125,7 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
         faceBuilder: (context, frame) => _face(context, (_) {}),
         builder: (context) => SizedBox(
           height: MediaQuery.sizeOf(context).height * 0.82,
-          child:
-              detailsBuilder?.call(context) ??
-              HermesLiveRunPage(
-                key: ValueKey(sessionId),
-                sessionId: sessionId,
-                embedded: true,
-              ),
+          child: details(context),
         ),
       );
     } finally {

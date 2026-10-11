@@ -6,6 +6,79 @@ import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_steel_viewer.dart';
 import 'hermez_chat_palette.dart';
+import '../motion/hermez_motion.dart';
+import '../../../shared/theme/theme_extensions.dart';
+
+/// Shared lazy watch aperture. Platform views mount only after their enclosing
+/// morph has settled, and are removed again before it contracts.
+class HermesRunBrowserSection extends StatefulWidget {
+  const HermesRunBrowserSection({
+    super.key,
+    required this.viewerUrl,
+    required this.sessionId,
+  });
+  final String viewerUrl;
+  final String sessionId;
+  @override
+  State<HermesRunBrowserSection> createState() =>
+      _HermesRunBrowserSectionState();
+}
+
+class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
+  bool _open = false;
+  final _aperture = GlobalKey();
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        spacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _open = !_open),
+            icon: const Icon(Icons.visibility_outlined),
+            label: Text(_open ? 'Close browser' : 'Watch browser'),
+          ),
+          if (_open)
+            TextButton.icon(
+              icon: const Icon(Icons.open_in_full),
+              label: const Text('Expand'),
+              onPressed: () => Navigator.of(context).push(
+                HermezRoute<void>(
+                  motion: HermezRouteMotion.expand,
+                  reducedMotion: context.reduceMotion,
+                  origin: _aperture.currentContext == null
+                      ? null
+                      : HermezMorphOrigin.of(
+                          _aperture.currentContext!,
+                          radius: 16,
+                        ),
+                  builder: (_) => HermesSteelFullScreenPage(
+                    viewerUrl: widget.viewerUrl,
+                    sessionId: widget.sessionId,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      if (_open) ...[
+        SizedBox(
+          key: _aperture,
+          height: 260,
+          child: _AfterArrival(
+            placeholder: const _BrowserAperture(),
+            child: HermesSteelLiveView(viewerUrl: widget.viewerUrl),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('Watch only · Hermes controls this browser.'),
+        ),
+      ],
+    ],
+  );
+}
 
 /// Embeds Steel's own debug player. It creates no Hermes/Steel session and
 /// opens no separate casting transport. Rebuilding after collapse reconnects.

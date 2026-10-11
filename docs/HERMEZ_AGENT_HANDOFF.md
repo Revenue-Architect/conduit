@@ -1248,3 +1248,99 @@ Pre-existing A2UI skill edits and probe/graphify files were left untouched.
   clear, uninstall, dependency/backend/config changes, or edits to the unrelated
   A2UI skill/probe/graphify work occurred. Commit locally on
   `feat/hermez-motion-foundation`; no push was requested for this change.
+
+## 2026-10-10 — one answer, one activity orb (profile 165)
+
+### What changed
+
+- Native Hermes answers now have one compact activity control beside the bot
+  mark. During execution it uses the existing native Thinking Orb state selector
+  (all nine variants); after completion it becomes a quiet, still done/failed
+  mark. Pending input remains accented and actionable until actually resolved.
+- The production duplicate `Explored…` row came from `StreamingStatusWidget`,
+  not just the older disclosure widget. Native Hermes answer headers now fold
+  that existing grouping/summary into the orb and suppress the separate row.
+  Grouped assistant continuations have one control, not one per transcript row.
+- Chat no longer also paints the inline run surface in its live footer or an
+  extra toolbar Run details button. `StreamingTurnFooter` still owns streaming
+  lifecycle/haptics; non-Hermes status/footer behavior is unchanged. No floating
+  overlay or artificial activity-height compensation was added.
+- Tapping the orb uses the measured source geometry and existing critically
+  damped `pushHermezSheetRoute` morph. The existing `HermesLiveRunPage` remains
+  the single detail implementation, including saved conversation results from
+  the earlier run-details fix, real Steer/Stop and completion handling.
+
+### Code map and ownership rules
+
+- `widgets/hermes_run_activity_orb.dart`: answer header entry, lifecycle/reduced
+  motion handling, quiet completion, exact session-scoped subscriptions.
+- `widgets/hermes_unified_activity_timeline.dart`: existing paired/grouped
+  Desktop rows enriched with the disclosure's shared tool/result renderer.
+  `StreamingStatusTimeline` and `hermesStatusSummary` were extracted from the
+  existing chat status widget rather than creating a second result format.
+- `services/hermes_run_history.dart`: exact answer transcript slicing, safe
+  status projection and authoritative stored model extraction. A current answer
+  can grow with assistant continuations; a new user turn detaches its live
+  controls. Optimistic ID fallback requires unique exact content, never “latest”.
+- `services/hermes_message_mapper.dart`: persisted tool-call arrays also accept
+  the Dashboard's JSON-encoded array representation, with existing bounds and
+  tool-call-ID result pairing. Invalid JSON fails safely.
+- `views/hermes_live_run_page.dart`: current-answer activity, plans/delegates,
+  errors/model/status, pending decisions, lazy browser and restored tool results
+  share one sheet. Historical answers do not inherit a newer run's pending input,
+  plan, browser or controls. Saved conversation results remain available.
+- `widgets/hermes_steel_live_view.dart`: lazy Watch/Close/Expand section reuses
+  the configured Steel viewer. Platform views wait for sheet arrival and are
+  removed before its reverse transition; no new browser transport was created.
+- Pending requests reuse the existing session provider/store and attention
+  resolution sheet. Successful resolution invalidates the shared projection;
+  dismissing the sheet does not deny. Existing transcript approval cards remain.
+- Both Flutter Material and `material_ui` localization/Material scopes are
+  bridged explicitly for the shared renderer and sheet; do not remove these
+  ancestors during a visual refactor.
+
+### Verification and delivery
+
+- Final regression run: **1,262 tests passed, one existing skip**, including the
+  complete Hermes suite and chat grouping, status, haptics, footer, approval
+  ownership, viewport and render-model regressions. New cases cover exactly one
+  control for a finished grouped answer, real stored tool results in its sheet,
+  320 dp at 100/200% text, pending decision dismissal, continuation ownership,
+  stored JSON calls, model ownership and sensitive-value redaction.
+- Focused analysis of all 14 changed Dart/test files: **No issues found**.
+  Formatting and diff checks passed. Logs are outside git under
+  `work/diagnostics/unified-orb-*.log`.
+- ARM64 **profile** APK 165 built and installed over 164 with wireless ADB
+  `install -r`. The application was reopened; `dumpsys package` confirms 165.
+  APK SHA256:
+  `b15c0b1869eedcaf4563c295d924ceb59daf209083f99983dc5e24cf524f2531`.
+- Initial native `flutter_soloud` compilation hit a Windows temp-object rename
+  permission error. A single retry using process-local TEMP/TMP at
+  `work/toolchain/tmp-profile165` succeeded. No dependency, global environment,
+  shared cache or backend changes were needed. Existing Kotlin/translation
+  warnings remain.
+- S25 Ultra device QA: Home and six custom bot icons load; an existing chat
+  shows one quiet activity control per visible completed answer. Its sheet
+  restores the selected answer's real file-edit call, arguments and result.
+  Back dismissal and reopening restore the same sheet without a second control.
+  No Flutter Material, RenderFlex overflow, error-building or fatal markers
+  appeared in the Conduit process log during this pass. Captures are outside git
+  at `work/diagnostics/hermez-unified-orb-20261010`.
+- Icon assignment SHA256 before/after remains
+  `efe586c6f4a400d7ebb875cb0fcaeecb32f6b32257e4d40c03ee7cfdc5cc3796`.
+  No uninstall, data clear, chat typing or message sending occurred.
+
+### Explicit limits / next-agent cautions
+
+- Live Steer/Stop, approval submission and Steel playback were not exercised on
+  the phone because QA was restricted to existing chats without sending or
+  changing runs. Existing automated coverage passed; do not claim those live
+  device scenarios were tested.
+- Historical ephemeral plan/subagent events cannot be reconstructed if Hermes
+  did not persist them. Unmatched legacy statuses render once after the paired
+  timeline rather than inventing chronological metadata. Restored transcript
+  results retain existing safety bounds/pagination.
+- No service, transport, model routing, profile configuration or infrastructure
+  was replaced. Concurrent Claude chat-frost commits remain intact. Unrelated
+  A2UI skill/probe/graphify changes are excluded. Commit locally on
+  `feat/hermez-motion-foundation`; **do not push**.

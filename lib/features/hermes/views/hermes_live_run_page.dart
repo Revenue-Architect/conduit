@@ -13,7 +13,6 @@ import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_live_activity.dart';
 import '../services/hermes_run_history.dart';
 import '../services/hermes_media_parser.dart';
-import '../services/hermes_pending_decision_store.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
 import '../sheets/hermes_completed_run_sheet.dart';
 import '../widgets/hermes_session_tile.dart';
@@ -29,13 +28,20 @@ import '../services/hermes_agentic_state.dart';
 import '../sheets/hermes_delegates_sheet.dart';
 import '../sheets/hermes_plan_sheet.dart';
 import '../sheets/hermes_tool_inspector_sheet.dart';
-import '../widgets/hermes_activity_view.dart';
 import '../widgets/hermes_plan_view.dart';
 import '../widgets/hermez_live.dart';
 import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_surfaces.dart';
 import '../motion/hermez_motion_surface.dart';
 import '../motion/hermez_motion_tokens.dart';
+import '../../../core/models/chat_message.dart';
+import '../../chat/widgets/streaming_status_widget.dart';
+import '../services/hermes_message_mapper.dart';
+import '../services/hermes_steel_viewer.dart';
+import '../providers/hermes_live_run_providers.dart';
+import '../widgets/hermes_steel_live_view.dart';
+import '../widgets/hermes_unified_activity_timeline.dart';
+import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
 
 class HermesLiveRunPage extends ConsumerStatefulWidget {
   const HermesLiveRunPage({
@@ -43,6 +49,8 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
     required this.sessionId,
     this.openChat = false,
     this.embedded = false,
+    this.answerMessages,
+    this.currentAnswer = false,
   });
   final String sessionId;
 
@@ -50,6 +58,8 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
   /// conversation, showing the run's status while its transcript loads.
   final bool openChat;
   final bool embedded;
+  final List<ChatMessage>? answerMessages;
+  final bool currentAnswer;
 
   @override
   ConsumerState<HermesLiveRunPage> createState() => _HermesLiveRunPageState();
@@ -66,7 +76,6 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   bool _completionPresented = false;
   DateTime? _startedAt;
   HermesDesktopApiService? _pendingService;
-  Future<List<HermesPendingDesktopDecision>>? _pendingFuture;
   Future<List<Map<String, dynamic>>>? _historyFuture;
 
   @override
@@ -78,16 +87,6 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
       _sawRunning = false;
       _completionPresented = false;
       _startedAt = null;
-    }
-  }
-
-  Future<List<HermesPendingDesktopDecision>> _loadPending(
-    HermesDesktopApiService service,
-  ) async {
-    try {
-      return await service.pendingStoredDecisionsForSession(widget.sessionId);
-    } catch (_) {
-      return const [];
     }
   }
 
@@ -220,7 +219,6 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     if (service is HermesDesktopApiService &&
         !identical(_pendingService, service)) {
       _pendingService = service;
-      _pendingFuture = _loadPending(service);
       _historyFuture = service.readRunDetailsMessages(widget.sessionId);
     }
     final palette = HermezChatPalette.forBrightness(
@@ -275,13 +273,33 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
               initialData: service.turnStateFor(widget.sessionId),
               builder: (context, turn) {
                 final state = turn.data ?? HermesDesktopTurnState.idle;
-                final running = state == HermesDesktopTurnState.running;
+                final scoped = widget.answerMessages != null;
+                final localMessages = scoped
+                    ? ref.watch(chatMessagesProvider)
+                    : const <ChatMessage>[];
+                final liveAnswer = scoped && widget.currentAnswer
+                    ? hermesCurrentAnswerMessages(
+                        localMessages,
+                        widget.answerMessages!,
+                      )
+                    : const <ChatMessage>[];
+                final activeAnswer =
+                    !scoped ||
+                    (widget.currentAnswer &&
+                        (localMessages.isEmpty || liveAnswer.isNotEmpty));
+                final answerMessages = liveAnswer.isNotEmpty
+                    ? liveAnswer
+                    : widget.answerMessages;
+                final running =
+                    activeAnswer && state == HermesDesktopTurnState.running;
                 if (running) {
                   if (!_sawRunning) {
                     _startedAt = DateTime.now();
                     _completionPresented = false;
                   }
                   _sawRunning = true;
+                } else if (!activeAnswer) {
+                  _sawRunning = false;
                 } else if (_sawRunning &&
                     state == HermesDesktopTurnState.idle &&
                     !_completionPresented) {
@@ -304,9 +322,38 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                   builder: (context, history) {
                     final messages =
                         history.data ?? const <Map<String, dynamic>>[];
+                    final selected = scoped
+                        ? hermesAnswerTranscript(messages, answerMessages!)
+                        : messages;
+                    final statuses = <ChatStatusUpdate>[];
+                    // The stored mapper restores arguments/results into the
+                    // same status contracts the old Explored sheet rendered.
+                    for (final message in hermesMessagesToChatMessages(
+                      selected,
+                      sessionId: widget.sessionId,
+                    )) {
+                      statuses.addAll(message.statusHistory);
+                    }
+                    final localStatuses = [
+                      for (final message
+                          in answerMessages ?? const <ChatMessage>[])
+                        ...message.statusHistory,
+                    ];
+                    if (activeAnswer && localStatuses.isNotEmpty) {
+                      // A sheet left open during a turn receives new arguments
+                      // and results from the existing chat state, not a snapshot.
+                      statuses
+                        ..clear()
+                        ..addAll(localStatuses);
+                    } else if (statuses.isEmpty) {
+                      for (final message
+                          in answerMessages ?? const <ChatMessage>[]) {
+                        statuses.addAll(message.statusHistory);
+                      }
+                    }
                     final stored = hermesTranscriptActivity(
                       widget.sessionId,
-                      messages,
+                      selected,
                       sensitiveValues: service.config.sensitiveValues,
                     );
                     return StreamBuilder<List<HermesLiveActivityEvent>>(
@@ -316,20 +363,57 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                         widget.sessionId,
                       ),
                       builder: (context, activity) {
+                        final live = activeAnswer
+                            ? HermesRunSummary.latest(
+                                activity.data ?? const [],
+                                running: running,
+                              ).events
+                            : const <HermesLiveActivityEvent>[];
                         final events = mergeHermesRunHistory(
                           stored,
-                          activity.data ?? const [],
+                          scoped ? live : activity.data ?? const [],
                         );
                         return ListView(
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
                           children: [
                             _LiveHero(
                               sessionId: widget.sessionId,
-                              state: state,
+                              state: activeAnswer
+                                  ? state
+                                  : HermesDesktopTurnState.idle,
                               events: events,
                               startedAt: _startedAt,
+                              showAgentic: activeAnswer,
+                              model: hermesTranscriptModel(
+                                selected,
+                                sensitiveValues: service.config.sensitiveValues,
+                              ),
                             ),
                             const SizedBox(height: 18),
+                            if (activeAnswer)
+                              _PendingRunRequests(sessionId: widget.sessionId),
+                            if (activeAnswer &&
+                                running &&
+                                parseSteelViewerUrl(
+                                      ref.watch(hermesSteelViewerUrlProvider),
+                                    ) !=
+                                    null &&
+                                HermesRunSummary.conversation(
+                                  events,
+                                  running: running,
+                                ).tools.any(
+                                  (tool) =>
+                                      HermesActivityPresenter.family(
+                                        tool.name,
+                                      ) ==
+                                      HermesActivityFamily.browser,
+                                ))
+                              HermesRunBrowserSection(
+                                viewerUrl: ref.watch(
+                                  hermesSteelViewerUrlProvider,
+                                ),
+                                sessionId: widget.sessionId,
+                              ),
                             if (history.connectionState ==
                                 ConnectionState.waiting)
                               const Padding(
@@ -367,14 +451,21 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                                     events,
                                     running: running,
                                   );
-                                  if (rows.isEmpty) {
+                                  if (rows.isEmpty && statuses.isEmpty) {
                                     return const Text(
                                       'No tool steps were recorded. Conversation responses are below.',
                                     );
                                   }
-                                  return HermesActivityList(
+                                  return HermesUnifiedActivityTimeline(
                                     rows: rows,
-                                    visible: 30,
+                                    statuses: filterVisibleStatusUpdates(
+                                      hermesSafeRunStatuses(
+                                        statuses,
+                                        service.config.sensitiveValues,
+                                      ),
+                                      isStreaming: running,
+                                    ),
+                                    running: running,
                                     onInspect: (row, origin) =>
                                         showHermesToolInspector(
                                           context,
@@ -387,6 +478,20 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                               ),
                             ),
                             const SizedBox(height: 14),
+                            for (final message
+                                in answerMessages ?? const <ChatMessage>[])
+                              if (message.error != null)
+                                HermesPanel(
+                                  child: Text(
+                                    HermesActivityPresenter.clean(
+                                          message.error?.content,
+                                          sensitiveValues:
+                                              service.config.sensitiveValues,
+                                          max: 2048,
+                                        ) ??
+                                        'This run reported an error.',
+                                  ),
+                                ),
                             if (messages.isNotEmpty)
                               _SavedConversationResults(
                                 key: ValueKey('results-${widget.sessionId}'),
@@ -429,62 +534,6 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                               onKeepRunning: () =>
                                   setState(() => _confirmingStop = false),
                               onStop: () => _stop(service),
-                            ),
-                            FutureBuilder<List<HermesPendingDesktopDecision>>(
-                              key: ValueKey('decisions-${widget.sessionId}'),
-                              future: _pendingFuture,
-                              builder: (context, pending) {
-                                final decisions =
-                                    pending.data ??
-                                    const <HermesPendingDesktopDecision>[];
-                                if (decisions.isEmpty) {
-                                  return const SizedBox.shrink();
-                                }
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 14),
-                                  child: HermesPanel(
-                                    child: Column(
-                                      children: [
-                                        for (final decision in decisions)
-                                          Builder(
-                                            builder: (rowContext) => RepaintBoundary(
-                                              child: ListTile(
-                                                title: Text(
-                                                  decision.prompt ??
-                                                      'Hermes needs input',
-                                                ),
-                                                trailing: const Icon(
-                                                  Icons.chevron_right_rounded,
-                                                ),
-                                                onTap: () async {
-                                                  final resolved =
-                                                      await showHermesAttentionResolutionSheet(
-                                                        context,
-                                                        decision,
-                                                        origin:
-                                                            HermezMorphOrigin.of(
-                                                              rowContext,
-                                                              radius: 18,
-                                                              color: palette
-                                                                  .surface,
-                                                            ),
-                                                      );
-                                                  if (resolved == true &&
-                                                      mounted) {
-                                                    setState(
-                                                      () => _pendingFuture =
-                                                          _loadPending(service),
-                                                    );
-                                                  }
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
                             ),
                           ],
                         );
@@ -576,12 +625,16 @@ class _LiveHero extends ConsumerWidget {
     required this.state,
     required this.events,
     required this.startedAt,
+    this.showAgentic = true,
+    this.model,
   });
 
   final String sessionId;
   final HermesDesktopTurnState state;
   final List<HermesLiveActivityEvent> events;
   final DateTime? startedAt;
+  final bool showAgentic;
+  final String? model;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -594,9 +647,10 @@ class _LiveHero extends ConsumerWidget {
       run.isEmpty ? events : run.events,
       running: running,
     );
-    final agentic =
-        ref.watch(hermesAgenticStateProvider(sessionId)).value ??
-        HermesAgenticSnapshot.empty;
+    final agentic = showAgentic
+        ? ref.watch(hermesAgenticStateProvider(sessionId)).value ??
+              HermesAgenticSnapshot.empty
+        : HermesAgenticSnapshot.empty;
     final plan = agentic.hasPlan ? agentic.todo : null;
     final workers = agentic.subagents;
     final current = rows.reversed
@@ -665,6 +719,11 @@ class _LiveHero extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
+          if (agentic.info?.model != null || model != null)
+            Text(
+              'Model · ${agentic.info?.model ?? model}',
+              style: HermezType.meta(palette),
+            ),
           HermezLiveText(
             headline,
             live: running,
@@ -734,6 +793,98 @@ class _LiveHero extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The same persisted requests as transcript/composer cards. Dismissal never
+/// resolves them; store changes update the orb and sheet together.
+class _PendingRunRequests extends ConsumerStatefulWidget {
+  const _PendingRunRequests({required this.sessionId});
+  final String sessionId;
+  @override
+  ConsumerState<_PendingRunRequests> createState() =>
+      _PendingRunRequestsState();
+}
+
+class _PendingRunRequestsState extends ConsumerState<_PendingRunRequests>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      ref.invalidate(hermesPendingSessionDecisionsProvider(widget.sessionId));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = ref.watch(
+      hermesPendingSessionDecisionsProvider(widget.sessionId),
+    );
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    if (pending.hasError) {
+      return TextButton(
+        onPressed: () => ref.invalidate(
+          hermesPendingSessionDecisionsProvider(widget.sessionId),
+        ),
+        child: const Text('Could not load requests · Retry'),
+      );
+    }
+    final decisions = pending.value ?? const [];
+    if (decisions.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: HermesPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Input needed'),
+            for (final decision in decisions)
+              Builder(
+                builder: (rowContext) => RepaintBoundary(
+                  child: ListTile(
+                    title: Text(
+                      decision.prompt ?? 'Hermes needs your response',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      final resolved = await showHermesAttentionResolutionSheet(
+                        context,
+                        decision,
+                        origin: HermezMorphOrigin.of(
+                          rowContext,
+                          radius: 18,
+                          color: palette.surface,
+                        ),
+                      );
+                      if (resolved == true && mounted) {
+                        ref.invalidate(
+                          hermesPendingSessionDecisionsProvider(
+                            widget.sessionId,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

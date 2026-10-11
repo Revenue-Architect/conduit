@@ -236,7 +236,19 @@ List<ChatStatusUpdate> _persistedHermesToolStarts(
   required int messageIndex,
   required Map<String, ({int messageIndex, int statusIndex})> pendingTools,
 }) {
-  final rawCalls = item['tool_calls'] ?? item['toolCalls'];
+  var rawCalls = item['tool_calls'] ?? item['toolCalls'];
+  // Dashboard history can encode the same tool-call array as JSON text.
+  // Retain the existing bounded parser/result pairing rather than another path.
+  if (rawCalls is String) {
+    if (rawCalls.length > kHermesMaxHistoryMessageTextCharacters) {
+      return const [];
+    }
+    try {
+      rawCalls = jsonDecode(rawCalls);
+    } on FormatException {
+      return const [];
+    }
+  }
   if (rawCalls is! List) return const <ChatStatusUpdate>[];
   final occurredAt = parseHermesTimestamp(
     item['created_at'] ?? item['timestamp'],

@@ -99,10 +99,15 @@ void main() {
           expect(find.text('Finished'), findsOneWidget);
           final list = find
               .descendant(
-                of: find.byType(HermesLiveRunPage),
+                of: find
+                    .descendant(
+                      of: find.byType(HermesLiveRunPage),
+                      matching: find.byType(ListView),
+                    )
+                    .first,
                 matching: find.byType(Scrollable),
               )
-              .last;
+              .first;
           await tester.scrollUntilVisible(
             find.text('Earlier saved conclusion'),
             180,

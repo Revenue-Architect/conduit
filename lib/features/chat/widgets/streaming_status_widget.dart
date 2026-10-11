@@ -6,6 +6,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/raster_media_policy.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/conduit_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/themed_sheets.dart';
@@ -225,7 +226,7 @@ class _StreamingStatusWidgetState extends State<StreamingStatusWidget> {
                     controller: controller,
                     padding: const EdgeInsets.all(Spacing.lg),
                     children: [
-                      _MinimalHistoryTimeline(
+                      StreamingStatusTimeline(
                         updates: updates,
                         isStreaming: isStreaming,
                       ),
@@ -311,16 +312,19 @@ class _MinimalStatusRow extends StatelessWidget {
 }
 
 /// Minimal timeline for expanded history - small dots like OpenWebUI.
-class _MinimalHistoryTimeline extends StatelessWidget {
-  const _MinimalHistoryTimeline({
+class StreamingStatusTimeline extends StatelessWidget {
+  const StreamingStatusTimeline({
+    super.key,
     required this.updates,
     required this.isStreaming,
+    this.showHeaders = true,
   });
 
   static const double _markerGap = Spacing.sm;
 
   final List<ChatStatusUpdate> updates;
   final bool isStreaming;
+  final bool showHeaders;
 
   @override
   Widget build(BuildContext context) {
@@ -340,20 +344,21 @@ class _MinimalHistoryTimeline extends StatelessWidget {
       return Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(
-              left: _TimelineMarker._width + _markerGap,
+            padding: EdgeInsets.only(
+              left: showHeaders ? _TimelineMarker._width + _markerGap : 0,
               bottom: Spacing.sm,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                AssistantDetailHeader(
-                  title: description,
-                  showShimmer: isPending,
-                  allowWrap: true,
-                  showChevron: false,
-                ),
+                if (showHeaders)
+                  AssistantDetailHeader(
+                    title: description,
+                    showShimmer: isPending,
+                    allowWrap: true,
+                    showChevron: false,
+                  ),
                 if (queries.isNotEmpty) ...[
                   const SizedBox(height: Spacing.xs),
                   _MinimalQueryChips(queries: queries),
@@ -378,26 +383,34 @@ class _MinimalHistoryTimeline extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(
-            top: 0,
-            bottom: 0,
-            left: 0,
-            child: _TimelineMarker(
-              index: index,
-              isFirst: isFirst,
-              isLast: isLast,
-              isPending: isPending,
-              theme: theme,
+          if (showHeaders)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 0,
+              child: _TimelineMarker(
+                index: index,
+                isFirst: isFirst,
+                isLast: isLast,
+                isPending: isPending,
+                theme: theme,
+              ),
             ),
-          ),
         ],
       );
     }).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: items,
+    return Localizations.override(
+      context: context,
+      delegates: conduitLocalizationsDelegates,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: items,
+        ),
+      ),
     );
   }
 }
@@ -733,6 +746,28 @@ String _buildHermesToolGroupTitle(
   return isStreaming && updates.any((update) => update.done != true)
       ? l10n.markdownDetailsGroupPendingTitle(summary)
       : l10n.markdownDetailsGroupCompleteTitle(summary);
+}
+
+/// The same tool grouping used by the legacy status disclosure, now also used
+/// by the single Hermes activity orb. No new tool-name taxonomy.
+String hermesStatusSummary(
+  BuildContext context,
+  List<ChatStatusUpdate> updates, {
+  required bool running,
+}) {
+  final tools = updates
+      .where((update) => update.hidden != true && _isHermesToolUpdate(update))
+      .toList();
+  if (tools.isEmpty) return '';
+  return _buildHermesToolGroupTitle(context, tools, running);
+}
+
+String? hermesStatusToolName(ChatStatusUpdate update) {
+  if (!_isHermesToolUpdate(update)) return null;
+  final name = update.action!.substring('hermes_tool_'.length);
+  return name.startsWith('opaque')
+      ? update.description?.split(RegExp(r'\s(?:·|failed)')).first.trim()
+      : name;
 }
 
 String _resolveStatusDescription(ChatStatusUpdate update) {

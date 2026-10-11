@@ -63,6 +63,7 @@ import '../../hermes/widgets/hermes_a2ui_surface.dart';
 import '../../hermes/widgets/hermes_a2ui_media_scope.dart';
 import '../../hermes/widgets/hermes_artifact_view.dart';
 import '../../hermes/widgets/hermez_bot_mark.dart';
+import '../../hermes/widgets/hermes_run_activity_orb.dart';
 
 // Wrap only standalone base64 image lines so <details> attributes stay intact.
 final _standaloneBase64ImagePattern = RegExp(
@@ -100,6 +101,8 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   /// shows one of each. Sources and the version chip still render on their own
   /// row when this is false — only the buttons move.
   final bool showActionBar;
+  final List<ChatMessage>? runMessages;
+  final bool currentRunAnswer;
 
   /// Supplies the full text of the grouped response for read-aloud.
   ///
@@ -133,6 +136,8 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
     this.modelIconUrl,
     this.showModelHeader = true,
     this.showActionBar = true,
+    this.runMessages,
+    this.currentRunAnswer = false,
     this.resolveGroupedResponseText,
     this.versionModelNames = const <String?>[],
     this.versionModelIconUrls = const <String?>[],
@@ -979,7 +984,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           );
 
     _cachedAvatar = Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
+      padding: EdgeInsets.only(
+        bottom: _isHermesAssistantMessage ? 0 : Spacing.md,
+      ),
       child: Row(
         children: [
           leading,
@@ -1194,7 +1201,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       widget.message.statusHistory,
       isStreaming: _uiTreatsAsStreaming,
     );
-    final hasStatusTimeline = displayStatusHistory.isNotEmpty;
+    final unifiedActivity =
+        _isHermesAssistantMessage &&
+        validateHermesOpaqueIdentifier(
+              _chatMessage?.metadata?['hermesSessionId'],
+            ) !=
+            null;
+    final hasStatusTimeline =
+        displayStatusHistory.isNotEmpty && !unifiedActivity;
     final activeCodeExecutions = _resolveActiveCodeExecutions();
     final hasCodeExecutions = activeCodeExecutions.isNotEmpty;
     final bool showingVersion = _activeVersionIndex >= 0;
@@ -1245,7 +1259,31 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Cached AI Name and Avatar to prevent flashing
-          _cachedAvatar ?? const SizedBox.shrink(),
+          if (unifiedActivity && widget.showModelHeader && !showingVersion)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.xs),
+              child: Row(
+                children: [
+                  Flexible(child: _cachedAvatar ?? const SizedBox.shrink()),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: HermesMessageActivity(
+                      key: ValueKey('message-run-$_messageId'),
+                      messages: widget.runMessages ?? [_chatMessage!],
+                      currentAnswer: widget.currentRunAnswer,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: _isHermesAssistantMessage ? Spacing.md : 0,
+              ),
+              child: _cachedAvatar ?? const SizedBox.shrink(),
+            ),
 
           // Reasoning blocks are now rendered inline where they appear
 
