@@ -174,7 +174,7 @@ class _ShaderFrost extends StatefulWidget {
   final double extent;
 
   /// How long the frost takes to dissolve, ending at [extent].
-  static const feather = 56.0;
+  static const feather = 48.0;
 
   @override
   State<_ShaderFrost> createState() => _ShaderFrostState();

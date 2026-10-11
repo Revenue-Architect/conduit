@@ -4421,7 +4421,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     // their lower half and is gone just below them.
                     // The background colour holds behind the controls, then
                     // thins out with the frost over a longer fade.
-                    fadeHeight: 44,
+                    fadeHeight: 37,
                     blurSigma: 6,
                   ),
                 ),
