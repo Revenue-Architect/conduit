@@ -41,21 +41,31 @@ class _HermesToolInspector extends ConsumerStatefulWidget {
 }
 
 class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
-  late Future<List<Map<String, dynamic>>> _transcript;
+  // One load per run, started together on open, so switching runs is a
+  // crossfade between ready content, never a skeleton that collapses the sheet.
+  final Map<int, Future<List<Map<String, dynamic>>>> _transcripts = {};
   late int _index = widget.row.toolIds.length - 1;
 
   @override
   void initState() {
     super.initState();
-    _transcript = _load();
+    _transcriptFor(_index);
+    for (var i = 0; i < widget.row.toolIds.length; i++) {
+      _transcriptFor(i);
+    }
   }
 
-  Future<List<Map<String, dynamic>>> _load() async {
+  Future<List<Map<String, dynamic>>> _transcriptFor(int index) =>
+      _transcripts.putIfAbsent(index, () => _load(index));
+
+  void _reload() => setState(() => _transcripts.remove(_index));
+
+  Future<List<Map<String, dynamic>>> _load(int index) async {
     final service = ref.read(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return const [];
     final toolId = widget.row.toolIds.isEmpty
         ? null
-        : widget.row.toolIds[_index];
+        : widget.row.toolIds[index];
     if (toolId != null) {
       try {
         return await service.toolCallMessages(widget.sessionId, toolId);
@@ -80,6 +90,78 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
       HermesActivityRowState.waiting => 'WAITING',
       _ => 'DONE',
     };
+    final index = _index;
+    final body = FutureBuilder<List<Map<String, dynamic>>>(
+      // Keyed by run: each run gets its own snapshot and its own
+      // expanded/collapsed code sections.
+      key: ValueKey('hermes-tool-run-$index'),
+      future: _transcriptFor(index),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: HermezSkeleton.lines(count: 5),
+          );
+        }
+        if (snapshot.hasError) {
+          return _Note(
+            text: 'Could not load this step from Hermes.',
+            action: 'Retry',
+            onAction: _reload,
+          );
+        }
+        final toolId = row.toolIds.isEmpty ? null : row.toolIds[index];
+        final record = toolId == null
+            ? null
+            : findHermesToolCall(
+                snapshot.data ?? const [],
+                toolId,
+                sensitiveValues: secrets,
+              );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (row.object != null) ...[
+              _Section(
+                label: 'ACTION',
+                child: Text(row.object!, style: HermezType.body(palette)),
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (record == null)
+              _Note(
+                text: row.state == HermesActivityRowState.running
+                    ? 'Still running. Its input and result show here once Hermes stores the step.'
+                    : 'Hermes has not stored this step yet. It shows here when the turn is saved.',
+                action: 'Refresh',
+                onAction: _reload,
+              )
+            else ...[
+              if (record.input != null)
+                _CodeSection(
+                  label: 'INPUT',
+                  text: record.input!,
+                  truncated: record.inputTruncated,
+                ),
+              if (record.input != null) const SizedBox(height: 16),
+              if (record.result != null)
+                _CodeSection(
+                  label: record.failed ? 'ERROR' : 'RESULT',
+                  text: record.result!,
+                  truncated: record.resultTruncated,
+                  attention: record.failed,
+                )
+              else
+                _Note(
+                  text: 'No result yet. The step is still running.',
+                  action: 'Refresh',
+                  onAction: _reload,
+                ),
+            ],
+          ],
+        );
+      },
+    );
     return HermezModalSheet(
       eyebrow: '$status · ${row.toolName ?? 'tool'}',
       title: row.verb,
@@ -111,84 +193,41 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
           if (row.summary != null) _Fact(label: 'Hermes', value: row.summary!),
         ],
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _transcript,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: HermezSkeleton.lines(count: 5),
-            );
-          }
-          if (snapshot.hasError) {
-            return _Note(
-              text: 'Could not load this step from Hermes.',
-              action: 'Retry',
-              onAction: () => setState(() => _transcript = _load()),
-            );
-          }
-          final toolId = row.toolIds.isEmpty ? null : row.toolIds[_index];
-          final record = toolId == null
-              ? null
-              : findHermesToolCall(
-                  snapshot.data ?? const [],
-                  toolId,
-                  sensitiveValues: secrets,
-                );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (row.toolIds.length > 1) ...[
-                _RunSwitcher(
-                  count: row.toolIds.length,
-                  index: _index,
-                  onSelect: (index) => setState(() {
-                    _index = index;
-                    _transcript = _load();
-                  }),
-                ),
-                const SizedBox(height: 14),
-              ],
-              if (row.object != null) ...[
-                _Section(
-                  label: 'ACTION',
-                  child: Text(row.object!, style: HermezType.body(palette)),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (record == null)
-                _Note(
-                  text: row.state == HermesActivityRowState.running
-                      ? 'Still running. Its input and result show here once Hermes stores the step.'
-                      : 'Hermes has not stored this step yet. It shows here when the turn is saved.',
-                  action: 'Refresh',
-                  onAction: () => setState(() => _transcript = _load()),
-                )
-              else ...[
-                if (record.input != null)
-                  _CodeSection(
-                    label: 'INPUT',
-                    text: record.input!,
-                    truncated: record.inputTruncated,
-                  ),
-                if (record.input != null) const SizedBox(height: 16),
-                if (record.result != null)
-                  _CodeSection(
-                    label: record.failed ? 'ERROR' : 'RESULT',
-                    text: record.result!,
-                    truncated: record.resultTruncated,
-                    attention: record.failed,
-                  )
-                else
-                  _Note(
-                    text: 'No result yet. The step is still running.',
-                    action: 'Refresh',
-                    onAction: () => setState(() => _transcript = _load()),
-                  ),
-              ],
-            ],
-          );
-        },
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The switcher stays put; only the run's content changes.
+          if (row.toolIds.length > 1) ...[
+            _RunSwitcher(
+              count: row.toolIds.length,
+              index: index,
+              onSelect: (i) {
+                if (i != _index) setState(() => _index = i);
+              },
+            ),
+            const SizedBox(height: 14),
+          ],
+          // Fade through, never cross-fade: two blocks of code laid over
+          // each other read as a glitch. The old run leaves at once and the
+          // new one settles in.
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            layoutBuilder: (current, previous) =>
+                current ?? const SizedBox.shrink(),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween(
+                  begin: const Offset(0, 0.012),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            ),
+            child: body,
+          ),
+        ],
       ),
     );
   }
