@@ -98,8 +98,12 @@ class HermesSessionTile extends ConsumerWidget {
         actions: _contextMenuActions(context, ref),
         previewBuilder: buildConversationTileContextPreview,
         child: Material(
-          type: MaterialType.transparency,
+          color: selected
+              ? palette.accent.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
           child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () => openHermesSession(context, ref, session),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -117,7 +121,7 @@ class HermesSessionTile extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text.rich(
-                          _highlighted(
+                          hermezHighlightedText(
                             _displayTitle(context),
                             highlight ?? '',
                             HermezType.section(palette).copyWith(fontSize: 15),
@@ -129,7 +133,7 @@ class HermesSessionTile extends ConsumerWidget {
                         ),
                         if (_matchSnippet() case final snippet?)
                           Text.rich(
-                            _highlighted(
+                            hermezHighlightedText(
                               snippet,
                               highlight!,
                               HermezType.meta(palette),
@@ -657,7 +661,7 @@ Future<void> openHermesSession(
 }
 
 /// [text] with every case-insensitive occurrence of [query] in [match] style.
-TextSpan _highlighted(
+TextSpan hermezHighlightedText(
   String text,
   String query,
   TextStyle base,

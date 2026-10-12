@@ -92,12 +92,7 @@ class HermesAwayDigest extends ConsumerWidget {
             // Your conversations, not the automated runs behind them.
             ...sessions.where(
               (session) =>
-                  !const {
-                    'cron',
-                    'webhook',
-                    'subagent',
-                    'api_server',
-                  }.contains(session.source) &&
+                  !session.isAutomated &&
                   (session.updatedAt?.toUtc().isAfter(since) ?? false),
             ),
           ]..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!)));
@@ -228,10 +223,7 @@ class _AwayCard extends ConsumerWidget {
     );
   }
 
-  static bool _failed(HermesJob job) =>
-      (job.lastError?.isNotEmpty ?? false) ||
-      (job.lastStatus?.toLowerCase().contains('fail') ?? false) ||
-      (job.lastStatus?.toLowerCase().contains('error') ?? false);
+  static bool _failed(HermesJob job) => job.isFailing;
 }
 
 class _AwayRow extends StatelessWidget {

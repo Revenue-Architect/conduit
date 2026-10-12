@@ -2,8 +2,9 @@ import '../../spaces/providers/spaces_providers.dart';
 import '../../spaces/widgets/save_as_page_sheet.dart';
 
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:io' show Platform;
+
+import '../utils/streaming_reveal.dart';
 
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
@@ -431,6 +432,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       return;
     }
     if (_shouldPaceStreamingContent(raw)) {
+      if (_pacedStreamingTarget == null) {
+        _streamingPaceStartedAt = null;
+        _streamingPaceStartLength = _displayedContent.length;
+      }
       _pacedStreamingTarget = raw;
       _startStreamingPace();
       return;
@@ -467,6 +472,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   // popping in paragraph by paragraph. Completion always shows everything.
   String? _pacedStreamingTarget;
   bool _streamingPaceScheduled = false;
+  Duration? _streamingPaceStartedAt;
+  int _streamingPaceStartLength = 0;
 
   bool _shouldPaceStreamingContent(String raw) =>
       // The first words land at once; only later bursts are paced.
@@ -483,7 +490,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     SchedulerBinding.instance.scheduleFrame();
   }
 
-  void _paceStreamingStep(Duration _) {
+  void _paceStreamingStep(Duration timestamp) {
     _streamingPaceScheduled = false;
     final target = _pacedStreamingTarget;
     if (!mounted || target == null) return;
@@ -498,16 +505,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       _pacedStreamingTarget = null;
       return;
     }
-    var end = shown + math.max<int>(3, (backlog / 12).ceil());
-    if (end >= target.length) {
-      end = target.length;
-    } else {
-      // Whole words, and never half of a surrogate pair.
-      final space = target.indexOf(' ', end);
-      if (space != -1 && space - end < 12) end = space;
-      final unit = target.codeUnitAt(end - 1);
-      if (unit >= 0xD800 && unit <= 0xDBFF) end++;
-    }
+    _streamingPaceStartedAt ??= timestamp;
+    final end = streamingRevealEnd(
+      text: target,
+      shown: shown,
+      startedAtLength: _streamingPaceStartLength,
+      elapsed: timestamp - _streamingPaceStartedAt!,
+    );
     _applyDisplayedContent(target.substring(0, end));
     if (end < target.length) {
       _startStreamingPace();

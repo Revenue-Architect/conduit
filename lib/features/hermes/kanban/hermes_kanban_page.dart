@@ -1369,12 +1369,18 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                 textAlign: TextAlign.center,
               ),
             ),
-          // Workflow order, so the board reads left to right as work moves:
-          // Triage and Ready stay as entry points, Done always comes last.
+          // Empty stages occupy their workflow position too; Done stays last.
           for (final lane in kanbanLanes)
             if (occupied.contains(lane) ||
                 (query.isEmpty && entryLanes.contains(lane)))
-              _laneSection(lane, visibleByLane[lane]!),
+              _laneSection(lane, visibleByLane[lane]!)
+            else if (query.isEmpty && otherEmpty.contains(lane))
+              HermezReveal(
+                visible: _showEmptyLanes,
+                weight: HermezMotionWeight.medium,
+                revealKey: ValueKey('hermes-kanban-empty-$lane'),
+                child: _laneSection(lane, const []),
+              ),
           if (query.isEmpty && otherEmpty.isNotEmpty) ...[
             Align(
               alignment: Alignment.centerLeft,
@@ -1392,17 +1398,6 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                       ? 'Hide empty stages'
                       : 'Show ${otherEmpty.length} empty stages',
                 ),
-              ),
-            ),
-            HermezReveal(
-              visible: _showEmptyLanes,
-              weight: HermezMotionWeight.medium,
-              revealKey: const ValueKey('hermes-kanban-empty-lanes'),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final lane in otherEmpty) _laneSection(lane, const []),
-                ],
               ),
             ),
           ],

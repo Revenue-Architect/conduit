@@ -459,6 +459,12 @@ class _JobCardState extends ConsumerState<_JobCard> {
   /// A failing job starts open, so what went wrong is already on screen.
   late bool _expanded = _failing;
 
+  @override
+  void didUpdateWidget(covariant _JobCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.job.isFailing && job.isFailing) _expanded = true;
+  }
+
   /// The guarded delete is open inside this card.
   bool _confirmingDelete = false;
 
@@ -736,9 +742,7 @@ class _JobCardState extends ConsumerState<_JobCard> {
     );
   }
 
-  bool get _failing =>
-      job.lastError?.isNotEmpty == true ||
-      job.lastDeliveryError?.isNotEmpty == true;
+  bool get _failing => job.isFailing;
 
   /// "Every hour · next 10:00 AM", or what went wrong.
   String _whenLine(BuildContext context, AppLocalizations l10n) {
@@ -969,9 +973,6 @@ class _DeleteGuard extends StatelessWidget {
 }
 
 int _jobRank(HermesJob job) {
-  if (job.lastError?.isNotEmpty == true ||
-      job.lastDeliveryError?.isNotEmpty == true) {
-    return 0;
-  }
+  if (job.isFailing) return 0;
   return job.enabled ? 1 : 2;
 }

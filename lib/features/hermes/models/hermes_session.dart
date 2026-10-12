@@ -35,6 +35,13 @@ class HermesSessionSummary {
   final String? profile;
   final int? messageCount;
 
+  /// API transport alone does not distinguish a person from an automation.
+  bool get isAutomated => const {
+    'cron',
+    'webhook',
+    'subagent',
+  }.contains(source?.trim().toLowerCase());
+
   /// Parses one session object from `GET /api/sessions`, or null when it has no
   /// usable id. Tolerant of the field-name variations across Hermes versions.
   static HermesSessionSummary? fromJson(Map<String, dynamic> json) {

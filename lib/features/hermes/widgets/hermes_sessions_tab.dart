@@ -229,17 +229,20 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
     final theme = context.conduitTheme;
     final expanded = _expandedBots.contains(bot.name);
     final recentOwned = sessions
-        .where((session) => session.profile == bot.name)
+        .where((session) => session.profile == bot.name && !session.isAutomated)
         .toList(growable: false);
     final scoped = expanded
         ? ref.watch(hermesBotSessionsProvider(bot.name))
         : null;
-    final scopedOwned = scoped?.asData?.value;
+    final scopedOwned = scoped?.asData?.value
+        .where((session) => !session.isAutomated)
+        .toList(growable: false);
     final owned =
         scopedOwned == null || (scopedOwned.isEmpty && recentOwned.isNotEmpty)
         ? recentOwned
         : scopedOwned;
-    final conversationCount = profileTotals?[bot.name] ?? owned.length;
+    // Profile totals also count automated runs, not just conversations.
+    final conversationCount = owned.length;
     final visibleCount = _visibleBotSessions[bot.name] ?? 8;
     final avatar = bot.hasAvatar
         ? ref.watch(hermesBotAvatarProvider(bot.name)).asData?.value
@@ -289,7 +292,7 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                       ),
                       if (conversationCount > 0)
                         Text(
-                          '$conversationCount chats',
+                          '$conversationCount recent chats',
                           style: AppTypography.bodySmallStyle.copyWith(
                             color: theme.textSecondary,
                           ),
@@ -357,12 +360,7 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
 
   /// Scheduled jobs, webhooks, scouts and delegated sub-runs: work Hermes did
   /// on its own, not a conversation you had.
-  static bool _isAutomated(HermesSessionSummary session) => const {
-    'cron',
-    'webhook',
-    'subagent',
-    'api_server',
-  }.contains(session.source);
+  static bool _isAutomated(HermesSessionSummary session) => session.isAutomated;
 
   /// Rows with the bot's portrait, profile and time, so a chat is
   /// recognisable without opening it.
@@ -447,14 +445,18 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          bot.title,
+                        child: Text.rich(
+                          hermezHighlightedText(
+                            bot.title,
+                            query,
+                            AppTypography.bodyLargeStyle.copyWith(
+                              color: theme.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            TextStyle(color: theme.buttonPrimary),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyLargeStyle.copyWith(
-                            color: theme.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
                         ),
                       ),
                       Icon(

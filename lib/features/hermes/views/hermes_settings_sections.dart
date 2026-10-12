@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -484,14 +486,7 @@ class HermesServerStatusSection extends ConsumerWidget {
           .watch(hermesServerStatusProvider)
           .when(
             data: (status) {
-              final entries = status.entries
-                  .where(
-                    (entry) =>
-                        entry.value is num ||
-                        entry.value is String ||
-                        entry.value is bool,
-                  )
-                  .toList();
+              final entries = status.entries.toList();
               if (entries.isEmpty) {
                 return Text(
                   l10n.hermesNoServerStatus,
@@ -504,7 +499,7 @@ class HermesServerStatusSection extends ConsumerWidget {
                 status: status,
                 details: [
                   for (final entry in entries)
-                    '${_humanize(entry.key)}: ${entry.value}',
+                    '${_humanize(entry.key)}: ${entry.value is Map || entry.value is List ? const JsonEncoder.withIndent('  ').convert(entry.value) : entry.value}',
                 ],
               );
             },
@@ -574,13 +569,18 @@ class _ServerStatusSummaryState extends State<_ServerStatusSummary> {
     final status = widget.status;
     final overall = status['overall']?.toString().toLowerCase();
     final running = status['gateway_running'];
-    final healthy =
-        (overall == null || overall == 'ok' || overall == 'healthy') &&
-        running != false;
+    final reportedHealthy = overall == 'ok' || overall == 'healthy';
+    final needsAttention =
+        running == false || (overall != null && !reportedHealthy);
+    final healthy = !needsAttention && (reportedHealthy || running == true);
     final version = status['version']?.toString();
     final sessions = status['active_sessions'];
     final summary = [
-      healthy ? 'Healthy' : 'Needs attention',
+      healthy
+          ? 'Healthy'
+          : needsAttention
+          ? 'Needs attention'
+          : 'Status unavailable',
       if (version != null && version.isNotEmpty) 'v$version',
       if (sessions is num)
         '${sessions.toInt()} active session${sessions == 1 ? '' : 's'}',
@@ -595,7 +595,11 @@ class _ServerStatusSummaryState extends State<_ServerStatusSummary> {
               height: 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: healthy ? const Color(0xFF17A46A) : theme.error,
+                color: healthy
+                    ? const Color(0xFF17A46A)
+                    : needsAttention
+                    ? theme.error
+                    : theme.textSecondary,
               ),
             ),
             const SizedBox(width: 10),

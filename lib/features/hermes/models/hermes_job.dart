@@ -59,6 +59,18 @@ class HermesJob {
   final DateTime? nextRun;
   final DateTime? lastRun;
 
+  /// A failure remains visible even when the server has no diagnostic text.
+  bool get isFailing =>
+      lastError?.trim().isNotEmpty == true ||
+      lastDeliveryError?.trim().isNotEmpty == true ||
+      const {
+        'failed',
+        'failure',
+        'error',
+        'timeout',
+        'timed_out',
+      }.contains(lastStatus?.trim().toLowerCase());
+
   static HermesJob? fromJson(Map<String, dynamic> json) {
     final id = validateHermesOpaqueIdentifier(json['id'] ?? json['job_id']);
     if (id == null) return null;

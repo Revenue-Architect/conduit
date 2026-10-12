@@ -13,6 +13,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
+  testWidgets('revealed empty lanes keep workflow order with Done last', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(600, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final client = HermesKanbanClient(
+      const HermesConfig(
+        enabled: true,
+        mode: HermesBackendMode.desktopGateway,
+        baseUrl: 'https://example.test/v1',
+        desktopAuthKind: HermesDesktopAuthKind.dashboardCookie,
+      ),
+      request: (_, uri, {body}) async => uri.path.endsWith('/boards')
+          ? (
+              status: 200,
+              body: '{"boards":[{"slug":"default","name":"Default"}]}',
+            )
+          : (
+              status: 200,
+              body: '{"columns":[{"name":"done","tasks":[{"id":"done-1","title":"Finished task","status":"done"}]}]}',
+            ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(home: HermesKanbanPage(client: client)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('empty stages'));
+    await tester.pumpAndSettle();
+    final titles = tester
+        .widgetList<ExpansionTile>(find.byType(ExpansionTile))
+        .map(
+          (tile) =>
+              ((tile.title as Row).children.whereType<Flexible>().first.child
+                      as Text)
+                  .data,
+        )
+        .toList();
+    expect(titles, [
+      'Triage',
+      'Todo',
+      'Scheduled',
+      'Ready',
+      'Running',
+      'Blocked',
+      'Review',
+      'Done',
+    ]);
+    expect(tester.takeException(), isNull);
+  });
   test('Kanban attachment identity requires a real server ID and filename', () {
     final target = HermesKanbanArtifactTarget.fromAttachment(
       board: 'default',
