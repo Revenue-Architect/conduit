@@ -35,9 +35,21 @@ import javax.net.ssl.HttpsURLConnection
 
 internal const val TEXT_RELAY = "https://umbrel.tail4c9e01.ts.net:8448"
 internal val otpText = Regex("\\b(?:otp|verification|verify|authentication|security|one[ -]time|2fa|passcode|login|sign[ -]?in|confirmation)\\b.{0,100}\\b\\d{4,8}\\b|\\b\\d{4,8}\\b.{0,100}\\b(?:code|otp|verification|passcode)\\b", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-internal fun isFilteredText(text: String, address: String): Boolean =
-    otpText.containsMatchIn(text) || text.trim().matches(Regex("\\d{4,8}")) ||
-    address.filter(Char::isDigit).length in 1..6 || address.any(Char::isLetter)
+internal val strictCode = Regex("\\b(?:code|otp|passcode|pin)\\b\\W{0,3}(?:is\\b)?\\W{0,3}\\d{4,8}\\b|\\b\\d{4,8}\\b\\W{0,3}is\\W{1,3}your\\b.{0,30}\\bcode\\b", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+/** Short codes, alphanumeric senders and real codes never leave the phone. The broad code-shaped pattern only
+ *  applies to strangers: "the security deposit is 2000" from a saved contact is a real message (same rule as the relay). */
+internal fun isFilteredText(text: String, address: String, knownContact: Boolean = false, outgoing: Boolean = false): Boolean =
+    address.filter(Char::isDigit).length in 1..6 || address.any(Char::isLetter) || strictCode.containsMatchIn(text) ||
+    (!knownContact && !outgoing && (otpText.containsMatchIn(text) || text.trim().matches(Regex("\\d{4,8}"))))
+/** Clip to the relay's 8192-byte limit on a character boundary. A stalled cursor would stop every later text. */
+internal fun clipText(text: String, limit: Int = 8000): Pair<String, Boolean> {
+    if (text.toByteArray().size <= limit) return text to false
+    val marker = " […message truncated]"
+    var end = text.length
+    while (end > 0 && (text.substring(0, end) + marker).toByteArray().size > limit) end -= maxOf(1, (end / 50))
+    if (end > 0 && Character.isHighSurrogate(text[end - 1])) end -= 1
+    return text.substring(0, end) + marker to true
+}
 internal fun acknowledgedBatch(status: Int, accepted: Int, submitted: Int) = status == 202 && accepted == submitted
 
 /** One encrypted JSON preference, backed by Android Keystore. No raw credentials in ordinary prefs. */
@@ -188,10 +200,12 @@ internal class PhoneTextReader(private val context: Context, private val salt: S
             while (scanned < 500 && c.moveToNext()) {
                 val id = c.getLong(0); last = id; scanned++
                 var address = ""; var text = ""; val attachments = JSONArray(); val participants = JSONArray()
+                var senderAddress = ""
                 val at: Long; val direction: Int
                 if (sms) {
                     address = c.getString(1) ?: ""; at = c.getLong(2); direction = c.getInt(3); text = c.getString(4) ?: ""
                     if (address.isNotBlank()) participants.put(participant(address))
+                    senderAddress = address
                 } else {
                     at = c.getLong(1) * 1000; direction = c.getInt(2)
                     resolver.query(Uri.parse("content://mms/$id/addr"), arrayOf("address", "type"), null, null, null)?.use { a ->
@@ -199,6 +213,7 @@ internal class PhoneTextReader(private val context: Context, private val salt: S
                             val addr = a.getString(0) ?: ""
                             if (addr != "insert-address-token" && addr.isNotBlank() && !isFilteredText("", addr)) {
                                 if (address.isBlank() || (direction == 1 && a.getInt(1) == 137)) address = addr
+                                if (a.getInt(1) == 137) senderAddress = addr  // PduHeaders.FROM: who wrote it
                                 participants.put(participant(addr))
                             }
                         }
@@ -215,16 +230,23 @@ internal class PhoneTextReader(private val context: Context, private val salt: S
                         text = parts.joinToString("\n")
                     }
                 }
-                if (direction !in 1..2 || participants.length() == 0 || isFilteredText(text, address)) continue
+                if (direction !in 1..2 || participants.length() == 0) continue
+                val outgoing = direction != 1
+                val sender = if (!outgoing && senderAddress.isNotBlank()) participant(senderAddress) else null
+                val known = sender?.optString("name")?.let { it != "Unknown contact" } ?: false
+                if (isFilteredText(text, address, known, outgoing)) continue
                 val canonical = recipients(c.getLong(if (sms) 5 else 3)).ifEmpty { listOf(address) }
                 val threadParticipants = JSONArray()
                 for (recipient in canonical) threadParticipants.put(participant(recipient))
-                // Never clip a message and advance its cursor: an oversized row must remain retryable.
-                require(text.toByteArray().size <= 8192) { "Text exceeds relay limit" }
-                batch.put(JSONObject().put("key", "$table:$id").put("direction", if (direction == 1) "in" else "out")
-                    .put("at", Instant.ofEpochMilli(at).toString()).put("text", text).put("participants", threadParticipants)
+                // A visibly clipped long message beats a cursor that can never advance past it.
+                val (body, truncated) = clipText(text)
+                val row = JSONObject().put("key", "$table:$id").put("direction", if (outgoing) "out" else "in")
+                    .put("at", Instant.ofEpochMilli(at).toString()).put("text", body).put("participants", threadParticipants)
                     .put("thread_ref", threadRef(canonical))
-                    .put("kind", if (sms) "sms" else "rcs-text").put("attachments", attachments))
+                    .put("kind", if (sms) "sms" else "rcs-text").put("attachments", attachments)
+                if (truncated) row.put("truncated", true)
+                if (sender != null) row.put("sender", sender)
+                batch.put(row)
             }
         }
         return PhoneTextBatch(batch, last, scanned)
