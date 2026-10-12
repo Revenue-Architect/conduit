@@ -786,6 +786,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       path: Routes.hermesLiveRun,
       name: RouteNames.hermesLiveRun,
       pageBuilder: (context, state) {
+        final originProfile = state.uri.queryParameters['profile'];
+        if (originProfile != null &&
+            !HermesConfig.isValidDesktopProfile(originProfile)) {
+          return _buildNoTransitionPage(
+            state: state,
+            child: const Scaffold(
+              body: Center(
+                child: Text('This chat link has an invalid profile.'),
+              ),
+            ),
+          );
+        }
         final page = HermesLiveRunPage(
           sessionId:
               validateHermesOpaqueIdentifier(
@@ -793,6 +805,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ) ??
               '',
           openChat: state.uri.queryParameters['open'] == 'chat',
+          profile: originProfile,
         );
         // A "finished" notification passes through this page on its way to
         // the conversation: no transition, nothing drawn, so there is no

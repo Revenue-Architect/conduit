@@ -43,11 +43,26 @@ import '../widgets/hermes_steel_live_view.dart';
 import '../widgets/hermes_unified_activity_timeline.dart';
 import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
 
+HermesSessionSummary? matchingOriginatingHermesSession(
+  List<HermesSessionSummary> sessions,
+  String sessionId,
+  String? profile,
+) {
+  for (final candidate in sessions) {
+    if (candidate.id == sessionId &&
+        (profile == null || candidate.profile == profile)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 class HermesLiveRunPage extends ConsumerStatefulWidget {
   const HermesLiveRunPage({
     super.key,
     required this.sessionId,
     this.openChat = false,
+    this.profile,
     this.embedded = false,
     this.answerMessages,
     this.currentAnswer = false,
@@ -57,6 +72,9 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
   /// Opened from a "finished" notification: go straight on to the
   /// conversation, showing the run's status while its transcript loads.
   final bool openChat;
+
+  /// Profile supplied by a scoped originating-session link; never changes credentials.
+  final String? profile;
   final bool embedded;
   final List<ChatMessage>? answerMessages;
   final bool currentAnswer;
@@ -81,7 +99,10 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   @override
   void didUpdateWidget(covariant HermesLiveRunPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionId != widget.sessionId) {
+    if (oldWidget.sessionId != widget.sessionId ||
+        oldWidget.profile != widget.profile) {
+      _chatOpened = false;
+      _openChatFailed = false;
       _pendingService = null;
       _historyFuture = null;
       _sawRunning = false;
@@ -183,9 +204,11 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
       final sessions = await ref
           .read(hermesSessionsProvider.future)
           .timeout(const Duration(seconds: 6));
-      for (final candidate in sessions) {
-        if (candidate.id == widget.sessionId) row = candidate;
-      }
+      row = matchingOriginatingHermesSession(
+        sessions,
+        widget.sessionId,
+        widget.profile,
+      );
     } catch (_) {}
     for (var i = 0; i < 40 && mounted; i++) {
       final service = ref.read(hermesApiServiceProvider);
@@ -199,7 +222,8 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
               HermesSessionSummary(
                 id: widget.sessionId,
                 title: 'Hermes run',
-                profile: service.boundProfileFor(widget.sessionId),
+                profile:
+                    widget.profile ?? service.boundProfileFor(widget.sessionId),
               ),
         );
         // Opening replaces this page; if it is still here, it did not open.
