@@ -574,6 +574,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val maxSharedFileCount = 6
     private var methodChannel: MethodChannel? = null
     private var shareChannel: MethodChannel? = null
+    private var textSharingBridge: TextSharingBridge? = null
     private var pendingStagedShareInProgress: Boolean
         get() = PendingShareImportRuntime.isImportInProgress
         set(value) {
@@ -611,6 +612,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        textSharingBridge = TextSharingBridge(applicationContext).also { it.setup(flutterEngine) }
 
         // Initialize background streaming handler
         backgroundStreamingHandler = BackgroundStreamingHandler(this)
@@ -1725,6 +1727,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
     
     override fun onDestroy() {
+        textSharingBridge?.dispose()
         if (::nativeSttBridge.isInitialized) {
             nativeSttBridge.dispose()
         }

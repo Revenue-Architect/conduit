@@ -22,6 +22,7 @@ import '../services/hermes_connection_service.dart';
 import '../services/hermes_steel_viewer.dart';
 import 'hermes_desktop_connection_section.dart';
 import 'hermes_settings_sections.dart';
+import 'hermes_text_sharing_page.dart';
 
 /// Settings for the optional direct Hermes Agent backend: enable toggle, server
 /// URL, API key, long-term memory key, and a connection test.
@@ -559,6 +560,19 @@ class _HermesSettingsPageState extends ConsumerState<HermesSettingsPage> {
         const HermesCapabilitiesSection(),
         const SizedBox(height: Spacing.lg),
         const HermesToolsetsSection(),
+        if (PlatformInfo.isAndroid) ...[
+          const SizedBox(height: Spacing.lg),
+          ListTile(
+            leading: const Icon(Icons.sms_outlined),
+            title: const Text('Share texts with Hermes'),
+            subtitle: const Text('Private, read-only message sharing'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const HermesTextSharingPage(),
+              ),
+            ),
+          ),
+        ],
         if (config.mode == HermesBackendMode.desktopGateway) ...[
           const SizedBox(height: Spacing.lg),
           const HermesDesktopManagementSection(),

@@ -78,6 +78,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Core library desugaring for flutter_local_notifications
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.activity:activity:1.12.4")
