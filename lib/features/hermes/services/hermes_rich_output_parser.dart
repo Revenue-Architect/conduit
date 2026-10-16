@@ -15,6 +15,11 @@ final class A2uiSegment extends HermesRichOutputSegment {
   const A2uiSegment(super.content);
 }
 
+/// OpenUI Lang uses its own bounded catalog; A2UI JSON is never reinterpreted.
+final class OpenuiSegment extends HermesRichOutputSegment {
+  const OpenuiSegment(super.content);
+}
+
 final _fenceOpeningPattern = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$');
 final _fenceClosingPattern = RegExp(r'^ {0,3}(`{3,}|~{3,})[ \t]*$');
 
@@ -47,10 +52,15 @@ List<HermesRichOutputSegment> parseHermesRichOutput(String text) {
         break;
       }
 
-      if (opening.info == 'a2ui') {
+      if (opening.info == 'a2ui' || opening.info == 'openui') {
         _appendMarkdown(segments, text.substring(markdownStart, cursor));
         final contentStart = hasLineFeed ? lineEnd + 1 : text.length;
-        segments.add(A2uiSegment(text.substring(contentStart, closing.start)));
+        final payload = text.substring(contentStart, closing.start);
+        segments.add(
+          opening.info == 'a2ui'
+              ? A2uiSegment(payload)
+              : OpenuiSegment(payload),
+        );
         markdownStart = closing.after;
       }
       cursor = closing.after;

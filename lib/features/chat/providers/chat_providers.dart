@@ -75,6 +75,7 @@ import '../../hermes/services/hermes_local_document_service.dart';
 import '../../hermes/services/hermes_local_document_trust_store.dart';
 import '../../hermes/services/hermes_message_mapper.dart';
 import '../../hermes/services/hermes_run_transport.dart';
+import '../../hermes/services/hermes_inline_ui_capability.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
 import '../../direct_connections/direct_connections.dart';
 import '../../direct_connections/providers/direct_mcp_providers.dart';
@@ -13778,6 +13779,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
         ),
         HermesResponsesTurnService() => service.streamResponseWithReasoning(
           responseInput ?? HermesChatInput.text(input),
+          instructions: hermesInlineUiInstructions,
           sessionId: sessionId,
           previousResponseId: responsePreviousResponseId,
           conversationHistory: responseStartsNewChain ? responseHistory : null,

@@ -335,6 +335,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         await _detachStaged(binding.runtimeId, stagedPaths);
         throw cancelToken!.cancelError!;
       }
+      text = hermesInlineUiTurnText(text);
       promptBaseline = freshSession
           ? const <String>{}
           : await _matchingPromptMarkers(storedId, text);
@@ -869,6 +870,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
   }
 
   Future<bool> _runtimeSteer(String storedId, String text) async {
+    text = hermesInlineUiTurnText(text);
     final binding = await _resume(storedId);
     final baseline = await _matchingPromptMarkers(storedId, text);
     late final Map<String, dynamic> result;
@@ -900,6 +902,7 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
   }
 
   Future<void> _runtimeQueue(String storedId, String text) async {
+    text = hermesInlineUiTurnText(text);
     final binding = await _resume(storedId);
     final baseline = await _matchingPromptMarkers(storedId, text);
     try {

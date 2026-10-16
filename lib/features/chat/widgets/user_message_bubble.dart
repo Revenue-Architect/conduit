@@ -25,6 +25,7 @@ import '../providers/chat_providers.dart';
 import '../utils/file_utils.dart';
 import '../utils/message_targeting.dart';
 import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
+import '../../hermes/services/hermes_inline_ui_capability.dart';
 import 'enhanced_attachment.dart';
 import 'enhanced_image_attachment.dart';
 
@@ -796,7 +797,11 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
     final interactionLabel = widget.isHermesConversation
         ? hermesA2uiInteractionLabel(rawContent)
         : null;
-    final visibleContent = interactionLabel ?? rawContent;
+    final visibleContent =
+        interactionLabel ??
+        (widget.isHermesConversation
+            ? hermesInlineUiVisibleText(rawContent)
+            : rawContent);
     final hasImages =
         widget.message.attachmentIds != null &&
         widget.message.attachmentIds!.isNotEmpty;

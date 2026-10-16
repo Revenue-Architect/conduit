@@ -31,6 +31,7 @@ import 'hermes_dashboard_webview_policy.dart';
 import 'hermes_clarify_form.dart';
 import 'hermes_desktop_transport.dart';
 import 'hermes_identifier.dart';
+import 'hermes_inline_ui_capability.dart';
 import 'hermes_json_guard.dart';
 import 'hermes_pending_decision_store.dart';
 import 'hermes_live_activity.dart';

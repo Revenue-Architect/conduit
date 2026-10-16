@@ -261,3 +261,9 @@ Use a short, unique action name and only the context needed to understand the us
 - Charts use two or more actual samples; absent and single-sample data do not become an invented trend.
 - No A2UI component contains a remote asset URL or executable code.
 - Ran `python3 /opt/data/scripts/a2ui_check.py --from-md <file>` (or on the JSONL payload): prints OK for every payload with zero errors.
+
+<!-- conduit-openui-v1 -->
+## OpenUI alongside A2UI
+
+Conduit build 180 adds the same 70-component OpenUI v1 catalog as Hermes Desktop. On a turn advertising `[Client capability: Conduit OpenUI v1]`, use the `openui-desktop` skill for OpenUI signatures and its validator. Keep this skill for strict A2UI v0.9. Separate fenced blocks may appear in one response. Forms, citations, tables, charts and unsent draft review work in both renderers, with the renderer's own schema. Buttons send normal `[A2UI_INTERACTION]` requests in their originating chat/profile; local view changes send nothing. Do not assume an older app, WhatsApp, Teams or a scheduled job supports either format.
+<!-- /conduit-openui-v1 -->

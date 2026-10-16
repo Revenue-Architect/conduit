@@ -16,6 +16,8 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/streaming_markdown_widget.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/providers/app_providers.dart'
+    show activeConversationProvider;
 import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
 import '../providers/text_to_speech_provider.dart';
 import '../providers/queued_completion_provider.dart';
@@ -36,6 +38,9 @@ import '../providers/chat_providers.dart'
     show
         chatComposerTextInsertionTargetId,
         isChatStreamingProvider,
+        captureChatMutationOwner,
+        chatMutationTokenStillActive,
+        chatMessagesProvider,
         sendMessageWithContainer,
         streamingContentProvider;
 import '../../../shared/utils/external_link_launcher.dart';
@@ -63,6 +68,7 @@ import '../../hermes/services/hermes_media_parser.dart';
 import '../../hermes/services/hermes_rich_output_parser.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/widgets/hermes_a2ui_surface.dart';
+import '../../hermes/widgets/hermes_openui_surface.dart';
 import '../../hermes/widgets/hermes_a2ui_media_scope.dart';
 import '../../hermes/widgets/hermes_artifact_view.dart';
 import '../../hermes/widgets/hermez_bot_mark.dart';
@@ -769,6 +775,36 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final sessionId = validateHermesOpaqueIdentifier(
       _chatMessage?.metadata?['hermesSessionId'],
     );
+    final uiOwner = captureChatMutationOwner(
+      ref,
+      ref.read(activeConversationProvider),
+    );
+    final uiConfig = ref.read(hermesConfigProvider);
+    final uiMessageId = _messageId;
+    final uiContent = _chatMessage?.content;
+    final inlineUiBusy = _uiTreatsAsStreaming || ref.watch(isChatStreamingProvider);
+    Future<void> sendInlineUi(String prompt) async {
+      // Never fall back to whichever conversation happens to be active now.
+      if (!mounted ||
+          widget.readOnly ||
+          _uiTreatsAsStreaming ||
+          ref.read(isChatStreamingProvider) ||
+          !chatMutationTokenStillActive(ref, uiOwner) ||
+          ref.read(hermesConfigProvider) != uiConfig ||
+          !ref
+              .read(chatMessagesProvider)
+              .any(
+                (m) =>
+                    m.id == uiMessageId &&
+                    m.content == uiContent &&
+                    m.metadata?['hermesSessionId'] == sessionId,
+              ) ||
+          widget.onFollowUpSelected == null) {
+        throw StateError('Open the original chat and connection to interact.');
+      }
+      await widget.onFollowUpSelected!(prompt);
+    }
+
     // Only image directives already supplied in this same assistant message
     // may be referenced by a comparison/room visual. Never parse file paths
     // from an A2UI object's fields into a new download authority.
@@ -833,6 +869,20 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             segmentIndex++;
           }
         }
+      } else if (segment is OpenuiSegment) {
+        children.add(
+          HermesOpenuiSurface(
+            key: ValueKey<String>('hermes-openui:$_messageId:$segmentIndex'),
+            payload: segment.content,
+            surfaceId:
+                'openui-${uiMessageId.length > 90 ? uiMessageId.substring(0, 90) : uiMessageId}-$segmentIndex',
+            onInteraction: widget.readOnly || widget.onFollowUpSelected == null
+                ? null
+                : sendInlineUi,
+            isBusy: inlineUiBusy,
+          ),
+        );
+        segmentIndex++;
       } else if (segment is A2uiSegment) {
         children.add(
           HermesA2uiSurface(
@@ -843,8 +893,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               declaredImages: declaredImages,
               sessionId: sessionId,
             ),
-            onInteraction: widget.readOnly ? null : _handleFollowUpTap,
-            isBusy: _uiTreatsAsStreaming,
+            onInteraction: widget.readOnly || widget.onFollowUpSelected == null
+                ? null
+                : sendInlineUi,
+            isBusy: inlineUiBusy,
           ),
         );
         segmentIndex++;
