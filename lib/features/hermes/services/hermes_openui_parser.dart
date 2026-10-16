@@ -242,6 +242,32 @@ class _Parser {
       take(']');
       return items;
     }
+    if (optional('{')) {
+      // Plain string-keyed data, accepted only where the schema says object
+      // (ImageGallery items). Bounded and never executed.
+      final entries = <String, dynamic>{};
+      if (optional('}')) return entries;
+      do {
+        if (entries.length >= 8) {
+          throw const FormatException('Too many object fields.');
+        }
+        space();
+        if (position >= source.length) {
+          throw const FormatException('Incomplete object.');
+        }
+        final key = source[position] == '"' ? value(depth + 1) : _word();
+        if (key is! String || _unsafeNames.contains(key)) {
+          throw const FormatException('Invalid object field name.');
+        }
+        take(':');
+        if (entries.containsKey(key)) {
+          throw FormatException('Duplicate object field $key.');
+        }
+        entries[key] = value(depth + 1);
+      } while (optional(','));
+      take('}');
+      return entries;
+    }
     final number = RegExp(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)')
         .matchAsPrefix(source, position);
     if (number != null) {
@@ -315,6 +341,17 @@ void _validate(dynamic value, Map schema) {
               value > (schema['exclusiveMinimum'] as num));
     case 'boolean':
       valid = value is bool;
+    case 'object':
+      final fields = (schema['properties'] as Map?) ?? const {};
+      valid =
+          value is Map &&
+          value.keys.every(fields.containsKey) &&
+          (schema['required'] as List? ?? const []).every(value.containsKey);
+      if (valid) {
+        for (final entry in value.entries) {
+          _validate(entry.value, fields[entry.key] as Map);
+        }
+      }
     case 'array':
       valid =
           value is List &&

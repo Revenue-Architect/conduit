@@ -85,6 +85,9 @@ FileCard(name: string, type: string, size: string, description: string) — Supp
 Breadcrumbs(items: string[]) — Display hierarchy; no navigation to arbitrary destinations.
 Status(label: string, detail: string, severity: "info" | "success" | "warning" | "error") — Named status with explicit message.
 DefinitionList(labels: string[], values: string[]) — Pairs of labels and descriptions.
+Image(alt: string, src?: string) — Compact image. src is an https/http URL, a data:image URI or a MEDIA-declared path; without a usable src it shows a placeholder with the alt text. Tap opens a local zoom viewer; nothing is sent.
+ImageBlock(src: string, alt?: string) — Full-width image block with the same src rules as Image. Failures show a placeholder with the alt text. Tap opens a local zoom viewer.
+ImageGallery(images: {src: string, alt?: string, details?: string}[]) — Swipeable gallery of 1 to 12 images given as {src, alt, details} objects, with page dots. details is shown with the image. Local only; sends nothing.
 
 ## Examples
 
@@ -99,9 +102,11 @@ Before finishing, walk your output and verify:
 2. There is exactly one root assignment, all component calls inline, no unresolved references.
 
 - Only use this format when the CURRENT turn advertises [Client capability: Hermes Desktop OpenUI v1] or [Client capability: Conduit OpenUI v1], or this current user turn is an OpenUI interaction with context.renderer=openui. Otherwise use supported A2UI or normal text.
-- Use a closed fenced openui block, containing exactly one root = Stack([...]) statement. Inline all component calls. No named references, extra statements, functions, actions, queries, mutations, reactive bindings, arbitrary URLs, images or expressions.
+- Use a closed fenced openui block, containing exactly one root = Stack([...]) statement. Inline all component calls. No named references, extra statements, functions, actions, queries, mutations, reactive bindings or expressions. URLs are allowed only as image src values (Image, ImageBlock, ImageGallery).
 - All arguments are positional in the declared schema order. Required arguments first. Omit optional trailing arguments or give their exact enum values. Never add invented components or props.
 - At most 64KiB, 200 components, 16 levels of component nesting. Plain short answers stay prose. Mark synthetic data as examples. Cite factual evidence outside the UI or use the existing A2UI CitationCard. Use A2UI DraftReview for unsent recipient/subject/message review.
 - A2UI and OpenUI may appear in separate fences in the same reply. Preserve strict A2UI v0.9 JSONL. Never put A2UI JSON into an openui fence or OpenUI Lang into an a2ui fence.
+- Image components (Conduit only until Desktop exposes them; use them only when the client advertises Image, ImageBlock and ImageGallery): src is an https:// or http:// image URL (any host, including the user's own LAN or Tailscale server), a data:image/(png|jpeg|gif|webp|avif|bmp);base64 URI (keep it under 48 KB; the whole program is capped at 64 KiB) or a path from a MEDIA: line in the same reply. Other schemes (javascript:, file:, content:, intent:) and non-image responses are rejected. Only the image is fetched, with no cookies, credentials or referrer. Write meaningful alt text; an unavailable image shows a placeholder with that alt text. ImageGallery takes an array of {src, alt, details} objects, at most 12.
+- Buttons on an older reply are disabled once a newer user turn exists, so put the actions the user should take in the latest reply. Local tabs, selections and galleries keep working on older replies.
 - Button(label,message) sends an ordinary conversational request through [A2UI_INTERACTION] with context.renderer=openui. Only explicit button clicks send; typing/selecting/checking stays local. Form(name,children) includes current field values, including unchanged defaults. No button auto-sends email or applies a change.
 - Use one unique field name per Form. Never nest Forms. Input/Select/Checkbox must be inside Form. Select initial must equal an option. Table row widths equal column count; BarChart labels and values have equal length; Progress value does not exceed max.

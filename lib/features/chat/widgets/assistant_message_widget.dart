@@ -247,6 +247,16 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   bool get _shouldRenderHermesA2ui =>
       _isHermesAssistantMessage && !_uiTreatsAsStreaming;
 
+  /// Whether a later user turn already answered the message with [id].
+  static bool _hasFollowingUserTurn(List<ChatMessage> messages, String id) {
+    final index = messages.indexWhere((m) => m.id == id);
+    if (index < 0) return false;
+    for (var i = index + 1; i < messages.length; i++) {
+      if (messages[i].role == 'user') return true;
+    }
+    return false;
+  }
+
   // press state handled by shared ChatActionButton
 
   Future<void> _handleFollowUpTap(String suggestion) async {
@@ -783,10 +793,19 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final uiMessageId = _messageId;
     final uiContent = _chatMessage?.content;
     final inlineUiBusy = _uiTreatsAsStreaming || ref.watch(isChatStreamingProvider);
+    // A newer user turn means this reply was already answered. OpenUI keeps
+    // its local edits and disables only the send buttons; A2UI takes the
+    // existing read-only lock, which still lets local controls open.
+    final inlineUiSuperseded = ref.watch(
+      chatMessagesProvider.select(
+        (messages) => _hasFollowingUserTurn(messages, uiMessageId),
+      ),
+    );
     Future<void> sendInlineUi(String prompt) async {
       // Never fall back to whichever conversation happens to be active now.
       if (!mounted ||
           widget.readOnly ||
+          _hasFollowingUserTurn(ref.read(chatMessagesProvider), uiMessageId) ||
           _uiTreatsAsStreaming ||
           ref.read(isChatStreamingProvider) ||
           !chatMutationTokenStillActive(ref, uiOwner) ||
@@ -880,6 +899,17 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 ? null
                 : sendInlineUi,
             isBusy: inlineUiBusy,
+            superseded: inlineUiSuperseded,
+            // Only images declared with MEDIA: in this same message.
+            mediaPreview: (path) {
+              final artifact = declaredImages[path];
+              return artifact == null
+                  ? null
+                  : HermesArtifactView(
+                      artifact: artifact,
+                      sessionId: sessionId,
+                    );
+            },
           ),
         );
         segmentIndex++;
@@ -893,7 +923,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               declaredImages: declaredImages,
               sessionId: sessionId,
             ),
-            onInteraction: widget.readOnly || widget.onFollowUpSelected == null
+            onInteraction:
+                widget.readOnly ||
+                    inlineUiSuperseded ||
+                    widget.onFollowUpSelected == null
                 ? null
                 : sendInlineUi,
             isBusy: inlineUiBusy,

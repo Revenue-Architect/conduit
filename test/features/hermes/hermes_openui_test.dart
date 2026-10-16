@@ -85,12 +85,16 @@ void main() {
       'v0.9',
     );
   });
-  test('exact Desktop schemas, 70 components and complete shared fixtures', () {
+  // The three image components exist only in Conduit until Desktop migrates to
+  // the full openuiLibrary; restore a comparison against Desktop's generated
+  // catalog.schema.json afterwards. For now the Dart catalog must equal the
+  // reference copy in docs/hermes-openui/references.
+  test('Dart catalog equals its reference copy, 73 components and complete fixtures', () {
     final schema = jsonDecode(
       File('${directory.path}/catalog.schema.json').readAsStringSync(),
     );
     expect(jsonDecode(hermesOpenuiSchemaJson), schema[r'$defs']);
-    expect(hermesOpenuiComponentNames, hasLength(70));
+    expect(hermesOpenuiComponentNames, hasLength(73));
     final covered = <String>{};
     void walk(HermesOpenuiNode n) {
       covered.add(n.type);

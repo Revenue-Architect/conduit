@@ -1,6 +1,6 @@
 ---
 name: openui-desktop
-description: "Inline generative UI in Hermes Desktop or Conduit when the CURRENT turn advertises OpenUI v1: 70 themed layout, chart, table, form, navigation, evidence and review components. Coexists with the existing A2UI v0.9 catalog."
+description: "Inline generative UI in Hermes Desktop or Conduit when the CURRENT turn advertises OpenUI v1: 70 themed layout, chart, table, form, navigation, evidence and review components, plus Conduit-only image components. Coexists with the existing A2UI v0.9 catalog."
 version: 1.1.0
 license: MIT
 ---
@@ -23,7 +23,7 @@ Both formats can appear in one answer in **separate**, properly closed fences. U
 
 ## Emission
 
-Exactly one `root = Stack([...])` assignment inside a closed `openui` fence. Inline component calls and literal arguments only. No references, multiple assignments, functions, queries, mutations, reactive variables, JavaScript, URLs, arbitrary HTML or Markdown inside component text. At most 64 KiB, 200 components and 16 component levels. The complete response renders after its fence closes; partial programs cannot send actions.
+Exactly one `root = Stack([...])` assignment inside a closed `openui` fence. Inline component calls and literal arguments only. No references, multiple assignments, functions, queries, mutations, reactive variables, JavaScript, arbitrary HTML or Markdown inside component text. URLs appear only as image `src` values. At most 64 KiB, 200 components and 16 component levels. The complete response renders after its fence closes; partial programs cannot send actions.
 
 Write the program to a temporary `.openui` file, then run the bundled validator before emitting it:
 
@@ -32,6 +32,14 @@ Write the program to a temporary `.openui` file, then run the bundled validator 
 Use the active profile's skill directory. Correct errors and rerun; do not claim validation without an actual zero-error result. If Node or the checker is unavailable, state that limitation rather than claiming a pass. Examples under `references/` are synthetic and must remain labelled as examples.
 
 The renderer supplies the font, surfaces, red accent, focus treatment, responsive wrapping and current light/dark palette. Supply useful content and real units, not colors or a copy of a page layout. Charts retain exact numeric values. Evidence requires a source, page/location and exact excerpt; keep interpretation separate. All drafts stay explicitly unsent.
+
+## Images (Conduit only)
+
+When the client advertises Image, ImageBlock and ImageGallery (Conduit build 182 and later; Desktop does not yet), use `Image(alt, src?)`, `ImageBlock(src, alt?)` and `ImageGallery([{src: "...", alt: "...", details: "..."}, ...])` with at most 12 items. `src` is an `https://` or `http://` image URL (any host, including the user's LAN or Tailscale server), a `data:image/png|jpeg|gif|webp|avif|bmp;base64` URI under about 48 KB, or a path from a `MEDIA:` line in the same reply. Never use `javascript:`, `file:`, `content:` or `intent:`. Always write meaningful alt text. A missing or failed image shows a placeholder with the alt text. Do not claim an image is displayed unless its source is one you were given or created.
+
+## Older replies
+
+Buttons on an older reply are disabled once a newer user turn exists. Put the actions the user should take in the latest reply; tabs, selections and galleries still work on older ones.
 
 ## Interaction contract
 

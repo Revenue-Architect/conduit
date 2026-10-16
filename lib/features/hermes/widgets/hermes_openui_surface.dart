@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/hermes_openui_parser.dart';
+import 'hermes_openui_images.dart';
 import 'hermez_visual_theme.dart';
 
 /// The same bounded 70-component OpenUI v1 catalog as Hermes Desktop, in Dart.
@@ -16,11 +17,25 @@ class HermesOpenuiSurface extends StatefulWidget {
     required this.surfaceId,
     this.onInteraction,
     this.isBusy = false,
+    this.superseded = false,
+    this.mediaPreview,
+    this.remoteImageProvider,
   });
   final String payload;
   final String surfaceId;
   final FutureOr<void> Function(String prompt)? onInteraction;
   final bool isBusy;
+
+  /// A newer user turn already answered this reply. Explicit send buttons are
+  /// disabled; tabs, selections and other local edits keep working.
+  final bool superseded;
+
+  /// Previews of images declared with MEDIA: in the same reply, or null for a
+  /// path that was not declared. Image sources never gain file access.
+  final Widget? Function(String path)? mediaPreview;
+
+  /// Replaces the http(s) image provider; tests use it to avoid the network.
+  final ImageProvider Function(String url)? remoteImageProvider;
   @override
   State<HermesOpenuiSurface> createState() => _HermesOpenuiSurfaceState();
 }
@@ -80,7 +95,9 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
 
   Future<void> _send(HermesOpenuiNode node, String? form) async {
     final callback = widget.onInteraction;
-    if (_locked || callback == null || _root == null) return;
+    if (_locked || widget.superseded || callback == null || _root == null) {
+      return;
+    }
     if (form != null && _invalidFields.values.contains(form)) {
       setState(
         () => _error = 'Correct the highlighted form fields before sending.',
@@ -256,6 +273,19 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
         },
       );
 
+  HermesOpenuiImageEnvironment get _imageEnvironment =>
+      HermesOpenuiImageEnvironment(
+        remoteImageProvider: widget.remoteImageProvider,
+        mediaPreview: widget.mediaPreview,
+      );
+
+  HermesOpenuiImageSpec _imageSpec(Map<String, dynamic> p) =>
+      HermesOpenuiImageSpec(
+        src: p['src'] as String? ?? '',
+        alt: p['alt'] as String? ?? '',
+        details: p['details'] as String? ?? '',
+      );
+
   Widget _node(BuildContext c, HermesOpenuiNode node, String? form) {
     final p = node.props;
     final type = node.type;
@@ -305,8 +335,25 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
         ]);
       case 'Badge':
         return _badge(c, s('label'), s('tone', 'accent'));
+      case 'Image':
+      case 'ImageBlock':
+        return HermesOpenuiImage(
+          spec: _imageSpec(p),
+          compact: type == 'Image',
+          environment: _imageEnvironment,
+        );
+      case 'ImageGallery':
+        return HermesOpenuiImageGallery(
+          items: [
+            for (final image in list('images'))
+              _imageSpec((image as Map).cast<String, dynamic>()),
+          ],
+          environment: _imageEnvironment,
+        );
       case 'Button':
-        final action = _locked ? null : () => _send(node, form);
+        final action = _locked || widget.superseded
+            ? null
+            : () => _send(node, form);
         return s('variant') == 'secondary'
             ? OutlinedButton(onPressed: action, child: Text(s('label')))
             : FilledButton.icon(

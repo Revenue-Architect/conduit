@@ -211,6 +211,15 @@
     },
     "DefinitionList": {
       "$ref": "#/$defs/DefinitionList"
+    },
+    "Image": {
+      "$ref": "#/$defs/Image"
+    },
+    "ImageBlock": {
+      "$ref": "#/$defs/ImageBlock"
+    },
+    "ImageGallery": {
+      "$ref": "#/$defs/ImageGallery"
     }
   },
   "required": [
@@ -283,7 +292,10 @@
     "FileCard",
     "Breadcrumbs",
     "Status",
-    "DefinitionList"
+    "DefinitionList",
+    "Image",
+    "ImageBlock",
+    "ImageGallery"
   ],
   "additionalProperties": false,
   "$defs": {
@@ -2096,6 +2108,82 @@
       "additionalProperties": false,
       "id": "DefinitionList",
       "description": "Pairs of labels and descriptions."
+    },
+    "Image": {
+      "type": "object",
+      "properties": {
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "src": {
+          "type": "string",
+          "maxLength": 49152
+        }
+      },
+      "required": [
+        "alt"
+      ],
+      "additionalProperties": false,
+      "id": "Image",
+      "description": "Compact image. src is an https/http URL, a data:image URI or a MEDIA-declared path; without a usable src it shows a placeholder with the alt text. Tap opens a local zoom viewer; nothing is sent."
+    },
+    "ImageBlock": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string",
+          "maxLength": 49152
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "src"
+      ],
+      "additionalProperties": false,
+      "id": "ImageBlock",
+      "description": "Full-width image block with the same src rules as Image. Failures show a placeholder with the alt text. Tap opens a local zoom viewer."
+    },
+    "ImageGallery": {
+      "type": "object",
+      "properties": {
+        "images": {
+          "minItems": 1,
+          "maxItems": 12,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "src": {
+                "type": "string",
+                "maxLength": 49152
+              },
+              "alt": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "details": {
+                "type": "string",
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "src"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "images"
+      ],
+      "additionalProperties": false,
+      "id": "ImageGallery",
+      "description": "Swipeable gallery of 1 to 12 images given as {src, alt, details} objects, with page dots. details is shown with the image. Local only; sends nothing."
     }
   }
 }
