@@ -2,6 +2,10 @@
 
 Build 180 adds native Dart rendering for the same 70-component OpenUI v1 catalog as Hermes Desktop. Both use the same schema and four example programs in `references/`. The React SDK cannot render Flutter widgets directly, so this port implements the bounded language contract with Flutter controls and the existing Hermez visual theme. It does not use a WebView, OpenUI Gateway or a separate conversation.
 
+These 70 entries are this application's custom library. They do not include every component or visual treatment in the [OpenUI demos](https://www.openui.com/demos). Those apps combine their own components with photo, map and live-data sources. This catalog currently has no image component or remote image-URL support; an `Avatar` displays initials, and a `Card` contains text and child components. Catalog coverage does not establish demo parity or individual phone testing of every component.
+
+The native surface supplies a transparent Material host. Bare tabs, selectors and lists must work in the custom chat even when the generated program does not wrap them in a Card. The gallery checks deliberately run without a Scaffold to catch that missing-host failure.
+
 Completed assistant responses can contain separate `openui` and `a2ui` fences, with Markdown around them. A2UI keeps its strict v0.9 JSONL contract. OpenUI accepts one inline `root = Stack([...])` statement, positional arguments, literal data, at most 64 KiB, 200 components and 16 component levels. Unsupported or partial programs fall back to source text. Generated content cannot execute code, call tools, fetch URLs or open files.
 
 Explicit buttons use the existing `[A2UI_INTERACTION]` envelope with `context.renderer=openui`, the requested message and current form values, including unchanged defaults. Local controls do not send messages or change operational state. Drafts remain unsent. Busy, read-only, changed-connection and wrong-chat interactions cannot submit; both renderers reuse the existing chat ownership guard.

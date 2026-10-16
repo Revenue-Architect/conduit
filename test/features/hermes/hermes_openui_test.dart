@@ -11,6 +11,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('bare tabs and forms work in a custom chat without Material', (
+    tester,
+  ) async {
+    final sent = <String>[];
+    const code =
+        'root = Stack(['
+        'Tabs([Tab("Overview",[Text("Ready")]),Tab("Details",[Text("More")])]),'
+        'Form("trip",[Select("destination","Destination",["A","B"],"A"),'
+        'MultiSelect("interests","Interests",["Food","Outdoors"],["Food"]),'
+        'Button("Compare","Compare my choices")])])';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SingleChildScrollView(
+          child: HermesOpenuiSurface(
+            payload: code,
+            surfaceId: 'custom-chat',
+            onInteraction: sent.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Outdoors'));
+    await tester.pumpAndSettle();
+    expect(sent, isEmpty);
+    await tester.tap(find.text('Compare'));
+    await tester.pumpAndSettle();
+    final values = jsonDecode(
+      sent.single.split('\n').skip(1).join('\n'),
+    )['action']['context']['values'];
+    expect(values, {'destination': 'A', 'interests': ['Food', 'Outdoors']});
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('integer schema accepts 2.0 without a native cast failure', (
     tester,
   ) async {
@@ -122,13 +158,11 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               theme: ThemeData(brightness: brightness),
-              home: Scaffold(
-                body: SingleChildScrollView(
-                  child: HermesOpenuiSurface(
-                    payload: example.readAsStringSync(),
-                    surfaceId: 'gallery',
-                    onInteraction: (_) {},
-                  ),
+              home: SingleChildScrollView(
+                child: HermesOpenuiSurface(
+                  payload: example.readAsStringSync(),
+                  surfaceId: 'gallery',
+                  onInteraction: (_) {},
                 ),
               ),
             ),

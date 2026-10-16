@@ -130,30 +130,36 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
   @override
   Widget build(BuildContext context) => Theme(
     data: hermezVisualTheme(Theme.of(context)),
-    child: Builder(
-      builder: (context) {
-        if (_root == null)
-          return _panel(context, [
-            const Text(
-              'This OpenUI could not be displayed. Ask Hermes to regenerate it.',
-            ),
-            ExpansionTile(
-              title: const Text('View source'),
-              children: [SelectableText(widget.payload)],
-            ),
-          ]);
-        return Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: _column([
-            _node(context, _root!, null),
-            if (_error != null)
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+    // A native/custom chat need not have a Scaffold or Material ancestor.
+    // Bare form controls, chips and ListTiles still need an ink host even
+    // when the generated program does not place them inside a Card.
+    child: Material(
+      type: MaterialType.transparency,
+      child: Builder(
+        builder: (context) {
+          if (_root == null)
+            return _panel(context, [
+              const Text(
+                'This OpenUI could not be displayed. Ask Hermes to regenerate it.',
               ),
-          ]),
-        );
-      },
+              ExpansionTile(
+                title: const Text('View source'),
+                children: [SelectableText(widget.payload)],
+              ),
+            ]);
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: _column([
+              _node(context, _root!, null),
+              if (_error != null)
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+            ]),
+          );
+        },
+      ),
     ),
   );
 
