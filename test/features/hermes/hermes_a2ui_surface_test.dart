@@ -643,6 +643,52 @@ void main() {
     );
   });
 
+  testWidgets('bare controls work without a Scaffold or Material ancestor', (
+    tester,
+  ) async {
+    // The real chat has no Scaffold above an assistant message, and bare
+    // controls (not wrapped in a Card) need an ink host of their own.
+    const payload = '''
+{"version":"v0.9","createSurface":{"surfaceId":"bare","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
+{"version":"v0.9","updateComponents":{"surfaceId":"bare","components":[{"id":"root","component":"Column","children":["topics","agree","note","go"]},{"id":"topics","component":"ChoicePicker","label":"Topics","variant":"multipleSelection","displayStyle":"chips","options":[{"label":"Museums","value":"museums"},{"label":"Food","value":"food"}],"value":[]},{"id":"agree","component":"CheckBox","label":"Keep it relaxed","value":false},{"id":"note","component":"TextField","label":"Note"},{"id":"go","component":"Button","child":"go-label","action":{"event":{"name":"bare.go"}}},{"id":"go-label","component":"Text","text":"Plan it"}]}}
+''';
+    final sentPrompts = <String>[];
+    await tester.binding.setSurfaceSize(const Size(360, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SingleChildScrollView(
+          child: HermesA2uiSurface(
+            payload: payload,
+            onInteraction: sentPrompts.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Scaffold), findsNothing);
+
+    await tester.tap(find.text('Museums'));
+    await tester.pump();
+    await tester.tap(find.text('Keep it relaxed'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'quiet please');
+    await tester.pump();
+    expect(sentPrompts, isEmpty, reason: 'local edits never send');
+    expect(tester.widget<FilterChip>(find.byType(FilterChip).first).selected,
+        isTrue);
+    expect(tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        isTrue);
+
+    await tester.tap(find.text('Plan it'));
+    await tester.pump();
+    expect(sentPrompts, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('does not load agent-supplied network media', (tester) async {
     const payload = '''
 {"version":"v0.9","createSurface":{"surfaceId":"media","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}

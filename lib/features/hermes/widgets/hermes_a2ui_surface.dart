@@ -207,7 +207,12 @@ class _HermesA2uiSurfaceState extends State<HermesA2uiSurface> {
     );
     return HermesA2uiMediaScope(
       preview: widget.mediaPreview,
-      child: Theme(data: hermezVisualTheme(Theme.of(context)), child: surface),
+      child: Theme(
+        data: hermezVisualTheme(Theme.of(context)),
+        // The custom chat has no Scaffold or Material ancestor. Bare chips,
+        // checkboxes and text fields (outside a Card) still need an ink host.
+        child: Material(type: MaterialType.transparency, child: surface),
+      ),
     );
   }
 }
