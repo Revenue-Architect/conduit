@@ -333,4 +333,21 @@ This turn is in Hermez/Conduit with the same bounded 70-component OpenUI v1 cata
     await tester.pumpAndSettle();
     expect(find.text('First\nLong description'), findsOneWidget);
   });
+
+  testWidgets(
+    'a placeholder inside a narrow grid card does not overflow its frame',
+    (tester) async {
+      // Real reply (message 9480): three Image cards in a Grid on a phone width. The 16:10 frame is under
+      // 90dp tall there, which used to overflow by 27px with a three-line alt text.
+      await pumpProgram(
+        tester,
+        'root = Stack([Grid([Card("A", "x", [Image("Lac Monroe in Mont-Tremblant National Park", "https://images.example/a.jpg")]), Card("B", "y", [Image("Lac Memphremagog", "https://images.example/b.jpg")]), Card("C", "z", [Image("Ottawa Locks on the Rideau Canal", "https://images.example/c.jpg")])], 3)])',
+        fail: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Lac Memphremagog'), findsWidgets);
+    },
+  );
 }

@@ -322,36 +322,47 @@ class _HermesOpenuiPictureState extends State<HermesOpenuiPicture> {
           border: Border.all(color: theme.colorScheme.outlineVariant),
           borderRadius: widget.borderRadius,
         ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.image_outlined,
-                  size: 28,
-                  color: theme.colorScheme.primary,
+        // The frame is a 16:10 box, so inside a narrow grid card it can be under 90dp tall. Below 132dp the
+        // content drops the note line and shrinks the icon/padding instead of overflowing the frame.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 132;
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 8 : 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.image_outlined,
+                      size: compact ? 20 : 28,
+                      color: theme.colorScheme.primary,
+                    ),
+                    SizedBox(height: compact ? 2 : 6),
+                    Flexible(
+                      child: Text(
+                        _label,
+                        textAlign: TextAlign.center,
+                        maxLines: compact ? 2 : 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge,
+                      ),
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        note,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _label,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  note,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
