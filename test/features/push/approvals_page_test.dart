@@ -64,7 +64,10 @@ void main() {
         deviceId: 'dev-1',
       ),
     ),
-    if (paired) pushGatewayClientProvider.overrideWith((ref) => client),
+    if (paired) pushGatewayClientProvider.overrideWith((ref) {
+      ref.watch(pushPairingProvider); // preserve the real client's dependency
+      return client;
+    }),
     pushRegistrationServiceProvider.overrideWithValue(
       PushRegistrationService(
         host: ConduitPushHostApi(),
