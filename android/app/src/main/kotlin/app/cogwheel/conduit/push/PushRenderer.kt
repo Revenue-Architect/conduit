@@ -111,7 +111,7 @@ internal class PushRenderer(private val context: Context) {
             .setTimeoutAfter(timeoutMs)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         if (retry != null) {
-            val needsUnlock = retry is RetryAction.Decide && retry.decision == "approve"
+            val needsUnlock = retry is RetryAction.Decide
             if (!needsUnlock || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val action = NotificationCompat.Action.Builder(0, "Retry", decideIntent(id, 90, retry))
                 // Retrying an Approve is still an approval: keep the unlock gate.
@@ -146,7 +146,8 @@ internal class PushRenderer(private val context: Context) {
                 val decision = action.decision ?: return
                 val approval = action.approval ?: return
                 val digest = action.digest ?: return
-                val unlockRequired = action.auth || decision == "approve"
+                // Both decisions require the unlocked phone (Kamran's choice).
+                val unlockRequired = true
                 if (unlockRequired && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                     // No system unlock gate before Android 12: open the request
                     // instead of letting a locked phone approve it.
