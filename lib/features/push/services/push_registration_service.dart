@@ -30,13 +30,19 @@ class PushRegistrationService {
     required ConduitPushHostApi host,
     required SecureCredentialStorage secure,
     bool? isAndroid,
+    PushGatewayClient Function(String origin, String token)? clientFactory,
   }) : _host = host,
        _secure = secure,
-       _android = isAndroid ?? Platform.isAndroid;
+       _android = isAndroid ?? Platform.isAndroid,
+       _clientFactory =
+           clientFactory ??
+           ((origin, token) => PushGatewayClient(origin: origin, token: token));
 
   final ConduitPushHostApi _host;
   final SecureCredentialStorage _secure;
   final bool _android;
+  final PushGatewayClient Function(String, String) _clientFactory;
+  Future<void>? _starting;
 
   bool get supported => _android;
 
@@ -75,6 +81,7 @@ class PushRegistrationService {
       gateway: origin,
       deviceId: result.deviceId,
       expiresAt: result.expiresAt,
+      gatewayEpoch: result.gatewayEpoch,
     );
     if (_android) {
       await _host.storeVault(
@@ -124,11 +131,43 @@ class PushRegistrationService {
 
   /// Runs on app start (after the app is ready): re-asserts registration and
   /// repairs a lost native vault from secure storage.
-  Future<void> startup() async {
+  Future<void> startup() =>
+      _starting ??= _startup().whenComplete(() => _starting = null);
+
+  Future<void> _startup() async {
     if (!_android) return;
     try {
-      final pairing = await this.pairing();
+      var pairing = await this.pairing();
       if (pairing == null) return;
+      final client = _clientFactory(pairing.gateway, pairing.token);
+      final health = await client.deviceMe();
+      final epoch = health.raw['gateway_epoch']?.toString();
+      if (pairing.gatewayEpoch != null &&
+          epoch != null &&
+          epoch != pairing.gatewayEpoch) {
+        await forgetPairing();
+        return;
+      }
+      if (pairing.expiresAt == null ||
+          pairing.expiresAt!.isBefore(
+            DateTime.now().add(const Duration(days: 30)),
+          )) {
+        final renewed = await client.rotateToken(pairing.deviceId, epoch);
+        await savePairing(renewed, pairing.gateway);
+        pairing = await this.pairing();
+        if (pairing == null) return;
+      } else if (pairing.gatewayEpoch == null && epoch != null) {
+        await savePairing(
+          PairResult(
+            deviceId: pairing.deviceId,
+            token: pairing.token,
+            expiresAt: pairing.expiresAt!,
+            scopes: const [],
+            gatewayEpoch: epoch,
+          ),
+          pairing.gateway,
+        );
+      }
       final status = await _host.status();
       if (!status.paired) {
         await _host.storeVault(
@@ -141,8 +180,15 @@ class PushRegistrationService {
       }
       if (status.distributorSelected) {
         await _host.register();
-        await _host.syncEndpoint();
       }
+      await _host.syncEndpoint(); // also queues durable inbox catch-up
+    } on PushGatewayException catch (error) {
+      if (error.isUnauthorized) await forgetPairing();
+      DebugLogger.warning(
+        'startup-gateway-failed',
+        scope: 'push/registration',
+        data: {'status': error.statusCode},
+      );
     } on PlatformException catch (error) {
       DebugLogger.warning(
         'startup-failed',

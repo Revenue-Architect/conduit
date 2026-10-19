@@ -363,6 +363,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('"container": "changedetection"'), findsOneWidget);
     expect(find.text('Registered parameters'), findsOneWidget);
+    await tester.ensureVisible(find.byType(HoldToConfirmButton));
+    await tester.pumpAndSettle();
     final gesture = await tester.startGesture(
       tester.getCenter(find.byType(HoldToConfirmButton)),
     );

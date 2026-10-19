@@ -57,7 +57,7 @@ class PushEnvelopeTest {
     @Test
     fun truncatesOverlongTitleAndBody() {
         val title = "t".repeat(500)
-        val body = "b".repeat(5000)
+        val body = "b".repeat(1500)
         val e = parse("""{"v":1,"t":"notify","id":"x1","ts":1760841600,"cat":"alerts","title":"$title","body":"$body"}""")!!
         assertEquals(PushLimits.MAX_TITLE, e.title.length)
         assertEquals(PushLimits.MAX_BODY, e.body.length)

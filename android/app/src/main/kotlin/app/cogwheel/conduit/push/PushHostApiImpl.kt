@@ -119,6 +119,7 @@ internal class PushHostApiImpl(
             store.pendingUpload = true
             PushWork.enqueueUpload(context)
         }
+        if (vault.isPaired) PushWork.enqueueInbox(context)
     }
 
     override fun batteryUnrestricted(packageName: String): Boolean? = isUnrestricted(packageName)

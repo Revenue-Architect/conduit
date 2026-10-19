@@ -32,6 +32,7 @@ class PushSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 KIND_VERIFY -> verify(client, inputData.getString(KEY_NONCE))
                 KIND_UPLOAD -> upload(client, store)
                 KIND_DELETE -> delete(client, store)
+                KIND_INBOX -> inbox(client, store)
                 else -> Result.success()
             }
         } catch (_: IOException) {
@@ -58,6 +59,29 @@ class PushSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
             else -> retryOrGiveUp(PushPolicy.ACK_MAX_ATTEMPTS)
         }
+    }
+
+    private fun inbox(client: PushGatewayClient, store: PushStore): Result {
+        // Bound one worker's budget; a retry resumes from the last committed page.
+        repeat(20) {
+            val cursor = store.inboxCursor
+            val query = cursor?.let { "&since=" + java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+            val response = client.get("/inbox?limit=100$query")
+            if (response.code == 401 || response.code == 403) {
+                store.lastError = "gateway_unauthorized"
+                PushRuntime.statusChanged()
+                return Result.success()
+            }
+            if (response.code !in 200..299) return retryOrGiveUp(10)
+            val page = PushInboxPage.parse(response.body) ?: return retryOrGiveUp(10)
+            page.envelopes.forEach { (envelope, raw) ->
+                PushIntake.handle(applicationContext, envelope, raw)
+            }
+            if (page.next != null) store.inboxCursor = page.next
+            if (!page.more) return Result.success()
+            if (page.next == null || page.next == cursor) return retryOrGiveUp(10)
+        }
+        return Result.retry()
     }
 
     private fun verify(client: PushGatewayClient, nonce: String?): Result {
@@ -132,6 +156,7 @@ class PushSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
         const val KIND_VERIFY = "verify"
         const val KIND_UPLOAD = "upload"
         const val KIND_DELETE = "delete"
+        const val KIND_INBOX = "inbox"
     }
 }
 

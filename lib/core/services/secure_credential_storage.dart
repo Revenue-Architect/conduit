@@ -351,11 +351,16 @@ class SecureCredentialStorage {
     required String gateway,
     required String deviceId,
     required DateTime expiresAt,
+    String? gatewayEpoch,
   }) async {
     try {
       await _secureStorage.write(key: _pushDeviceTokenKey, value: token);
       await _secureStorage.write(key: _pushGatewayKey, value: gateway);
       await _secureStorage.write(key: _pushDeviceIdKey, value: deviceId);
+      await _secureStorage.write(
+        key: 'push_gateway_epoch_v1',
+        value: gatewayEpoch,
+      );
       await _secureStorage.write(
         key: _pushExpiresKey,
         value: expiresAt.toUtc().toIso8601String(),
@@ -396,6 +401,10 @@ class SecureCredentialStorage {
       gateway: gateway,
       deviceId: deviceId,
       expiresAt: expires,
+      gatewayEpoch: await _readHermesSecret(
+        'push_gateway_epoch_v1',
+        scope: 'push/device',
+      ),
     );
   }
 
@@ -405,6 +414,7 @@ class SecureCredentialStorage {
       await _secureStorage.delete(key: _pushGatewayKey);
       await _secureStorage.delete(key: _pushDeviceIdKey);
       await _secureStorage.delete(key: _pushExpiresKey);
+      await _secureStorage.delete(key: 'push_gateway_epoch_v1');
     } catch (e) {
       DebugLogger.error('delete-failed', scope: 'push/device', error: e);
       rethrow;
@@ -719,10 +729,12 @@ class PushDeviceSecrets {
     required this.gateway,
     required this.deviceId,
     this.expiresAt,
+    this.gatewayEpoch,
   });
 
   final String token;
   final String gateway;
   final String deviceId;
   final DateTime? expiresAt;
+  final String? gatewayEpoch;
 }

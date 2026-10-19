@@ -35,12 +35,14 @@ class PairResult {
     required this.token,
     required this.expiresAt,
     required this.scopes,
+    this.gatewayEpoch,
   });
 
   final String deviceId;
   final String token;
   final DateTime expiresAt;
   final List<String> scopes;
+  final String? gatewayEpoch;
 }
 
 /// What the gateway says about this device (`GET /devices/me`). The route's
@@ -64,9 +66,14 @@ class DeviceHealth {
 
   static DeviceHealth fromJson(Object? value) {
     final map = value is Map ? Map<String, dynamic>.from(value) : const {};
-    final device = map['device'] is Map ? Map<String, dynamic>.from(map['device']) : map;
-    final endpoint = map['endpoint'] is Map ? Map<String, dynamic>.from(map['endpoint']) : const <String, dynamic>{};
-    final fallback = map['fallback'] ?? map['fallback_flags'] ?? map['fallbacks'];
+    final device = map['device'] is Map
+        ? Map<String, dynamic>.from(map['device'])
+        : map;
+    final endpoint = map['endpoint'] is Map
+        ? Map<String, dynamic>.from(map['endpoint'])
+        : const <String, dynamic>{};
+    final fallback =
+        map['fallback'] ?? map['fallback_flags'] ?? map['fallbacks'];
     final categories = <String>[];
     final perCategory = map['categories'];
     if (perCategory is Map) {
@@ -86,7 +93,8 @@ class DeviceHealth {
     } else if (fallback is List) {
       categories.addAll(fallback.whereType<String>());
     }
-    final state = endpoint['state'] ?? map['endpoint_state'] ?? device['endpoint_state'];
+    final state =
+        endpoint['state'] ?? map['endpoint_state'] ?? device['endpoint_state'];
     return DeviceHealth(
       raw: Map<String, dynamic>.from(map),
       name: device['name'] is String ? device['name'] as String : null,
@@ -99,7 +107,10 @@ class DeviceHealth {
 
 DateTime? _epochOrIso(Object? value) {
   if (value is int) {
-    return DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true).toLocal();
+    return DateTime.fromMillisecondsSinceEpoch(
+      value * 1000,
+      isUtc: true,
+    ).toLocal();
   }
   if (value is String) return DateTime.tryParse(value)?.toLocal();
   return null;
@@ -129,13 +140,10 @@ String normalizePairingCode(String input) =>
 /// The Dart side of the phone gateway (spec 5.3). The device token is only ever
 /// sent as a bearer header and is never logged.
 class PushGatewayClient {
-  PushGatewayClient({
-    required String origin,
-    required String token,
-    Dio? dio,
-  }) : _dio = dio ?? _newDio(),
-       _base = '${origin.replaceAll(RegExp(r'/+$'), '')}/phone/v1',
-       _token = token;
+  PushGatewayClient({required String origin, required String token, Dio? dio})
+    : _dio = dio ?? _newDio(),
+      _base = '${origin.replaceAll(RegExp(r'/+$'), '')}/phone/v1',
+      _token = token;
 
   final Dio _dio;
   final String _base;
@@ -188,6 +196,31 @@ class PushGatewayClient {
           _epochOrIso(body['expires_at']) ??
           DateTime.now().add(const Duration(days: 180)),
       scopes: scopes is List ? scopes.whereType<String>().toList() : const [],
+      gatewayEpoch: body['gateway_epoch']?.toString(),
+    );
+  }
+
+  Future<PairResult> rotateToken(String deviceId, String? gatewayEpoch) async {
+    final response = await _send(
+      () => _dio.post<Object?>(
+        '$_base/devices/me/token/rotate',
+        options: _options(),
+      ),
+    );
+    final body = response.data;
+    final expiry = body is Map ? _epochOrIso(body['expires_at']) : null;
+    if (body is! Map || body['token'] is! String || expiry == null) {
+      throw const PushGatewayException(
+        message: 'The gateway sent an invalid token renewal.',
+      );
+    }
+    return PairResult(
+      deviceId: deviceId,
+      token: body['token'] as String,
+      expiresAt: expiry,
+      scopes:
+          (body['scopes'] as List?)?.whereType<String>().toList() ?? const [],
+      gatewayEpoch: gatewayEpoch,
     );
   }
 
@@ -204,18 +237,16 @@ class PushGatewayClient {
     final response = await _send(
       () => _get(
         '/approvals',
-        query: {
-          'status': status,
-          'limit': limit,
-          'before': ?before,
-        },
+        query: {'status': status, 'limit': limit, 'before': ?before},
       ),
     );
     return ApprovalPage.fromJson(response.data);
   }
 
   Future<Approval> getApproval(String id) async {
-    final response = await _send(() => _get('/approvals/${Uri.encodeComponent(id)}'));
+    final response = await _send(
+      () => _get('/approvals/${Uri.encodeComponent(id)}'),
+    );
     final data = response.data;
     final item = data is Map && data['item'] is Map ? data['item'] : data;
     final approval = Approval.fromJson(item);
@@ -250,7 +281,9 @@ class PushGatewayClient {
       ),
     );
     final data = response.data;
-    final status = data is Map ? ApprovalStatus.parse(data['status']) : ApprovalStatus.unknown;
+    final status = data is Map
+        ? ApprovalStatus.parse(data['status'])
+        : ApprovalStatus.unknown;
     if (status != ApprovalStatus.unknown) return status;
     return decision == ApprovalDecision.approve
         ? ApprovalStatus.approved
@@ -301,7 +334,9 @@ class PushGatewayClient {
     final code = response.statusCode ?? 0;
     if (code >= 200 && code < 300) return response;
     final data = response.data;
-    final error = data is Map && data['error'] is String ? data['error'] as String : null;
+    final error = data is Map && data['error'] is String
+        ? data['error'] as String
+        : null;
     throw PushGatewayException(
       message: _messageFor(code, error),
       statusCode: code,

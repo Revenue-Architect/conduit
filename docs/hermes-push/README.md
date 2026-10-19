@@ -41,6 +41,16 @@ adb shell dumpsys notification --noredact | grep -A12 app.cogwheel.conduit
 adb shell am kill app.cogwheel.conduit.debug    # test with the process dead
 ```
 
+## Recovery and renewal
+
+On start and resume, Hermez checks the gateway epoch, renews device tokens with
+less than 30 days remaining, and queues inbox catch-up. Inbox pages are validated
+before the cursor is committed and replay through the same native intake and
+dedup path as live pushes. A changed epoch or revoked token requires pairing
+again. Temporary network errors retain the pairing. Native WorkManager retries
+inbox requests and acknowledges duplicate deliveries as well as new ones.
+
 ## Not in this build
 
-QR scanning of the pairing code, device-token rotation (180-day expiry), release-id re-pairing.
+QR scanning of the pairing code. Manual code pairing is supported; changing the
+Android application id requires pairing the new installation.

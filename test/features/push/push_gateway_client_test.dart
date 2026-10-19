@@ -93,6 +93,7 @@ void main() {
       check(result.deviceId).equals('dev-1');
       check(result.token).equals('hpd_new');
       check(result.scopes).deepEquals(['approvals:read', 'approvals:decide']);
+      check(result.gatewayEpoch).equals('1');
       final request = adapter.requests.single;
       check(request.uri.toString()).equals('$_origin/phone/v1/pair');
       check(request.method).equals('POST');
@@ -104,7 +105,9 @@ void main() {
     });
 
     test('a bad code is an unauthorized-style error', () async {
-      final adapter = _FakeAdapter((o) => _json(401, {'error': 'invalid_code'}));
+      final adapter = _FakeAdapter(
+        (o) => _json(401, {'error': 'invalid_code'}),
+      );
       await check(
         PushGatewayClient.pair(
           origin: _origin,
@@ -135,6 +138,47 @@ void main() {
   });
 
   group('approvals', () {
+    test(
+      'token rotation uses the device token and validates its replacement',
+      () async {
+        final adapter = _FakeAdapter(
+          (o) => _json(200, {
+            'token': 'hpd_renewed',
+            'expires_at': 1800000000,
+            'scopes': ['inbox:read'],
+          }),
+        );
+        final client = PushGatewayClient(
+          origin: _origin,
+          token: _token,
+          dio: _dio(adapter),
+        );
+        final result = await client.rotateToken('dev-1', 'epoch-1');
+        expect(result.token, 'hpd_renewed');
+        expect(result.gatewayEpoch, 'epoch-1');
+        expect(
+          adapter.requests.single.uri.path,
+          '/phone/v1/devices/me/token/rotate',
+        );
+        expect(
+          adapter.requests.single.headers['Authorization'],
+          'Bearer $_token',
+        );
+      },
+    );
+
+    test('malformed token rotation is rejected', () async {
+      final adapter = _FakeAdapter((o) => _json(200, {'token': 'hpd_bad'}));
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
+      await expectLater(
+        client.rotateToken('dev-1', 'epoch-1'),
+        throwsA(isA<PushGatewayException>()),
+      );
+    });
     test('list sends the bearer token and query', () async {
       final adapter = _FakeAdapter(
         (o) => _json(200, {
@@ -142,8 +186,16 @@ void main() {
           'next_before': '2026-10-01T00:00:00+00:00',
         }),
       );
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
-      final page = await client.listApprovals(status: 'all', limit: 30, before: '2026-10-10T00:00:00+00:00');
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
+      final page = await client.listApprovals(
+        status: 'all',
+        limit: 30,
+        before: '2026-10-10T00:00:00+00:00',
+      );
       check(page.items).length.equals(2);
       check(page.nextBefore).equals('2026-10-01T00:00:00+00:00');
       final request = adapter.requests.single;
@@ -158,7 +210,11 @@ void main() {
 
     test('detail unwraps an item', () async {
       final adapter = _FakeAdapter((o) => _json(200, {'item': _row('a-1')}));
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       final approval = await client.getApproval('a-1');
       check(approval.id).equals('a-1');
       check(adapter.requests.single.uri.path).equals('/phone/v1/approvals/a-1');
@@ -166,13 +222,23 @@ void main() {
 
     test('detail also accepts a bare object', () async {
       final adapter = _FakeAdapter((o) => _json(200, _row('a-9')));
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       check((await client.getApproval('a-9')).id).equals('a-9');
     });
 
     test('decision body, digest and idempotency key', () async {
-      final adapter = _FakeAdapter((o) => _json(200, {'id': 'a-1', 'status': 'approved'}));
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final adapter = _FakeAdapter(
+        (o) => _json(200, {'id': 'a-1', 'status': 'approved'}),
+      );
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       final status = await client.decide(
         id: 'a-1',
         decision: ApprovalDecision.approve,
@@ -185,41 +251,72 @@ void main() {
       check(request.uri.path).equals('/phone/v1/approvals/a-1/decision');
       check(request.headers['Idempotency-Key']).equals('dec-a-1-approve-dev-1');
       check(request.headers['Authorization']).equals('Bearer $_token');
-      check(request.data as Map).deepEquals({'decision': 'approve', 'digest': 'dg'});
+      check(request.data as Map)
+          .deepEquals({'decision': 'approve', 'digest': 'dg'});
     });
 
-    test('a replayed decision with no status still reports the decision', () async {
-      final adapter = _FakeAdapter((o) => _json(200, {'replayed': true}));
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
-      final status = await client.decide(
-        id: 'a-1',
-        decision: ApprovalDecision.deny,
-        digest: 'dg',
-        deviceId: 'dev-1',
-      );
-      check(status).equals(ApprovalStatus.denied);
-    });
+    test(
+      'a replayed decision with no status still reports the decision',
+      () async {
+        final adapter = _FakeAdapter((o) => _json(200, {'replayed': true}));
+        final client = PushGatewayClient(
+          origin: _origin,
+          token: _token,
+          dio: _dio(adapter),
+        );
+        final status = await client.decide(
+          id: 'a-1',
+          decision: ApprovalDecision.deny,
+          digest: 'dg',
+          deviceId: 'dev-1',
+        );
+        check(status).equals(ApprovalStatus.denied);
+      },
+    );
 
     test('409 conflict carries the current status', () async {
       final adapter = _FakeAdapter(
         (o) => _json(409, {'error': 'conflict', 'status': 'denied'}),
       );
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       await check(
-        client.decide(id: 'a-1', decision: ApprovalDecision.approve, digest: 'dg', deviceId: 'd'),
+        client.decide(
+          id: 'a-1',
+          decision: ApprovalDecision.approve,
+          digest: 'dg',
+          deviceId: 'd',
+        ),
       ).throws<PushGatewayException>(
         (it) => it
           ..has((e) => e.isConflict, 'isConflict').isTrue()
-          ..has((e) => e.currentStatus, 'currentStatus').equals(ApprovalStatus.denied)
+          ..has(
+            (e) => e.currentStatus,
+            'currentStatus',
+          ).equals(ApprovalStatus.denied)
           ..has((e) => e.isDigestMismatch, 'isDigestMismatch').isFalse(),
       );
     });
 
     test('digest mismatch is its own case', () async {
-      final adapter = _FakeAdapter((o) => _json(409, {'error': 'digest_mismatch'}));
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final adapter = _FakeAdapter(
+        (o) => _json(409, {'error': 'digest_mismatch'}),
+      );
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       await check(
-        client.decide(id: 'a-1', decision: ApprovalDecision.approve, digest: 'old', deviceId: 'd'),
+        client.decide(
+          id: 'a-1',
+          decision: ApprovalDecision.approve,
+          digest: 'old',
+          deviceId: 'd',
+        ),
       ).throws<PushGatewayException>(
         (it) => it.has((e) => e.isDigestMismatch, 'isDigestMismatch').isTrue(),
       );
@@ -233,7 +330,11 @@ void main() {
         (500, (e) => e.statusCode == 500 && !e.isNetwork),
       ]) {
         final adapter = _FakeAdapter((o) => _json(code, {'error': 'x'}));
-        final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+        final client = PushGatewayClient(
+          origin: _origin,
+          token: _token,
+          dio: _dio(adapter),
+        );
         try {
           await client.getApproval('a-1');
           fail('expected an error for $code');
@@ -245,7 +346,11 @@ void main() {
 
     test('a network failure is reported without the token', () async {
       final adapter = _FakeAdapter((o) => throw const SocketLikeError());
-      final client = PushGatewayClient(origin: _origin, token: _token, dio: _dio(adapter));
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
       try {
         await client.listApprovals();
         fail('expected an error');

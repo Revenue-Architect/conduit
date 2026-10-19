@@ -106,6 +106,7 @@ void main() {
     check(fill.widthFactor!).isGreaterThan(0.2);
     check(fill.widthFactor!).isLessThan(0.7);
     await gesture.up();
+    await tester.pump(); // start the release animation before advancing time
     await tester.pump(const Duration(milliseconds: 400));
     final drained = tester.widget<FractionallySizedBox>(
       find.byType(FractionallySizedBox),

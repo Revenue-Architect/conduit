@@ -20,6 +20,12 @@ internal object PushIntake {
         val store = PushStore.get(context)
         val nowSeconds = nowMs / 1000L
 
+        // A replay may be the server retrying an acknowledgement lost in transit.
+        if (envelope.ack || envelope.type == PushType.PROBE) {
+            store.queueAck(envelope.id)
+            PushWork.enqueueAck(context)
+        }
+
         if (PushPolicy.isExpired(envelope, nowSeconds)) {
             Log.i(TAG, "drop expired envelope type=${envelope.type.wire}")
             return
@@ -27,10 +33,6 @@ internal object PushIntake {
         if (!store.markFresh(envelope.id)) {
             Log.i(TAG, "drop duplicate envelope type=${envelope.type.wire}")
             return
-        }
-        if (envelope.ack || envelope.type == PushType.PROBE) {
-            store.queueAck(envelope.id)
-            PushWork.enqueueAck(context)
         }
 
         when (envelope.type) {

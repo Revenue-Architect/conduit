@@ -63,6 +63,10 @@ internal class PushStore private constructor(private val prefs: SharedPreference
 
     val generation: Int get() = prefs.getInt(KEY_GENERATION, 0)
 
+    var inboxCursor: String?
+        get() = prefs.getString("inbox_cursor_v1", null)
+        set(value) { prefs.edit().putString("inbox_cursor_v1", value).commit() }
+
     /** Moves the generation counter up to at least [minimum] (never down). */
     fun raiseGeneration(minimum: Int) = synchronized(lock) {
         if (prefs.getInt(KEY_GENERATION, 0) < minimum) {
@@ -144,6 +148,7 @@ internal class PushStore private constructor(private val prefs: SharedPreference
 
     fun clearRegistrationState() = synchronized(lock) {
         prefs.edit()
+            .remove("inbox_cursor_v1").remove(KEY_DEDUP).remove(KEY_ACKS)
             .remove(KEY_EP_URL).remove(KEY_EP_PUB).remove(KEY_EP_AUTH).remove(KEY_EP_DIST)
             .putBoolean(KEY_PENDING_UPLOAD, false)
             .apply()

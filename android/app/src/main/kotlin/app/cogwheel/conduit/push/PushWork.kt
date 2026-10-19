@@ -15,6 +15,15 @@ import java.util.concurrent.TimeUnit
 internal object PushWork {
     private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
+    fun enqueueInbox(context: Context) {
+        val request = OneTimeWorkRequestBuilder<PushSyncWorker>()
+            .setInputData(Data.Builder().putString(PushSyncWorker.KEY_KIND, PushSyncWorker.KIND_INBOX).build())
+            .setConstraints(online)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork("push-inbox", ExistingWorkPolicy.KEEP, request)
+    }
+
     fun enqueueAck(context: Context) {
         val request = OneTimeWorkRequestBuilder<PushSyncWorker>()
             .setInputData(Data.Builder().putString(PushSyncWorker.KEY_KIND, PushSyncWorker.KIND_ACK).build())

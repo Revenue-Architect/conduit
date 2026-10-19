@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../notifications/providers/notification_center.dart';
 import '../platform/conduit_push_api.g.dart';
@@ -24,12 +25,25 @@ final pushRuntimeProvider = Provider<PushDispatcher>((ref) {
     },
   );
   ConduitPushFlutterApi.setUp(dispatcher);
-  ref.onDispose(() => ConduitPushFlutterApi.setUp(null));
-  // Registration and endpoint upload: after startup, never during first frame.
-  unawaited(
-    Future<void>.delayed(const Duration(seconds: 2), () {
-      return ref.read(pushRegistrationServiceProvider).startup();
-    }),
+  var disposed = false;
+  Future<void> reconcile() async {
+    await ref.read(pushRegistrationServiceProvider).startup();
+    if (disposed) return;
+    ref.invalidate(pushPairingProvider);
+    unawaited(ref.read(pushStatusProvider.notifier).refresh());
+    ref.invalidate(approvalsPendingProvider);
+  }
+
+  final lifecycle = AppLifecycleListener(
+    onResume: () => unawaited(reconcile()),
   );
+  final timer = Timer(const Duration(seconds: 2), () => unawaited(reconcile()));
+  ref.onDispose(() {
+    disposed = true;
+    timer.cancel();
+    lifecycle.dispose();
+    ConduitPushFlutterApi.setUp(null);
+  });
+  // Registration and endpoint upload: after startup, never during first frame.
   return dispatcher;
 });
