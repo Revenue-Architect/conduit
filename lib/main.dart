@@ -61,6 +61,7 @@ import 'package:conduit/l10n/app_localizations.dart';
 import 'core/services/quick_actions_service.dart';
 import 'core/providers/app_startup_providers.dart';
 import 'features/notifications/providers/notification_center.dart';
+import 'features/push/providers/push_runtime.dart';
 import 'features/notifications/services/local_notification_service.dart';
 import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
@@ -950,6 +951,9 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     // Open WebUI sign-in: start them here so Hermes-only users get deep links
     // (foreground taps and the tap that cold-launched the app).
     ref.read(notificationCenterProvider);
+    // Native push (UnifiedPush): foreground banners, health updates and
+    // registration. The receiver itself runs natively, with or without this.
+    ref.read(pushRuntimeProvider);
     unawaited(_drainLaunchTap());
   }
 

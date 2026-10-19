@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome status-bar icon for pushed notifications: a disc with an H cut out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2a10,10 0 1,0 0,20a10,10 0 1,0 0,-20zM8.5,7h2v3.5h3V7h2v10h-2v-4.5h-3V17h-2z" />
+</vector>

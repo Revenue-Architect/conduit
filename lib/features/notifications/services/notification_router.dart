@@ -62,8 +62,12 @@ class NotificationRouter {
   Future<NotificationSurface> route(AppNotification notification) async {
     final settings = _readSettings();
 
-    // 1. Master toggle.
-    if (!settings.notificationsEnabled) return NotificationSurface.suppressed;
+    // 1. Master toggle. Pushed notifications were already admitted by the
+    // native push switches (which also gate the system notification), so the
+    // Open WebUI-aligned master toggle, off by default, must not hide them.
+    if (!notification.kind.isPush && !settings.notificationsEnabled) {
+      return NotificationSurface.suppressed;
+    }
 
     // 2. Per-kind toggle.
     if (!_kindEnabled(notification.kind, settings)) {
@@ -126,6 +130,16 @@ class NotificationRouter {
         return true;
       case NotificationKind.hermesRun:
         return settings.notificationChatEnabled;
+      // Category switches for push live natively; Dart only receives what
+      // the native side let through.
+      case NotificationKind.pushApproval:
+      case NotificationKind.pushAlert:
+      case NotificationKind.pushProactive:
+      case NotificationKind.pushBrief:
+      case NotificationKind.pushAgent:
+      case NotificationKind.pushWatch:
+      case NotificationKind.pushStatus:
+        return true;
     }
   }
 
@@ -139,6 +153,14 @@ class NotificationRouter {
       case NotificationKind.hermesAttention:
       case NotificationKind.hermesRun:
         return view.isViewingHermesSession(notification.sourceId);
+      case NotificationKind.pushApproval:
+      case NotificationKind.pushAlert:
+      case NotificationKind.pushProactive:
+      case NotificationKind.pushBrief:
+      case NotificationKind.pushAgent:
+      case NotificationKind.pushWatch:
+      case NotificationKind.pushStatus:
+        return false;
     }
   }
 

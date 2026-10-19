@@ -99,6 +99,7 @@ coverage/
 # Generated files
 *.g.dart
 !lib/core/platform/conduit_platform_apis.g.dart
+!lib/features/push/platform/conduit_push_api.g.dart
 *.freezed.dart
 lib/l10n/app_localizations.dart
 lib/l10n/app_localizations_*.dart

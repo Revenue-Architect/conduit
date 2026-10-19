@@ -42,6 +42,9 @@ import '../../features/hermes/kanban/hermes_kanban_page.dart';
 import '../../features/hermes/views/hermes_home_page.dart';
 import '../../features/hermes/views/hermes_bot_detail_page.dart';
 import '../../features/hermes/views/hermes_attention_page.dart';
+import '../../features/push/views/approval_detail_page.dart';
+import '../../features/push/views/approvals_page.dart';
+import '../../features/push/views/push_pairing_page.dart';
 import '../../features/hermes/views/hermes_artifacts_page.dart';
 import '../../features/hermes/views/hermes_live_run_page.dart';
 import '../../features/hermes/views/hermes_conversations_page.dart';
@@ -94,6 +97,9 @@ bool _isAccountlessBackendLocation(String location) {
       location == Routes.hermesHome ||
       location == Routes.hermesConversations ||
       location == Routes.hermesAttention ||
+      location == Routes.hermesApprovals ||
+      location.startsWith('${Routes.hermesApprovals}/') ||
+      location == Routes.hermesPushPairing ||
       location == Routes.hermesArtifacts ||
       location.startsWith('/profile/hermes/bots/') ||
       location.startsWith('/profile/hermes/live/') ||
@@ -874,6 +880,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               : const SpacesPage(),
         );
       },
+    ),
+    GoRoute(
+      path: Routes.hermesApprovals,
+      name: RouteNames.hermesApprovals,
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const ApprovalsPage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.hermesApproval,
+      name: RouteNames.hermesApproval,
+      pageBuilder: (context, state) {
+        final id = validateHermesOpaqueIdentifier(
+          state.pathParameters['approvalId'],
+        );
+        return _buildHermezPage(
+          context: context,
+          state: state,
+          child: id == null
+              ? const ApprovalsPage()
+              : ApprovalDetailPage(approvalId: id),
+        );
+      },
+    ),
+    GoRoute(
+      path: Routes.hermesPushPairing,
+      name: RouteNames.hermesPushPairing,
+      pageBuilder: (context, state) => _buildHermezPage(
+        context: context,
+        state: state,
+        child: const PushPairingPage(),
+      ),
     ),
     GoRoute(
       path: Routes.hermesAttention,

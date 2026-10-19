@@ -28,6 +28,10 @@ class SecureCredentialStorage {
   static const String _hermesSessionKeyKey = 'hermes_session_key_v1';
   static const String _hermesDesktopCredentialsKey =
       'hermes_desktop_credentials_v1';
+  static const String _pushDeviceTokenKey = 'push_device_token_v1';
+  static const String _pushGatewayKey = 'push_gateway_v1';
+  static const String _pushDeviceIdKey = 'push_device_id_v1';
+  static const String _pushExpiresKey = 'push_expires_at_v1';
   static const String _directConnectionProfilesKey =
       'direct_connection_profiles_v1';
   static const String _directMcpServersKey = 'direct_mcp_servers_v1';
@@ -340,6 +344,73 @@ class SecureCredentialStorage {
     }
   }
 
+  /// Save the phone gateway pairing (device token, gateway origin, device id).
+  /// The native push vault holds a mirror for background work.
+  Future<void> savePushDevice({
+    required String token,
+    required String gateway,
+    required String deviceId,
+    required DateTime expiresAt,
+  }) async {
+    try {
+      await _secureStorage.write(key: _pushDeviceTokenKey, value: token);
+      await _secureStorage.write(key: _pushGatewayKey, value: gateway);
+      await _secureStorage.write(key: _pushDeviceIdKey, value: deviceId);
+      await _secureStorage.write(
+        key: _pushExpiresKey,
+        value: expiresAt.toUtc().toIso8601String(),
+      );
+    } catch (e) {
+      DebugLogger.error('save-failed', scope: 'push/device', error: e);
+      rethrow;
+    }
+  }
+
+  /// The stored phone gateway pairing, or null when this device is not paired.
+  Future<PushDeviceSecrets?> readPushDevice() async {
+    final token = await _readHermesSecret(
+      _pushDeviceTokenKey,
+      scope: 'push/device',
+    );
+    final gateway = await _readHermesSecret(
+      _pushGatewayKey,
+      scope: 'push/device',
+    );
+    final deviceId = await _readHermesSecret(
+      _pushDeviceIdKey,
+      scope: 'push/device',
+    );
+    if (token == null ||
+        token.isEmpty ||
+        gateway == null ||
+        gateway.isEmpty ||
+        deviceId == null ||
+        deviceId.isEmpty) {
+      return null;
+    }
+    final expires = DateTime.tryParse(
+      await _readHermesSecret(_pushExpiresKey, scope: 'push/device') ?? '',
+    );
+    return PushDeviceSecrets(
+      token: token,
+      gateway: gateway,
+      deviceId: deviceId,
+      expiresAt: expires,
+    );
+  }
+
+  Future<void> deletePushDevice() async {
+    try {
+      await _secureStorage.delete(key: _pushDeviceTokenKey);
+      await _secureStorage.delete(key: _pushGatewayKey);
+      await _secureStorage.delete(key: _pushDeviceIdKey);
+      await _secureStorage.delete(key: _pushExpiresKey);
+    } catch (e) {
+      DebugLogger.error('delete-failed', scope: 'push/device', error: e);
+      rethrow;
+    }
+  }
+
   /// Save the Hermes long-term memory session key (`X-Hermes-Session-Key`).
   Future<void> saveHermesSessionKey(String sessionKey) async {
     try {
@@ -639,4 +710,19 @@ class SecureCredentialStorage {
       DebugLogger.error('migrate-failed', scope: 'credentials', error: e);
     }
   }
+}
+
+/// The phone gateway pairing as stored in secure storage.
+class PushDeviceSecrets {
+  const PushDeviceSecrets({
+    required this.token,
+    required this.gateway,
+    required this.deviceId,
+    this.expiresAt,
+  });
+
+  final String token;
+  final String gateway;
+  final String deviceId;
+  final DateTime? expiresAt;
 }

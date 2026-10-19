@@ -96,6 +96,15 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hermez" android:host="hermes" android:pathPrefix="/profile/hermes/live/" />
             </intent-filter>
+            <!-- Push notification deep links (approvals, threads, briefs). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hermez" android:host="hermes" android:pathPrefix="/profile/hermes/approvals" />
+                <data android:scheme="hermez" android:host="hermes" android:pathPrefix="/profile/hermes/conversations" />
+                <data android:scheme="hermez" android:host="hermes" android:pathPrefix="/profile/hermes/home" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -159,6 +168,26 @@
             android:stopWithTask="false"
             tools:replace="android:foregroundServiceType"/>
         
+        <!-- UnifiedPush: the distributor (ntfy) delivers decrypted pushes here, with or
+             without the app running. Exported because the distributor is another app. -->
+        <receiver
+            android:name=".push.PushReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
+                <action android:name="org.unifiedpush.android.connector.TEMP_UNAVAILABLE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Approve / Deny / relay taps from the notification shade. Not exported. -->
+        <receiver
+            android:name=".push.ApprovalActionReceiver"
+            android:exported="false" />
+
         <!-- Home Screen Widget -->
         <receiver
             android:name=".ConduitWidgetProvider"

@@ -13,6 +13,7 @@ import '../../../core/utils/debug_logger.dart';
 import '../../channels/providers/channel_providers.dart';
 import '../../chat/providers/chat_providers.dart';
 import '../../hermes/services/hermes_identifier.dart';
+import '../../push/models/push_route.dart';
 import '../../navigation/widgets/responsive_drawer_layout.dart';
 import '../models/app_notification.dart';
 import '../services/active_view_tracker.dart';
@@ -77,7 +78,8 @@ void _showInAppBanner(Ref ref, AppNotification notification) {
   final overlay = NavigationService.navigatorKey.currentState?.overlay;
   if (overlay != null &&
       (notification.kind == NotificationKind.hermesRun ||
-          notification.kind == NotificationKind.hermesAttention)) {
+          notification.kind == NotificationKind.hermesAttention ||
+          notification.kind.isPush)) {
     HermezInAppBanner.show(
       overlay,
       title: notification.title,
@@ -144,6 +146,17 @@ Future<void> _handleTap(Ref ref, NotificationTap tap) async {
               ? const {'open': 'chat'}
               : const <String, String>{},
         );
+      // A pushed notification carries the app route it opens.
+      case NotificationKind.pushApproval:
+      case NotificationKind.pushAlert:
+      case NotificationKind.pushProactive:
+      case NotificationKind.pushBrief:
+      case NotificationKind.pushAgent:
+      case NotificationKind.pushWatch:
+      case NotificationKind.pushStatus:
+        final route = safePushRoute(tap.sourceId);
+        if (route == null) return;
+        await NavigationService.router.push<void>(route);
       case NotificationKind.channelMessage:
         NavigationService.navigateToChannel(tap.sourceId);
       case NotificationKind.chatCompletion:

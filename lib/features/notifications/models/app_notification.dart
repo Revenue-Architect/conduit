@@ -37,6 +37,43 @@ enum NotificationKind {
   /// [AppNotification.sourceId] is the Hermes stored session id.
   @JsonValue('hermes_run')
   hermesRun,
+
+  /// Pushed (UnifiedPush) notifications, delivered by the Umbrel while the
+  /// app is open. [AppNotification.sourceId] is the in-app route to open
+  /// (for example `/profile/hermes/approvals/<id>`), not a chat id.
+  @JsonValue('push_approval')
+  pushApproval,
+
+  @JsonValue('push_alert')
+  pushAlert,
+
+  @JsonValue('push_proactive')
+  pushProactive,
+
+  @JsonValue('push_brief')
+  pushBrief,
+
+  @JsonValue('push_agent')
+  pushAgent,
+
+  @JsonValue('push_watch')
+  pushWatch,
+
+  @JsonValue('push_status')
+  pushStatus;
+
+  /// Whether this notification came through the push path. Push has its own
+  /// switches (native side) and ignores the Open WebUI-aligned master toggle.
+  bool get isPush => switch (this) {
+    NotificationKind.pushApproval ||
+    NotificationKind.pushAlert ||
+    NotificationKind.pushProactive ||
+    NotificationKind.pushBrief ||
+    NotificationKind.pushAgent ||
+    NotificationKind.pushWatch ||
+    NotificationKind.pushStatus => true,
+    _ => false,
+  };
 }
 
 /// An immutable, transport-agnostic description of a notification to surface.

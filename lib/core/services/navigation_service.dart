@@ -189,6 +189,9 @@ class Routes {
   static const String hermesBotDetail = '/profile/hermes/bots/:profile';
   static const String hermesLiveRun = '/profile/hermes/live/:sessionId';
   static const String hermesAttention = '/profile/hermes/attention';
+  static const String hermesApprovals = '/profile/hermes/approvals';
+  static const String hermesApproval = '/profile/hermes/approvals/:approvalId';
+  static const String hermesPushPairing = '/profile/hermes/push/pair';
   static const String hermesArtifacts = '/profile/hermes/artifacts';
   static const String hermesMcp = '/profile/hermes/mcp';
   static const String hermesTeams = '/profile/hermes/teams';
@@ -248,6 +251,9 @@ class RouteNames {
   static const String hermesBotDetail = 'hermes-bot-detail';
   static const String hermesLiveRun = 'hermes-live-run';
   static const String hermesAttention = 'hermes-attention';
+  static const String hermesApprovals = 'hermes-approvals';
+  static const String hermesApproval = 'hermes-approval';
+  static const String hermesPushPairing = 'hermes-push-pairing';
   static const String hermesArtifacts = 'hermes-artifacts';
   static const String hermesMcp = 'hermes-mcp';
   static const String hermesTeams = 'hermes-teams';

@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../profile/widgets/settings_page_scaffold.dart';
 import '../../../shared/widgets/utility_components.dart';
+import '../../push/views/push_settings_section.dart';
 import '../services/local_notification_service.dart';
 
 /// Notification preferences. The master toggle requests OS permission on
@@ -72,6 +73,9 @@ class NotificationSettingsPage extends ConsumerWidget {
         // What Android actually reports, and a direct test, so a missing
         // notification can be traced to the device or to the event.
         const NotificationHealthSection(),
+        settingsSectionGap,
+        // Push from the Umbrel (UnifiedPush): health, pairing, categories.
+        const PushSettingsSection(),
         settingsSectionGap,
         InsetGroupedList(
           children: [

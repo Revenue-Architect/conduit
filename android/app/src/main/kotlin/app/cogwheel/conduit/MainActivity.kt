@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import app.cogwheel.conduit.push.PushBridge
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -621,6 +622,8 @@ class MainActivity : FlutterFragmentActivity() {
         nativeSttBridge.setup(flutterEngine)
         nativeTtsBridge = NativeTtsBridge(this)
         nativeTtsBridge.setup(flutterEngine)
+        // Native UnifiedPush bridge (receiver, renderer and actions live in .push).
+        PushBridge.attach(flutterEngine, this)
 
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ASSISTANT_CHANNEL)
         shareChannel = MethodChannel(
@@ -1726,6 +1729,11 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
     
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        PushBridge.detach(flutterEngine)
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     override fun onDestroy() {
         textSharingBridge?.dispose()
         if (::nativeSttBridge.isInitialized) {

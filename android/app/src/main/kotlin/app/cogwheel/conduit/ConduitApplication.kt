@@ -6,6 +6,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import app.cogwheel.conduit.push.PushChannels
+import app.cogwheel.conduit.push.PushRuntime
 
 /**
  * Custom Application class to perform early initialization tasks.
@@ -22,6 +24,10 @@ class ConduitApplication : Application() {
         // Create notification channels immediately at app startup
         // This ensures channels exist before any service tries to use them
         createNotificationChannels()
+        // Push: track whether an activity is on screen and create the
+        // per-category channels before any push can arrive with the app dead.
+        PushRuntime.install(this)
+        PushChannels.ensure(this)
     }
 
     private fun createNotificationChannels() {
