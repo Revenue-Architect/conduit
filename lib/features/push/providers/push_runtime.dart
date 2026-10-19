@@ -22,6 +22,7 @@ final pushRuntimeProvider = Provider<PushDispatcher>((ref) {
     },
     onApprovalActivity: (_) {
       ref.invalidate(approvalsPendingProvider);
+      ref.invalidate(approvalDetailProvider);
     },
   );
   ConduitPushFlutterApi.setUp(dispatcher);
@@ -32,6 +33,7 @@ final pushRuntimeProvider = Provider<PushDispatcher>((ref) {
     ref.invalidate(pushPairingProvider);
     unawaited(ref.read(pushStatusProvider.notifier).refresh());
     ref.invalidate(approvalsPendingProvider);
+    ref.invalidate(approvalDetailProvider);
   }
 
   final lifecycle = AppLifecycleListener(

@@ -1,4 +1,5 @@
 import '../../hermes/services/hermes_identifier.dart';
+import '../../push/views/approval_continuation_notice.dart';
 import '../../spaces/models/spaces_models.dart';
 import '../../spaces/providers/spaces_providers.dart';
 import '../../spaces/widgets/page_chat_context_chip.dart';
@@ -4053,6 +4054,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             children: [
               const SizedBox(height: Spacing.xl),
               const FileAttachmentWidget(),
+              const ApprovalContinuationNotice(),
               const ContextAttachmentWidget(),
               if (hasAttachments) const SizedBox(height: Spacing.sm),
               Consumer(

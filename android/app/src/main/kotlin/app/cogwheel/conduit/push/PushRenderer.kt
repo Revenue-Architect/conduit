@@ -102,11 +102,12 @@ internal class PushRenderer(private val context: Context) {
         approvalId: String?,
         retry: RetryAction? = null,
         timeoutMs: Long = UPDATE_TIMEOUT_MS,
+        openChat: Boolean = false,
     ) {
         PushChannels.ensure(context)
         val id = notificationId(tag)
         val builder = baseBuilder(category.channelId, title, text)
-            .setContentIntent(contentIntent(id, approvalId?.let { PushDeepLinks.approval(it) } ?: PushDeepLinks.approvals(), null))
+            .setContentIntent(contentIntent(id, approvalId?.let { PushDeepLinks.approval(it, openChat) } ?: PushDeepLinks.approvals(), null))
             .setOnlyAlertOnce(true)
             .setTimeoutAfter(timeoutMs)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

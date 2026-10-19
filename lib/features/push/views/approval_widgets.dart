@@ -68,7 +68,11 @@ class _NowBuilderState extends State<NowBuilder> {
 
 /// Small pill showing a request's state.
 class ApprovalStatusChip extends StatelessWidget {
-  const ApprovalStatusChip({super.key, required this.status, this.overdue = false});
+  const ApprovalStatusChip({
+    super.key,
+    required this.status,
+    this.overdue = false,
+  });
 
   final ApprovalStatus status;
   final bool overdue;
@@ -171,10 +175,7 @@ class ApprovalDecisionBar extends StatelessWidget {
             icon: Icon(Icons.close_rounded, color: colors.deny),
             label: Text(
               'Deny',
-              style: TextStyle(
-                color: colors.deny,
-                fontWeight: FontWeight.w800,
-              ),
+              style: TextStyle(color: colors.deny, fontWeight: FontWeight.w800),
             ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: colors.deny.withValues(alpha: 0.6)),
@@ -190,7 +191,12 @@ class ApprovalDecisionBar extends StatelessWidget {
 }
 
 /// Shows the result of a decision. Errors stay until dismissed.
-void showApprovalSnack(BuildContext context, String message, {bool error = false}) {
+void showApprovalSnack(
+  BuildContext context,
+  String message, {
+  bool error = false,
+  VoidCallback? onOpenChat,
+}) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
   messenger
@@ -200,6 +206,9 @@ void showApprovalSnack(BuildContext context, String message, {bool error = false
         content: Text(message),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: error ? 6 : 3),
+        action: onOpenChat == null
+            ? null
+            : SnackBarAction(label: 'Open chat', onPressed: onOpenChat),
       ),
     );
 }

@@ -902,7 +902,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           state: state,
           child: id == null
               ? const ApprovalsPage()
-              : ApprovalDetailPage(approvalId: id),
+              : ApprovalDetailPage(
+                  approvalId: id,
+                  openChatWhenResolved:
+                      state.uri.queryParameters['open'] == 'chat',
+                ),
         );
       },
     ),

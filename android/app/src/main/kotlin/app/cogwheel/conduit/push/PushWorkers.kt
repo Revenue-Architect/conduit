@@ -331,6 +331,7 @@ class ActionWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             title = "Approval",
             text = text,
             approvalId = approval,
+            openChat = true,
         )
     }
 

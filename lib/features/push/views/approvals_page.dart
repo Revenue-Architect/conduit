@@ -12,6 +12,7 @@ import '../providers/push_providers.dart';
 import '../services/push_gateway_client.dart';
 import 'approval_formatting.dart';
 import 'approval_widgets.dart';
+import 'approval_continuation_notice.dart';
 
 /// Pending requests (decide here) and history. Built on the phone gateway's
 /// `/approvals` routes; nothing here talks to V2 directly.
@@ -30,7 +31,9 @@ class _ApprovalsPageState extends ConsumerState<ApprovalsPage> {
     super.initState();
     // Fresh history each visit; pending refreshes through its own provider.
     Future.microtask(() {
-      if (mounted) unawaited(ref.read(approvalsHistoryProvider.notifier).refresh());
+      if (mounted) {
+        unawaited(ref.read(approvalsHistoryProvider.notifier).refresh());
+      }
     });
   }
 
@@ -52,12 +55,38 @@ class _ApprovalsPageState extends ConsumerState<ApprovalsPage> {
         .decide(approval, decision);
     if (!mounted) return;
     setState(() => _busy.remove(approval.id));
-    showApprovalSnack(context, outcome.message, error: !outcome.succeeded);
+    showApprovalSnack(
+      context,
+      outcome.message,
+      error: !outcome.succeeded,
+      onOpenChat: !outcome.succeeded
+          ? null
+          : () => unawaited(_openChat(approval.id)),
+    );
+  }
+
+  Future<void> _openChat(String id) async {
+    final client = ref.read(pushGatewayClientProvider);
+    if (client == null) return;
+    try {
+      final approval = await client.getApproval(id);
+      if (mounted) openApprovalConversation(context, ref, approval);
+    } catch (_) {
+      if (mounted) {
+        showApprovalSnack(
+          context,
+          'Could not load the originating chat. Try the request in History.',
+          error: true,
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     final pairing = ref.watch(pushPairingProvider);
     final pending = ref.watch(approvalsPendingProvider);
     final history = ref.watch(approvalsHistoryProvider);
@@ -240,7 +269,9 @@ class _SummaryPanel extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: (pending ?? 0) > 0 ? palette.accent : palette.muted,
+            backgroundColor: (pending ?? 0) > 0
+                ? palette.accent
+                : palette.muted,
             radius: 11,
           ),
           const SizedBox(width: 13),
@@ -330,7 +361,10 @@ class _PendingCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    ApprovalStatusChip(status: approval.status, overdue: overdue),
+                    ApprovalStatusChip(
+                      status: approval.status,
+                      overdue: overdue,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),

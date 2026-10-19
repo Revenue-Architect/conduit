@@ -89,6 +89,9 @@ class Approval {
     this.payload,
     this.payloadDigest,
     this.originSessionId,
+    this.originProfile,
+    this.wakeMode,
+    this.wakeState,
     this.events = const [],
   });
 
@@ -105,7 +108,35 @@ class Approval {
   final Map<String, dynamic>? payload;
   final String? payloadDigest;
   final String? originSessionId;
+  final String? originProfile;
+  final String? wakeMode;
+  final String? wakeState;
   final List<ApprovalEvent> events;
+
+  bool get awaitingResume =>
+      !isPending &&
+      wakeMode == 'resume' &&
+      (wakeState == 'pending' || wakeState == 'retry');
+
+  String get continuationMessage {
+    if (isPending) return 'Waiting for your decision.';
+    if (status == ApprovalStatus.cancelled) {
+      return 'This request was cancelled.';
+    }
+    if (awaitingResume &&
+        resolvedAt != null &&
+        DateTime.now().difference(resolvedAt!) >= const Duration(minutes: 2)) {
+      return 'Still waiting to resume. Open the request for the latest status.';
+    }
+    if (wakeMode == 'none') return 'No chat continuation was requested.';
+    return switch (wakeState) {
+      'pending' || 'retry' => 'Decision sent — waiting to resume this chat.',
+      'sent' => 'Continuation requested in this chat.',
+      'gone' => 'The original chat could not be resumed.',
+      'failed' => 'Could not resume this chat. Your decision was recorded.',
+      _ => 'Your decision was recorded. Resume status is unavailable.',
+    };
+  }
 
   bool get isPending => status == ApprovalStatus.pending;
 
@@ -160,8 +191,20 @@ class Approval {
       originSessionId: origin is Map && origin['session_id'] is String
           ? origin['session_id'] as String
           : null,
+      originProfile: origin is Map && origin['profile'] is String
+          ? origin['profile'] as String
+          : null,
+      wakeMode: value['wake_mode'] is String
+          ? value['wake_mode'] as String
+          : null,
+      wakeState: value['wake_state'] is String
+          ? value['wake_state'] as String
+          : null,
       events: events is List
-          ? events.map(ApprovalEvent.fromJson).whereType<ApprovalEvent>().toList()
+          ? events
+                .map(ApprovalEvent.fromJson)
+                .whereType<ApprovalEvent>()
+                .toList()
           : const [],
     );
   }

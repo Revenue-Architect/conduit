@@ -151,7 +151,18 @@ final approvalDetailProvider = FutureProvider.autoDispose
           statusCode: 401,
         );
       }
-      return client.getApproval(id);
+      final approval = await client.getApproval(id);
+      if (!ref.mounted) return approval;
+      // Only a visible request awaiting continuation refreshes, for at most
+      // two minutes. No background polling or additional wake is created.
+      final resolved = approval.resolvedAt;
+      if (approval.awaitingResume &&
+          resolved != null &&
+          DateTime.now().difference(resolved) < const Duration(minutes: 2)) {
+        final timer = Timer(const Duration(seconds: 3), ref.invalidateSelf);
+        ref.onDispose(timer.cancel);
+      }
+      return approval;
     });
 
 /// Decided and expired approvals, paged by the gateway's `before` cursor.
@@ -228,7 +239,11 @@ class ApprovalsHistoryNotifier extends Notifier<ApprovalsHistoryState> {
         loaded: true,
       );
     } on PushGatewayException catch (error) {
-      state = state.copyWith(loading: false, loaded: true, error: error.message);
+      state = state.copyWith(
+        loading: false,
+        loaded: true,
+        error: error.message,
+      );
     }
   }
 }
@@ -317,7 +332,10 @@ class ApprovalDecider {
       }
       if (error.isNotFound) {
         await _afterChange(approval);
-        return ApprovalDecisionOutcome(ApprovalDecisionKind.gone, error.message);
+        return ApprovalDecisionOutcome(
+          ApprovalDecisionKind.gone,
+          error.message,
+        );
       }
       if (error.isUnauthorized) {
         return ApprovalDecisionOutcome(
@@ -325,7 +343,10 @@ class ApprovalDecider {
           error.message,
         );
       }
-      return ApprovalDecisionOutcome(ApprovalDecisionKind.failed, error.message);
+      return ApprovalDecisionOutcome(
+        ApprovalDecisionKind.failed,
+        error.message,
+      );
     }
   }
 
@@ -356,7 +377,9 @@ class PushPairingController {
     required String deviceName,
   }) async {
     final normalized = normalizeGatewayOrigin(origin);
-    if (normalized == null) return 'Enter the gateway address, for example https://umbrel.tail4c9e01.ts.net:8450.';
+    if (normalized == null) {
+      return 'Enter the gateway address, for example https://umbrel.tail4c9e01.ts.net:8450.';
+    }
     final cleaned = normalizePairingCode(code);
     if (cleaned.length < 8) return 'Enter the pairing code from the Umbrel.';
     final service = _ref.read(pushRegistrationServiceProvider);
@@ -371,12 +394,16 @@ class PushPairingController {
       final result = await PushGatewayClient.pair(
         origin: normalized,
         code: cleaned,
-        deviceName: deviceName.trim().isEmpty ? 'Android phone' : deviceName.trim(),
+        deviceName: deviceName.trim().isEmpty
+            ? 'Android phone'
+            : deviceName.trim(),
         appVersion: version,
       );
       await service.savePairing(result, normalized);
     } on PushGatewayException catch (error) {
-      if (error.statusCode == 401 || error.statusCode == 403 || error.statusCode == 400) {
+      if (error.statusCode == 401 ||
+          error.statusCode == 403 ||
+          error.statusCode == 400) {
         return 'That code was not accepted. Codes work once and expire after '
             'five minutes. Create a new one and try again.';
       }
@@ -384,7 +411,11 @@ class PushPairingController {
     }
     _ref.invalidate(pushPairingProvider);
     final enabled = await service.enable();
-    DebugLogger.log('paired', scope: 'push/pairing', data: {'enable': enabled.name});
+    DebugLogger.log(
+      'paired',
+      scope: 'push/pairing',
+      data: {'enable': enabled.name},
+    );
     await _ref.read(pushStatusProvider.notifier).refresh();
     return switch (enabled) {
       PushEnableResult.ok => null,
@@ -392,8 +423,9 @@ class PushPairingController {
         'Paired. Install ntfy from the Play Store, open it once, then check '
             'push health.',
       PushEnableResult.notPaired => 'Pairing was not saved. Try again.',
-      PushEnableResult.failed => 'Paired, but Android did not register push. '
-          'Check push health.',
+      PushEnableResult.failed =>
+        'Paired, but Android did not register push. '
+            'Check push health.',
     };
   }
 

@@ -104,7 +104,8 @@ internal object PushDeepLinks {
 
     fun approvals(): String = "$BASE/approvals"
 
-    fun approval(id: String): String = "$BASE/approvals/$id"
+    fun approval(id: String, openChat: Boolean = false): String =
+        "$BASE/approvals/$id" + if (openChat) "?open=chat" else ""
 }
 
 /** What the shade shows for each stage of a decision made from a notification. */
