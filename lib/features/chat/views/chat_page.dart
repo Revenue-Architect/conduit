@@ -1112,6 +1112,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
     final service = ref.read(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return;
+    final forced = service.consumeForcedTranscriptRefresh(storedId);
     final generation = ++_hermesTranscriptRefreshGeneration;
     try {
       final raw = await service.getSessionMessages(storedId);
@@ -1185,7 +1186,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 !isRestoredHermesDesktopRunningPlaceholder(message),
           )
           .length;
-      if (currentAuthoritativeCount > 0 &&
+      if (!forced &&
+          currentAuthoritativeCount > 0 &&
           candidateAuthoritativeCount < currentAuthoritativeCount) {
         return;
       }

@@ -256,6 +256,7 @@ final class HermesDesktopApiService
   final Map<String, HermesSessionBinding> _bindings = {};
   final Map<String, int> _bindingSocketGenerations = {};
   final Set<String> _freshSessionIds = {};
+  final Set<String> _forcedTranscriptRefreshes = {};
   final Map<String, List<Map<String, dynamic>>> _lastTranscripts = {};
   final Map<String, String> _appliedSessionOptions = {};
 
@@ -1044,6 +1045,11 @@ final class HermesDesktopApiService
     _connectionOperations.clear();
   }
 
+  /// True once per [requestTranscriptRefresh]: the open chat should replace its
+  /// transcript with the stored one even if it has fewer merged segments.
+  bool consumeForcedTranscriptRefresh(String storedId) =>
+      _forcedTranscriptRefreshes.remove(storedId);
+
   void _emitTurnState(HermesDesktopTurnState state) {
     if (!_closed) _turnStates.add(state);
   }
@@ -1054,6 +1060,25 @@ final class HermesDesktopApiService
 
   void _emitTranscriptChange(String id) {
     if (!_closed) _transcriptChanges.add(id);
+  }
+
+  /// Asks any open chat for [storedId] to reload its transcript. Used when the
+  /// server continues a session on its own (an approval wake), which does not
+  /// arrive on this connection's event stream.
+  ///
+  /// A bot chat reads its history from the bound runtime, which only learns of
+  /// a server-started turn when the binding is refreshed, so rebind first.
+  void requestTranscriptRefresh(String storedId) {
+    if (_closed) return;
+    _forcedTranscriptRefreshes.add(storedId);
+    unawaited(() async {
+      try {
+        await _resume(storedId, refresh: true);
+      } catch (_) {
+        // The reload below still re-reads whatever the runtime holds.
+      }
+      _emitTranscriptChange(storedId);
+    }());
   }
 
   void _emitDesktopContract(int value) {

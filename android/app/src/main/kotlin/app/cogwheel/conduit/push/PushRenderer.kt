@@ -63,13 +63,22 @@ internal class PushRenderer(private val context: Context) {
         PushChannels.ensure(context)
         val channelId = PushChannels.channelIdFor(envelope.category, envelope.shadow)
         val id = notificationId(envelope.effectiveTag)
+        // An update only replaces a notification that is still showing. If the
+        // request was already handled (decided in the app, swiped away), a
+        // late "Approved" would just be stale clutter.
+        val showing = try {
+            manager.activeNotifications.any { it.id == id }
+        } catch (_: Exception) {
+            true
+        }
+        if (!showing) return
         val title = envelope.title.ifEmpty { existingTitle ?: "Hermes" }
         val groupKey = "hermez.group.${envelope.group ?: envelope.category.wire}"
         val builder = baseBuilder(channelId, title, envelope.body)
             .setContentIntent(contentIntent(id, PushDeepLinks.forOpen(envelope.open), envelope.open))
             .setGroup(groupKey)
             .setOnlyAlertOnce(true)
-            .setTimeoutAfter(UPDATE_TIMEOUT_MS)
+            .setTimeoutAfter(RESULT_TIMEOUT_MS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
         manager.notify(id, builder.build())
     }
@@ -101,7 +110,7 @@ internal class PushRenderer(private val context: Context) {
         text: String,
         approvalId: String?,
         retry: RetryAction? = null,
-        timeoutMs: Long = UPDATE_TIMEOUT_MS,
+        timeoutMs: Long = RESULT_TIMEOUT_MS,
         openChat: Boolean = false,
     ) {
         PushChannels.ensure(context)
@@ -109,7 +118,8 @@ internal class PushRenderer(private val context: Context) {
         val builder = baseBuilder(category.channelId, title, text)
             .setContentIntent(contentIntent(id, approvalId?.let { PushDeepLinks.approval(it, openChat) } ?: PushDeepLinks.approvals(), null))
             .setOnlyAlertOnce(true)
-            .setTimeoutAfter(timeoutMs)
+            // A failed action keeps its Retry button much longer than a result.
+            .setTimeoutAfter(if (retry != null) FAILURE_TIMEOUT_MS else timeoutMs)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         if (retry != null) {
             val needsUnlock = retry is RetryAction.Decide
@@ -277,7 +287,9 @@ internal class PushRenderer(private val context: Context) {
         private const val GENERIC_ID = 0x5A5A0001
         private const val SUMMARY_THRESHOLD = 3
         private const val MAX_TIMEOUT_SECONDS = 7L * 86_400L
-        private const val UPDATE_TIMEOUT_MS = 6L * 60L * 60L * 1000L
+        /** A finished decision is a receipt, not a to-do: it clears itself. */
+        private const val RESULT_TIMEOUT_MS = 10L * 60L * 1000L
+        private const val FAILURE_TIMEOUT_MS = 6L * 60L * 60L * 1000L
 
         /** Stable id in a high range so it never collides with the Dart plugin's counter. */
         fun notificationId(tag: String): Int = (tag.hashCode() and 0x3FFFFFFF) or 0x40000000

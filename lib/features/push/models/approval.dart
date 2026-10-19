@@ -118,6 +118,23 @@ class Approval {
       wakeMode == 'resume' &&
       (wakeState == 'pending' || wakeState == 'retry');
 
+  /// When the server dispatched the wake, from the timeline (null until then).
+  DateTime? get wakeSentAt {
+    for (final event in events.reversed) {
+      if (event.type == 'WAKE_SENT') return event.createdAt;
+    }
+    return null;
+  }
+
+  /// "Approved" / "Denied" / "Expired" for notices that name the decision.
+  String get decisionWord => switch (status) {
+    ApprovalStatus.approved => 'Approved',
+    ApprovalStatus.denied => 'Denied',
+    ApprovalStatus.expired => 'Expired',
+    ApprovalStatus.cancelled => 'Cancelled',
+    _ => 'Decided',
+  };
+
   String get continuationMessage {
     if (isPending) return 'Waiting for your decision.';
     if (status == ApprovalStatus.cancelled) {
@@ -130,10 +147,10 @@ class Approval {
     }
     if (wakeMode == 'none') return 'No chat continuation was requested.';
     return switch (wakeState) {
-      'pending' || 'retry' => 'Decision sent — waiting to resume this chat.',
-      'sent' => 'Continuation requested in this chat.',
-      'gone' => 'The original chat could not be resumed.',
-      'failed' => 'Could not resume this chat. Your decision was recorded.',
+      'pending' || 'retry' => 'Decision recorded. Waking the agent…',
+      'sent' => 'The agent was asked to continue this chat.',
+      'gone' => 'The original chat can\u2019t be continued. Your decision was recorded.',
+      'failed' => 'Couldn\u2019t continue this chat. Your decision was recorded.',
       _ => 'Your decision was recorded. Resume status is unavailable.',
     };
   }
