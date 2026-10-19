@@ -58,6 +58,13 @@ State at handoff (as observed by Claude at ~14:20 UTC):
 - V1 proactive API retired; approvals moved to Hermes V2. Reliability audit + fixes; profile hygiene (backups `/opt/data/backups/profile-hygiene-20261019/`); ops scripts fixed.
 - n8n fixes, gateway fallback leak, Tailscale Serve routes repointed, duplicate n8n credential deleted.
 
+## 5b. Loose ends to verify (laptop was offline at handoff, couldn't check)
+
+- Agent Computer plugin repo (`C:/Users/Kamran/Documents/Codex/2026-10-07/your-umbrel-ssh-private-key-is/hermes-agent-computer`): Steel fix (`src/machine.ts`, `src/controller.ts`, tests) is installed; confirm it's committed.
+- Desktop host branch `kaizen/a2ui-host` (`%LOCALAPPDATA%/hermes/hermes-agent`): image fix committed as `0a570d4756`, local only by design. After any Desktop update run `check-after-update.mjs` (patches must be re-applied; see laptop RECOVERY.md §13–15).
+- Conduit `feat/hermes-open-threads-p2` (build 183) and `feat/conduit-unifiedpush` should be merged/rebased together before build 184 — the UP branch is based on `ea66979` and the handoff-doc commits on p2 are docs-only.
+- NPM: something recreated it at 13:44 and 14:12 UTC today. Check Umbrel's app logs (need sudo / dashboard) for why; if it recurs, it's Umbrel-side, not ours.
+
 ## 6. Kamran-owned todos (don't do)
 
 Rotate LiteLLM key, ntfy password, dashboard secret; `zfs allow` for snapshot automation; optional healthchecks.io. See KAMRAN-TODO-20261018.md.
