@@ -185,7 +185,7 @@ class _ApprovalDetailPageState extends ConsumerState<ApprovalDetailPage> {
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
                   onPressed: () => context.push(
-                    '/profile/hermes/live/${Uri.encodeComponent(approval.originSessionId!)}',
+                    '/profile/hermes/live/${Uri.encodeComponent(approval.originSessionId!)}?open=chat',
                   ),
                   icon: const Icon(Icons.chat_bubble_outline_rounded),
                   label: const Text('Open the chat that asked'),
