@@ -28,6 +28,13 @@ Design: `/home/umbrel/.jarvis/docs/CONDUIT-NOTIFICATIONS-SPEC-20261019.md` (deci
 - Decisions wake the originating session via `POST /v1/runs` (webhook route only as fallback).
 - Cutover per category via mode file: `legacy → shadow → dual → conduit`; rollback = edit mode file.
 
+**Consolidated status (final, from both agents):**
+- Server: DONE and live. ntfy v2.32.0, `hermes-notify` (senders 18769, phone gateway 18768 → Serve 8450), V2 0.6.0 (operator/ingest keys, wake). 63 + 59 tests pass; fake-phone end-to-end passed. All 8 categories still in `legacy` mode. `approvals_loop`/`wake_loop` on, `hermes-v2-approvals.timer` disabled. Selftest 85 PASS / 3 WARN / 0 FAIL. Rollback: `/home/umbrel/.jarvis/backups/notify-20261019/`. Kuma NPM IP issue already fixed by the server agent.
+- Conduit: CODE WRITTEN, NOT BUILT. Laptop worktree `…/work/conduit-unifiedpush`, branch `feat/conduit-unifiedpush` @ `333ac747` (64 files, unpushed). Kotlin never compiled; Dart tests need re-run (last 101/6, test fixes applied); tink duplicate-class check pending. Not implemented: `GET /inbox` catch-up, token rotation, `gateway_epoch`, QR scan.
+- Blocker: phone wireless debugging was off — ask Kamran to re-enable it. Laptop scheduled jobs get Ctrl-C-killed; see the Conduit brief's workaround.
+
+**Next steps, in order:** (1) re-run Dart tests + compile Kotlin, fix; (2) build 184, pull build-183 rollback APK, install via adb; (3) pair phone per CONDUIT-PAIRING.md; (4) `notifyctl cutover` per category (dual → conduit), verify each; (5) supervised approvals test (shade Approve/Deny + in-app, session wake), then `cutover --approvals`; (6) on-device check of file cards incl. session `20261018_231313_e7c11b`; (7) push branch, update STATE.md/CHANGELOG/KAMRAN-TODO.
+
 State at handoff (as observed by Claude at ~14:20 UTC):
 - Running on Umbrel: `hermes-notify` (healthy), `hermes-v2-shadow` on `hermes-v2-next:0.6.0-notify` (healthy), keep-image containers for both.
 - Selftest approvals checks all PASS (dispatcher timer every 10 s, 0 pending).
