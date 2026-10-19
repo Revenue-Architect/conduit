@@ -84,3 +84,13 @@ back does not require restoring old notification data. To roll back the phone,
 install the backed-up APK in place with the matching signer and supported
 version downgrade flag. Never clear app storage. Installed Desktop, its theme,
 plugins and host patches are outside this change.
+
+## Build 185 install receipt (2026-10-19, Claude)
+
+- Branch feat/conduit-unifiedpush was clean and pushed at 348f16d7 (on top of 56423851).
+- Build log finished successfully (assembleProfile 642.9s, app-profile.apk 143.1MB, SHA256 9394A312...411D).
+- Signer of build 185 equals signer of installed 184 (Android Debug, SHA-256 b288d04a...67ee), so `adb install -r` kept data and pairing.
+- Installed on the S25 Ultra over wireless adb: Success; versionCode 185, versionName 4.1.7; no FATAL/AndroidRuntime in logcat after launch.
+- On device: Approvals screen loads history (All clear, nothing pending); an approval detail shows Requested by / Bot, the resume line "Continuation requested in this chat." and an "Open default chat" button, which lands directly in the chat with the same resume notice (no activity screen). `notifyctl test --category approvals` was acked.
+- Not exercised: a fresh live Approve/Deny from the shade (needs an agent to create a request, i.e. sending a chat message) and specialist-profile resume (unsupported, 404 on run endpoints, shown honestly). Screenshots: private laptop folder approval-ux-20261019/185-*.png.
+- Rollback: `adb install -r approval-ux-20261019/rollback-installed-184.apk` (same signer).
