@@ -1,5 +1,8 @@
 # Handoff to Codex — 2026-10-19 (from Claude session)
 
+> Latest Codex completion (October 19): build 184 is installed, the S25 Ultra is paired, and all eight categories use Conduit with ntfy fallback. The completion receipt at the end supersedes the earlier pending-build and pairing status.
+
+
 Read this first, then the two agent briefs at the bottom. You have zero context; everything you need is here or linked.
 Canonical docs live on the Umbrel at `/home/umbrel/.jarvis/docs/` (STATE.md, CHANGE-CHECKLIST.md, CHANGELOG-20261018.md, KAMRAN-TODO-20261018.md, RELIABILITY-AUDIT-20261018.md, CONDUIT-NOTIFICATIONS-SPEC-20261019.md, CONDUIT-NOTIFICATIONS-CONTRACT-CHANGES.md, CONDUIT-PAIRING.md). Follow CHANGE-CHECKLIST.md for every change and add a CHANGELOG entry.
 
@@ -68,3 +71,49 @@ State at handoff (as observed by Claude at ~14:20 UTC):
 ## 6. Kamran-owned todos (don't do)
 
 Rotate LiteLLM key, ntfy password, dashboard secret; `zfs allow` for snapshot automation; optional healthchecks.io. See KAMRAN-TODO-20261018.md.
+
+
+## Codex phone completion — October 19, 2026 [codex-phone-20261019]
+
+Build 184 is installed in place on the S25 Ultra. The installed build-183 APK
+was backed up first; signer parity passed. Source branch
+`feat/conduit-unifiedpush` is pushed (verification receipt commit `723b71a3`), including a merge of
+`feat/hermes-open-threads-p2` / `f9074532` (its extra commits were docs only).
+Added inbox catch-up, token renewal and gateway-epoch re-pairing; manual code
+pairing works, QR scanning remains deferred.
+
+The real phone `dev_bcxd85e2rwprrwd0` is paired, its encrypted endpoint is
+verified, and all eight categories passed real-phone acknowledgement tests and
+moved from dual to conduit (approvals last). A stopped-process delivery passed.
+Plain ntfy fallback, original subscriptions and Kuma's independent copy remain.
+ntfy's default is now tailnet HTTPS on 8446; its existing kamran account was
+verified. Both apps were already battery-whitelisted.
+
+Kamran confirmed in-app hold-to-approve, unlocked shade Approve, and a Deny
+that required unlocking first. Request `86d9f694-9784-4373-b2ff-d97899b39a02`
+was decided via Conduit and woke its original scratch session once; it answered
+PHONE-WOKEN-OK. That scratch session was deleted by exact id. The replacement
+Deny request `59803ddf-f1eb-459f-a5b4-00b127371cc9` is denied via Conduit.
+Only labelled no-action fixtures were used; their terminal approval records
+remain as test history. One unused setup pairing code was expired afterwards.
+
+The bare-path handoff in session `20261018_231313_e7c11b` renders as a file card;
+Open downloaded it and displayed its actual document in Android's local viewer.
+179 Dart tests, scoped analysis, Kotlin compilation, 27 native tests and the
+profile duplicate-class check passed. Full server selftest: 86 PASS, 3 WARN,
+0 FAIL (89 checks). Scout's initial timeout cleared; the warnings are existing
+ZFS age and earlier simulated fallback/failed-test records. Critical channel
+bypass-DND is false. No prolonged Doze, acoustic DND or real-phone fallback
+failure injection is claimed; server simulated fallback evidence remains valid.
+
+Rollback: each category `notifyctl mode set <category> legacy`; retain ntfy.
+Mode/database backups: `~/.jarvis/backups/notify-20261019-codex-phone/`.
+Phone rollback APK and evidence: laptop private workspace
+`claude-qa-20261019-push/rollback/build183-installed.apk` and sibling logs/images.
+Detailed hashes, request IDs and limits: https://github.com/Revenue-Architect/conduit/blob/feat/conduit-unifiedpush/docs/hermes-push/CODEX-2026-10-19.md
+
+Desktop loose-end check: host image fix `0a570d4756` is committed locally.
+Agent Computer's source directory has no .git repository; its installed and
+built plugin hashes match, but no Steel-fix commit could be confirmed. Desktop
+was not changed. Follow RECOVERY sections 13–15 after updates. Credential
+rotations, ZFS delegation and the Kuma duplicate-copy decision remain Kamran's.

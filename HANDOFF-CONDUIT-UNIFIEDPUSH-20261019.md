@@ -1,5 +1,10 @@
 # Handoff: Conduit ("Hermez") side of Conduit-native notifications (UnifiedPush)
 
+> Codex completion, October 19: build 184 is installed and paired; all eight
+> categories now use Conduit with ntfy fallback. See
+> [the completion receipt](docs/hermes-push/CODEX-2026-10-19.md). The original
+> agent brief below records the earlier, unbuilt state.
+
 Written 2026-10-19 by Claude for Codex (zero context). No secrets in this file.
 
 ## 1. Goal

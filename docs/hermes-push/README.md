@@ -1,5 +1,8 @@
 # Hermes push (UnifiedPush) in Hermez
 
+Build 184 is installed and paired on the S25 Ultra. All eight categories use
+Conduit with ntfy fallback. [Completion receipt](CODEX-2026-10-19.md).
+
 Native notifications from the Umbrel. The phone's ntfy app is only the
 *distributor*; Hermez registers with it through the UnifiedPush connector,
 decrypts pushes itself and renders them as Hermez notifications. Design:
