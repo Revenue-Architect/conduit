@@ -51,10 +51,20 @@ class _ApprovalDetailPageState extends ConsumerState<ApprovalDetailPage> {
     });
     showApprovalSnack(context, outcome.message, error: !outcome.succeeded);
     if (outcome.succeeded && !_openedChat) {
+      // Claim the navigation before awaiting so the refreshed detail below
+      // cannot open the chat a second time.
+      _openedChat = true;
+      // The chat notice needs the decided request, not the pending copy this
+      // page was showing: read it back from the server once.
+      var decided = approval;
+      try {
+        decided = await ref.read(approvalDetailProvider(approval.id).future);
+      } catch (_) {}
+      if (!mounted) return;
       _openedChat = openApprovalConversation(
         context,
         ref,
-        approval,
+        decided,
         replace: true,
       );
     }
