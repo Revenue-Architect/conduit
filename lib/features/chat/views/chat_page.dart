@@ -4039,9 +4039,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         final avatar = roster.hasAvatar
             ? ref.read(hermesBotAvatarProvider(roster.name)).asData?.value
             : null;
-        final title = roster.title.trim();
+        final rawTitle = roster.title.trim();
+        // The roster title falls back to the profile name "default".
+        // Show that as Default.
+        final title =
+            rawTitle.isEmpty || rawTitle.toLowerCase() == 'default'
+            ? 'Default'
+            : rawTitle;
         return (
-          title: title.isEmpty ? 'Default' : title,
+          title: title,
           avatar: avatar,
           shape: roster.avatarShape,
           color: roster.avatarColor,
