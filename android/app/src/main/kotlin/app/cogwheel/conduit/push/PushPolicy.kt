@@ -1,5 +1,6 @@
 package app.cogwheel.conduit.push
 
+import android.net.Uri
 import org.json.JSONObject
 
 /**
@@ -96,10 +97,23 @@ internal object PushDeepLinks {
 
     fun forOpen(open: PushOpen?): String? = when (open?.kind) {
         OpenKind.APPROVAL -> "$BASE/approvals/${open?.id}"
-        OpenKind.SESSION -> "$BASE/live/${open?.id}"
+        OpenKind.SESSION -> session(open?.id)
         OpenKind.THREAD -> "$BASE/conversations?thread=${open?.id}"
         OpenKind.BRIEF -> "$BASE/home?brief=${open?.id}"
         OpenKind.URL, OpenKind.NONE, null -> null
+    }
+
+    private val PROFILE = Regex("^[a-z0-9][a-z0-9_-]{0,63}$")
+
+    /** A session push opens that chat directly. The id may be "<profile>:<session>". */
+    fun session(id: String?): String? {
+        if (id.isNullOrBlank()) return null
+        val cut = id.indexOf(':')
+        val profile = if (cut > 0) id.substring(0, cut) else null
+        val sid = if (cut > 0) id.substring(cut + 1) else id
+        if (sid.isBlank()) return null
+        val query = if (profile != null && PROFILE.matches(profile)) "?open=chat&profile=$profile" else "?open=chat"
+        return "$BASE/live/${Uri.encode(sid)}$query"
     }
 
     fun approvals(): String = "$BASE/approvals"

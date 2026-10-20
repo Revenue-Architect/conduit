@@ -1115,7 +1115,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final forced = service.consumeForcedTranscriptRefresh(storedId);
     final generation = ++_hermesTranscriptRefreshGeneration;
     try {
-      final raw = await service.getSessionMessages(storedId);
+      List<Map<String, dynamic>> raw;
+      if (forced) {
+        try {
+          raw = await service.readStoredTranscript(storedId);
+        } catch (_) {
+          raw = await service.getSessionMessages(storedId);
+        }
+      } else {
+        raw = await service.getSessionMessages(storedId);
+      }
       List<HermesPendingDesktopDecision> pending;
       try {
         pending = await service.pendingDecisionsForSession(storedId);
