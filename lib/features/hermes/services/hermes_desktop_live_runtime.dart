@@ -705,10 +705,11 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     );
     _bindingSocketGenerations[stored] = _rpc.socketGeneration;
     _appliedSessionOptions[stored] = normalized.fingerprint;
-    // Bind even when the profile is "default" and the connection profile is
-    // something else. profileForSession falls back to the connection profile,
-    // and the session list only records profiles that differ from it.
-    if (scopedProfile != null) {
+    // Same rule as the session list: only a different profile is a bot
+    // chat. profileForSession falls back to the connection profile, so a
+    // plain Default chat stays unbound and later turns still apply options
+    // and load the REST transcript.
+    if (scopedProfile != null && scopedProfile != config.desktopProfile) {
       _sessionProfiles[stored] = scopedProfile;
     }
     final info = _object(result['info']);

@@ -4031,7 +4031,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (bot != null) return bot;
     final name = _hermesChatProfile(conversation);
     if (name == null) return null;
-    if (conversation == null && name == 'default') {
+    // A Default chat keeps the roster title after the first message binds
+    // a conversation. The raw profile name is "default".
+    if (name == 'default') {
       final roster = _rosterBotNamed('default');
       if (roster != null) {
         final avatar = roster.hasAvatar
@@ -4413,8 +4415,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
-    if (activeConversation == null &&
-        ref.watch(preferredBackendProvider) == PreferredBackend.hermes) {
+    if (ref.watch(preferredBackendProvider) == PreferredBackend.hermes &&
+        (activeConversation == null ||
+            _hermesChatProfile(activeConversation) == 'default')) {
       final bots = ref.watch(hermesBotsProvider).asData?.value;
       HermesBot? fallback;
       if (bots != null) {

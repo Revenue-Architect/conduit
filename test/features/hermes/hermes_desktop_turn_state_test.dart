@@ -524,6 +524,91 @@ void main() {
     },
   );
 
+  test('a session on the connection profile is not a bot chat', () async {
+    SharedPreferences.setMockInitialValues({});
+    PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+    final harness = _GatewayHarness();
+    final service = HermesDesktopApiService(
+      config: HermesConfig(
+        enabled: true,
+        baseUrl: 'https://hermes.example',
+        mode: HermesBackendMode.desktopGateway,
+        desktopProfile: 'default',
+        desktopCredentials: HermesDesktopCredentials(
+          legacyToken: 'session-token',
+        ),
+      ),
+      dio: _statusDio(),
+      rpc: HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      ),
+    );
+    addTearDown(() async {
+      service.close();
+      await harness.dispose();
+    });
+    harness.responder = (method) => switch (method) {
+      'session.create' => {
+        'session_id': 'runtime-default',
+        'stored_session_id': 'stored-default',
+        'info': const {},
+      },
+      _ => const {},
+    };
+
+    final id = await service.createDesktopSession(
+      options: const HermesDesktopSessionOptions(profile: 'default'),
+    );
+
+    check(id).equals('stored-default');
+    check(service.boundProfileFor(id)).isNull();
+    check(service.profileForSession(id)).equals('default');
+  });
+
+  test(
+    'a default session is remembered when the connection profile differs',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      PreferencesStore.debugOverride(await SharedPreferences.getInstance());
+      final harness = _GatewayHarness();
+      final service = HermesDesktopApiService(
+        config: HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          mode: HermesBackendMode.desktopGateway,
+          desktopProfile: 'ops',
+          desktopCredentials: HermesDesktopCredentials(
+            legacyToken: 'session-token',
+          ),
+        ),
+        dio: _statusDio(),
+        rpc: HermesDesktopRpcClient(
+          channelFactory: (_, _, {httpClient}) => harness.channel,
+        ),
+      );
+      addTearDown(() async {
+        service.close();
+        await harness.dispose();
+      });
+      harness.responder = (method) => switch (method) {
+        'session.create' => {
+          'session_id': 'runtime-default',
+          'stored_session_id': 'stored-default',
+          'info': const {},
+        },
+        _ => const {},
+      };
+
+      final id = await service.createDesktopSession(
+        options: const HermesDesktopSessionOptions(profile: 'default'),
+      );
+
+      check(id).equals('stored-default');
+      check(service.boundProfileFor(id)).equals('default');
+      check(service.profileForSession(id)).equals('default');
+    },
+  );
+
   test('an existing bot session binds its profile before resume', () async {
     SharedPreferences.setMockInitialValues({});
     PreferencesStore.debugOverride(await SharedPreferences.getInstance());
