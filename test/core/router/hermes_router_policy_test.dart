@@ -532,6 +532,9 @@ void main() {
 
       final state = _MockGoRouterState();
       final notifier = container.read(routerNotifierProvider);
+      when(() => state.uri).thenReturn(Uri.parse(Routes.splash));
+      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
       check(notifier.redirect(_MockBuildContext(), state))
           .equals(Routes.hermesHome);
@@ -568,6 +571,9 @@ void main() {
 
       final state = _MockGoRouterState();
       final notifier = container.read(routerNotifierProvider);
+      when(() => state.uri).thenReturn(Uri.parse(Routes.splash));
+      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
+
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
       check(notifier.redirect(_MockBuildContext(), state))
           .equals(Routes.hermesHome);

@@ -239,6 +239,10 @@ class RouterNotifier extends ChangeNotifier {
         return location == Uri.parse(destination).path ? null : destination;
       }
       if (usesAccountlessPrimaryBackend) {
+        // Splash is process start. The server provider is often still
+        // loading then; sending it through the accountless allow-list
+        // opened Home. Home itself is unchanged.
+        if (location == Routes.splash) return Routes.chat;
         return _accountlessOrAuthRedirect(location);
       }
       if (prefersHermes && hermesConfig.enabled) {
@@ -264,6 +268,7 @@ class RouterNotifier extends ChangeNotifier {
         return location == Uri.parse(destination).path ? null : destination;
       }
       if (usesAccountlessPrimaryBackend) {
+        if (location == Routes.splash) return Routes.chat;
         return _accountlessOrAuthRedirect(location);
       }
       if (prefersHermes && hermesConfig.enabled) {
