@@ -670,6 +670,12 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       reasoningEffort: reasoning?.isEmpty == true ? null : reasoning,
       fast: options.fast,
     );
+    final requestedProfile = (profile ?? options.profile)?.trim();
+    final scopedProfile =
+        requestedProfile != null &&
+            HermesConfig.isValidDesktopProfile(requestedProfile)
+        ? requestedProfile
+        : null;
     await _ensureConnected();
     final result = _object(
       await _rpc.request<Object?>(
@@ -681,7 +687,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
           'provider': ?normalized.provider,
           'reasoning_effort': ?normalized.reasoningEffort,
           'fast': ?normalized.fast,
-          'profile': ?profile,
+          'profile': ?scopedProfile,
           if (hidden) 'hidden': true,
           if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
         },
@@ -699,6 +705,12 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
     );
     _bindingSocketGenerations[stored] = _rpc.socketGeneration;
     _appliedSessionOptions[stored] = normalized.fingerprint;
+    // Bind even when the profile is "default" and the connection profile is
+    // something else. profileForSession falls back to the connection profile,
+    // and the session list only records profiles that differ from it.
+    if (scopedProfile != null) {
+      _sessionProfiles[stored] = scopedProfile;
+    }
     final info = _object(result['info']);
     _recordDesktopContract(info);
     _agentic.applySessionInfo(stored, info);

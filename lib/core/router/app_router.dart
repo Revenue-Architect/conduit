@@ -219,7 +219,9 @@ class RouterNotifier extends ChangeNotifier {
     if (authState == AuthNavigationState.authenticated &&
         _isAuthLocation(location) &&
         location != Routes.connectionIssue) {
-      return prefersHermes && hermesUsable ? Routes.hermesHome : Routes.chat;
+      // A completed sign-in opens a fresh chat, the same place a cold start
+      // lands. Home stays one tap away in the drawer.
+      return Routes.chat;
     }
 
     // Onboarding and local backend setup screens always render.
@@ -314,8 +316,10 @@ class RouterNotifier extends ChangeNotifier {
     // session. Auth routes remain reachable so users can add or repair an
     // optional Open WebUI connection. Once that session is authenticated, its
     // server-backed surfaces remain available too.
+    // Opening the app lands in a fresh chat, ready to type; Home stays one
+    // tap away in the drawer.
     if (prefersHermes && hermesUsable && location == Routes.splash) {
-      return Routes.hermesHome;
+      return Routes.chat;
     }
     if (usesAccountlessPrimaryBackend &&
         (!hasActiveServer || authState != AuthNavigationState.authenticated)) {
@@ -399,9 +403,7 @@ class RouterNotifier extends ChangeNotifier {
         if (_isAuthLocation(location) ||
             location == Routes.splash ||
             location == Routes.connectionIssue) {
-          return prefersHermes && hermesUsable
-              ? Routes.hermesHome
-              : Routes.chat;
+          return Routes.chat;
         }
         return _workspaceRedirect(location);
     }

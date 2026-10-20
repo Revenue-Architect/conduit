@@ -13206,6 +13206,7 @@ Future<void> _dispatchOwnedHermesRunFromChat(
       allowCapturedDatabasePersistence: allowCapturedDatabasePersistence,
       trackLatePersistence: latePersistence.add,
       lateSessionCleanupDeadline: lateSessionCleanupDeadline,
+      newSessionProfile: originConversation == null ? 'default' : null,
     );
   } finally {
     var primaryProjectionPersisted = !owner.usesOpenWebUiBackend;
@@ -13384,6 +13385,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
   required bool allowCapturedDatabasePersistence,
   required void Function(Future<void> persistence) trackLatePersistence,
   required Duration lateSessionCleanupDeadline,
+  required String? newSessionProfile,
 }) async {
   final configController =
       ref.read(hermesConfigProvider.notifier) as HermesConfigController;
@@ -13578,6 +13580,9 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
         supported: metadata?['hermesFast'] == true,
         selected: ref.read(hermesFastTierSelectionProvider),
       ),
+      // A chat with no conversation yet is the Default bot. Regeneration and
+      // an already-open conversation pass null and keep their own profile.
+      profile: newSessionProfile,
     );
     // A model or effort picked in this new chat before its first message:
     // the session is created with it, and keeps it on later turns.

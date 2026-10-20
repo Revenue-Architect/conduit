@@ -17,12 +17,18 @@ final class HermesDesktopSessionOptions {
     this.provider,
     this.reasoningEffort,
     this.fast,
+    this.profile,
   });
 
   final String? model;
   final String? provider;
   final String? reasoningEffort;
   final bool? fast;
+
+  /// Profile scope for `session.create`. Null lets the gateway use the
+  /// connection profile. Kept out of [fingerprint]: model identity is separate
+  /// from which bot owns the session.
+  final String? profile;
 
   String get fingerprint =>
       '${provider ?? ''}\u0000${model ?? ''}\u0000${reasoningEffort ?? ''}\u0000${fast ?? ''}';
@@ -62,6 +68,7 @@ final class HermesSessionModelChoice {
         provider: model != null ? provider : options.provider,
         reasoningEffort: reasoningEffort ?? options.reasoningEffort,
         fast: fast ?? options.fast,
+        profile: options.profile,
       );
 }
 

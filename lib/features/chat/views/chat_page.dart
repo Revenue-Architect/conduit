@@ -28,6 +28,7 @@ import '../../../shared/widgets/sidebar_layout_contract.dart';
 import 'dart:async';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/services/interaction_activity.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/native_sheet_hydration_service.dart';
@@ -53,6 +54,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../hermes/models/hermes_config.dart';
+import '../../hermes/providers/hermes_agentic_providers.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/services/hermes_decision_projection.dart';
@@ -875,6 +877,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         );
   }
 
+  /// Blank composer on a preferred, usable Hermes desktop: drop any in-memory
+  /// session or draft model pick, and select the Hermes model when the
+  /// current one is not Hermes. Leaves a conversation that navigation or a
+  /// notification already opened alone, and does not rewrite the saved
+  /// connection profile.
+  void _prepareColdStartDefaultHermesChat() {
+    if (ref.read(activeConversationProvider) != null) return;
+    if (ref.read(preferredBackendProvider) != PreferredBackend.hermes) return;
+    final config = ref.read(hermesConfigProvider);
+    if (!config.isUsable || config.mode != HermesBackendMode.desktopGateway) {
+      return;
+    }
+    resetHermesForNewChat(ref);
+    ref.read(hermesDraftModelChoiceProvider.notifier).set(null);
+    final selected = ref.read(selectedModelProvider);
+    if (selected != null && isHermesModel(selected)) return;
+    ref.read(isManualModelSelectionProvider.notifier).set(true);
+    ref.read(selectedModelProvider.notifier).set(hermesSyntheticModel());
+  }
+
   Future<void> _checkAndAutoSelectModel() async {
     // Check if a model is already selected
     final selectedModel = ref.read(selectedModelProvider);
@@ -1033,6 +1055,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
       // Initialize Android Assistant Handler
       ref.read(androidAssistantProvider);
+
+      // Cold start is an empty Default-bot chat. Pin that before model
+      // restore so a saved connection profile or an Open WebUI default model
+      // cannot take the blank composer. No server session is created here.
+      _prepareColdStartDefaultHermesChat();
+      if (!mounted) return;
 
       // First, ensure a model is selected
       await _checkAndAutoSelectModel();
@@ -3972,12 +4000,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final sessionId = validateHermesOpaqueIdentifier(
       conversation?.metadata['hermesSessionId'],
     );
+    // No conversation yet: this is the Default bot, not whichever profile
+    // Settings last saved for jobs and artifacts.
     final name =
-        (sessionId == null
-                ? service.config.desktopProfile
-                : service.profileForSession(sessionId))
+        (sessionId != null
+                ? service.profileForSession(sessionId)
+                : conversation == null
+                ? 'default'
+                : service.config.desktopProfile)
             .trim();
     return HermesConfig.isValidDesktopProfile(name) ? name : null;
+  }
+
+  HermesBot? _rosterBotNamed(String name) {
+    final bots = ref.read(hermesBotsProvider).asData?.value;
+    if (bots == null) return null;
+    for (final bot in bots) {
+      if (bot.name == name) return bot;
+    }
+    return null;
   }
 
   /// The bot this chat talks to. Chats opened from a bot carry it in their
@@ -3990,6 +4031,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (bot != null) return bot;
     final name = _hermesChatProfile(conversation);
     if (name == null) return null;
+    if (conversation == null && name == 'default') {
+      final roster = _rosterBotNamed('default');
+      if (roster != null) {
+        final avatar = roster.hasAvatar
+            ? ref.read(hermesBotAvatarProvider(roster.name)).asData?.value
+            : null;
+        final title = roster.title.trim();
+        return (
+          title: title.isEmpty ? 'Default' : title,
+          avatar: avatar,
+          shape: roster.avatarShape,
+          color: roster.avatarColor,
+          imageKind: roster.avatarImageKind,
+        );
+      }
+      return (
+        title: 'Default',
+        avatar: null,
+        shape: 'squircle',
+        color: '#8b5cf6',
+        imageKind: null,
+      );
+    }
     return (
       title: name,
       avatar: null,
@@ -4015,11 +4079,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return HermesChatContextBar(
       key: ValueKey('hermes-context-${sessionId ?? 'draft'}'),
       sessionId: sessionId,
-      profile: sessionId == null
-          ? service.config.desktopProfile
-          : service.profileForSession(sessionId),
+      profile: sessionId != null
+          ? service.profileForSession(sessionId)
+          : draft
+          ? 'default'
+          : service.config.desktopProfile,
       profileTitle: title is String && title.trim().isNotEmpty
           ? title.trim()
+          : draft
+          ? _hermesBotPresentation(conversation)?.title
           : null,
       page: _pageForConversation(ref, conversation),
     );
@@ -4345,6 +4413,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final activeConversation = ref.watch(activeConversationProvider);
+    if (activeConversation == null &&
+        ref.watch(preferredBackendProvider) == PreferredBackend.hermes) {
+      final bots = ref.watch(hermesBotsProvider).asData?.value;
+      HermesBot? fallback;
+      if (bots != null) {
+        for (final bot in bots) {
+          if (bot.name == 'default') {
+            fallback = bot;
+            break;
+          }
+        }
+      }
+      if (fallback?.hasAvatar == true) {
+        ref.watch(hermesBotAvatarProvider('default'));
+      }
+    }
     final hermesBot = _hermesBotPresentation(activeConversation);
     final hermezVisuals = _useHermezChatVisuals;
     final hermezPalette = HermezChatPalette.forBrightness(theme.brightness);

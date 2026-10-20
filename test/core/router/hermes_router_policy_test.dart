@@ -315,7 +315,7 @@ void main() {
         container.read(hermesSecretsLoadingProvider.notifier).set(false);
 
         check(notifier.redirect(_MockBuildContext(), state))
-            .equals(Routes.hermesHome);
+            .equals(Routes.chat);
       },
     );
 
@@ -538,7 +538,7 @@ void main() {
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
       check(notifier.redirect(_MockBuildContext(), state))
-          .equals(Routes.hermesHome);
+          .equals(Routes.chat);
     });
 
     test('authenticated Hermes escapes auth when OWUI errors', () async {
@@ -574,7 +574,7 @@ void main() {
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
       check(notifier.redirect(_MockBuildContext(), state))
-          .equals(Routes.hermesHome);
+          .equals(Routes.chat);
     });
   });
 
