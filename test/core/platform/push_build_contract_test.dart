@@ -16,7 +16,7 @@ void main() {
     expect(
       File('android/app/src/main/kotlin/app/cogwheel/conduit/MainActivity.kt')
           .readAsStringSync(),
-      contains('PushHostApiImpl'),
+      contains('PushBridge.attach'),
     );
   });
 }
