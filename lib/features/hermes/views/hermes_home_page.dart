@@ -16,6 +16,7 @@ import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_active_work_sheet.dart';
 import '../sheets/hermes_scheduled_agent_sheet.dart';
 import '../sheets/hermez_modal_sheet.dart';
+import '../../push/providers/push_providers.dart' show approvalsPendingProvider;
 import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermez_bot_identity.dart';
 import '../widgets/hermez_bot_mark.dart';
@@ -562,6 +563,31 @@ class HermesHomePage extends ConsumerWidget {
                     ),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Requests agents have made that only the user can approve.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _UtilityObject(
+                    label: 'APPROVALS',
+                    count: ref
+                        .watch(approvalsPendingProvider)
+                        .asData
+                        ?.value
+                        .length,
+                    description: 'Decide what agents may do',
+                    semanticLabel: 'Approvals',
+                    onOpen: (origin) => context.pushNamed(
+                      RouteNames.hermesApprovals,
+                      extra: origin,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: SizedBox.shrink()),
               ],
             ),
           ],

@@ -1,4 +1,5 @@
 import '../../hermes/services/hermes_identifier.dart';
+import '../../push/views/approval_continuation_notice.dart';
 import '../../spaces/models/spaces_models.dart';
 import '../../spaces/providers/spaces_providers.dart';
 import '../../spaces/widgets/page_chat_context_chip.dart';
@@ -1139,9 +1140,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
     final service = ref.read(hermesApiServiceProvider);
     if (service is! HermesDesktopApiService) return;
+    final forced = service.consumeForcedTranscriptRefresh(storedId);
     final generation = ++_hermesTranscriptRefreshGeneration;
     try {
-      final raw = await service.getSessionMessages(storedId);
+      List<Map<String, dynamic>> raw;
+      if (forced) {
+        try {
+          raw = await service.readStoredTranscript(storedId);
+        } catch (_) {
+          raw = await service.getSessionMessages(storedId);
+        }
+      } else {
+        raw = await service.getSessionMessages(storedId);
+      }
       List<HermesPendingDesktopDecision> pending;
       try {
         pending = await service.pendingDecisionsForSession(storedId);
@@ -1212,7 +1223,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 !isRestoredHermesDesktopRunningPlaceholder(message),
           )
           .length;
-      if (currentAuthoritativeCount > 0 &&
+      if (!forced &&
+          currentAuthoritativeCount > 0 &&
           candidateAuthoritativeCount < currentAuthoritativeCount) {
         return;
       }
@@ -4129,6 +4141,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             children: [
               const SizedBox(height: Spacing.xl),
               const FileAttachmentWidget(),
+              const ApprovalContinuationNotice(),
               const ContextAttachmentWidget(),
               if (hasAttachments) const SizedBox(height: Spacing.sm),
               Consumer(

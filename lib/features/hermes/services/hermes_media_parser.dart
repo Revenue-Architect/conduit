@@ -116,6 +116,39 @@ final _mediaDirectivePattern = RegExp(
       r"""|\S+)[`"'*_]{0,3}""",
 );
 
+// A bare, absolute server path under /opt/data/ that ends in a delivery
+// extension, e.g. the handoff file a specialist names without a MEDIA: line.
+// It deliberately has no spaces: only unquoted prose paths the model writes
+// whole are recognised. The download itself is still authorised by the server
+// (/api/fs/download); nothing here widens what can be fetched.
+const _optDataPathChars = r"""[^\s`"'<>|*]""";
+
+final _bareOptDataPathPattern = RegExp(
+  '(?<![A-Za-z0-9_./~\\-])/opt/data/$_optDataPathChars+?\\.'
+  '(?:${_extensionAlternation.join('|')})$_pathEndBoundary',
+);
+
+// A backticked span that is exactly such a path (how the model usually writes
+// it) is a path, not code, so it must not be masked.
+final _exactBacktickedOptDataPath = RegExp(
+  '^`/opt/data/$_optDataPathChars+\\.'
+  '(?:${_extensionAlternation.join('|')})`\$',
+);
+
+/// Server paths that must never become a download card, even though they sit
+/// under /opt/data: secrets, environment files, auth and config. Anything with
+/// a `..` segment is refused too.
+bool _isDeniedServerPath(String path) {
+  if (path.contains('..')) return true;
+  final segments = path.split('/').where((part) => part.isNotEmpty).toList();
+  for (final segment in segments) {
+    final lower = segment.toLowerCase();
+    if (lower == '.secrets' || lower.startsWith('.env')) return true;
+  }
+  final name = segments.isEmpty ? '' : segments.last.toLowerCase();
+  return name == 'auth.json' || name == 'config.yaml';
+}
+
 const _imageExtensions = <String>{
   'png',
   'jpg',
@@ -139,12 +172,17 @@ const _audioExtensions = <String>{
 
 const _videoExtensions = <String>{'mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'};
 
-/// Extracts explicit Hermes `MEDIA:` directives and leaves surrounding prose
-/// in [HermesMediaParseResult.cleanText]. Ordinary filesystem paths are never
-/// interpreted.
+/// Extracts Hermes `MEDIA:` directives, plus bare absolute server paths under
+/// `/opt/data/` that end in a delivery extension (the safety net for replies
+/// that name a file without a `MEDIA:` line), and leaves the surrounding prose
+/// in [HermesMediaParseResult.cleanText]. A bare path is replaced by its file
+/// name so the sentence still reads; a `MEDIA:` directive is removed. Other
+/// filesystem paths are never interpreted, and neither is anything inside
+/// fenced code, inline code (other than a span that is exactly the path), or a
+/// blockquote.
 HermesMediaParseResult parseHermesMedia(String text) {
   final artifacts = <HermesMediaArtifact>[];
-  final removals = <({int start, int end})>[];
+  final edits = <({int start, int end, String replacement})>[];
   final scanText = _maskProtectedSpans(text);
 
   for (final match in _mediaDirectivePattern.allMatches(scanText)) {
@@ -164,11 +202,12 @@ HermesMediaParseResult parseHermesMedia(String text) {
         text.substring(lineStart, match.start).trim().isEmpty &&
         (trailingLineText.isEmpty || trailingPunctuationOnly);
 
-    removals.add((
+    edits.add((
       start: isOnlyContentOnLine ? lineStart : match.start,
       end: isOnlyContentOnLine
           ? (nextLineBreak < 0 ? lineEnd : nextLineBreak + 1)
           : match.end,
+      replacement: '',
     ));
     artifacts.add(
       HermesMediaArtifact(
@@ -179,16 +218,39 @@ HermesMediaParseResult parseHermesMedia(String text) {
     );
   }
 
+  // Bare /opt/data paths. A path already delivered by a MEDIA: directive (or
+  // earlier in the same message) gets no second card, but is still shortened
+  // to its file name in the prose.
+  final seenPaths = {for (final artifact in artifacts) artifact.path};
+  for (final match in _bareOptDataPathPattern.allMatches(scanText)) {
+    final path = match.group(0)!;
+    if (_isDeniedServerPath(path)) continue;
+    if (edits.any((e) => match.start < e.end && e.start < match.end)) continue;
+    final filename = _filenameForPath(path);
+    edits.add((start: match.start, end: match.end, replacement: filename));
+    if (seenPaths.add(path)) {
+      artifacts.add(
+        HermesMediaArtifact(
+          path: path,
+          filename: filename,
+          kind: _kindForPath(path),
+        ),
+      );
+    }
+  }
+
   if (artifacts.isEmpty) {
     return HermesMediaParseResult(cleanText: text, artifacts: const []);
   }
 
+  edits.sort((left, right) => left.start.compareTo(right.start));
   final clean = StringBuffer();
   var cursor = 0;
-  for (final removal in removals) {
-    if (removal.start < cursor) continue;
-    clean.write(text.substring(cursor, removal.start));
-    cursor = removal.end;
+  for (final edit in edits) {
+    if (edit.start < cursor) continue;
+    clean.write(text.substring(cursor, edit.start));
+    clean.write(edit.replacement);
+    cursor = edit.end;
   }
   clean.write(text.substring(cursor));
   final cleanedText = clean.toString();
@@ -244,6 +306,8 @@ String _maskProtectedSpans(String text) {
     // Backticks immediately following MEDIA: quote the artifact path; they are
     // not a Markdown code span and must remain parseable.
     if (RegExp(r'MEDIA:\s*$').hasMatch(linePrefix)) continue;
+    // A span that is exactly a server file path is a path, not code.
+    if (_exactBacktickedOptDataPath.hasMatch(match.group(0)!)) continue;
     spans.add((start: match.start, end: match.end));
   }
 

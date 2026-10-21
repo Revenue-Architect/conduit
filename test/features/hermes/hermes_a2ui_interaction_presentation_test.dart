@@ -29,4 +29,22 @@ void main() {
       isNull,
     );
   });
+
+  test('shows the automated approval wake notice as a one-line receipt', () {
+    const notice =
+        '[Hermes V2 - approval decided]\n'
+        'Approval 70a164c5-7aff-43ec-b6df-f2f9510e0db6 for "pairing_test" '
+        'was APPROVED by Kamran at 3:21 PM (via conduit).\n'
+        'Request: Harmless pairing test.\n'
+        'If APPROVED: continue the task you paused.';
+    expect(
+      hermesA2uiInteractionLabel(notice),
+      'Approved \u00b7 pairing_test \u00b7 3:21 PM',
+    );
+    expect(
+      hermesApprovalNoticeLabel(notice.replaceFirst('APPROVED', 'DENIED')),
+      'Denied \u00b7 pairing_test \u00b7 3:21 PM',
+    );
+    expect(hermesApprovalNoticeLabel('Approval was approved'), isNull);
+  });
 }

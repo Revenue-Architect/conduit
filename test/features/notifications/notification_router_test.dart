@@ -129,6 +129,62 @@ void main() {
     });
   });
 
+  group('push', () {
+    AppNotification push(NotificationKind kind, {String key = 'p-1'}) =>
+        AppNotification(
+          kind: kind,
+          title: 'Approval needed',
+          body: 'Restart a container',
+          sourceId: '/profile/hermes/approvals/abc',
+          dedupKey: key,
+        );
+
+    test('a push banner appears even when the master toggle is off', () async {
+      final router = build(
+        settings: allOn.copyWith(notificationsEnabled: false),
+      );
+      final surface = await router.route(push(NotificationKind.pushApproval));
+      check(surface).equals(NotificationSurface.banner);
+      check(banners.single.kind).equals(NotificationKind.pushApproval);
+    });
+
+    test('every push kind is shown, none are tied to chat toggles', () async {
+      final router = build(
+        settings: allOn.copyWith(
+          notificationChatEnabled: false,
+          notificationChannelEnabled: false,
+        ),
+      );
+      var n = 0;
+      for (final kind in NotificationKind.values.where((k) => k.isPush)) {
+        final surface = await router.route(push(kind, key: 'k${n++}'));
+        check(surface).equals(NotificationSurface.banner);
+      }
+      check(n).equals(7);
+    });
+
+    test('a repeated push is dropped by the dedup key', () async {
+      final router = build();
+      await router.route(push(NotificationKind.pushAlert));
+      final second = await router.route(push(NotificationKind.pushAlert));
+      check(second).equals(NotificationSurface.suppressed);
+      check(banners).length.equals(1);
+    });
+
+    test('push never bumps channel unread counts', () async {
+      final router = build();
+      await router.route(push(NotificationKind.pushWatch));
+      check(unreads).isEmpty();
+    });
+
+    test('non-push kinds still need the master toggle', () async {
+      final router = build(
+        settings: allOn.copyWith(notificationsEnabled: false),
+      );
+      check(await router.route(_chat())).equals(NotificationSurface.suppressed);
+    });
+  });
+
   group('gating', () {
     test('master toggle off suppresses everything', () async {
       final router = build(

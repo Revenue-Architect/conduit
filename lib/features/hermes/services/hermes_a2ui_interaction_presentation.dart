@@ -8,6 +8,8 @@ final _actionNamePattern = RegExp(
 /// A short label for an A2UI action turn. The stored message and the text sent
 /// to Hermes remain the original protocol payload.
 String? hermesA2uiInteractionLabel(String content) {
+  final approval = hermesApprovalNoticeLabel(content);
+  if (approval != null) return approval;
   if (!content.startsWith(_interactionPrefix) ||
       content.length > _interactionPrefix.length + 4096) {
     return null;
@@ -41,4 +43,24 @@ String? hermesA2uiInteractionLabel(String content) {
 String _humanize(String identifier) {
   final words = identifier.replaceAll(RegExp(r'[._-]+'), ' ');
   return '${words[0].toUpperCase()}${words.substring(1)}';
+}
+
+const _approvalNoticePrefix = '[Hermes V2 - approval decided]';
+final _approvalNoticePattern = RegExp(
+  r'^Approval \S+ for "([^"\n]{1,80})" was (APPROVED|DENIED|EXPIRED|CANCELLED) by [^\n]*? at ([^\n(]{1,20}?) \(via',
+  multiLine: true,
+);
+
+/// The automated "approval decided" notice the server sends to wake a chat is
+/// machine instruction text. People see a one-line receipt instead; the stored
+/// message and what the agent receives are unchanged.
+String? hermesApprovalNoticeLabel(String content) {
+  if (!content.startsWith(_approvalNoticePrefix) || content.length > 6000) {
+    return null;
+  }
+  final match = _approvalNoticePattern.firstMatch(content);
+  if (match == null) return null;
+  final word = match.group(2)!.toLowerCase();
+  final status = '${word[0].toUpperCase()}${word.substring(1)}';
+  return '$status \u00b7 ${match.group(1)} \u00b7 ${match.group(3)!.trim()}';
 }

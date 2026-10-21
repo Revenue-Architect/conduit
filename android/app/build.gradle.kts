@@ -77,8 +77,18 @@ kotlin {
     }
 }
 
+// The UnifiedPush connector depends on com.google.crypto.tink:tink (the JVM jar)
+// while ML Kit / other libraries bring tink-android at the same version. Both
+// carry the same classes, which fails the duplicate-class check, so keep only
+// the Android artifact.
+configurations.configureEach {
+    exclude(group = "com.google.crypto.tink", module = "tink")
+}
+
 dependencies {
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+    // UnifiedPush connector (Kotlin). Receives pushes natively, with no Flutter engine.
+    implementation("org.unifiedpush.android:connector:3.3.5")
     // Core library desugaring for flutter_local_notifications
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.activity:activity:1.12.4")
