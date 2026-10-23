@@ -389,9 +389,12 @@ class MediaUploadController {
   }
 
   /// Retires only owners captured by [captureAttachmentOwnership].
+  /// Composer tiles leave immediately; [cleanupAfter] can retain source bytes
+  /// until a send has finished transferring its prepared payload.
   Future<void> retireAttachmentOwnership(
-    MediaAttachmentOwnershipSnapshot snapshot,
-  ) {
+    MediaAttachmentOwnershipSnapshot snapshot, {
+    Future<void>? cleanupAfter,
+  }) {
     final notifier = _ref.read(attachedFilesProvider.notifier);
     final cleanups = <Future<void>>[];
     final retiredPaths = <String>{};
@@ -412,13 +415,14 @@ class MediaUploadController {
           !retiredPaths.add(filePath)) {
         continue;
       }
-      cleanups.add(
-        _retireCapturedAttachment(
+      cleanups.add(() async {
+        if (cleanupAfter != null) await cleanupAfter;
+        await _retireCapturedAttachment(
           filePath: filePath,
           owner: owner,
           removedAttachment: removedAttachment,
-        ),
-      );
+        );
+      }());
     }
 
     if (cleanups.isEmpty) return Future<void>.value();

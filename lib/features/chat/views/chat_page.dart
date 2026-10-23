@@ -300,7 +300,7 @@ class _HermesBotToolbarTitle extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: SizedBox(
-          height: TouchTarget.minimum,
+          height: 64,
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: compact ? 1 : 0),
             duration: context.reduceMotion
@@ -313,7 +313,7 @@ class _HermesBotToolbarTitle extends StatelessWidget {
               children: [
                 HermesBotAvatar(
                   key: const ValueKey('hermes-bot-toolbar-avatar'),
-                  size: 36 - 8 * collapse,
+                  size: 56 - 23 * collapse,
                   label: bot.title,
                   imageUrl: bot.avatar,
                   shape: bot.shape,
@@ -1369,7 +1369,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final generation = ++_pinPositionGeneration;
     final topInset =
         MediaQuery.paddingOf(context).top +
-        conduitAdaptiveToolbarHeightOf(context) +
+        _chatToolbarHeight(context) +
         Spacing.md;
     _pinToTopEndSpaceExtent = math.max(
       0,
@@ -1470,6 +1470,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     ChatSendPlaceholderHandle? pendingSend;
     var didDispatch = false;
+    final attachmentSendSettled = Completer<void>();
     try {
       // Get attached files and collect uploaded file IDs (including data URLs for images)
       final attachedFiles = includeComposerContext
@@ -1478,6 +1479,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final mediaUploadController = ref.read(mediaUploadControllerProvider);
       final sentAttachmentOwnership = mediaUploadController
           .captureAttachmentOwnership();
+      var attachmentsRetired = false;
+      void retireSentAttachments() {
+        if (!includeComposerContext || attachmentsRetired) return;
+        attachmentsRetired = true;
+        unawaited(
+          mediaUploadController
+              .retireAttachmentOwnership(
+                sentAttachmentOwnership,
+                cleanupAfter: attachmentSendSettled.future,
+              )
+              .catchError((Object error, StackTrace stackTrace) {
+                DebugLogger.error(
+                  'sent-attachment-cleanup-failed',
+                  scope: 'chat/attachment',
+                  error: error,
+                  stackTrace: stackTrace,
+                );
+              }),
+        );
+      }
+
       final uploadedFileIds = attachedFiles
           .where(
             (file) =>
@@ -1506,6 +1528,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         uploadedFileIds.isNotEmpty ? uploadedFileIds : null,
         toolIds: toolIds.isNotEmpty ? toolIds : null,
         onAssistantPlaceholderCreated: (handle) {
+          // Hermes has already copied file contents into its prepared input.
+          // Its send future can stay open for the entire reply stream.
+          if (isHermesModel(selectedModel)) retireSentAttachments();
           didDispatch = true;
           _releaseMessageSendAdmission(sendOwner);
           pendingSend = handle;
@@ -1517,24 +1542,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
       didDispatch = true;
 
-      // Clear only after durableSend has transferred every attachment needed
-      // by the message/outbox. Retire only the exact identities/generations
-      // captured for this send: a paste or picker result published while the
-      // durable transaction awaited still belongs to the next composer turn.
-      if (includeComposerContext) {
-        unawaited(
-          mediaUploadController
-              .retireAttachmentOwnership(sentAttachmentOwnership)
-              .catchError((Object error, StackTrace stackTrace) {
-                DebugLogger.error(
-                  'sent-attachment-cleanup-failed',
-                  scope: 'chat/attachment',
-                  error: error,
-                  stackTrace: stackTrace,
-                );
-              }),
-        );
-      }
+      // Other backends retain their durable ownership boundary. A Hermes
+      // send that dispatched above has already retired this exact snapshot.
+      retireSentAttachments();
 
       if (wasOffline && hasDurableOutbox && mounted) {
         AdaptiveSnackBar.show(
@@ -1555,6 +1565,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         stackTrace: stackTrace,
       );
       recoverFailedChatSend(ref, e, pendingSend);
+    } finally {
+      attachmentSendSettled.complete();
     }
     return didDispatch;
   }
@@ -2927,7 +2939,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // Add padding for the floating app bar and overlaid composer skeleton.
     final topPadding =
         MediaQuery.paddingOf(context).top +
-        conduitAdaptiveToolbarHeightOf(context) +
+        _chatToolbarHeight(context) +
         Spacing.md;
     final bottomPadding = _messageListBottomPadding();
     return CustomScrollView(
@@ -3014,7 +3026,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     final topPadding =
         MediaQuery.paddingOf(context).top +
-        conduitAdaptiveToolbarHeightOf(context) +
+        _chatToolbarHeight(context) +
         Spacing.md;
     final bottomPadding = _messageListBottomPadding();
 
@@ -3907,7 +3919,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // overlaid composer section.
     final topPadding =
         MediaQuery.paddingOf(context).top +
-        conduitAdaptiveToolbarHeightOf(context) +
+        _chatToolbarHeight(context) +
         Spacing.md;
     final bottomPadding = _messageListBottomPadding();
     return LayoutBuilder(
@@ -4607,7 +4619,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   child: ConduitChromeGradientFade.top(
                     contentHeight:
                         MediaQuery.viewPaddingOf(context).top +
-                        conduitAdaptiveToolbarHeightOf(context),
+                        _chatToolbarHeight(context),
                     backgroundColor: hermezVisuals
                         ? hermezPalette.canvas
                         : null,
@@ -4768,6 +4780,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  double _chatToolbarHeight(BuildContext context) {
+    final base = conduitAdaptiveToolbarHeightOf(context);
+    final bot = _hermesBotPresentation(ref.read(activeConversationProvider));
+    return bot == null ? base : math.max(base, 64);
+  }
+
   AdaptiveAppBar _buildAdaptiveChatAppBar({
     required BuildContext context,
     required WidgetRef ref,
@@ -4844,6 +4862,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       actions: actionWidgets,
       cupertinoTrailing: cupertinoTrailing,
       centerTitle: hermesBot != null,
+      toolbarHeight: _chatToolbarHeight(context),
     );
   }
 

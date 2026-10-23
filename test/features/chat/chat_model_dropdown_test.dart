@@ -1,3 +1,4 @@
+import 'package:conduit/shared/widgets/adaptive_toolbar_components.dart';
 import 'package:checks/checks.dart';
 import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/core/models/conversation.dart';
@@ -209,18 +210,18 @@ void main() {
               .first,
         );
         await tester.pumpWidget(header(false));
-        expect(avatarSize(), 36);
+        expect(avatarSize(), 56);
         await tester.pumpWidget(header(true));
         await tester.pump(const Duration(milliseconds: 110));
-        expect(avatarSize(), allOf(greaterThan(28), lessThan(36)));
+        expect(avatarSize(), allOf(greaterThan(33), lessThan(56)));
         expect(nameOpacity().opacity, allOf(greaterThan(0), lessThan(1)));
         await tester.pumpAndSettle();
-        expect(avatarSize(), 28);
+        expect(avatarSize(), 33);
         expect(nameOpacity().opacity, 0);
         expect(find.bySemanticsLabel('Chief'), findsOneWidget);
         await tester.pumpWidget(header(false, reduced: true));
         await tester.pump();
-        expect(avatarSize(), 36);
+        expect(avatarSize(), 56);
         expect(nameOpacity().opacity, 1);
         expect(tester.takeException(), isNull);
       } finally {
@@ -228,6 +229,54 @@ void main() {
       }
     },
   );
+
+  testWidgets('larger bot icon fits the centered toolbar without clipping', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Builder(
+          builder: (context) => Scaffold(
+            appBar: buildConduitCenteredAdaptiveAppBar(
+              context: context,
+              tintColor: Colors.black,
+              toolbarHeight: 64,
+              leading: const SizedBox.square(dimension: 44),
+              actions: const [],
+              title: debugBuildHermesBotToolbarTitleForTesting(
+                bot: (
+                  title: 'Chief',
+                  avatar: null,
+                  shape: 'squircle',
+                  color: '#8b5cf6',
+                  imageKind: null,
+                ),
+                maxWidth: 240,
+              ),
+            ).appBar,
+          ),
+        ),
+      ),
+    );
+    final bar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(bar.toolbarHeight, 64);
+    final avatar = tester.getRect(
+      find.byKey(const ValueKey('hermes-bot-toolbar-avatar')),
+    );
+    final bounds = tester.getRect(find.byType(AppBar));
+    expect(avatar.size, const Size.square(56));
+    expect(avatar.top, greaterThanOrEqualTo(bounds.top));
+    expect(avatar.bottom, lessThanOrEqualTo(bounds.bottom));
+    expect(avatar.center.dx, lessThan(400));
+    expect(tester.takeException(), isNull);
+    const cupertino = ConduitAdaptiveCupertinoNavigationBar(
+      textScaler: TextScaler.noScaling,
+      toolbarHeight: 64,
+      leading: SizedBox.square(dimension: 44),
+    );
+    expect(cupertino.preferredSize.height, 64);
+  });
 
   group('chatLocalFilePickerExtensions', () {
     test('filters Hermes to supported local documents without PDF', () {

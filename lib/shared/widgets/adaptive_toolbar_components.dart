@@ -138,6 +138,7 @@ class ConduitAdaptiveCupertinoNavigationBar extends StatelessWidget
     this.trailing,
     this.centerMiddle = true,
     this.systemOverlayStyle,
+    this.toolbarHeight,
   });
 
   final TextScaler textScaler;
@@ -146,11 +147,13 @@ class ConduitAdaptiveCupertinoNavigationBar extends StatelessWidget
   final Widget? trailing;
   final bool centerMiddle;
   final SystemUiOverlayStyle? systemOverlayStyle;
+  final double? toolbarHeight;
 
   double get _controlScale => resolveConduitSystemControlScale(textScaler);
 
   @override
-  Size get preferredSize => Size.fromHeight(kTextTabBarHeight * _controlScale);
+  Size get preferredSize =>
+      Size.fromHeight(toolbarHeight ?? kTextTabBarHeight * _controlScale);
 
   @override
   bool shouldFullyObstruct(BuildContext context) => false;
@@ -225,10 +228,12 @@ AdaptiveAppBar buildConduitCenteredAdaptiveAppBar({
   required List<Widget> actions,
   Widget? cupertinoTrailing,
   bool centerTitle = true,
+  double? toolbarHeight,
 }) {
   final textScaler = MediaQuery.textScalerOf(context);
   final controlExtent = conduitScaledControlExtent(context);
-  final toolbarHeight = conduitAdaptiveToolbarHeightOf(context);
+  final resolvedToolbarHeight =
+      toolbarHeight ?? conduitAdaptiveToolbarHeightOf(context);
   final overlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle;
 
   Widget scaled(Widget child) =>
@@ -239,6 +244,7 @@ AdaptiveAppBar buildConduitCenteredAdaptiveAppBar({
     tintColor: tintColor,
     cupertinoNavigationBar: ConduitAdaptiveCupertinoNavigationBar(
       textScaler: textScaler,
+      toolbarHeight: resolvedToolbarHeight,
       leading: leading,
       middle: title,
       centerMiddle: centerTitle,
@@ -256,7 +262,7 @@ AdaptiveAppBar buildConduitCenteredAdaptiveAppBar({
       shadowColor: Colors.transparent,
       elevation: Elevation.none,
       scrolledUnderElevation: Elevation.none,
-      toolbarHeight: toolbarHeight,
+      toolbarHeight: resolvedToolbarHeight,
       systemOverlayStyle: overlayStyle,
       centerTitle: centerTitle,
       titleSpacing: Spacing.sm,

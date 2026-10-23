@@ -1374,6 +1374,62 @@ void main() {
   );
 
   test(
+    'sent attachment tile clears synchronously while file cleanup is pending',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'conduit_sent_receipt_',
+      );
+      final file = File('${directory.path}/sent.txt');
+      await file.writeAsBytes([1]);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+        await directory.delete();
+      });
+      final old = _pendingImage(file, reportedBytes: 1);
+      final cleanupStarted = Completer<void>();
+      final finishCleanup = Completer<bool>();
+      final container = ProviderContainer(
+        overrides: [
+          apiServiceProvider.overrideWithValue(null),
+          selectedModelProvider.overrideWith(() => _SeededSelectedModel(null)),
+          attachedFilesProvider.overrideWith(
+            () => _SeededAttachedFilesNotifier([old]),
+          ),
+          terminalAttachmentCleanupProvider.overrideWithValue((
+            path, {
+            required beforeDeleteAdmission,
+            required canDelete,
+          }) async {
+            await beforeDeleteAdmission();
+            cleanupStarted.complete();
+            return finishCleanup.future;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(mediaUploadControllerProvider);
+      final snapshot = controller.captureAttachmentOwnership();
+      final sendSettled = Completer<void>();
+      final cleanup = controller.retireAttachmentOwnership(
+        snapshot,
+        cleanupAfter: sendSettled.future,
+      );
+      expect(container.read(attachedFilesProvider), isEmpty);
+      await Future<void>.delayed(Duration.zero);
+      expect(cleanupStarted.isCompleted, isFalse);
+      sendSettled.complete();
+      await cleanupStarted.future;
+      container.read(attachedFilesProvider.notifier).addFiles([
+        LocalAttachment(file: file, displayName: 'next-turn.txt'),
+      ]);
+      final replacement = container.read(attachedFilesProvider).single;
+      finishCleanup.complete(false);
+      await cleanup;
+      expect(container.read(attachedFilesProvider), [replacement]);
+    },
+  );
+
+  test(
     'ownership snapshot preserves a replacement at the same pathname',
     () async {
       final stagingDirectory = Directory(
