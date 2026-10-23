@@ -1,3 +1,12 @@
+import 'package:conduit/features/hermes/providers/hermes_agentic_providers.dart';
+import 'package:conduit/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit/features/hermes/services/hermes_agentic_state.dart';
+import 'package:conduit/features/hermes/sheets/hermes_model_sheet.dart';
+import 'package:conduit/shared/theme/app_theme.dart';
+import 'package:conduit/shared/theme/tweakcn_themes.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -255,6 +264,90 @@ void main() {
     check(request['explicit_only']).equals(true);
     check(request.containsKey('session_id')).isFalse();
     check(gateway.calls('config.set')).isEmpty();
+  });
+
+  const key = (storedId: 'stored-1', profile: 'default');
+  Future<void> openModelSheet(
+    WidgetTester tester, {
+    bool catalogFailure = false,
+  }) async {
+    final (service, gateway) = await _connected();
+    await tester.runAsync(() async {
+      final stored = await createSession(service, gateway);
+      await service.switchSessionModel(
+        stored,
+        const HermesSessionModelChoice(
+          model: 'next-model',
+          provider: 'litellm',
+        ),
+      );
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hermesApiServiceProvider.overrideWithValue(service),
+          hermesModelCatalogProvider(key).overrideWith((ref) async {
+            if (catalogFailure) throw StateError('catalog unavailable');
+            return const HermesModelCatalog(
+              options: [],
+              currentModel: 'old-model',
+              currentProvider: 'litellm',
+            );
+          }),
+          hermesAgenticStateProvider('stored-1').overrideWith(
+            (ref) => Stream.value(
+              const HermesAgenticSnapshot(
+                info: HermesSessionRuntimeInfo(
+                  model: 'old-model',
+                  provider: 'litellm',
+                  running: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showHermesModelSheet(
+                  context,
+                  sessionId: 'stored-1',
+                  profile: 'default',
+                ),
+                child: const Text('Open models'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open models'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'pending model and older session info do not invent a failed reply',
+    (tester) async {
+      await openModelSheet(tester);
+      expect(find.textContaining('failed on the last message'), findsNothing);
+      expect(find.textContaining('so Hermes used its fallback'), findsNothing);
+      expect(find.text('old-model'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('actual model catalog failure still offers retry', (
+    tester,
+  ) async {
+    await openModelSheet(tester, catalogFailure: true);
+    expect(find.text("Could not load this profile's models."), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
   });
 
   test('LiteLLM catalog keeps the live session and owning profile', () async {
