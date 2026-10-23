@@ -1,0 +1,1 @@
+{"name":"conduit-delegation","label":"Delegated work","version":"1.0.1","description":"Read-only projection of existing specialist handoffs and linked Kanban runs","tab":{"hidden":true},"entry":"dist/index.js","api":"projection_api.py"}

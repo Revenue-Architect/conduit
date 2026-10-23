@@ -107,11 +107,19 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       case 'session.info':
         _agentic.applySessionInfo(storedId, event.payload);
       case 'message.start':
-        _agentic.pruneFinishedSubagents(storedId);
+        break;
       default:
         if (event.type.startsWith('subagent.') &&
             event.type != 'subagent.text') {
-          _agentic.applySubagentEvent(storedId, event.type, event.payload);
+          _agentic.applySubagentEvent(storedId, event.type, {
+            ...event.payload,
+            'parent_session_id': storedId,
+            if (event.payload['admission_id'] != null)
+              'parent_turn_id': event.payload['admission_id'],
+            'parent_profile':
+                boundProfileFor(storedId) ?? config.desktopProfile,
+            'child_profile': boundProfileFor(storedId) ?? config.desktopProfile,
+          });
         }
     }
   }

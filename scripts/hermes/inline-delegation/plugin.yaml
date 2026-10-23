@@ -1,0 +1,5 @@
+name: conduit-delegation
+version: 1.0.0
+description: Read-only inline delegation projection for Conduit
+provides_hooks:
+  - pre_tool_call

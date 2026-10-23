@@ -1242,6 +1242,23 @@ void _handleEvent(
   required void Function(ChatMessage Function(ChatMessage)) updateMessage,
 }) {
   switch (event) {
+    case HermesTurnOrigin(:final turnId, :final toolCallId):
+      updateMessage((message) {
+        final metadata = Map<String, dynamic>.from(
+          message.metadata ?? const {},
+        );
+        final safeTurn = validateHermesOpaqueIdentifier(turnId);
+        final safeCall = validateHermesOpaqueIdentifier(toolCallId);
+        if (safeTurn != null) metadata['hermesTurnId'] = safeTurn;
+        if (safeCall != null) {
+          metadata['hermesToolCallIds'] = <String>{
+            ...((metadata['hermesToolCallIds'] as List?)?.whereType<String>() ??
+                const <String>[]),
+            safeCall,
+          }.take(256).toList(growable: false);
+        }
+        return message.copyWith(metadata: metadata);
+      });
     case HermesResponseCreated():
       break;
 

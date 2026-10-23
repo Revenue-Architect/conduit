@@ -8,6 +8,8 @@ import '../../../core/services/navigation_service.dart';
 import '../models/hermes_completed_run_snapshot.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_session.dart';
+import '../models/hermes_subagent.dart';
+import '../widgets/hermes_delegated_worker_card.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_live_activity.dart';
@@ -66,6 +68,8 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
     this.embedded = false,
     this.answerMessages,
     this.currentAnswer = false,
+    this.delegation,
+    this.parentLabel,
   });
   final String sessionId;
 
@@ -78,6 +82,8 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
   final bool embedded;
   final List<ChatMessage>? answerMessages;
   final bool currentAnswer;
+  final HermesSubagentState? delegation;
+  final String? parentLabel;
 
   @override
   ConsumerState<HermesLiveRunPage> createState() => _HermesLiveRunPageState();
@@ -239,6 +245,12 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.delegation case final worker?) {
+      return _DelegatedRunView(
+        worker: worker,
+        parentLabel: widget.parentLabel ?? 'Parent',
+      );
+    }
     final service = ref.watch(hermesApiServiceProvider);
     if (service is HermesDesktopApiService &&
         !identical(_pendingService, service)) {
@@ -952,6 +964,95 @@ class _Stat extends StatelessWidget {
         const SizedBox(width: 4),
         Text(label, style: HermezType.meta(palette)),
       ],
+    );
+  }
+}
+
+/// A child is an inspection of the existing run, never a new interactive owner.
+class _DelegatedRunView extends ConsumerStatefulWidget {
+  const _DelegatedRunView({required this.worker, required this.parentLabel});
+  final HermesSubagentState worker;
+  final String parentLabel;
+  @override
+  ConsumerState<_DelegatedRunView> createState() => _DelegatedRunViewState();
+}
+
+class _DelegatedRunViewState extends ConsumerState<_DelegatedRunView> {
+  Timer? _refresh;
+  int _revision = 0;
+  @override
+  void initState() {
+    super.initState();
+    _refresh = Timer.periodic(const Duration(seconds: 8), (_) {
+      final parent = widget.worker.parentSessionId;
+      final latest = parent == null
+          ? widget.worker
+          : ref
+                    .read(hermesAgenticStateProvider(parent))
+                    .value
+                    ?.subagents
+                    .where((w) => w.id == widget.worker.id)
+                    .firstOrNull ??
+                widget.worker;
+      if (latest.status.isTerminal) {
+        _refresh?.cancel();
+        return;
+      }
+      if (mounted &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+          latest.status.isLive) {
+        setState(() => _revision++);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final parent = widget.worker.parentSessionId;
+    final workers = parent == null
+        ? const <HermesSubagentState>[]
+        : ref.watch(hermesAgenticStateProvider(parent)).value?.subagents ??
+              const <HermesSubagentState>[];
+    final worker =
+        workers.where((w) => w.id == widget.worker.id).firstOrNull ??
+        widget.worker;
+    final service = ref.watch(hermesApiServiceProvider);
+    return HermesPageChrome(
+      title: '${widget.parentLabel} › ${worker.displayName}',
+      subtitle: 'Delegated session · ${worker.goal}',
+      leading: IconButton(
+        tooltip: 'Back to ${widget.parentLabel}',
+        icon: const Icon(Icons.arrow_back_rounded),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      child: service is! HermesDesktopApiService
+          ? const Center(child: Text('Child session unavailable.'))
+          : ListView(
+              key: PageStorageKey(
+                'child:${worker.childProfile}:${worker.childSessionId}',
+              ),
+              padding: const EdgeInsets.all(16),
+              children: [
+                HermesDelegatedWorkerCard(
+                  worker: worker,
+                  parentSessionId: parent ?? '',
+                  parentLabel: widget.parentLabel,
+                  expanded: true,
+                  onToggle: () {},
+                  compact: false,
+                  conversationRevision: _revision,
+                  loadConversation: (w) =>
+                      service.readDelegatedConversation(w, maximum: 1000),
+                  loadArtifact: service.readDelegationArtifact,
+                ),
+              ],
+            ),
     );
   }
 }

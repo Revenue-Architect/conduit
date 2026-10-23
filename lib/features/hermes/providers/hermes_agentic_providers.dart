@@ -22,6 +22,27 @@ final hermesAgenticStateProvider = StreamProvider.autoDispose
       }
       // A chat on screen gets its plan back even when Hermes sent none.
       service.restorePlanIfMissing(storedId);
+      var closed = false;
+      Timer? refresh;
+      Future<void> recover() async {
+        if (closed) return;
+        if (WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+          try {
+            await service.refreshDelegations(storedId);
+          } catch (_) {
+            // Native subagent events remain usable on older gateways.
+          }
+        }
+        if (!closed) refresh = Timer(const Duration(seconds: 8), recover);
+      }
+
+      unawaited(recover());
+      ref.onDispose(() {
+        closed = true;
+        refresh?.cancel();
+      });
       return service.agenticStateFor(storedId);
     });
 

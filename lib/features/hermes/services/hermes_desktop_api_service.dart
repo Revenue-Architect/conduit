@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/utils/debug_logger.dart';
+import '../../../core/models/chat_message.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_chat_input.dart';
@@ -44,6 +45,7 @@ part 'hermes_desktop_event_projection.dart';
 part 'hermes_desktop_live_runtime.dart';
 part 'hermes_desktop_turn_runtime.dart';
 part 'hermes_desktop_agentic.dart';
+part 'hermes_desktop_delegation.dart';
 
 typedef HermesDesktopCredentialsWriter = Future<void> Function(
   HermesDesktopCredentials credentials,
@@ -334,8 +336,10 @@ final class HermesDesktopApiService
     String path, {
     String? board,
     Map<String, Object?>? body,
+    String? profile,
   }) {
-    if (_closed ||
+    if ((profile != null && !HermesConfig.isValidDesktopProfile(profile)) ||
+        _closed ||
         config.desktopAuthKind != HermesDesktopAuthKind.nativePkce ||
         !const {'GET', 'POST', 'PATCH'}.contains(method) ||
         !path.startsWith('/api/plugins/kanban/') ||
@@ -347,7 +351,10 @@ final class HermesDesktopApiService
     return _requestJson(
       method,
       path,
-      query: board == null ? null : {'board': board},
+      query: {
+        if (board != null) 'board': board,
+        if (profile != null) 'profile': profile,
+      },
       body: body,
     );
   }

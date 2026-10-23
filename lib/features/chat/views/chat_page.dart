@@ -1,3 +1,4 @@
+import '../../hermes/widgets/hermes_turn_delegation.dart';
 import '../../hermes/services/hermes_identifier.dart';
 import '../../push/views/approval_continuation_notice.dart';
 import '../../spaces/models/spaces_models.dart';
@@ -3487,6 +3488,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool suppressStreamingHaptics,
   }) {
     final groupIds = rowMetadata.groupMessageIds;
+    final parentSession = validateHermesOpaqueIdentifier(
+      rowRef.read(activeConversationProvider)?.metadata['hermesSessionId'],
+    );
+    final inlineDelegation =
+        parentSession != null &&
+            latestMessage.metadata?['transport'] == kHermesTransport
+        ? HermesTurnDelegation(
+            sessionId: parentSession,
+            message: latestMessage,
+            parentLabel:
+                _hermesChatProfile(rowRef.read(activeConversationProvider)) ??
+                'Hermes',
+            turnMessages: [
+              for (final id in groupIds)
+                ?rowRef.watch(chatMessageByIdProvider(id)),
+            ],
+            onLayoutChanged:
+                _timelineViewportController.requestLayoutMaintenance,
+          )
+        : const SizedBox.shrink();
     final readOnly = rowRef.watch(activeConversationReadOnlyProvider);
     final displayedMessage = groupIds.length > 1
         ? _messageWithGroupedHermesToolStatuses(rowRef, latestMessage, groupIds)
@@ -3498,9 +3519,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           showModelHeader: rowMetadata.showModelHeader,
           showActionBar: rowMetadata.showActionBar,
         )) {
-      return const SizedBox.shrink();
+      return inlineDelegation;
     }
-    return assistant.AssistantMessageWidget(
+    final assistantContent = assistant.AssistantMessageWidget(
       message: displayedMessage,
       isStreaming: latestMessage.isStreaming,
       showFollowUps: rowMetadata.showFollowUps,
@@ -3563,6 +3584,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       onDelete: () => _deleteMessageGroup(
         groupIds.isEmpty ? <String>[messageId] : groupIds,
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [assistantContent, inlineDelegation],
     );
   }
 
@@ -4054,8 +4079,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         final rawTitle = roster.title.trim();
         // The roster title falls back to the profile name "default".
         // Show that as Default.
-        final title =
-            rawTitle.isEmpty || rawTitle.toLowerCase() == 'default'
+        final title = rawTitle.isEmpty || rawTitle.toLowerCase() == 'default'
             ? 'Default'
             : rawTitle;
         return (

@@ -24,6 +24,65 @@ import 'hermes_kanban_client.dart';
 import '../widgets/hermez_commit_button.dart';
 import '../widgets/hermez_skeleton.dart';
 
+/// Open the existing native task result and controls from an explicitly linked
+/// delegation. No title lookup, session resume, or new worker is involved.
+Future<void> openHermesDelegatedKanbanTask(
+  BuildContext context, {
+  required HermesDesktopApiService service,
+  required String taskId,
+  required String board,
+  required String profile,
+  HermezMorphOrigin? origin,
+}) async {
+  final client = HermesKanbanClient(
+    service.config,
+    nativeRequest: (method, path, {board, body}) => service.requestKanbanJson(
+      method,
+      path,
+      board: board,
+      body: body,
+      profile: profile,
+    ),
+  );
+  try {
+    final detail = await client.task(board, taskId);
+    if (!context.mounted) return;
+    final selection = await pushHermezSheetRoute<_KanbanLinkedSelection>(
+      context,
+      origin: origin,
+      heightFactor: .88,
+      builder: (_) => Material(
+        child: _KanbanTaskSheet(
+          board: board,
+          task: detail.task,
+          client: client,
+          onChanged: () async {},
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (selection) {
+      case _KanbanLinkedTask(:final id):
+        await openHermesDelegatedKanbanTask(
+          context,
+          service: service,
+          taskId: id,
+          board: board,
+          profile: profile,
+        );
+      case _KanbanLinkedAttachment(:final target):
+        await context.pushNamed<void>(
+          RouteNames.hermesArtifacts,
+          extra: target,
+        );
+      case null:
+        break;
+    }
+  } finally {
+    await client.close();
+  }
+}
+
 sealed class _KanbanLinkedSelection {
   const _KanbanLinkedSelection();
 }

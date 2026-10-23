@@ -299,6 +299,8 @@ int _hermesEventCharacters(
   HermesRunEvent event, {
   required int maxCharacters,
 }) => switch (event) {
+  HermesTurnOrigin(:final turnId, :final toolCallId) =>
+    (turnId?.length ?? 0) + (toolCallId?.length ?? 0),
   HermesResponseCreated(:final responseId) => responseId.length,
   HermesTokenDelta(:final content) => content.length,
   HermesReasoningDelta(:final content) => content.length,

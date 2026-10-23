@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 enum HermesSubagentStatus {
   queued,
   running,
+  waiting,
   completed,
   failed,
   interrupted,
@@ -12,7 +13,7 @@ enum HermesSubagentStatus {
 
   bool get isTerminal => switch (this) {
     completed || failed || interrupted || timeout => true,
-    queued || running || unknown => false,
+    queued || running || waiting || unknown => false,
   };
 
   bool get isLive => this == queued || this == running;
@@ -35,13 +36,24 @@ enum HermesSubagentStatus {
         return HermesSubagentStatus.interrupted;
       case 'timeout' || 'timed_out':
         return HermesSubagentStatus.timeout;
+      case 'waiting' || 'blocked' || 'waiting_for_approval':
+        return HermesSubagentStatus.waiting;
+      case 'unknown' || 'disconnected' || 'unavailable':
+        return HermesSubagentStatus.unknown;
     }
     if (terminalEvent) return HermesSubagentStatus.failed;
-    return value == 'queued'
-        ? HermesSubagentStatus.queued
-        : HermesSubagentStatus.running;
+    return switch (value) {
+      'queued' || 'pending' => HermesSubagentStatus.queued,
+      'running' ||
+      'working' ||
+      'started' ||
+      null => HermesSubagentStatus.running,
+      _ => HermesSubagentStatus.unknown,
+    };
   }
 }
+
+enum HermesDelegationKind { native, specialist, kanban }
 
 /// One line of what a worker did, newest last.
 typedef HermesSubagentLine = ({String text, bool tool, bool error});
@@ -71,6 +83,20 @@ final class HermesSubagentState {
     this.filesRead = 0,
     this.filesWritten = 0,
     this.lines = const [],
+    this.kind = HermesDelegationKind.native,
+    this.parentSessionId,
+    this.parentTurnId,
+    this.parentMessageId,
+    this.parentProfile,
+    this.childProfile,
+    this.sourceToolCallId,
+    this.taskId,
+    this.runId,
+    this.name,
+    this.artifacts = const [],
+    this.reportedStart = false,
+    this.nativeControlId,
+    this.boardSlug,
   });
 
   static const int maxLines = 24;
@@ -100,13 +126,32 @@ final class HermesSubagentState {
   final int filesRead;
   final int filesWritten;
   final List<HermesSubagentLine> lines;
+  final HermesDelegationKind kind;
+  final String? parentSessionId;
+  final String? parentTurnId;
+  final String? parentMessageId;
+  final String? parentProfile;
+  final String? childProfile;
+  final String? sourceToolCallId;
+  final String? taskId;
+  final String? runId;
+  final String? name;
+  final List<String> artifacts;
+  final bool reportedStart;
+  final String? nativeControlId;
+  final String? boardSlug;
+
+  String get displayName => name ?? childProfile ?? 'Delegate';
+  bool get supportsNativeControl => kind == HermesDelegationKind.native;
 
   /// The latest thing it reported, for a one-line glance.
   String? get latest => lines.isEmpty ? null : lines.last.text;
 
   /// The id Hermes uses for steering, or null for a placeholder row that
   /// only has a derived id.
-  String? get steerableId => id.startsWith('~') ? null : id;
+  String? get steerableId => !supportsNativeControl
+      ? null
+      : nativeControlId ?? (id.startsWith('~') ? null : id);
 
   /// Applies one `subagent.*` event. A finished worker stays finished: late
   /// progress for it is ignored.
@@ -117,49 +162,51 @@ final class HermesSubagentState {
     required DateTime now,
     Iterable<String> sensitiveValues = const [],
   }) {
-    if (previous != null && previous.status.isTerminal) return previous;
+    final settled = previous?.status.isTerminal ?? false;
     String text(Object? value, [int max = _previewCharacters]) =>
         _compact(_redact(value is String ? value : '', sensitiveValues), max);
-    final id = _id(payload) ?? previous?.id;
+    final id = previous?.id ?? _id(payload);
     if (id == null) return null;
-    final terminal = type == 'subagent.complete';
-    final status = switch (type) {
-      'subagent.spawn_requested' when payload['status'] == null =>
-        HermesSubagentStatus.queued,
-      _ => HermesSubagentStatus.parse(
-        payload['status'],
-        terminalEvent: terminal,
-      ),
-    };
-    final tool = text(payload['tool_name'], 64);
-    final preview = text(payload['tool_preview']).isNotEmpty
-        ? text(payload['tool_preview'])
-        : text(payload['text']);
+    final terminal = type.endsWith('.complete') || type.endsWith('.completed');
+    final status = settled
+        ? previous!.status
+        : switch (type) {
+            'subagent.spawn_requested' when payload['status'] == null =>
+              HermesSubagentStatus.queued,
+            _ => HermesSubagentStatus.parse(
+              payload['status'],
+              terminalEvent: terminal,
+            ),
+          };
+    final tool = settled ? '' : text(payload['tool_name'], 64);
+    // Tool arguments, raw outputs and thinking are not a public activity feed.
+    final preview = text(payload['status_summary']);
     final added = <HermesSubagentLine>[
-      for (final tail in _tail(payload['output_tail']))
+      for (final tail
+          in settled
+              ? const <({String? tool, String preview, bool error})>[]
+              : _tail(payload['output_tail']))
         (
-          text: tail.tool == null
-              ? text(tail.preview)
-              : _toolLine(tail.tool!, text(tail.preview, 96)),
+          text: tail.tool == null ? '' : _toolLine(tail.tool!, ''),
           tool: tail.tool != null,
           error: tail.error,
         ),
       if (tool.isNotEmpty)
         (
-          text: _toolLine(
-            tool,
-            preview.length > 96 ? '${preview.substring(0, 95)}…' : preview,
-          ),
+          text: _toolLine(tool, ''),
           tool: true,
           error: payload['error'] != null,
         ),
-      if ((type == 'subagent.progress' || type == 'subagent.thinking') &&
+      if (!settled &&
+          type.endsWith('.progress') &&
           tool.isEmpty &&
           preview.isNotEmpty)
         (text: preview, tool: false, error: payload['error'] != null),
     ];
     final seconds = _double(payload['duration_seconds']);
-    final rawSummary = text(payload['summary']).isNotEmpty
+    final rawSummary = settled
+        ? ''
+        : text(payload['summary']).isNotEmpty
         ? text(payload['summary'])
         : status == HermesSubagentStatus.timeout
         ? 'Timed out after ${seconds?.round() ?? '?'}s'
@@ -181,8 +228,14 @@ final class HermesSubagentState {
       id: id,
       goal: goal.isNotEmpty ? goal : previous?.goal ?? 'Delegated task',
       status: status,
-      startedAt: previous?.startedAt ?? now,
-      updatedAt: now,
+      startedAt:
+          previous?.startedAt ??
+          _time(payload['started_at']) ??
+          _time(payload['timestamp']) ??
+          now,
+      updatedAt: settled
+          ? previous!.updatedAt
+          : _time(payload['updated_at']) ?? _time(payload['timestamp']) ?? now,
       parentId: _string(payload['parent_id']) ?? previous?.parentId,
       childSessionId:
           _string(payload['child_session_id']) ?? previous?.childSessionId,
@@ -202,17 +255,65 @@ final class HermesSubagentState {
       filesWritten:
           _count(payload['files_written']) ?? previous?.filesWritten ?? 0,
       lines: lines,
+      kind:
+          previous?.kind ??
+          switch (payload['worker_kind'] ?? payload['kind']) {
+            'specialist' => HermesDelegationKind.specialist,
+            'kanban' => HermesDelegationKind.kanban,
+            _ => HermesDelegationKind.native,
+          },
+      parentSessionId:
+          previous?.parentSessionId ?? _string(payload['parent_session_id']),
+      parentTurnId:
+          previous?.parentTurnId ?? _string(payload['parent_turn_id']),
+      parentMessageId:
+          previous?.parentMessageId ?? _string(payload['parent_message_id']),
+      parentProfile:
+          previous?.parentProfile ?? _string(payload['parent_profile']),
+      childProfile: previous?.childProfile ?? _string(payload['child_profile']),
+      sourceToolCallId:
+          previous?.sourceToolCallId ?? _string(payload['source_tool_call_id']),
+      taskId: _string(payload['task_id']) ?? previous?.taskId,
+      runId: _string(payload['run_id']) ?? previous?.runId,
+      boardSlug: _string(payload['board_slug']) ?? previous?.boardSlug,
+      name: _string(payload['name'], 128) ?? previous?.name,
+      artifacts: payload['artifacts'] is List
+          ? List.unmodifiable(
+              (payload['artifacts'] as List)
+                  .whereType<String>()
+                  .where((v) => v.length <= 2048)
+                  .take(12),
+            )
+          : previous?.artifacts ?? const [],
+      reportedStart:
+          previous?.reportedStart == true ||
+          _time(payload['started_at']) != null ||
+          _time(payload['timestamp']) != null,
+      nativeControlId:
+          _string(payload['subagent_id']) ?? previous?.nativeControlId,
     );
   }
 
   static String? _id(Map<String, Object?> payload) {
-    final id = _string(payload['subagent_id'], 128);
+    // A delegation may be a batch: each native child has its own subagent id.
+    final id =
+        _string(payload['subagent_id'], 128) ??
+        _string(payload['delegation_id'], 256);
     if (id != null) return id;
-    final goal = _string(payload['goal'], 400);
-    if (goal == null) return null;
-    return '~${_string(payload['parent_id'], 128) ?? 'root'}:'
-        '${_int(payload['task_index']) ?? 0}:${goal.hashCode}';
+    final call = _string(payload['source_tool_call_id']);
+    if (call == null) return null;
+    return '~${_string(payload['parent_turn_id']) ?? 'turn'}:$call:${_int(payload['task_index']) ?? 0}';
   }
+
+  static DateTime? _time(Object? value) => switch (value) {
+    final num seconds when seconds.isFinite && seconds > 0 =>
+      DateTime.fromMillisecondsSinceEpoch(
+        (seconds * 1000).round(),
+        isUtc: true,
+      ),
+    final String text => DateTime.tryParse(text),
+    _ => null,
+  };
 
   static String _toolLine(String tool, String preview) {
     final label = tool
@@ -245,13 +346,26 @@ final class HermesSubagentState {
   }
 
   static String _redact(String value, Iterable<String> secrets) {
-    var out = value;
+    var out = value.replaceAll(
+      RegExp(
+        r'<(?:think|thinking|analysis)>.*?(?:</(?:think|thinking|analysis)>|$)',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      '',
+    );
     for (final secret in secrets) {
       if (secret.length >= 4 && out.contains(secret)) {
         out = out.replaceAll(secret, '••••');
       }
     }
-    return out;
+    return out.replaceAll(
+      RegExp(
+        r'\b(?:sk-[\w-]{12,}|Bearer\s+[\w.=-]{12,}|(?:api[_-]?key|token|password|secret)\s*[:=]\s*\S+)',
+        caseSensitive: false,
+      ),
+      '[redacted]',
+    );
   }
 
   static String? _string(Object? value, [int max = 256]) {

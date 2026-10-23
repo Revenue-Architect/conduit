@@ -13,6 +13,13 @@ sealed class HermesRunEvent {
   const HermesRunEvent();
 }
 
+/// Authoritative origin identifiers, separate from the response/session id.
+final class HermesTurnOrigin extends HermesRunEvent {
+  const HermesTurnOrigin({this.turnId, this.toolCallId});
+  final String? turnId;
+  final String? toolCallId;
+}
+
 /// Identity announced by the OpenAI-compatible Responses stream.
 final class HermesResponseCreated extends HermesRunEvent {
   const HermesResponseCreated(this.responseId);

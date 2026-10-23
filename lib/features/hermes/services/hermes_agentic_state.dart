@@ -190,7 +190,9 @@ final class HermesAgenticStateStore {
     String type,
     Map<String, Object?> payload,
   ) {
-    if (!type.startsWith('subagent.')) return false;
+    if (!type.startsWith('subagent.') && !type.startsWith('delegation.')) {
+      return false;
+    }
     final workers = _subagents[storedId] ?? <String, HermesSubagentState>{};
     final probe = HermesSubagentState.reduce(
       null,
@@ -200,7 +202,27 @@ final class HermesAgenticStateStore {
       sensitiveValues: sensitiveValues,
     );
     if (probe == null) return false;
-    final previous = workers[probe.id];
+    final previous =
+        workers[probe.id] ??
+        workers.values
+            .where(
+              (worker) =>
+                  (probe.nativeControlId != null &&
+                      worker.nativeControlId == probe.nativeControlId) ||
+                  (probe.kind == HermesDelegationKind.native &&
+                      probe.sourceToolCallId != null &&
+                      worker.sourceToolCallId == probe.sourceToolCallId &&
+                      worker.taskIndex == probe.taskIndex &&
+                      worker.kind == probe.kind) ||
+                  (probe.kind == HermesDelegationKind.kanban &&
+                      worker.kind == probe.kind &&
+                      probe.taskId != null &&
+                      worker.taskId == probe.taskId &&
+                      (worker.runId == probe.runId ||
+                          worker.runId == null ||
+                          probe.runId == null)),
+            )
+            .firstOrNull;
     final next = previous == null
         ? probe
         : HermesSubagentState.reduce(
@@ -224,14 +246,9 @@ final class HermesAgenticStateStore {
     return true;
   }
 
-  /// A new turn: drop the previous turn's finished workers, keep live ones.
-  void pruneFinishedSubagents(String storedId) {
-    final workers = _subagents[storedId];
-    if (workers == null) return;
-    final before = workers.length;
-    workers.removeWhere((_, worker) => worker.status.isTerminal);
-    if (workers.length != before) _emit(storedId);
-  }
+  /// Historical workers belong to their initiating turn and survive new turns.
+  /// The normal per-session cap evicts old terminal entries as new ones arrive.
+  void pruneFinishedSubagents(String storedId) {}
 
   /// A stored id was re-keyed (fresh session -> canonical id).
   void alias(String fromId, String toId) {
@@ -242,7 +259,14 @@ final class HermesAgenticStateStore {
       changed = true;
     }
     if (_subagents.remove(fromId) case final workers?) {
-      _subagents.putIfAbsent(toId, () => workers);
+      final target = _subagents.putIfAbsent(toId, () => {});
+      for (final entry in workers.entries) {
+        final current = target[entry.key];
+        if (current == null ||
+            (!current.status.isTerminal && entry.value.status.isTerminal)) {
+          target[entry.key] = entry.value;
+        }
+      }
       changed = true;
     }
     if (_info.remove(fromId) case final info?) {

@@ -201,6 +201,17 @@ List<ChatMessage> hermesMessagesToChatMessages(
               ))
         : null;
     final transportMetadata = <String, dynamic>{
+      if (acceptedRole == 'assistant' && item['tool_calls'] is List)
+        'hermesToolCallIds': [
+          for (final call in (item['tool_calls'] as List).take(256))
+            if (call is Map) ?validateHermesOpaqueIdentifier(call['id']),
+        ],
+      if (acceptedRole == 'assistant')
+        if (validateHermesOpaqueIdentifier(
+              item['turn_id'] ?? itemMetadata['turn_id'],
+            )
+            case final String turnId)
+          'hermesTurnId': turnId,
       if (acceptedRole == 'assistant') 'transport': 'hermesRun',
       if (responseId != null) ...{
         'hermesTransportMode': 'responses',

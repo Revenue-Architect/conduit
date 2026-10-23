@@ -15,6 +15,8 @@ bool _projectHermesTurnEvent(
   required String Function(Iterable<String> keys) firstValue,
 }) {
   switch (event.type) {
+    case 'message.start':
+      add(HermesTurnOrigin(turnId: value('admission_id')));
     case 'message.delta':
       final delta = value('delta').isNotEmpty ? value('delta') : value('text');
       if (delta.isNotEmpty) add(HermesTokenDelta(delta));
@@ -30,6 +32,11 @@ bool _projectHermesTurnEvent(
       if (delta.isNotEmpty) add(HermesReasoningDelta(delta));
     case 'tool.start':
     case 'tool.generating':
+      add(
+        HermesTurnOrigin(
+          toolCallId: firstValue(const ['tool_id', 'tool_call_id']),
+        ),
+      );
       add(
         HermesToolProgress(
           toolName: value('name').isEmpty ? 'tool' : value('name'),
@@ -60,6 +67,7 @@ bool _projectHermesTurnEvent(
     case 'subagent.spawn_requested':
     case 'subagent.start':
     case 'subagent.thinking':
+      return true;
     case 'subagent.tool':
     case 'subagent.progress':
     case 'subagent.complete':

@@ -374,6 +374,11 @@ final class HermesDesktopRpcClient {
         final payload = rawPayload is Map
             ? Map<String, dynamic>.from(rawPayload)
             : <String, dynamic>{};
+        // Keep the gateway's execution identity with the event. Background
+        // workers may later publish without a current execution stamp.
+        for (final key in const ['admission_id', 'execution_generation']) {
+          if (params[key] != null) payload[key] = params[key];
+        }
         // A server request that timed out or was cancelled: tear the card
         // down through the kind's existing expire path.
         if (type == 'request.cancel') {
