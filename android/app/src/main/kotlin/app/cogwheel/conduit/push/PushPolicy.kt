@@ -1,6 +1,7 @@
 package app.cogwheel.conduit.push
 
-import android.net.Uri
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import org.json.JSONObject
 
 /**
@@ -109,12 +110,16 @@ internal object PushDeepLinks {
     fun session(id: String?): String? {
         if (id.isNullOrBlank()) return null
         val cut = id.indexOf(':')
-        val profile = if (cut > 0) id.substring(0, cut) else null
-        val sid = if (cut > 0) id.substring(cut + 1) else id
+        val profile = if (cut > 0) id.substring(0, cut).takeIf { PROFILE.matches(it) } else null
+        val sid = if (profile != null) id.substring(cut + 1) else id
         if (sid.isBlank()) return null
         val query = if (profile != null && PROFILE.matches(profile)) "?open=chat&profile=$profile" else "?open=chat"
-        return "$BASE/live/${Uri.encode(sid)}$query"
+        return "$BASE/live/${encode(sid)}$query"
     }
+
+    private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
+
+    fun notification(id: String): String = "$BASE/home?notification=${encode(id)}"
 
     fun approvals(): String = "$BASE/approvals"
 

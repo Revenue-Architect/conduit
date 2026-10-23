@@ -149,6 +149,47 @@ void main() {
     check(usesNoTransitionForNativeSheet(true)).isFalse();
   });
 
+  test(
+    'cold notification destination survives secure-storage recovery',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          reviewerModeProvider.overrideWithValue(false),
+          activeServerProvider.overrideWith((_) async => null),
+          preferredBackendProvider.overrideWith(
+            _FixedPreferredBackendController.new,
+          ),
+          hermesConfigProvider.overrideWith(
+            () => _FixedHermesConfigController(_incompleteHermes),
+          ),
+          hermesSecretsLoadingProvider.overrideWith(
+            () => _FixedHermesSecretsLoading(false),
+          ),
+          authStateManagerProvider.overrideWith(_SignedOutAuthStateManager.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(activeServerProvider.future);
+      await container.read(authStateManagerProvider.future);
+      final state = _MockGoRouterState();
+      final notifier = container.read(routerNotifierProvider);
+      const target = '/profile/hermes/live/origin?open=chat&profile=kai';
+      when(() => state.uri).thenReturn(Uri.parse(target));
+      expect(
+        notifier.redirect(_MockBuildContext(), state),
+        Routes.hermesSettings,
+      );
+      (container.read(
+        hermesConfigProvider.notifier,
+      ) as _FixedHermesConfigController).publish(_usableHermes);
+      when(() => state.uri).thenReturn(Uri.parse(Routes.hermesSettings));
+      expect(notifier.redirect(_MockBuildContext(), state), target);
+      // Consumed once; ordinary navigation no longer gets replaced by the tap.
+      when(() => state.uri).thenReturn(Uri.parse(Routes.chat));
+      expect(notifier.redirect(_MockBuildContext(), state), isNull);
+    },
+  );
+
   group('Hermes-only route policy', () {
     test('allows app-local profile and Hermes settings surfaces', () {
       for (final location in <String>[
@@ -540,8 +581,7 @@ void main() {
           .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
-      check(notifier.redirect(_MockBuildContext(), state))
-          .equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
     });
 
     test('authenticated Hermes escapes auth when OWUI errors', () async {
@@ -579,8 +619,7 @@ void main() {
           .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
-      check(notifier.redirect(_MockBuildContext(), state))
-          .equals(Routes.chat);
+      check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
     });
   });
 

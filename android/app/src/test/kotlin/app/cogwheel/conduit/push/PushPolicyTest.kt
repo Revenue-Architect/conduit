@@ -86,11 +86,18 @@ class PushPolicyTest {
     fun deepLinksMatchTheAppRoutes() {
         val approval = PushOpen(OpenKind.APPROVAL, "abc-123", null)
         assertEquals("hermez://hermes/profile/hermes/approvals/abc-123", PushDeepLinks.forOpen(approval))
-        assertEquals("hermez://hermes/profile/hermes/live/s1", PushDeepLinks.forOpen(PushOpen(OpenKind.SESSION, "s1", null)))
+        assertEquals("hermez://hermes/profile/hermes/live/s1?open=chat", PushDeepLinks.forOpen(PushOpen(OpenKind.SESSION, "s1", null)))
         assertEquals("hermez://hermes/profile/hermes/conversations?thread=7", PushDeepLinks.forOpen(PushOpen(OpenKind.THREAD, "7", null)))
         assertEquals("hermez://hermes/profile/hermes/home?brief=2026-10-19", PushDeepLinks.forOpen(PushOpen(OpenKind.BRIEF, "2026-10-19", null)))
         assertNull(PushDeepLinks.forOpen(PushOpen(OpenKind.NONE, null, null)))
         assertNull(PushDeepLinks.forOpen(null))
+    }
+
+    @Test
+    fun sessionLinksRetainExactProfileAndFallbackRetainsNotificationIdentity() {
+        assertEquals("hermez://hermes/profile/hermes/live/s1?open=chat&profile=kai", PushDeepLinks.session("kai:s1"))
+        assertEquals("hermez://hermes/profile/hermes/live/a%2Fb?open=chat&profile=ops", PushDeepLinks.session("ops:a/b"))
+        assertEquals("hermez://hermes/profile/hermes/home?notification=notice-42", PushDeepLinks.notification("notice-42"))
     }
 
     @Test

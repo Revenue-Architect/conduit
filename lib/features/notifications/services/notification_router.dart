@@ -1,3 +1,5 @@
+import '../../push/models/hermes_notification_target.dart';
+
 import 'dart:collection';
 
 import '../../../core/services/settings_service.dart';
@@ -152,7 +154,10 @@ class NotificationRouter {
         return view.isViewingChannel(notification.sourceId);
       case NotificationKind.hermesAttention:
       case NotificationKind.hermesRun:
-        return view.isViewingHermesSession(notification.sourceId);
+        return view.isViewingHermesSession(
+          hermesNotificationTarget(notification.sourceId)?.sessionId ??
+              notification.sourceId,
+        );
       case NotificationKind.pushApproval:
       case NotificationKind.pushAlert:
       case NotificationKind.pushProactive:

@@ -115,7 +115,7 @@ void main() {
     await pumpEventQueue();
     expect(system.map((n) => n.title), ['kai finished']);
     expect(system.single.kind, NotificationKind.hermesRun);
-    expect(system.single.sourceId, 'session-1');
+    expect(system.single.sourceId, 'kai:session-1');
   });
 
   test('a run that starts and fails notifies', () async {

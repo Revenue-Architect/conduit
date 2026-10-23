@@ -267,3 +267,13 @@ Use a short, unique action name and only the context needed to understand the us
 
 Conduit build 180 adds the same 70-component OpenUI v1 catalog as Hermes Desktop. On a turn advertising `[Client capability: Conduit OpenUI v1]`, use the `openui-desktop` skill for OpenUI signatures and its validator. Keep this skill for strict A2UI v0.9. Separate fenced blocks may appear in one response. Forms, citations, tables, charts and unsent draft review work in both renderers, with the renderer's own schema. Buttons send normal `[A2UI_INTERACTION]` requests in their originating chat/profile; local view changes send nothing. Do not assume an older app, WhatsApp, Teams or a scheduled job supports either format.
 <!-- /conduit-openui-v1 -->
+
+## Generated UI design rules (October 22, 2026)
+
+These rules apply to both A2UI and OpenUI on Conduit and Hermes Desktop.
+
+- Never use colored left borders, accent rails, side stripes or a colored edge to decorate a card, heading, quote, verdict or callout. Use a quiet uniform outline or spacing.
+- Use neutral surfaces and readable type. Avoid large tinted status slabs, decorative gradients, glass effects, glow, heavy shadows, oversized verdict cards and repetitive rounded card grids.
+- Use a status label or icon only when it conveys actual state. Do not add a success badge to an opinion, recommendation or ordinary explanation. Keep semantic color small and purposeful; never communicate state with color alone.
+- Keep table headers neutral. Use color for meaningful data distinctions and charts, not decoration. Avoid rainbow sections, gratuitous emoji, redundant pills and excessive uppercase micro-labels.
+- Keep rich UI useful: concise headings, compact rows, checklists, comparisons, charts and working controls. Group related content without boxing every paragraph. Match the host theme, light/dark mode and mobile width.

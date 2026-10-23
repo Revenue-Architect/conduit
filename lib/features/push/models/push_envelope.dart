@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'hermes_notification_target.dart';
+
 /// Push categories (spec section 5.1). The wire names are the `cat` field.
 enum PushCategory {
   approvals,
@@ -192,7 +194,9 @@ class PushEnvelope {
     if (kind == null) return null;
     final id = value['id'];
     final url = value['url'];
-    if (kind == PushOpenKind.none) return const PushOpen(kind: PushOpenKind.none);
+    if (kind == PushOpenKind.none) {
+      return const PushOpen(kind: PushOpenKind.none);
+    }
     if (kind == PushOpenKind.url) {
       return url is String && url.startsWith(relayOrigin)
           ? PushOpen(kind: kind, url: url)
@@ -241,7 +245,7 @@ String? pushRouteFor(PushOpen? open) {
     case PushOpenKind.approval:
       return open.id == null ? null : '/profile/hermes/approvals/${open.id}';
     case PushOpenKind.session:
-      return open.id == null ? null : '/profile/hermes/live/${open.id}';
+      return open.id == null ? null : hermesNotificationSessionRoute(open.id!);
     case PushOpenKind.thread:
       return open.id == null
           ? null

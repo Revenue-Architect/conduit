@@ -34,11 +34,12 @@ void main() {
       check(PushEnvelope.tryParse('')).isNull();
       check(PushEnvelope.tryParse('[]')).isNull();
       check(
-        PushEnvelope.tryParse('{"v":2,"t":"notify","id":"a","ts":1,"cat":"alerts"}'),
+        PushEnvelope.tryParse(
+          '{"v":2,"t":"notify","id":"a","ts":1,"cat":"alerts"}',
+        ),
       ).isNull();
-      check(
-        PushEnvelope.tryParse(_json('"t":"explode","cat":"alerts"')),
-      ).isNull();
+      check(PushEnvelope.tryParse(_json('"t":"explode","cat":"alerts"')))
+          .isNull();
     });
 
     test('rejects an oversized envelope', () {
@@ -48,7 +49,9 @@ void main() {
 
     test('truncates long title and body', () {
       final e = PushEnvelope.tryParse(
-        _json('"t":"notify","cat":"alerts","title":"${'t' * 300}","body":"${'b' * 900}"'),
+        _json(
+          '"t":"notify","cat":"alerts","title":"${'t' * 300}","body":"${'b' * 900}"',
+        ),
       )!;
       check(e.title.length).equals(PushEnvelope.maxTitle);
       check(e.body.length).equals(PushEnvelope.maxBody);
@@ -56,7 +59,8 @@ void main() {
 
     test('probe and verify need no category', () {
       check(PushEnvelope.tryParse(_json('"t":"probe"'))).isNotNull();
-      check(PushEnvelope.tryParse(_json('"t":"verify","nonce":"n"'))).isNotNull();
+      check(PushEnvelope.tryParse(_json('"t":"verify","nonce":"n"')))
+          .isNotNull();
       check(PushEnvelope.tryParse(_json('"t":"notify"'))).isNull();
     });
 
@@ -69,35 +73,64 @@ void main() {
 
     test('a url open must be the pinned relay origin', () {
       final ok = PushEnvelope.tryParse(
-        _json('"t":"notify","cat":"alerts","open":{"k":"url","url":"https://umbrel.tail4c9e01.ts.net:8447/a"}'),
+        _json(
+          '"t":"notify","cat":"alerts","open":{"k":"url","url":"https://umbrel.tail4c9e01.ts.net:8447/a"}',
+        ),
       )!;
       check(ok.open?.kind).equals(PushOpenKind.url);
       final evil = PushEnvelope.tryParse(
-        _json('"t":"notify","cat":"alerts","open":{"k":"url","url":"https://evil.example/a"}'),
+        _json(
+          '"t":"notify","cat":"alerts","open":{"k":"url","url":"https://evil.example/a"}',
+        ),
       )!;
       check(evil.open).isNull();
     });
 
     test('ids with path characters are rejected', () {
       check(
-        PushEnvelope.tryParse('{"v":1,"t":"notify","id":"../x","ts":1,"cat":"alerts"}'),
+        PushEnvelope.tryParse(
+          '{"v":1,"t":"notify","id":"../x","ts":1,"cat":"alerts"}',
+        ),
       ).isNull();
     });
   });
 
   group('routes', () {
     test('open kinds map to app routes', () {
-      check(pushRouteFor(const PushOpen(kind: PushOpenKind.approval, id: 'a-1')))
-          .equals('/profile/hermes/approvals/a-1');
+      check(
+        pushRouteFor(const PushOpen(kind: PushOpenKind.approval, id: 'a-1')),
+      ).equals('/profile/hermes/approvals/a-1');
       check(pushRouteFor(const PushOpen(kind: PushOpenKind.session, id: 's1')))
-          .equals('/profile/hermes/live/s1');
+          .equals('/profile/hermes/live/s1?open=chat');
       check(pushRouteFor(const PushOpen(kind: PushOpenKind.thread, id: '7')))
           .equals('/profile/hermes/conversations?thread=7');
-      check(pushRouteFor(const PushOpen(kind: PushOpenKind.brief, id: '2026-10-19')))
-          .equals('/profile/hermes/home?brief=2026-10-19');
+      check(
+        pushRouteFor(
+          const PushOpen(kind: PushOpenKind.brief, id: '2026-10-19'),
+        ),
+      ).equals('/profile/hermes/home?brief=2026-10-19');
       check(pushRouteFor(const PushOpen(kind: PushOpenKind.none))).isNull();
       check(pushRouteFor(null)).isNull();
     });
+
+    test(
+      'session links preserve profile equally for banners and native taps',
+      () {
+        final route = pushRouteFor(
+          const PushOpen(kind: PushOpenKind.session, id: 'kai:session-42'),
+        )!;
+        expect(Uri.parse(route).path, '/profile/hermes/live/session-42');
+        expect(Uri.parse(route).queryParameters, {
+          'open': 'chat',
+          'profile': 'kai',
+        });
+        expect(safePushRoute('/profile/hermes/live/kai:session-42'), route);
+        final encoded = pushRouteFor(
+          const PushOpen(kind: PushOpenKind.session, id: 'ops:session/42'),
+        )!;
+        expect(Uri.parse(encoded).pathSegments.last, 'session/42');
+      },
+    );
 
     test('safePushRoute only allows Hermes pages inside the app', () {
       check(safePushRoute('/profile/hermes/approvals/a-1'))
@@ -125,7 +158,9 @@ void main() {
 
     test('notify becomes an AppNotification carrying the route', () {
       final e = PushEnvelope.tryParse(
-        _json('"t":"notify","cat":"approvals","dedupe":"d-1","title":"T","body":"B","open":{"k":"approval","id":"$_approval"}'),
+        _json(
+          '"t":"notify","cat":"approvals","dedupe":"d-1","title":"T","body":"B","open":{"k":"approval","id":"$_approval"}',
+        ),
       )!;
       final n = notificationFromEnvelope(e)!;
       check(n.kind).equals(NotificationKind.pushApproval);
@@ -134,15 +169,16 @@ void main() {
       check(n.title).equals('T');
     });
 
-    test('without an open target approvals go to the list, others to home', () {
+    test('every category without a target keeps its exact notification ID', () {
       final a = notificationFromEnvelope(
         PushEnvelope.tryParse(_json('"t":"notify","cat":"approvals"'))!,
       )!;
-      check(a.sourceId).equals('/profile/hermes/approvals');
+      expect(Uri.parse(a.sourceId).queryParameters['notification'], isNotEmpty);
       final b = notificationFromEnvelope(
         PushEnvelope.tryParse(_json('"t":"notify","cat":"briefs"'))!,
       )!;
-      check(b.sourceId).equals('/profile/hermes/home');
+      expect(Uri.parse(b.sourceId).path, '/profile/hermes/home');
+      expect(Uri.parse(b.sourceId).queryParameters['notification'], isNotEmpty);
     });
 
     test('only notify envelopes are shown', () {
@@ -163,9 +199,8 @@ void main() {
 
     test('NotificationTap round-trips a push kind', () {
       // The tap payload is kind name + sourceId; make sure push kinds decode.
-      check(
-        NotificationKind.values.where((k) => k.name == 'pushApproval'),
-      ).isNotEmpty();
+      check(NotificationKind.values.where((k) => k.name == 'pushApproval'))
+          .isNotEmpty();
     });
   });
 }

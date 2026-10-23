@@ -30,7 +30,8 @@ internal class PushRenderer(private val context: Context) {
         val groupKey = "hermez.group.${envelope.group ?: envelope.category.wire}"
 
         val builder = baseBuilder(channelId, title.ifEmpty { "Hermes" }, envelope.body)
-            .setContentIntent(contentIntent(id, PushDeepLinks.forOpen(envelope.open), envelope.open))
+            .setContentIntent(contentIntent(id, PushDeepLinks.forOpen(envelope.open) ?:
+                (if (envelope.open?.kind == OpenKind.URL) null else PushDeepLinks.notification(envelope.id)), envelope.open))
             .setGroup(groupKey)
             .setWhen(envelope.timestamp * 1000L)
             .setShowWhen(true)
@@ -75,7 +76,8 @@ internal class PushRenderer(private val context: Context) {
         val title = envelope.title.ifEmpty { existingTitle ?: "Hermes" }
         val groupKey = "hermez.group.${envelope.group ?: envelope.category.wire}"
         val builder = baseBuilder(channelId, title, envelope.body)
-            .setContentIntent(contentIntent(id, PushDeepLinks.forOpen(envelope.open), envelope.open))
+            .setContentIntent(contentIntent(id, PushDeepLinks.forOpen(envelope.open) ?:
+                (if (envelope.open?.kind == OpenKind.URL) null else PushDeepLinks.notification(envelope.id)), envelope.open))
             .setGroup(groupKey)
             .setOnlyAlertOnce(true)
             .setTimeoutAfter(RESULT_TIMEOUT_MS)

@@ -9,19 +9,14 @@ import '../platform/conduit_push_api.g.dart';
 NotificationKind notificationKindForPush(PushCategory category) =>
     switch (category) {
       PushCategory.approvals => NotificationKind.pushApproval,
-      PushCategory.critical || PushCategory.alerts => NotificationKind.pushAlert,
+      PushCategory.critical ||
+      PushCategory.alerts => NotificationKind.pushAlert,
       PushCategory.proactive => NotificationKind.pushProactive,
       PushCategory.briefs => NotificationKind.pushBrief,
       PushCategory.agent => NotificationKind.pushAgent,
       PushCategory.watch => NotificationKind.pushWatch,
       PushCategory.status => NotificationKind.pushStatus,
     };
-
-/// Where a tap on a push banner goes when the envelope names no destination.
-String defaultPushRoute(PushCategory category) =>
-    category == PushCategory.approvals
-    ? '/profile/hermes/approvals'
-    : '/profile/hermes/home';
 
 /// Turns a decrypted, foreground envelope into an [AppNotification], or null
 /// when it is not something to show (probe, verify, malformed, dismiss).
@@ -32,7 +27,12 @@ AppNotification? notificationFromEnvelope(PushEnvelope envelope) {
     kind: notificationKindForPush(envelope.category),
     title: title,
     body: envelope.body,
-    sourceId: envelope.route ?? defaultPushRoute(envelope.category),
+    sourceId:
+        envelope.route ??
+        Uri(
+          path: '/profile/hermes/home',
+          queryParameters: {'notification': envelope.id},
+        ).toString(),
     dedupKey: 'push:${envelope.dedupKey}',
   );
 }
@@ -71,8 +71,12 @@ class PushDispatcher implements ConduitPushFlutterApi {
   void onStatusChanged() => _onStatusChange();
 
   @override
-  void onEndpoint(String url, String pubKey, String authSecret, int generation) =>
-      _onStatusChange();
+  void onEndpoint(
+    String url,
+    String pubKey,
+    String authSecret,
+    int generation,
+  ) => _onStatusChange();
 
   @override
   void onRegistrationFailed(String reason) {

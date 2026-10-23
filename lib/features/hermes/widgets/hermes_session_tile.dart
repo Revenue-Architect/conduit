@@ -558,7 +558,9 @@ Future<void> openHermesSession(
   }
   if (service is HermesDesktopApiService) {
     try {
-      pendingDecisions = await service.pendingDecisionsForSession(session.id);
+      pendingDecisions = await service
+          .pendingDecisionsForSession(session.id)
+          .timeout(const Duration(seconds: 3));
     } catch (_) {
       // Pending presentation is recoverable; the transcript is still useful.
     }
@@ -566,7 +568,8 @@ Future<void> openHermesSession(
 
   var hermesModel = hermesSyntheticModel();
   try {
-    final models = await ref.read(modelsProvider.future);
+    // Opening a known Hermes transcript must not wait for unrelated providers.
+    final models = ref.read(modelsProvider).asData?.value ?? const [];
     for (final model in models) {
       if (isHermesModel(model)) {
         hermesModel = model;

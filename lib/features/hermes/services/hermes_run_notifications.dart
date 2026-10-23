@@ -202,7 +202,9 @@ class HermesRunNotifier with WidgetsBindingObserver {
         kind: NotificationKind.hermesAttention,
         title: '$bot needs you',
         body: [ask ?? 'Open to review the request.', ?title].join('\n'),
-        sourceId: sessionId,
+        sourceId: _profile(sessionId) == null
+            ? sessionId
+            : '${_profile(sessionId)}:$sessionId',
         dedupKey:
             'hermes-attention:$sessionId:'
             '${event.detail ?? event.timestamp.millisecondsSinceEpoch ~/ 60000}',
@@ -236,7 +238,9 @@ class HermesRunNotifier with WidgetsBindingObserver {
         kind: NotificationKind.hermesRun,
         title: failed ? '$bot hit a problem' : '$bot finished',
         body: [lead, if (second.isNotEmpty) second.join(' · ')].join('\n'),
-        sourceId: sessionId,
+        sourceId: _profile(sessionId) == null
+            ? sessionId
+            : '${_profile(sessionId)}:$sessionId',
         dedupKey:
             'hermes-run:$sessionId:${event.timestamp.millisecondsSinceEpoch}',
       ),

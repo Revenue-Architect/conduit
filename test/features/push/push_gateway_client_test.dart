@@ -54,6 +54,40 @@ Map<String, dynamic> _row(String id) => {
 };
 
 void main() {
+  test(
+    'detail lookup retains full text and exact reference under device auth',
+    () async {
+      final adapter = _FakeAdapter(
+        (o) => _json(200, {
+          'item': {'title': 'Update', 'body': 'Preview'},
+          'body': 'Full saved notification body',
+          'source_url': 'https://evil.example/not-allowed',
+        }),
+      );
+      final client = PushGatewayClient(
+        origin: _origin,
+        token: _token,
+        dio: _dio(adapter),
+      );
+      final detail = await client.getNotification('notice-42');
+      expect(detail.body, 'Full saved notification body');
+      expect(detail.sourceUrl, isNull);
+      expect(
+        adapter.requests.single.uri.path,
+        '/phone/v1/notifications/notice-42',
+      );
+      expect(
+        adapter.requests.single.headers['Authorization'],
+        'Bearer $_token',
+      );
+      await client.getNotification('7', kind: 'thread');
+      expect(adapter.requests.last.uri.queryParameters, {
+        'kind': 'thread',
+        'id': '7',
+      });
+    },
+  );
+
   group('origin and code normalization', () {
     test('gateway origins', () {
       check(normalizeGatewayOrigin('umbrel.tail4c9e01.ts.net:8450'))

@@ -12,7 +12,7 @@ import '../../../core/utils/current_localizations.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../channels/providers/channel_providers.dart';
 import '../../chat/providers/chat_providers.dart';
-import '../../hermes/services/hermes_identifier.dart';
+import '../../push/models/hermes_notification_target.dart';
 import '../../push/models/push_route.dart';
 import '../../navigation/widgets/responsive_drawer_layout.dart';
 import '../models/app_notification.dart';
@@ -137,15 +137,12 @@ Future<void> _handleTap(Ref ref, NotificationTap tap) async {
       // answer; the live page shows while the transcript loads.
       case NotificationKind.hermesAttention:
       case NotificationKind.hermesRun:
-        final sessionId = validateHermesOpaqueIdentifier(tap.sourceId);
-        if (sessionId == null) return;
-        await NavigationService.router.pushNamed<void>(
-          RouteNames.hermesLiveRun,
-          pathParameters: {'sessionId': sessionId},
-          queryParameters: tap.kind == NotificationKind.hermesRun
-              ? const {'open': 'chat'}
-              : const <String, String>{},
+        final route = hermesNotificationSessionRoute(
+          tap.sourceId,
+          openChat: tap.kind == NotificationKind.hermesRun,
         );
+        if (route == null) return;
+        await NavigationService.router.push<void>(route);
       // A pushed notification carries the app route it opens.
       case NotificationKind.pushApproval:
       case NotificationKind.pushAlert:
@@ -226,7 +223,13 @@ class NotificationCenter extends _$NotificationCenter {
     await local.initialize();
     final tap = await local.launchTap();
     if (tap != null) {
-      await _handleTap(ref, tap);
+      // The post-sign-in startup can win the app shell's splash wait.
+      for (var i = 0; i < 100 && ref.mounted; i++) {
+        final route = NavigationService.currentRoute;
+        if (route != null && Uri.tryParse(route)?.path != Routes.splash) break;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      if (ref.mounted) await _handleTap(ref, tap);
     }
   }
 }

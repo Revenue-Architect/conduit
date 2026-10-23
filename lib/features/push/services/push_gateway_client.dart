@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/approval.dart';
+import '../models/push_envelope.dart';
 
 /// A gateway call that did not succeed. [code] is the gateway's `error` string
 /// when it sent one; [statusCode] is null for network failures.
@@ -27,6 +28,17 @@ class PushGatewayException implements Exception {
 
   @override
   String toString() => 'PushGatewayException($statusCode, $code, $message)';
+}
+
+class PushNotificationDetail {
+  const PushNotificationDetail({
+    required this.title,
+    required this.body,
+    this.sourceUrl,
+  });
+  final String title;
+  final String body;
+  final String? sourceUrl;
 }
 
 class PairResult {
@@ -256,6 +268,41 @@ class PushGatewayClient {
       );
     }
     return approval;
+  }
+
+  /// Fetch the tapped record, independent of the receiver's inbox cursor.
+  Future<PushNotificationDetail> getNotification(
+    String reference, {
+    String? kind,
+  }) async {
+    final response = await _send(
+      () => kind == null
+          ? _get('/notifications/${Uri.encodeComponent(reference)}')
+          : _get(
+              '/notifications/resolve',
+              query: {'kind': kind, 'id': reference},
+            ),
+    );
+    final data = response.data;
+    if (data is! Map || data['item'] is! Map) {
+      throw const PushGatewayException(
+        message: 'This notification could not be read.',
+      );
+    }
+    final item = Map<String, dynamic>.from(data['item'] as Map);
+    return PushNotificationDetail(
+      title: item['title'] is String ? item['title'] as String : 'Notification',
+      body: data['body'] is String
+          ? data['body'] as String
+          : (item['body'] as String? ?? ''),
+      sourceUrl:
+          data['source_url'] is String &&
+              (data['source_url'] as String).startsWith(
+                PushEnvelope.relayOrigin,
+              )
+          ? data['source_url'] as String
+          : null,
+    );
   }
 
   /// Sends one decision. The idempotency key makes a repeated tap harmless;

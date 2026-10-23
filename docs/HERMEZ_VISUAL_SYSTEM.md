@@ -35,3 +35,13 @@ asymmetry, technical linework, and information density. Check narrow widths,
 large text, light/dark mode, and tap targets. If removing the Hermes logo makes
 the screen look like a stock Material dashboard, refine it before calling it
 finished. Atmospheric details are required but must remain subtle.
+
+## Generated UI design rules (October 22, 2026)
+
+These rules apply to both A2UI and OpenUI on Conduit and Hermes Desktop.
+
+- Never use colored left borders, accent rails, side stripes or a colored edge to decorate a card, heading, quote, verdict or callout. Use a quiet uniform outline or spacing.
+- Use neutral surfaces and readable type. Avoid large tinted status slabs, decorative gradients, glass effects, glow, heavy shadows, oversized verdict cards and repetitive rounded card grids.
+- Use a status label or icon only when it conveys actual state. Do not add a success badge to an opinion, recommendation or ordinary explanation. Keep semantic color small and purposeful; never communicate state with color alone.
+- Keep table headers neutral. Use color for meaningful data distinctions and charts, not decoration. Avoid rainbow sections, gratuitous emoji, redundant pills and excessive uppercase micro-labels.
+- Keep rich UI useful: concise headings, compact rows, checklists, comparisons, charts and working controls. Group related content without boxing every paragraph. Match the host theme, light/dark mode and mobile width.

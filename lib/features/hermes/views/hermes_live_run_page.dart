@@ -22,7 +22,6 @@ import '../widgets/hermes_run_action_dialogs.dart';
 import '../widgets/hermes_run_actions.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../motion/hermez_morph_origin.dart';
-import '../motion/hermez_motion_route.dart' show HermezRouteExits;
 import 'hermes_page_chrome.dart';
 import '../providers/hermes_agentic_providers.dart';
 import '../services/hermes_activity_presenter.dart';
@@ -205,6 +204,9 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
   /// both, for a few seconds. If the chat cannot be opened, show the live page
   /// instead of a blank screen.
   Future<void> _openChatWhenReady() async {
+    final navigationEpoch = ref
+        .read(hermesSessionNavigationEpochProvider.notifier)
+        .bump();
     HermesSessionSummary? row;
     try {
       final sessions = await ref
@@ -216,11 +218,15 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
         widget.profile,
       );
     } catch (_) {}
+    // Wait for startup hydration, then attempt one read. A failed read stays
+    // on this destination with an explicit retry instead of forty RPC retries.
     for (var i = 0; i < 40 && mounted; i++) {
       final service = ref.read(hermesApiServiceProvider);
       if (service is HermesDesktopApiService) {
-        if (!mounted) return;
-        HermezRouteExits.leaveForAnotherDestination();
+        if (!mounted ||
+            navigationEpoch != ref.read(hermesSessionNavigationEpochProvider)) {
+          return;
+        }
         await openHermesSession(
           context,
           ref,
@@ -232,11 +238,8 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                     widget.profile ?? service.boundProfileFor(widget.sessionId),
               ),
         );
-        // Opening replaces this page; if it is still here, it did not open.
-        if (!mounted ||
-            ref.read(hermesActiveSessionProvider) == widget.sessionId) {
-          return;
-        }
+        if (!mounted) return;
+        break;
       }
       await Future<void>.delayed(const Duration(milliseconds: 250));
     }
@@ -255,6 +258,9 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     if (service is HermesDesktopApiService &&
         !identical(_pendingService, service)) {
       _pendingService = service;
+      if (widget.profile != null) {
+        service.bindSessionProfile(widget.sessionId, widget.profile!);
+      }
       _historyFuture = service.readRunDetailsMessages(widget.sessionId);
     }
     final palette = HermezChatPalette.forBrightness(
@@ -290,7 +296,10 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     if (widget.openChat && !_openChatFailed) {
       // On its way to the conversation: only the page's own background,
       // until the chat replaces it.
-      return ColoredBox(color: palette.canvas, child: const SizedBox.expand());
+      return ColoredBox(
+        color: palette.canvas,
+        child: const Center(child: CircularProgressIndicator()),
+      );
     }
     return HermesPageChrome(
       // A new chat has no server title yet; never headline a placeholder.
@@ -305,6 +314,17 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
               onPressed: () => Navigator.of(context).pop(),
             )
           : null,
+      actions: [
+        if (widget.openChat && _openChatFailed)
+          TextButton.icon(
+            onPressed: () {
+              setState(() => _openChatFailed = false);
+              unawaited(_openChatWhenReady());
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry opening chat'),
+          ),
+      ],
       child: service is! HermesDesktopApiService
           ? const Center(child: Text('Live run is unavailable.'))
           : StreamBuilder<HermesDesktopTurnState>(

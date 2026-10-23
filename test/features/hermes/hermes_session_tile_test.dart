@@ -539,6 +539,7 @@ void main() {
 
   final modelScenarios = <String, Models Function()>{
     'model loading fails': _FailingModels.new,
+    'the model provider never answers': _PendingModels.new,
     'the model list has no Hermes entry': () =>
         _TestModels(const [Model(id: 'owui-model', name: 'OpenWebUI model')]),
   };
@@ -919,4 +920,9 @@ class _TestModels extends Models {
 class _FailingModels extends Models {
   @override
   Future<List<Model>> build() async => throw StateError('models unavailable');
+}
+
+class _PendingModels extends Models {
+  @override
+  Future<List<Model>> build() => Completer<List<Model>>().future;
 }

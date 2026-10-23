@@ -45,6 +45,7 @@ import '../../features/hermes/views/hermes_attention_page.dart';
 import '../../features/push/views/approval_detail_page.dart';
 import '../../features/push/views/approvals_page.dart';
 import '../../features/push/views/push_pairing_page.dart';
+import '../../features/push/views/notification_detail_page.dart';
 import '../../features/hermes/views/hermes_artifacts_page.dart';
 import '../../features/hermes/views/hermes_live_run_page.dart';
 import '../../features/hermes/views/hermes_conversations_page.dart';
@@ -172,7 +173,45 @@ class RouterNotifier extends ChangeNotifier {
     });
   }
 
+  String? _pendingHermesDestination;
+
   String? redirect(BuildContext context, GoRouterState state) {
+    final destination = _redirect(context, state);
+    final path = state.uri.path;
+    // Secure-storage/auth redirects must not consume a cold notification link.
+    if (destination != null &&
+        path.startsWith('/profile/hermes/') &&
+        path != Routes.hermesSettings &&
+        path != Routes.hermesPushPairing) {
+      _pendingHermesDestination = Uri(
+        path: path,
+        query: state.uri.hasQuery ? state.uri.query : null,
+      ).toString();
+    }
+    final pending = _pendingHermesDestination;
+    if (pending != null &&
+        ref.read(hermesConfigProvider).isUsable &&
+        !ref.read(hermesSecretsLoadingProvider) &&
+        (destination == Routes.chat ||
+            (destination == null &&
+                (path == Routes.chat ||
+                    path == Routes.splash ||
+                    path == Routes.hermesSettings)))) {
+      _pendingHermesDestination = null;
+      return pending;
+    }
+    if (destination == null &&
+        path.startsWith('/profile/hermes/') &&
+        path != Routes.hermesSettings &&
+        path != Routes.hermesPushPairing &&
+        ref.read(hermesConfigProvider).isUsable &&
+        !ref.read(hermesSecretsLoadingProvider)) {
+      _pendingHermesDestination = null;
+    }
+    return destination;
+  }
+
+  String? _redirect(BuildContext context, GoRouterState state) {
     final location = state.uri.path.isEmpty ? Routes.splash : state.uri.path;
     final reviewerMode = ref.read(reviewerModeProvider);
     if (reviewerMode) {
@@ -760,7 +799,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         // as the chat: the menu button or an edge swipe slides it aside, and
         // the HOME rail brings it back. Tablets keep Home as it was.
         child: Builder(
-          builder: (context) => usesPersistentTabletSidebar(context)
+          builder: (context) =>
+              state.uri.queryParameters['notification'] != null
+              ? NotificationDetailPage(
+                  reference: state.uri.queryParameters['notification']!,
+                )
+              : state.uri.queryParameters['brief'] != null
+              ? NotificationDetailPage(
+                  reference: state.uri.queryParameters['brief']!,
+                  referenceKind: 'brief',
+                )
+              : usesPersistentTabletSidebar(context)
               ? const HermesHomePage()
               : const DrawerShellPage(
                   mobileRailLabel: Text('HOME'),
@@ -776,7 +825,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       pageBuilder: (context, state) => _buildHermezPage(
         context: context,
         state: state,
-        child: const HermesConversationsPage(),
+        child: state.uri.queryParameters['thread'] != null
+            ? NotificationDetailPage(
+                reference: state.uri.queryParameters['thread']!,
+                referenceKind: 'thread',
+              )
+            : const HermesConversationsPage(),
       ),
     ),
     GoRoute(
