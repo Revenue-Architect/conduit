@@ -16,6 +16,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import '../../../core/services/worker_manager.dart';
+import '../../hermes/models/hermes_chat_input.dart';
 
 class EnhancedAttachment extends ConsumerStatefulWidget {
   final String attachmentId;
@@ -49,8 +50,20 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
     _resolveType();
   }
 
+  bool get _isLocalReference =>
+      widget.attachmentId.startsWith(kHermesLocalDocumentIdPrefix);
+
   Future<void> _resolveType() async {
     try {
+      // Legacy local references have no server file endpoint. The prompt already
+      // contains their content; keep a neutral receipt when metadata is absent.
+      if (_isLocalReference) {
+        setState(() {
+          _isLoading = false;
+          _fileInfo = {'name': 'Document'};
+        });
+        return;
+      }
       // Data URL for images – short-circuit to image widget
       if (widget.attachmentId.startsWith('data:image/')) {
         if (!mounted) return;
@@ -316,13 +329,15 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
     );
 
     return Semantics(
-      button: true,
+      button: !_isLocalReference,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          await ConduitHaptics.mediumImpact();
-          await _shareFile();
-        },
+        onTap: _isLocalReference
+            ? null
+            : () async {
+                await ConduitHaptics.mediumImpact();
+                await _shareFile();
+              },
         child: card,
       ),
     );

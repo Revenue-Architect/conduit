@@ -245,7 +245,13 @@ Widget debugBuildHermesBotToolbarTitleForTesting({
   required HermesBotChatPresentation bot,
   required double maxWidth,
   bool active = false,
-}) => _HermesBotToolbarTitle(bot: bot, maxWidth: maxWidth, active: active);
+  bool compact = false,
+}) => _HermesBotToolbarTitle(
+  bot: bot,
+  maxWidth: maxWidth,
+  active: active,
+  compact: compact,
+);
 
 @visibleForTesting
 HermesBotChatPresentation? chatHermesBotPresentation(
@@ -274,12 +280,14 @@ class _HermesBotToolbarTitle extends StatelessWidget {
     required this.bot,
     required this.maxWidth,
     required this.active,
+    this.compact = false,
     this.onTap,
   });
 
   final HermesBotChatPresentation bot;
   final double maxWidth;
   final bool active;
+  final bool compact;
   final VoidCallback? onTap;
 
   @override
@@ -291,35 +299,58 @@ class _HermesBotToolbarTitle extends StatelessWidget {
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            HermesBotAvatar(
-              key: const ValueKey('hermes-bot-toolbar-avatar'),
-              size: 28,
-              label: bot.title,
-              imageUrl: bot.avatar,
-              shape: bot.shape,
-              color: bot.color,
-              imageKind: bot.imageKind,
-              active: active,
+        child: SizedBox(
+          height: TouchTarget.minimum,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: compact ? 1 : 0),
+            duration: context.reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            builder: (context, collapse, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                HermesBotAvatar(
+                  key: const ValueKey('hermes-bot-toolbar-avatar'),
+                  size: 36 - 8 * collapse,
+                  label: bot.title,
+                  imageUrl: bot.avatar,
+                  shape: bot.shape,
+                  color: bot.color,
+                  imageKind: bot.imageKind,
+                  active: active,
+                ),
+                Flexible(
+                  child: ClipRect(
+                    child: Align(
+                      widthFactor: 1 - collapse,
+                      alignment: Alignment.centerLeft,
+                      child: Opacity(
+                        opacity: 1 - collapse,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: Spacing.sm),
+                          child: Text(
+                            bot.title,
+                            key: const ValueKey('hermes-bot-toolbar-title'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: conduitAdaptiveToolbarLeadingTitleTextStyle(
+                              context,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (active) ...[
+                  const SizedBox(width: Spacing.sm),
+                  const _HermesBotActivityDot(),
+                ],
+              ],
             ),
-            const SizedBox(width: Spacing.sm),
-            Flexible(
-              child: Text(
-                bot.title,
-                key: const ValueKey('hermes-bot-toolbar-title'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: conduitAdaptiveToolbarLeadingTitleTextStyle(context)
-                    .copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (active) ...[
-              const SizedBox(width: Spacing.sm),
-              const _HermesBotActivityDot(),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -331,7 +362,7 @@ class _HermesBotToolbarTitle extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           child: title,
         ),
       ),
@@ -1105,6 +1136,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       InteractionActivity.instance.endInteraction();
     }
     _timelineViewportController.dispose();
+    _botHeaderScrolling.dispose();
     super.dispose();
   }
 
@@ -3147,6 +3179,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         }
       },
       onUserDragStart: () {
+        _botHeaderScrolling.value = true;
         InteractionActivity.instance.beginInteraction();
         final pinnedTurnWasActive = _wantsPinToTop;
         _hasUserScrolled = true;
@@ -3169,6 +3202,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         } catch (_) {}
       },
       onUserDragEnd: () {
+        _botHeaderScrolling.value = false;
         InteractionActivity.instance.endInteraction();
         _endScrollProfile(reason: 'idle');
         _isUserInteractingWithScroll = false;
@@ -4699,6 +4733,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     layout.toggle();
   }
 
+  final _botHeaderScrolling = ValueNotifier(false);
   bool _isOpeningModelSelector = false;
 
   Future<void> _openModelSelector(BuildContext context) async {
@@ -4767,6 +4802,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       showModelDropdown: showModelDropdown,
       hermesBot: hermesBot,
       hermesBotActive: hermesBot != null && ref.watch(isChatStreamingProvider),
+      hasConversation: hasMessages,
       hermezVisuals: _useHermezChatVisuals,
     );
     final actionDescriptors = _buildAdaptiveToolbarActions(
@@ -4807,7 +4843,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       title: title,
       actions: actionWidgets,
       cupertinoTrailing: cupertinoTrailing,
-      centerTitle: false,
+      centerTitle: hermesBot != null,
     );
   }
 
@@ -4819,21 +4855,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool showModelDropdown,
     required HermesBotChatPresentation? hermesBot,
     required bool hermesBotActive,
+    required bool hasConversation,
     required bool hermezVisuals,
   }) {
     if (hermesBot != null) {
       final profile = _hermesChatProfile(ref.read(activeConversationProvider));
-      return _HermesBotToolbarTitle(
-        bot: hermesBot,
-        maxWidth: maxModelWidth,
-        active: hermesBotActive,
-        // The bot's own page: what it knows, its skills and schedules.
-        onTap: profile == null
-            ? null
-            : () => context.pushNamed(
-                RouteNames.hermesBotDetail,
-                pathParameters: {'profile': profile},
-              ),
+      return ValueListenableBuilder<bool>(
+        valueListenable: _botHeaderScrolling,
+        builder: (context, scrolling, _) => _HermesBotToolbarTitle(
+          bot: hermesBot,
+          maxWidth: maxModelWidth,
+          active: hermesBotActive,
+          compact: !hasConversation || scrolling,
+          onTap: profile == null
+              ? null
+              : () => context.pushNamed(
+                  RouteNames.hermesBotDetail,
+                  pathParameters: {'profile': profile},
+                ),
+        ),
       );
     }
     return ConduitAdaptiveAppBarModelSelector(

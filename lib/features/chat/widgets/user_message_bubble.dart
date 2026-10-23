@@ -168,7 +168,12 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
   }
 
   bool _isHermesLocalFileReference(dynamic file) {
-    return file is Map && file['source'] == 'hermes_local';
+    return file is Map &&
+        const {
+          'hermes_local',
+          'hermes_desktop_file',
+          'hermes_responses_file',
+        }.contains(file['source']);
   }
 
   _UserFilePartitions? _currentFilePartitions() {

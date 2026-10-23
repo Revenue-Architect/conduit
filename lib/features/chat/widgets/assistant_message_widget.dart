@@ -71,7 +71,6 @@ import '../../hermes/widgets/hermes_a2ui_surface.dart';
 import '../../hermes/widgets/hermes_openui_surface.dart';
 import '../../hermes/widgets/hermes_a2ui_media_scope.dart';
 import '../../hermes/widgets/hermes_artifact_view.dart';
-import '../../hermes/widgets/hermez_bot_mark.dart';
 import '../../hermes/widgets/hermes_run_activity_orb.dart';
 
 // Wrap only standalone base64 image lines so <details> attributes stay intact.
@@ -792,7 +791,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final uiConfig = ref.read(hermesConfigProvider);
     final uiMessageId = _messageId;
     final uiContent = _chatMessage?.content;
-    final inlineUiBusy = _uiTreatsAsStreaming || ref.watch(isChatStreamingProvider);
+    final inlineUiBusy =
+        _uiTreatsAsStreaming || ref.watch(isChatStreamingProvider);
     // A newer user turn means this reply was already answered. OpenUI keeps
     // its local edits and disables only the send buttons; A2UI takes the
     // existing read-only lock, which still lets local controls open.
@@ -1093,6 +1093,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final theme = context.conduitTheme;
     final modelName = _resolveActiveModelName();
     final iconUrl = _resolveActiveModelIconUrl();
+    // Hermes identity lives in the centered chat toolbar. Keep activity inline.
+    if (_isHermesAssistantMessage) {
+      _cachedAvatar = null;
+      _cachedAvatarModelName = modelName;
+      _cachedAvatarIconUrl = iconUrl;
+      return;
+    }
     // Grouped continuation: the response above already named this model. A
     // selected historical version can carry a DIFFERENT model, though, and
     // that identity was never shown above — so only stay silent while the
@@ -1112,14 +1119,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     }
     final hasIcon = iconUrl != null && iconUrl.isNotEmpty;
 
-    final Widget leading = _isHermesAssistantMessage
-        ? HermezBotMark(
-            identity: hermezIdentityForName(modelName),
-            botName: modelName,
-            size: 22,
-            label: modelName,
-          )
-        : hasIcon
+    final Widget leading = hasIcon
         ? ModelAvatar(size: 20, imageUrl: iconUrl, label: modelName)
         : Container(
             width: 20,
@@ -1136,9 +1136,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           );
 
     _cachedAvatar = Padding(
-      padding: EdgeInsets.only(
-        bottom: _isHermesAssistantMessage ? 0 : Spacing.md,
-      ),
+      padding: const EdgeInsets.only(bottom: Spacing.md),
       child: Row(
         // Hug the name so a header item can follow it directly.
         mainAxisSize: MainAxisSize.min,
@@ -1416,30 +1414,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           if (unifiedActivity && widget.showModelHeader && !showingVersion)
             Padding(
               padding: const EdgeInsets.only(bottom: Spacing.xs),
-              child: Row(
-                children: [
-                  Flexible(child: _cachedAvatar ?? const SizedBox.shrink()),
-                  const SizedBox(width: 6),
-                  // Loose, so it sits right after the bot's name instead of
-                  // starting at a fixed share of the row.
-                  Flexible(
-                    flex: 2,
-                    child: HermesMessageActivity(
-                      key: ValueKey('message-run-$_messageId'),
-                      messages: widget.runMessages ?? [_chatMessage!],
-                      currentAnswer: widget.currentRunAnswer,
-                    ),
-                  ),
-                ],
+              child: HermesMessageActivity(
+                key: ValueKey('message-run-$_messageId'),
+                messages: widget.runMessages ?? [_chatMessage!],
+                currentAnswer: widget.currentRunAnswer,
               ),
             )
-          else
-            Padding(
-              padding: EdgeInsets.only(
-                bottom: _isHermesAssistantMessage ? Spacing.md : 0,
-              ),
-              child: _cachedAvatar ?? const SizedBox.shrink(),
-            ),
+          else if (_cachedAvatar != null)
+            _cachedAvatar!,
 
           // Reasoning blocks are now rendered inline where they appear
 

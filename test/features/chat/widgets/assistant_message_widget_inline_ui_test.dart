@@ -1,3 +1,5 @@
+import 'package:conduit/features/hermes/widgets/hermez_bot_mark.dart';
+
 import 'dart:convert';
 
 import 'package:conduit/core/models/chat_message.dart';
@@ -114,10 +116,17 @@ void main() {
   }
 
   Finder surfaceOf(String id) => find.byWidgetPredicate(
-    (w) =>
-        w is HermesOpenuiSurface &&
-        w.surfaceId.startsWith('openui-$id-'),
+    (w) => w is HermesOpenuiSurface && w.surfaceId.startsWith('openui-$id-'),
   );
+
+  testWidgets('Hermes reply no longer repeats the toolbar bot identity', (
+    tester,
+  ) async {
+    await pumpChat(tester, messages: [_assistant('headerless')], sent: []);
+    expect(find.byType(HermezBotMark), findsNothing);
+    expect(find.text('Assistant'), findsNothing);
+    expect(find.byType(HermesOpenuiSurface), findsOneWidget);
+  });
 
   testWidgets('older surface cannot send; local controls still work', (
     tester,
@@ -148,10 +157,7 @@ void main() {
     expect(
       tester
           .widget<CheckboxListTile>(
-            find.descendant(
-              of: old,
-              matching: find.byType(CheckboxListTile),
-            ),
+            find.descendant(of: old, matching: find.byType(CheckboxListTile)),
           )
           .value,
       isTrue,

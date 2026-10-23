@@ -173,6 +173,59 @@ void main() {
     ).equals(1);
   });
 
+  testWidgets(
+    'bot identity shrinks and hides the name without losing its label',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      addTearDown(semantics.dispose);
+      Widget header(bool compact, {bool reduced = false}) => MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Scaffold(
+          body: MediaQuery(
+            data: MediaQueryData(disableAnimations: reduced),
+            child: debugBuildHermesBotToolbarTitleForTesting(
+              bot: (
+                title: 'Chief',
+                avatar: null,
+                shape: 'squircle',
+                color: '#8b5cf6',
+                imageKind: null,
+              ),
+              maxWidth: 200,
+              compact: compact,
+            ),
+          ),
+        ),
+      );
+      double avatarSize() => tester
+          .getSize(find.byKey(const ValueKey('hermes-bot-toolbar-avatar')))
+          .width;
+      Opacity nameOpacity() => tester.widget<Opacity>(
+        find
+            .ancestor(
+              of: find.byKey(const ValueKey('hermes-bot-toolbar-title')),
+              matching: find.byType(Opacity),
+            )
+            .first,
+      );
+      await tester.pumpWidget(header(false));
+      expect(avatarSize(), 36);
+      await tester.pumpWidget(header(true));
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(avatarSize(), allOf(greaterThan(28), lessThan(36)));
+      expect(nameOpacity().opacity, allOf(greaterThan(0), lessThan(1)));
+      await tester.pumpAndSettle();
+      expect(avatarSize(), 28);
+      expect(nameOpacity().opacity, 0);
+      expect(find.bySemanticsLabel('Chief'), findsOneWidget);
+      await tester.pumpWidget(header(false, reduced: true));
+      await tester.pump();
+      expect(avatarSize(), 36);
+      expect(nameOpacity().opacity, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   group('chatLocalFilePickerExtensions', () {
     test('filters Hermes to supported local documents without PDF', () {
       final extensions = chatLocalFilePickerExtensions(hermesSyntheticModel())!;

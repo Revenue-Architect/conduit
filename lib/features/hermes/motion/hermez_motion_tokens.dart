@@ -34,7 +34,7 @@ abstract final class HermezMotion {
   /// timing: springs, routes, implicit animations and scroll settling alike.
   /// It is one global clock ([timeDilation]), so nothing is missed and
   /// nothing drifts out of step with anything else.
-  static const appSpeed = 1.1;
+  static const appSpeed = 1.1 * 1.15;
 
   /// Applies [appSpeed] to the scheduler clock. Called once at startup,
   /// before the first frame; never under `flutter test`.

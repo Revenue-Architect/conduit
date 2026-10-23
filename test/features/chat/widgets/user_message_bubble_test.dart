@@ -132,6 +132,73 @@ void main() {
     },
   );
 
+  for (final source in ['hermes_desktop_file', 'hermes_responses_file']) {
+    testWidgets('$source renders its receipt without an OpenWebUI lookup', (
+      tester,
+    ) async {
+      final api = _FakeAttachmentInfoApiService(
+        onGetFileInfo: (_) => throw StateError('wrong backend'),
+      );
+      final message = ChatMessage(
+        id: 'hermes-native-file',
+        role: 'user',
+        content: '',
+        timestamp: DateTime(2026),
+        // This is the metadata-only descriptor emitted by prepareHermesTurn.
+        files: [
+          {
+            'type': 'file',
+            'source': source,
+            'name': 'brief.pdf',
+            'content_type': 'application/pdf',
+          },
+        ],
+        attachmentIds: const ['hermes-local:opaque-document'],
+      );
+      await tester.pumpWidget(
+        buildHarness(
+          message,
+          overrides: [apiServiceProvider.overrideWithValue(api)],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('brief.pdf'), findsOneWidget);
+      expect(find.text('Service unavailable'), findsNothing);
+      expect(find.byType(EnhancedAttachment), findsNothing);
+      expect(api.fileInfoCalls, 0);
+      expect(api.fileContentCalls, 0);
+    });
+  }
+
+  testWidgets('legacy Hermes attachment ID remains a local receipt', (
+    tester,
+  ) async {
+    final api = _FakeAttachmentInfoApiService(
+      onGetFileInfo: (_) => throw StateError('wrong backend'),
+    );
+    await tester.pumpWidget(
+      buildHarness(
+        ChatMessage(
+          id: 'legacy-native-file',
+          role: 'user',
+          content: '',
+          timestamp: DateTime(2026),
+          attachmentIds: const ['hermes-local:opaque-document'],
+        ),
+        overrides: [apiServiceProvider.overrideWithValue(api)],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Document'), findsOneWidget);
+    expect(find.text('Service unavailable'), findsNothing);
+    expect(find.text('Failed to load attachment'), findsNothing);
+    expect(api.fileInfoCalls, 0);
+    await tester.tap(find.text('Document'));
+    await tester.pump();
+    expect(api.fileContentCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses the redesigned rounded user bubble surface', (
     WidgetTester tester,
   ) async {

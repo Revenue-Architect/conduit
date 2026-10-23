@@ -160,19 +160,13 @@ class _HermesModelSheetState extends ConsumerState<_HermesModelSheet> {
     final draft = widget.sessionId == null
         ? ref.watch(hermesDraftModelChoiceProvider)
         : null;
+    // Session info can lag a pending pick; a mismatch is not failure evidence.
     final current = catalog.value;
     final currentModel = draft?.model ?? info?.model ?? current?.currentModel;
     final currentProvider = draft?.model != null
         ? draft?.provider
         : info?.provider ?? current?.currentProvider;
     final currentEffort = draft?.reasoningEffort ?? info?.reasoningEffort;
-    final service = ref.watch(hermesApiServiceProvider);
-    final picked =
-        widget.sessionId != null && service is HermesDesktopApiService
-        ? service.sessionModelChoice(widget.sessionId!)?.model
-        : null;
-    final fellBack =
-        picked != null && info?.model != null && info!.model != picked;
     final fast = draft?.fast ?? info?.fast ?? false;
     final selected = current?.options
         .where(
@@ -203,14 +197,6 @@ class _HermesModelSheetState extends ConsumerState<_HermesModelSheet> {
               ].join(' · '),
               style: HermezType.meta(palette),
             ),
-            if (fellBack) ...[
-              const SizedBox(height: 6),
-              Text(
-                '${hermesModelShortName(picked)} failed on the last message, '
-                'so Hermes used its fallback, ${hermesModelShortName(info.model!)}.',
-                style: HermezType.meta(palette).copyWith(color: palette.accent),
-              ),
-            ],
             const SizedBox(height: 12),
             HermezSegments(
               index: _tab,
