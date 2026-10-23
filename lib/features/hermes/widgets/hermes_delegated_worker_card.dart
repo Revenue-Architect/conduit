@@ -371,6 +371,7 @@ class _HermesDelegatedWorkerCardState
                     Padding(
                       padding: const EdgeInsets.only(top: 1),
                       child: HermezBotMark(
+                        botName: worker.childProfile ?? worker.displayName,
                         identity: hermezIdentityForName(
                           worker.childProfile ?? worker.displayName,
                         ),

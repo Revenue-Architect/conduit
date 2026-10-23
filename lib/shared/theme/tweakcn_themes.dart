@@ -158,8 +158,11 @@ TweakcnThemeVariant _hermezWithSignal(
 }
 
 class TweakcnThemes {
+  /// Shared canvas for the light chat surface and its matching chrome fades.
+  static const Color lightCanvas = Color(0xFFFCFCFC);
+
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
-    background: const Color(0xFFF7F7F7), // neutral light-grey canvas
+    background: lightCanvas,
     foreground: const Color(0xFF17181C), // graphite ink
     card: const Color(0xFFFFFFFF),
     cardForeground: const Color(0xFF17181C),
@@ -178,7 +181,7 @@ class TweakcnThemes {
     border: const Color(0xFFDADADA),
     input: const Color(0xFFDADADA),
     ring: const Color(0xFFFF5A26),
-    sidebarBackground: const Color(0xFFF7F7F7),
+    sidebarBackground: lightCanvas,
     sidebarForeground: const Color(0xFF17181C),
     sidebarPrimary: const Color(0xFFFF5A26),
     sidebarPrimaryForeground: const Color(0xFF17181C),
@@ -562,11 +565,7 @@ class TweakcnThemes {
     descriptionBuilder: (_) => 'White, graphite and signal orange',
     light: _conduitLight,
     dark: _conduitDark,
-    preview: const <Color>[
-      Color(0xFFFF5A26),
-      Color(0xFF202126),
-      Color(0xFFF7F7F7),
-    ],
+    preview: const <Color>[Color(0xFFFF5A26), Color(0xFF202126), lightCanvas],
   );
 
   /// Signal red. White text on the red keeps 4.8:1; graphite would be ~3.7:1.
@@ -587,11 +586,7 @@ class TweakcnThemes {
       onSignal: const Color(0xFFFFFFFF),
       accentTint: const Color(0xFF4B2327),
     ),
-    preview: const <Color>[
-      hermezRedSignal,
-      Color(0xFF202126),
-      Color(0xFFF7F7F7),
-    ],
+    preview: const <Color>[hermezRedSignal, Color(0xFF202126), lightCanvas],
   );
 
   /// Themes that belong to the Hermez design (allowed in Hermes-only mode).

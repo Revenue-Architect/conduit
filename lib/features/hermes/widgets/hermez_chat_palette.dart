@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/theme/tweakcn_themes.dart';
+
 /// Debug-only Android polish for Hermes chat; not a second app theme or route.
 bool shouldUseHermezChatVisuals({
   required bool debugBuild,
@@ -64,7 +66,7 @@ class HermezChatPalette {
             border: const Color(0xFF434449),
           )
         : HermezChatPalette(
-            canvas: const Color(0xFFF7F7F7),
+            canvas: TweakcnThemes.lightCanvas,
             surface: const Color(0xFFFFFFFF),
             ink: const Color(0xFF17181C),
             muted: const Color(0xFF666765),
