@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -42,12 +44,15 @@ class NavigationService {
     return router;
   }
 
+  static final Set<void Function()> _routeWaiters = {};
+
   static void attachRouter(GoRouter router) {
     _router?.routeInformationProvider.removeListener(_handleRouteChanged);
     _router = router;
     _lastRoute = router.routeInformationProvider.value.uri.toString();
     _routeRevision += 1;
     router.routeInformationProvider.addListener(_handleRouteChanged);
+    _notifyRouteWaiters();
   }
 
   static void _handleRouteChanged() {
@@ -55,6 +60,37 @@ class NavigationService {
     if (route == _lastRoute) return;
     _lastRoute = route;
     _routeRevision += 1;
+    _notifyRouteWaiters();
+  }
+
+  static void _notifyRouteWaiters() {
+    for (final waiter in List.of(_routeWaiters)) {
+      waiter();
+    }
+  }
+
+  /// Completes once a router is attached and its location is no longer
+  /// [path] (e.g. the app has left the splash screen), or after [timeout].
+  /// Event-driven: it reacts to the route change instead of polling.
+  static Future<void> waitUntilLeft(
+    String path, {
+    Duration timeout = const Duration(seconds: 10),
+  }) {
+    bool left() {
+      final route = currentRoute;
+      return route != null && Uri.tryParse(route)?.path != path;
+    }
+
+    if (left()) return Future<void>.value();
+    final done = Completer<void>();
+    void check() {
+      if (!done.isCompleted && left()) done.complete();
+    }
+
+    _routeWaiters.add(check);
+    return done.future
+        .timeout(timeout, onTimeout: () {})
+        .whenComplete(() => _routeWaiters.remove(check));
   }
 
   static NavigatorState? get navigator => navigatorKey.currentState;

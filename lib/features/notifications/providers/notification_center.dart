@@ -223,12 +223,9 @@ class NotificationCenter extends _$NotificationCenter {
     await local.initialize();
     final tap = await local.launchTap();
     if (tap != null) {
-      // The post-sign-in startup can win the app shell's splash wait.
-      for (var i = 0; i < 100 && ref.mounted; i++) {
-        final route = NavigationService.currentRoute;
-        if (route != null && Uri.tryParse(route)?.path != Routes.splash) break;
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
+      // The post-sign-in startup can win the app shell's splash wait; open the
+      // tap as soon as the app has left the splash screen.
+      await NavigationService.waitUntilLeft(Routes.splash);
       if (ref.mounted) await _handleTap(ref, tap);
     }
   }
