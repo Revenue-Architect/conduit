@@ -1,0 +1,51 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:conduit/features/hermes/services/hermes_agentic_state.dart';
+import 'package:conduit/features/hermes/services/hermes_inline_ui_capability.dart';
+
+void main() {
+  final now = DateTime.utc(2026, 10, 24);
+
+  test('a returned background delegation is a notice, not an owner message', () {
+    expect(
+      hermesIsDelegationResultNotice(
+        '[ASYNC DELEGATION BATCH COMPLETE — deleg_6b8f3a3d]\nA background…',
+      ),
+      isTrue,
+    );
+    expect(hermesIsDelegationResultNotice('Ask scout for a PONG'), isFalse);
+    expect(
+      hermesIsDelegationResultNotice('Why does [ASYNC DELEGATION show up?'),
+      isFalse,
+    );
+  });
+
+  test('a profile-routed native worker takes its name from the projection', () {
+    final store = HermesAgenticStateStore(clock: () => now);
+    // Live events only know the parent's profile.
+    store.applySubagentEvent('p', 'subagent.complete', {
+      'subagent_id': 'sa-0-1e0dab43',
+      'status': 'completed',
+      'goal': 'Reply with PONG',
+      'parent_session_id': 'p',
+      'parent_profile': 'default',
+      'child_profile': 'default',
+    });
+    // The server projection names the profile it ran as.
+    store.applySubagentEvent('p', 'delegation.complete', {
+      'delegation_id': 'sa-0-1e0dab43',
+      'subagent_id': 'sa-0-1e0dab43',
+      'worker_kind': 'native',
+      'parent_session_id': 'p',
+      'parent_profile': 'default',
+      'child_profile': 'default',
+      'name': 'scout',
+      'child_session_id': 'child-1',
+      'status': 'completed',
+    });
+    final workers = store.snapshotFor('p').subagents;
+    expect(workers, hasLength(1));
+    expect(workers.single.displayName, 'scout');
+    expect(workers.single.childSessionId, 'child-1');
+    expect(workers.single.childProfile, 'default');
+  });
+}

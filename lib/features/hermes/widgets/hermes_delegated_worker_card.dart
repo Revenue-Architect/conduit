@@ -370,11 +370,11 @@ class _HermesDelegatedWorkerCardState
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(top: 1),
+                      // The name is the profile the worker ran as; a routed
+                      // native child is stored under its parent's profile.
                       child: HermezBotMark(
-                        botName: worker.childProfile ?? worker.displayName,
-                        identity: hermezIdentityForName(
-                          worker.childProfile ?? worker.displayName,
-                        ),
+                        botName: worker.displayName,
+                        identity: hermezIdentityForName(worker.displayName),
                         size: 23,
                         label: worker.displayName,
                       ),

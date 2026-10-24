@@ -29,6 +29,12 @@ String hermesInlineUiTurnText(String text) {
       : '$text$_hermesInlineUiSuffix';
 }
 
+/// Hermes hands a finished background delegation back to the parent as a
+/// user-role message. It is the server waking the model, not the owner, so
+/// it is shown as a short notice instead of a sent bubble.
+bool hermesIsDelegationResultNotice(String text) =>
+    text.startsWith('[ASYNC DELEGATION ');
+
 /// Presentation only. Matching and server history keep the original wire text.
 String hermesInlineUiVisibleText(String text) {
   for (final suffix in const [_hermesInlineUiSuffix, _legacyInlineUiSuffix]) {

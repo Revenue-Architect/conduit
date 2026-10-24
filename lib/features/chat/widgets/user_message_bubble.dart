@@ -788,6 +788,28 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
     return _buildUserMessage();
   }
 
+  Widget _buildDelegationNotice(ConduitThemeExtension theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+      child: Row(
+        children: [
+          Icon(
+            Icons.subdirectory_arrow_left_rounded,
+            size: 16,
+            color: theme.textSecondary,
+          ),
+          const SizedBox(width: Spacing.xs),
+          Text(
+            'Delegated work came back',
+            style: AppTypography.labelMediumStyle.copyWith(
+              color: theme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUserMessage() {
     final theme = context.conduitTheme;
     final hermezVisuals = shouldUseHermezChatVisuals(
@@ -799,6 +821,10 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
       Theme.of(context).brightness,
     );
     final rawContent = widget.message.content as String;
+    if (widget.isHermesConversation &&
+        hermesIsDelegationResultNotice(rawContent)) {
+      return _buildDelegationNotice(theme);
+    }
     final interactionLabel = widget.isHermesConversation
         ? hermesA2uiInteractionLabel(rawContent)
         : null;

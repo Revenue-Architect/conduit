@@ -1,5 +1,9 @@
 part of 'hermes_desktop_api_service.dart';
 
+/// The parent usually answers a returned delegation within seconds; the
+/// second read covers a slower model.
+const _delegationFollowUpDelays = [Duration(seconds: 6), Duration(seconds: 20)];
+
 extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
   Future<void> _ensureConnected() async {
     if (_closed) throw StateError('Hermes service is closed.');
@@ -120,6 +124,18 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
                 boundProfileFor(storedId) ?? config.desktopProfile,
             'child_profile': boundProfileFor(storedId) ?? config.desktopProfile,
           });
+          // A background delegation hands its result back as a new server-
+          // started turn, which never arrives on this connection. Re-read the
+          // stored transcript once the parent has had time to answer.
+          if (event.type == 'subagent.complete') {
+            for (final delay in _delegationFollowUpDelays) {
+              unawaited(
+                Future<void>.delayed(delay, () {
+                  if (!_closed) requestTranscriptRefresh(storedId);
+                }),
+              );
+            }
+          }
         }
     }
   }
