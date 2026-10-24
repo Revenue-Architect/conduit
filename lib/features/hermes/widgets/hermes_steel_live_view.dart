@@ -17,9 +17,15 @@ class HermesRunBrowserSection extends StatefulWidget {
     required this.viewerUrl,
     required this.sessionId,
     this.initiallyOpen = false,
+    this.refreshToken = 0,
   });
   final String viewerUrl;
   final String sessionId;
+
+  /// A change reloads the player. Steel's player connects once, when it
+  /// loads; opened before Hermes has its browser session, it would wait on
+  /// "connecting" for the whole run.
+  final int refreshToken;
 
   /// Opens on its own: a browsing run is shown as it happens.
   final bool initiallyOpen;
@@ -30,6 +36,7 @@ class HermesRunBrowserSection extends StatefulWidget {
 
 class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
   late bool _open = widget.initiallyOpen;
+  var _reloads = 0;
   final _aperture = GlobalKey();
   void _expand() => Navigator.of(context).push(
     HermezRoute<void>(
@@ -105,6 +112,18 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
             ),
             if (_open)
               IconButton(
+                key: const ValueKey('hermes-browser-reload'),
+                tooltip: 'Reload the browser view',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  size: 17,
+                  color: palette.muted,
+                ),
+                onPressed: () => setState(() => _reloads++),
+              ),
+            if (_open)
+              IconButton(
                 key: const ValueKey('hermes-browser-expand'),
                 tooltip: 'Full screen',
                 visualDensity: VisualDensity.compact,
@@ -128,7 +147,12 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
                 height: 220,
                 child: _AfterArrival(
                   placeholder: const _BrowserAperture(),
-                  child: HermesSteelLiveView(viewerUrl: widget.viewerUrl),
+                  child: HermesSteelLiveView(
+                    key: ValueKey(
+                      'steel-view-${widget.refreshToken}-$_reloads',
+                    ),
+                    viewerUrl: widget.viewerUrl,
+                  ),
                 ),
               ),
               Padding(

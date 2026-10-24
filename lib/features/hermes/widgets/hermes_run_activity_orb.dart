@@ -26,7 +26,7 @@ import '../services/hermes_run_transport.dart' show kHermesProviderWaitAction;
 import '../services/hermes_steel_viewer.dart';
 import '../sheets/hermes_tool_inspector_sheet.dart';
 import 'hermes_inline_run_surface.dart'
-    show hermesRunUsedBrowser, hermesThinkingOrbState;
+    show hermesRunBrowserReady, hermesRunUsedBrowser, hermesThinkingOrbState;
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/conduit_localizations.dart';
 import '../views/hermes_live_run_page.dart';
@@ -186,17 +186,17 @@ class HermesMessageActivity extends ConsumerWidget {
         : null;
     // Watch-only Steel player, offered while a browsing run is under way.
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
+    final browserRun = HermesRunSummary.latest(events, running: running);
     final browser =
         running &&
             parseSteelViewerUrl(viewerUrl) != null &&
-            hermesRunUsedBrowser(
-              HermesRunSummary.latest(events, running: running),
-            )
+            hermesRunUsedBrowser(browserRun)
         ? HermesRunBrowserSection(
             key: ValueKey('steel-section-$sessionId'),
             viewerUrl: viewerUrl,
             sessionId: sessionId,
             initiallyOpen: true,
+            refreshToken: hermesRunBrowserReady(browserRun) ? 1 : 0,
           )
         : null;
     return HermezReveal(
