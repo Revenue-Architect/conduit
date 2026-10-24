@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,6 +193,46 @@ class _HermesSteelLiveViewState extends State<HermesSteelLiveView> {
   String? _error;
   int _generation = 0;
 
+  // Steel's player joins the browser session once, when it loads. Opened before
+  // Hermes' session is up, it waits on "Session connecting…" for the whole
+  // run, while a later reopen joins at once. So while it still says so, it is
+  // reloaded every few seconds, as a person reopening it would, up to a cap.
+  static const _connectCheck = Duration(seconds: 4);
+  static const _maxConnectReloads = 15;
+  int _connectReloads = 0;
+  Timer? _connectTimer;
+
+  @override
+  void dispose() {
+    _connectTimer?.cancel();
+    super.dispose();
+  }
+
+  void _checkConnected(InAppWebViewController controller) {
+    _connectTimer?.cancel();
+    if (_connectReloads >= _maxConnectReloads) return;
+    _connectTimer = Timer(_connectCheck, () async {
+      if (!mounted) return;
+      Object? text;
+      try {
+        text = await controller.evaluateJavascript(
+          source:
+              "(document.body ? document.body.innerText : '') + ' ' + "
+              "Array.from(document.querySelectorAll('input'))"
+              ".map(function (i) { return i.value + ' ' + i.placeholder; })"
+              ".join(' ')",
+        );
+      } catch (_) {
+        return;
+      }
+      if (!mounted || '$text'.toLowerCase().contains('connecting') == false) {
+        return;
+      }
+      _connectReloads++;
+      setState(() => _generation++);
+    });
+  }
+
   @override
   void didUpdateWidget(covariant HermesSteelLiveView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -232,8 +274,9 @@ class _HermesSteelLiveViewState extends State<HermesSteelLiveView> {
                         javaScriptEnabled: true,
                         mediaPlaybackRequiresUserGesture: false,
                       ),
-                      onLoadStop: (_, _) {
+                      onLoadStop: (controller, _) {
                         if (mounted) setState(() => _loading = false);
+                        _checkConnected(controller);
                       },
                       onReceivedError: (_, request, error) {
                         if (request.isForMainFrame == true && mounted) {
