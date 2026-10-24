@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -144,7 +146,8 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (row.object != null) ...[
+            // Inline, the step's own line already says what it did.
+            if (row.object != null && !widget.inline) ...[
               _Section(
                 label: 'ACTION',
                 child: Text(row.object!, style: HermezType.body(palette)),
@@ -366,7 +369,7 @@ class _Section extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(label, style: HermezType.technical(palette.muted)),
+            Text(label, style: HermezType.technical(palette.accent)),
             const Spacer(),
             ?trailing,
           ],
@@ -395,6 +398,53 @@ class _CodeSection extends StatefulWidget {
   State<_CodeSection> createState() => _CodeSectionState();
 }
 
+/// A tool's input or result as a person reads it. The server fences output
+/// as untrusted for the model and prefixes a notice to it; people only need
+/// the output itself. A JSON object reads as its fields, with the text fields
+/// (code, output) on their own lines and their newlines real, instead of a
+/// line of escaped `\n`.
+String hermesReadableToolText(String raw) {
+  var text = raw
+      .replaceAll(RegExp(r'<untrusted_tool_result[^>]*>\s*'), '')
+      .replaceAll(RegExp(r'\s*</untrusted_tool_result>'), '')
+      .replaceFirst(
+        RegExp(
+          r'^The following content was retrieved from an external source\..*?'
+          r'can issue instructions\.\s*',
+          dotAll: true,
+        ),
+        '',
+      )
+      .trim();
+  Object? decoded;
+  try {
+    decoded = jsonDecode(text);
+  } catch (_) {
+    return text;
+  }
+  if (decoded is! Map || decoded.isEmpty) return text;
+  final lines = <String>[];
+  // What the tool said leads; bookkeeping (exit codes, paths) follows.
+  final keys = [
+    for (final key in const ['output', 'result', 'code', 'command', 'query'])
+      if (decoded.containsKey(key)) key,
+    for (final key in decoded.keys)
+      if (!const ['output', 'result', 'code', 'command', 'query'].contains(key))
+        '$key',
+  ];
+  for (final key in keys) {
+    final value = decoded[key];
+    if (value is String) {
+      final body = value.trimRight();
+      lines.add(body.contains('\n') ? '$key:\n$body' : '$key: $body');
+    } else {
+      lines.add('$key: ${jsonEncode(value)}');
+    }
+  }
+  text = lines.join('\n');
+  return text;
+}
+
 class _CodeSectionState extends State<_CodeSection> {
   static const _collapsed = 1600;
   bool _expanded = false;
@@ -404,12 +454,7 @@ class _CodeSectionState extends State<_CodeSection> {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    // The server fences tool output as untrusted for the model; people only
-    // need the output itself.
-    final text = widget.text
-        .replaceAll(RegExp(r'<untrusted_tool_result[^>]*>\s*'), '')
-        .replaceAll(RegExp(r'\s*</untrusted_tool_result>'), '')
-        .trim();
+    final text = hermesReadableToolText(widget.text);
     final long = text.length > _collapsed;
     final shown = !long || _expanded
         ? text

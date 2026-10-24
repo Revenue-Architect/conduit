@@ -382,7 +382,7 @@ class _HermezPlanBarState extends State<HermezPlanBar>
               size: Size.infinite,
               painter: _PlanBarPainter(
                 statuses: statuses,
-                done: palette.ink,
+                done: palette.accent,
                 live: palette.accent,
                 band: Color.lerp(palette.accent, palette.ink, 0.35)!,
                 track: Color.lerp(palette.surface, palette.ink, 0.09)!,
@@ -504,7 +504,7 @@ class HermezTodoGlyph extends StatelessWidget {
           painter: _TodoGlyphPainter(
             status: status,
             t: t,
-            ink: palette.ink,
+            ink: palette.accent,
             accent: palette.accent,
             muted: palette.muted,
             surface: palette.surface,

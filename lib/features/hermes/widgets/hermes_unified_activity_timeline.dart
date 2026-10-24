@@ -15,7 +15,11 @@ class HermesUnifiedActivityTimeline extends StatelessWidget {
     required this.statuses,
     required this.running,
     this.onInspect,
+    this.showThinking = true,
   });
+
+  /// False under an answer whose line already lists its thoughts.
+  final bool showThinking;
   final List<HermesActivityRow> rows;
   final List<ChatStatusUpdate> statuses;
   final bool running;
@@ -36,7 +40,7 @@ class HermesUnifiedActivityTimeline extends StatelessWidget {
         : (reasoning.last.description ?? '')
               .replaceFirst(RegExp(r'^Thinking…\s*'), '')
               .trim();
-    if (thought.isNotEmpty) {
+    if (thought.isNotEmpty && showThinking) {
       entries.add(
         _Thinking(
           text: thought,

@@ -80,7 +80,7 @@ class HermezDecisionFrame extends StatelessWidget {
                 ),
               ),
               CustomPaint(
-                painter: _DecisionRail(palette.muted.withValues(alpha: 0.35)),
+                painter: _DecisionRail(palette.accent.withValues(alpha: 0.45)),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 6, 0, 2),
                   child: Column(

@@ -105,6 +105,16 @@ void main() {
         ]),
         ['Preparing delegation demo', 'Preparing delegation request'],
       );
+      expect(
+        hermesThoughtLines(const [
+          ChatStatusUpdate(
+            action: 'reasoning',
+            description:
+                'Thinking… **Loading browser guidance****Preparing live view**',
+          ),
+        ]),
+        ['Loading browser guidance', 'Preparing live view'],
+      );
       expect(hermesThoughtLines(const []), isEmpty);
     });
 

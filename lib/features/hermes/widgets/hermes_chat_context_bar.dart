@@ -325,7 +325,7 @@ class _ContextPill extends StatelessWidget {
               leading!,
               const SizedBox(width: 2),
             ] else ...[
-              Icon(icon, size: 15, color: ink),
+              Icon(icon, size: 15, color: selected ? ink : palette.accent),
               const SizedBox(width: 6),
             ],
             if (prefix != null) ...[

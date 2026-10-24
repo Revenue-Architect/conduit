@@ -16,16 +16,20 @@ class HermesRunBrowserSection extends StatefulWidget {
     super.key,
     required this.viewerUrl,
     required this.sessionId,
+    this.initiallyOpen = false,
   });
   final String viewerUrl;
   final String sessionId;
+
+  /// Opens on its own: a browsing run is shown as it happens.
+  final bool initiallyOpen;
   @override
   State<HermesRunBrowserSection> createState() =>
       _HermesRunBrowserSectionState();
 }
 
 class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
-  bool _open = false;
+  late bool _open = widget.initiallyOpen;
   final _aperture = GlobalKey();
   void _expand() => Navigator.of(context).push(
     HermezRoute<void>(
@@ -69,7 +73,7 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
                       Icon(
                         Icons.language_rounded,
                         size: 15,
-                        color: palette.ink,
+                        color: palette.accent,
                       ),
                       const SizedBox(width: 8),
                       Flexible(

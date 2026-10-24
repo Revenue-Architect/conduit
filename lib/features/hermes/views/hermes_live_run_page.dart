@@ -496,6 +496,7 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                                   );
                                 }
                                 return HermesUnifiedActivityTimeline(
+                                  showThinking: !widget.inline,
                                   rows: rows,
                                   statuses: filterVisibleStatusUpdates(
                                     hermesSafeRunStatuses(
@@ -774,10 +775,9 @@ class _LiveHero extends ConsumerWidget {
             : run.isEmpty
             ? 'Nothing running'
             : 'Finished');
-    if (compact) {
-      if (plan == null) return const SizedBox.shrink();
-      return _InlinePlan(sessionId: sessionId, plan: plan, running: running);
-    }
+    // Inline the plan lives under the answer's own line (HermesInlinePlan),
+    // not in the run's details.
+    if (compact) return const SizedBox.shrink();
     return _RunSection(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1179,8 +1179,9 @@ class _RunSection extends StatelessWidget {
 
 /// The plan's preview under an answer; tapping it unfolds the whole plan in
 /// place, with its step actions, instead of opening a sheet.
-class _InlinePlan extends StatefulWidget {
-  const _InlinePlan({
+class HermesInlinePlan extends StatefulWidget {
+  const HermesInlinePlan({
+    super.key,
     required this.sessionId,
     required this.plan,
     required this.running,
@@ -1191,10 +1192,10 @@ class _InlinePlan extends StatefulWidget {
   final bool running;
 
   @override
-  State<_InlinePlan> createState() => _InlinePlanState();
+  State<HermesInlinePlan> createState() => _InlinePlanState();
 }
 
-class _InlinePlanState extends State<_InlinePlan> {
+class _InlinePlanState extends State<HermesInlinePlan> {
   bool _open = false;
 
   @override

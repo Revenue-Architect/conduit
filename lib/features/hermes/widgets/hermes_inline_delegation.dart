@@ -91,7 +91,7 @@ class _InlineState extends State<HermesInlineDelegation> {
     final p = HermezChatPalette.forBrightness(Theme.of(context).brightness);
     if (workers.length == 1) {
       return _ThreadRail(
-        color: p.muted,
+        color: p.accent,
         last: true,
         child: _branch(workers.single),
       );
@@ -109,7 +109,7 @@ class _InlineState extends State<HermesInlineDelegation> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ThreadRail(
-          color: p.muted,
+          color: p.accent,
           last: !_open,
           child: HermezMotionSurface(
             key: const ValueKey('delegation-group'),
@@ -180,7 +180,7 @@ class _InlineState extends State<HermesInlineDelegation> {
                       curve: Curves.easeOutCubic,
                       child: Icon(
                         Icons.chevron_right_rounded,
-                        color: p.muted,
+                        color: p.accent,
                         size: 20,
                       ),
                     ),
@@ -198,7 +198,7 @@ class _InlineState extends State<HermesInlineDelegation> {
             children: [
               for (var i = 0; i < workers.length; i++)
                 _ThreadRail(
-                  color: p.muted,
+                  color: p.accent,
                   last: i == workers.length - 1,
                   child: _branch(workers[i]),
                 ),
@@ -297,7 +297,7 @@ class _AvatarStack extends StatelessWidget {
 
 /// The thread line a branch hangs from: down from the turn above, then an
 /// elbow into the branch's avatar. It continues past a branch that has
-/// siblings below it. A connector, deliberately thin and neutral.
+/// siblings below it. A thin connector in a light wash of the accent.
 class _ThreadRail extends StatelessWidget {
   const _ThreadRail({
     required this.color,
@@ -313,7 +313,7 @@ class _ThreadRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CustomPaint(
-    painter: _RailPainter(color: color.withValues(alpha: 0.35), last: last),
+    painter: _RailPainter(color: color.withValues(alpha: 0.45), last: last),
     child: Padding(
       padding: const EdgeInsets.only(left: indent),
       child: child,

@@ -1,6 +1,7 @@
+import 'dart:math' as math;
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:thinking_orbs/thinking_orbs.dart';
@@ -16,6 +17,7 @@ import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_live_run_providers.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_activity_presenter.dart';
+import '../services/hermes_agentic_state.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_identifier.dart';
 import '../services/hermes_inline_ui_capability.dart'
@@ -122,15 +124,55 @@ class HermesMessageActivity extends ConsumerWidget {
       ?model,
       if (elapsed != null && elapsed.inSeconds > 0)
         formatHermesRunDuration(elapsed),
-      if (run.steps > 0) run.steps == 1 ? '1 step' : '${run.steps} steps',
+      // Live events count this connection's steps; a saved turn counts its
+      // recorded tool steps. The larger is the honest count.
+      if (math.max(run.steps, hermesRunSteps(const [], statuses).length)
+          case final steps when steps > 0)
+        steps == 1 ? '1 step' : '$steps steps',
     ].join(' · ');
+    // A plan this turn wrote shows under its line, live, as soon as Hermes
+    // reports it: the bars and the steps are part of the answer, not a
+    // detail. Read from what the connection holds, without a fetch.
+    final usedTodo =
+        run.tools.any(
+          (tool) => const {'todo', 'todo_list'}.contains(tool.name),
+        ) ||
+        statuses.any(
+          (status) => const {
+            'todo',
+            'todo_list',
+          }.contains(hermesStatusToolName(status)),
+        );
+    final planView = currentAnswer && usedTodo
+        ? StreamBuilder<HermesAgenticSnapshot>(
+            stream: service.agenticStateFor(sessionId),
+            initialData: service.agenticSnapshotFor(sessionId),
+            builder: (context, snapshot) {
+              final plan = snapshot.data?.todo;
+              if (plan == null || plan.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return HermesInlinePlan(
+                key: ValueKey('turn-plan-$sessionId'),
+                sessionId: sessionId,
+                plan: plan,
+                running: running,
+              );
+            },
+          )
+        : null;
     // Watch-only Steel player, offered while a browsing run is under way.
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
     final browser =
         running &&
             parseSteelViewerUrl(viewerUrl) != null &&
             hermesRunUsedBrowser(run)
-        ? HermesRunBrowserSection(viewerUrl: viewerUrl, sessionId: sessionId)
+        ? HermesRunBrowserSection(
+            key: ValueKey('steel-section-$sessionId'),
+            viewerUrl: viewerUrl,
+            sessionId: sessionId,
+            initiallyOpen: true,
+          )
         : null;
     return HermezReveal(
       visible: !empty,
@@ -145,8 +187,10 @@ class HermesMessageActivity extends ConsumerWidget {
         thought: thought,
         meta: meta,
         browser: browser,
+        plan: planView,
         toolCount: toolCount,
         failed: failed,
+        turnKey: '$sessionId:${messages.first.id}',
         answerMessages: messages,
         currentAnswer: currentAnswer,
       ),
@@ -222,10 +266,11 @@ List<String> hermesThoughtLines(List<ChatStatusUpdate> statuses) {
   final lines = <String>[];
   for (final status in statuses) {
     if (status.action != 'reasoning') continue;
-    final text = (status.description ?? '').replaceFirst(
-      RegExp(r'^Thinking…\s*'),
-      '',
-    );
+    final text = (status.description ?? '')
+        .replaceFirst(RegExp(r'^Thinking…\s*'), '')
+        // Streamed summaries arrive as bold headings back to back
+        // ("**Loading guidance****Preparing view**"): each is its own line.
+        .replaceAll(RegExp(r'\*\*\s*\*\*'), '\n');
     for (final line in text.split('\n')) {
       final clean = line.replaceAll('*', '').trim();
       if (clean.isNotEmpty && !lines.contains(clean)) lines.add(clean);
@@ -278,7 +323,13 @@ String hermesActivityLabel(
   }
   if (steps.isEmpty) return fallback;
   // While running, say what is happening now; afterwards, what happened.
-  final lead = running ? steps.last : steps.first;
+  // Reading a skill is preparation, not the work: it leads only when it is
+  // all there was.
+  bool prep(({String verb, int count}) step) =>
+      step.verb.endsWith(' skill') && step.verb.startsWith('Open');
+  final work = steps.where((step) => !prep(step)).toList();
+  final pool = work.isEmpty ? steps : work;
+  final lead = running ? steps.last : pool.first;
   if (steps.length == 1) {
     return lead.count > 1 ? '${lead.verb} ${lead.count} times' : lead.verb;
   }
@@ -299,8 +350,10 @@ class HermesRunActivityOrb extends StatefulWidget {
     this.events = const [],
     this.statuses = const [],
     this.thought = const [],
+    this.turnKey,
     this.meta,
     this.browser,
+    this.plan,
     this.answerMessages,
     this.currentAnswer = false,
     this.detailsBuilder,
@@ -308,6 +361,10 @@ class HermesRunActivityOrb extends StatefulWidget {
 
   /// One quiet line over the unfolded steps: model, time, step count.
   final String? meta;
+
+  /// The plan this turn wrote, shown under the line whether or not the steps
+  /// are unfolded.
+  final Widget? plan;
 
   /// The watch-only browser line, while a browsing run can be watched.
   final Widget? browser;
@@ -317,6 +374,10 @@ class HermesRunActivityOrb extends StatefulWidget {
 
   /// The model's thinking, as [hermesThoughtLines] reads it.
   final List<String> thought;
+
+  /// Names the turn this line speaks for, so its open state outlives a
+  /// rebuilt row.
+  final String? turnKey;
   final String sessionId;
   final HermesDesktopTurnState state;
   final bool attention;
@@ -334,13 +395,39 @@ class HermesRunActivityOrb extends StatefulWidget {
   State<HermesRunActivityOrb> createState() => _HermesRunActivityOrbState();
 }
 
+/// Turns whose steps, and whose full details, are unfolded in this app
+/// session.
+final Set<String> _hermesOpenRuns = <String>{};
+final Set<String> _hermesOpenDetails = <String>{};
+
+/// Turns seen running: when one settles its line folds, even if the row that
+/// hosts it was rebuilt while it ran.
+final Set<String> _hermesRanTurns = <String>{};
+
+/// Forgets which turns are unfolded, for tests that reuse a session.
+@visibleForTesting
+void resetHermesOpenRuns() {
+  _hermesOpenRuns.clear();
+  _hermesOpenDetails.clear();
+  _hermesRanTurns.clear();
+}
+
 class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
     with WidgetsBindingObserver {
   bool _foreground = true;
-  bool _expanded = false;
+
+  // Open or folded is remembered per turn, not per widget: while a turn
+  // streams, the chat rebuilds the row that hosts this line, and a tap
+  // must survive that.
+  String get _turn => widget.turnKey ?? widget.sessionId;
+  bool get _expanded => _hermesOpenRuns.contains(_turn);
+  set _expanded(bool open) =>
+      open ? _hermesOpenRuns.add(_turn) : _hermesOpenRuns.remove(_turn);
 
   /// The full run details are unfolded under the steps.
-  bool _details = false;
+  bool get _details => _hermesOpenDetails.contains(_turn);
+  set _details(bool open) =>
+      open ? _hermesOpenDetails.add(_turn) : _hermesOpenDetails.remove(_turn);
   @override
   void initState() {
     super.initState();
@@ -381,6 +468,13 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
     );
     final done =
         widget.state == HermesDesktopTurnState.idle && !widget.attention;
+    if (widget.state == HermesDesktopTurnState.running) {
+      _hermesRanTurns.add(_turn);
+    } else if (widget.state == HermesDesktopTurnState.idle &&
+        _hermesRanTurns.remove(_turn)) {
+      _hermesOpenRuns.remove(_turn);
+      _hermesOpenDetails.remove(_turn);
+    }
     final title = widget.attention
         ? 'Input needed'
         : done
@@ -449,7 +543,7 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                           size: 16,
                           color: widget.failed
                               ? Theme.of(context).colorScheme.error
-                              : palette.muted,
+                              : palette.accent,
                         )
                       : ThinkingOrb(
                           size: OrbSize.size20,
@@ -459,9 +553,8 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                             rows: rows,
                           ),
                           semanticLabel: title,
-                          color: widget.attention
-                              ? palette.accent
-                              : palette.muted,
+                          // The working mark is the signal colour.
+                          color: palette.accent,
                           paused: !_foreground || !HermezLiveMotion.on(context),
                         ),
                 ),
@@ -494,10 +587,12 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                     child: Builder(
                       builder: (context) {
                         final text = widget.attention ? 'Input needed' : label;
+                        // Working or waiting on you reads in the accent;
+                        // a finished line settles to grey.
                         final style = TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: widget.attention
+                          color: widget.attention || !done
                               ? palette.accent
                               : palette.muted,
                         );
@@ -543,6 +638,17 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
       mainAxisSize: MainAxisSize.min,
       children: [
         face(onTap: () => setState(() => _expanded = !open)),
+        if (widget.plan case final plan?)
+          Padding(
+            padding: const EdgeInsets.only(left: 29, right: 4),
+            child: plan,
+          ),
+        // A browsing run shows its browser as it happens, folded or not.
+        if (widget.browser case final browser?)
+          Padding(
+            padding: const EdgeInsets.only(left: 29, bottom: 4),
+            child: browser,
+          ),
         HermezReveal(
           visible: open,
           revealKey: ValueKey('run-steps-${widget.sessionId}'),
@@ -550,7 +656,6 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
             steps: steps,
             showSteps: !(_details || widget.attention),
             meta: widget.meta,
-            browser: widget.browser,
             sessionId: widget.sessionId,
             details: _FullRunDetails(
               sessionId: widget.sessionId,
@@ -619,7 +724,7 @@ class _FullRunDetails extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: palette.ink,
+                        color: palette.accent,
                       ),
                     ),
                   ),
@@ -727,7 +832,6 @@ class _RunSteps extends StatelessWidget {
     required this.steps,
     required this.details,
     this.meta,
-    this.browser,
     this.sessionId,
     this.showSteps = true,
   });
@@ -735,7 +839,6 @@ class _RunSteps extends StatelessWidget {
   final List<HermesRunStep> steps;
   final Widget details;
   final String? meta;
-  final Widget? browser;
 
   /// Lets a tool step unfold its input and result in place.
   final String? sessionId;
@@ -768,21 +871,23 @@ class _RunSteps extends StatelessWidget {
         size: 13,
         color: palette.accent,
       ),
+      // A thought, and a finished step, marked in the accent: the colour
+      // runs down the rail instead of a column of grey.
       HermesActivityRowState.note => Icon(
-        Icons.notes_rounded,
+        Icons.lightbulb_outline_rounded,
         size: 13,
-        color: palette.muted,
+        color: palette.accent.withValues(alpha: 0.8),
       ),
       HermesActivityRowState.done => Icon(
         Icons.check_rounded,
         size: 14,
-        color: palette.muted,
+        color: palette.accent,
       ),
     };
     return Padding(
       padding: const EdgeInsets.only(left: 13, bottom: 6),
       child: CustomPaint(
-        painter: _StepRail(palette.muted.withValues(alpha: 0.35)),
+        painter: _StepRail(palette.accent.withValues(alpha: 0.4)),
         child: Padding(
           padding: const EdgeInsets.only(left: 16),
           child: Column(
@@ -811,12 +916,24 @@ class _RunSteps extends StatelessWidget {
                     style: meta.copyWith(color: palette.muted),
                   ),
                 ),
-              if (showSteps)
-                for (final (i, step) in shown.indexed)
+              // With the full details open their timeline has the tools;
+              // the thoughts stay, since the timeline does not repeat them.
+              for (final (i, step) in shown.indexed)
+                if (showSteps || step.state == HermesActivityRowState.note)
                   _StepLine(
                     key: ValueKey('step-$i-${step.text}'),
                     step: step,
-                    mark: mark(step.state),
+                    // A thought gets the bulb; Hermes' own notes keep
+                    // their lines icon.
+                    mark:
+                        step.state == HermesActivityRowState.note &&
+                            step.row != null
+                        ? Icon(
+                            Icons.notes_rounded,
+                            size: 13,
+                            color: palette.accent.withValues(alpha: 0.8),
+                          )
+                        : mark(step.state),
                     style: meta,
                     sessionId: sessionId,
                   ),
@@ -828,7 +945,6 @@ class _RunSteps extends StatelessWidget {
                     style: meta.copyWith(color: palette.muted),
                   ),
                 ),
-              ?browser,
               details,
             ],
           ),

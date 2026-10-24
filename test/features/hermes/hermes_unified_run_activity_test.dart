@@ -80,6 +80,7 @@ List<Map<String, dynamic>> _history() => [
 ];
 
 void main() {
+  setUp(resetHermesOpenRuns);
   test('live continuation stays in one answer, next user turn detaches it', () {
     final continuation = _answer.copyWith(id: 'continuation');
     expect(hermesCurrentAnswerMessages([_answer, continuation], [_answer]), [

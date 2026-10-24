@@ -98,9 +98,14 @@ List<ChatMessage> restoreHermesDesktopRunningMessage(
       timestamp: DateTime.now(),
       model: modelId,
       isStreaming: true,
-      metadata: const <String, dynamic>{
+      // A Hermes answer like any other: without this the row fell back to
+      // the generic model header and drew the server's avatar for "Chief"
+      // instead of the bot's own icon.
+      metadata: <String, dynamic>{
         kHermesRestoredDesktopRunningMetadataKey:
             _hermesRestoredDesktopPlaceholder,
+        'transport': 'hermesRun',
+        'hermesSessionId': ?validateHermesOpaqueIdentifier(sessionId),
       },
     ),
   );

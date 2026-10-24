@@ -543,7 +543,7 @@ class _HermesDelegatedWorkerCardState
                               TextSpan(
                                 text: worker.displayName,
                                 style: TextStyle(
-                                  color: palette.ink,
+                                  color: palette.accent,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -568,18 +568,28 @@ class _HermesDelegatedWorkerCardState
                             ),
                             const SizedBox(width: 5),
                             Flexible(
-                              child: Text(
-                                state,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: HermezType.meta(palette).copyWith(
-                                  color: attention
-                                      ? palette.accent
-                                      : palette.muted,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
+                              // A working delegate's line shimmers, like
+                              // the run's own line.
+                              child: Builder(
+                                builder: (context) {
+                                  final style = HermezType.meta(palette)
+                                      .copyWith(
+                                        color: attention
+                                            ? palette.accent
+                                            : palette.muted,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      );
+                                  return worker.status.isLive && !attention
+                                      ? HermezShimmerText(state, style: style)
+                                      : Text(
+                                          state,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: style,
+                                        );
+                                },
                               ),
                             ),
                           ],

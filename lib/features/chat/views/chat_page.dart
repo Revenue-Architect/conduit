@@ -4247,8 +4247,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           left: false,
           right: false,
           bottom: !Platform.isAndroid,
+          // Android draws edge to edge: the composer clears the gesture bar
+          // with room to breathe, and keeps a small gap above the keyboard
+          // (whose height the composer itself handles).
           minimum: Platform.isAndroid
-              ? EdgeInsets.zero
+              ? EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom > 0
+                      ? Spacing.sm
+                      : MediaQuery.viewPaddingOf(context).bottom + Spacing.sm,
+                )
               : const EdgeInsets.only(bottom: Spacing.sm),
           child: Column(
             mainAxisSize: MainAxisSize.min,

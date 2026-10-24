@@ -310,8 +310,8 @@ class _PlanRailLineState extends State<_PlanRailLine>
         painter: _PlanRailPainter(
           rail: widget.rail,
           drawn: HermezMotion.curveMedium.transform(_draw.value),
-          faint: palette.ink.withValues(alpha: 0.13),
-          solid: palette.ink.withValues(alpha: 0.5),
+          faint: palette.accent.withValues(alpha: 0.18),
+          solid: palette.accent.withValues(alpha: 0.6),
         ),
       ),
     );

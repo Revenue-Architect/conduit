@@ -162,9 +162,15 @@ class HermesActivityRowView extends StatelessWidget {
             width: tile,
             height: tile,
             decoration: BoxDecoration(
-              color: failed || waiting
-                  ? palette.accent.withValues(alpha: 0.12)
-                  : palette.ink.withValues(alpha: running ? 0.07 : 0.05),
+              // A light wash of the accent: each step reads as Hermez, not
+              // as grey chrome. Stronger when it failed or waits on you.
+              color: palette.accent.withValues(
+                alpha: failed || waiting
+                    ? 0.16
+                    : running
+                    ? 0.12
+                    : 0.08,
+              ),
               borderRadius: BorderRadius.circular(tile * 0.32),
             ),
             child: Center(
@@ -175,7 +181,7 @@ class HermesActivityRowView extends StatelessWidget {
                           ? Icons.error_outline_rounded
                           : hermesActivityIcon(row.family),
                       size: dense ? 15 : 17,
-                      color: failed || waiting ? palette.accent : palette.ink,
+                      color: palette.accent,
                     ),
             ),
           ),
