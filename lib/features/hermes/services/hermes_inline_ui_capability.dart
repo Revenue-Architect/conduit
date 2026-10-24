@@ -20,6 +20,9 @@ String hermesInlineUiTurnText(String text) {
   // Preserve the exact action envelope. Its renderer identifies this current
   // interaction; appending prose would make the JSON invalid for consumers.
   if (text.startsWith('[A2UI_INTERACTION]\n')) return text;
+  // Slash commands are parsed by the gateway, not the model; the suffix would
+  // become part of their arguments.
+  if (text.startsWith('/')) return text;
   return text.endsWith(_hermesInlineUiSuffix) ||
           text.endsWith(_legacyInlineUiSuffix)
       ? text

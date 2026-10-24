@@ -9,6 +9,7 @@ import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_pending_decision_store.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
+import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_technical_background.dart';
 import '../motion/hermez_morph_origin.dart';
@@ -21,6 +22,29 @@ final _attentionDecisionsProvider =
           ? service.pendingDecisions()
           : <HermesPendingDesktopDecision>[];
     });
+
+/// Chief's prepared initiative results still waiting on the owner. A decision
+/// (handled, dismissed, snoozed) archives the objective's chat on the server,
+/// and the default listing excludes archived chats.
+final _preparedProvider =
+    FutureProvider.autoDispose<List<HermesSessionSummary>>((ref) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return <HermesSessionSummary>[];
+      final rows = await service.listSessionsForProfile('default');
+      return rows
+          .map(HermesSessionSummary.fromJson)
+          .whereType<HermesSessionSummary>()
+          .where(
+            (session) =>
+                session.source?.trim().toLowerCase() == 'initiative_objective' &&
+                _objectiveChat.hasMatch(session.id),
+          )
+          .toList(growable: false);
+    });
+
+/// One objective's own chat; the digest, scorecard and tuning chats share the
+/// source label but are reports, not work waiting on the owner.
+final _objectiveChat = RegExp(r'^initiative-[0-9a-f]{24}$');
 
 final _failedJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
@@ -62,9 +86,12 @@ class HermesAttentionPage extends ConsumerWidget {
     );
     final decisions = ref.watch(_attentionDecisionsProvider);
     final failedJobs = ref.watch(_failedJobsProvider);
+    final preparedWork = ref.watch(_preparedProvider);
     final pending =
         decisions.asData?.value ?? const <HermesPendingDesktopDecision>[];
     final failed = failedJobs.asData?.value ?? const <(String, HermesJob)>[];
+    final prepared =
+        preparedWork.asData?.value ?? const <HermesSessionSummary>[];
     final sessionTitles = <String, String>{
       for (final session
           in ref.watch(hermesSessionsProvider).asData?.value ??
@@ -80,6 +107,7 @@ class HermesAttentionPage extends ConsumerWidget {
           onPressed: () {
             ref.invalidate(_attentionDecisionsProvider);
             ref.invalidate(_failedJobsProvider);
+            ref.invalidate(_preparedProvider);
           },
           icon: const Icon(Icons.refresh_rounded),
         ),
@@ -88,6 +116,7 @@ class HermesAttentionPage extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(_attentionDecisionsProvider);
           ref.invalidate(_failedJobsProvider);
+          ref.invalidate(_preparedProvider);
           await ref.read(_attentionDecisionsProvider.future);
         },
         child: ListView(
@@ -104,11 +133,11 @@ class HermesAttentionPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${pending.length + failed.length} items need your review',
+                          '${pending.length + failed.length + prepared.length} items need your review',
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         Text(
-                          'Across approvals, questions, and scheduled runs.',
+                          'Prepared work, approvals, questions, and scheduled runs.',
                           style: TextStyle(fontSize: 11, color: palette.muted),
                         ),
                       ],
@@ -129,11 +158,43 @@ class HermesAttentionPage extends ConsumerWidget {
               ),
             if (pending.isEmpty &&
                 failed.isEmpty &&
+                prepared.isEmpty &&
                 !decisions.isLoading &&
-                !failedJobs.isLoading)
+                !failedJobs.isLoading &&
+                !preparedWork.isLoading)
               const HermesPanel(
                 child: Text('Nothing needs your attention right now.'),
               ),
+            if (prepared.isNotEmpty) ...[
+              const HermesSectionTitle('Prepared for you'),
+              const SizedBox(height: 8),
+              for (final session in prepared) ...[
+                HermesPanel(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.task_alt_rounded,
+                      color: palette.accent,
+                    ),
+                    title: Text(
+                      session.title.trim().isEmpty
+                          ? 'Prepared work'
+                          : session.title.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: const Text(
+                      'Chief prepared this · nothing has been sent',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => openHermesSession(context, ref, session),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 12),
+            ],
             for (final kind in HermesPendingDesktopDecisionKind.values) ...[
               if (pending.any((item) => item.kind == kind)) ...[
                 HermesSectionTitle(_heading(kind)),

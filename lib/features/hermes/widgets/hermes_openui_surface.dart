@@ -8,6 +8,23 @@ import '../services/hermes_openui_parser.dart';
 import 'hermes_openui_images.dart';
 import 'hermez_visual_theme.dart';
 
+final _ownerCommand = RegExp(
+  r'^/initiative ((snooze|handled|dismiss|rewrite|reopen|status) obj_[0-9a-f]+ --version \d+( [A-Za-z0-9_:+-]+)?|weights (apply|skip) [0-9a-f]{12})$',
+);
+
+/// An initiative card button's exact owner command, sent as a plain slash
+/// command so the initiative-control plugin records it without a model turn.
+/// A form's `note` field is appended as one shell-quoted argument. Anything
+/// else (null) keeps the normal `[A2UI_INTERACTION]` path.
+String? hermesOpenuiOwnerCommand(String message, Map<String, dynamic>? values) {
+  if (!_ownerCommand.hasMatch(message)) return null;
+  final note = values?['note'];
+  if (note is! String || note.trim().isEmpty) {
+    return message.startsWith('/initiative rewrite ') ? null : message;
+  }
+  return "$message '${note.trim().replaceAll("'", "'\"'\"'")}'";
+}
+
 /// The same bounded 70-component OpenUI v1 catalog as Hermes Desktop, in Dart.
 /// Local edits never send; explicit buttons use the parent's scoped chat path.
 class HermesOpenuiSurface extends StatefulWidget {
@@ -110,7 +127,11 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
     if (values != null &&
         values.values.any((v) => v is String && v.length > 2048))
       return;
-    final prompt =
+    final message = node.props['message'];
+    final command = message is String
+        ? hermesOpenuiOwnerCommand(message, values)
+        : null;
+    final prompt = command ??
         '[A2UI_INTERACTION]\n${jsonEncode({
           'version': 'v0.9',
           'action': {
