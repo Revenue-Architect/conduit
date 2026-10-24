@@ -20,6 +20,14 @@ const _hermesBotShapes = {
   'drop',
 };
 
+/// The name people see for a profile id. The default profile is the owner's
+/// chief of staff, so it reads as "Chief"; other ids show as they are named.
+/// Wire calls keep the id.
+String hermesProfileDisplayName(String profile) => switch (profile) {
+  'default' || 'Default' => 'Chief',
+  _ => profile,
+};
+
 /// A Hermes Bot Mode agent. Upstream, a bot *is* a Hermes profile — this is one
 /// `profiles.list` row projected onto the sidebar roster.
 class HermesBot {
@@ -87,7 +95,7 @@ class HermesBot {
             botMeta is Map ? botMeta['title'] : null,
             maxCharacters: kMaxHermesBotTitleCharacters,
           ) ??
-          name,
+          hermesProfileDisplayName(name),
       description: validateHermesBoundedString(
         json['description'],
         maxCharacters: kMaxHermesBotTitleCharacters,

@@ -55,6 +55,8 @@ import '../../hermes/models/hermes_bot.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../navigation/widgets/drawer_shell_page.dart'
+    show hermesPhoneUsesDock;
 import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_agentic_providers.dart';
 import '../../hermes/providers/hermes_providers.dart';
@@ -344,7 +346,8 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                       widthFactor: 1,
                       alignment: Alignment.centerLeft,
                       child: Opacity(
-                        opacity: 1 -
+                        opacity:
+                            1 -
                             Curves.easeOut.transform(
                               math.min(1.0, collapse / 0.7),
                             ),
@@ -4164,10 +4167,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ? ref.read(hermesBotAvatarProvider(roster.name)).asData?.value
             : null;
         final rawTitle = roster.title.trim();
-        // The roster title falls back to the profile name "default".
-        // Show that as Default.
+        // The roster title falls back to the profile name "default", which
+        // reads as Chief.
         final title = rawTitle.isEmpty || rawTitle.toLowerCase() == 'default'
-            ? 'Default'
+            ? hermesProfileDisplayName('default')
             : rawTitle;
         return (
           title: title,
@@ -4178,7 +4181,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         );
       }
       return (
-        title: 'Default',
+        title: hermesProfileDisplayName('default'),
         avatar: null,
         shape: 'squircle',
         color: '#8b5cf6',
@@ -4605,8 +4608,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           hasInputFocus:
               hasNativeFocus || (currentFocus != null && currentFocus.hasFocus),
           dismissInputFocus: _dismissComposerFocus,
-          canNavigateBack: () => Navigator.of(context).canPop(),
-          navigateBack: () => Navigator.of(context).pop(),
+          canNavigateBack: () =>
+              Navigator.of(context).canPop() ||
+              hermesPhoneUsesDock(context, ref),
+          navigateBack: () => _navigateBack(context),
           confirmExit: () => ThemedDialogs.confirm(
             context,
             title: l10n.appTitle,
@@ -4775,6 +4780,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return page;
   }
 
+  /// Back out of a chat: to the screen underneath, else (a Hermes phone, whose
+  /// navigation is Home's dock) to Home.
+  void _navigateBack(BuildContext context) {
+    _dismissComposerFocus();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(Routes.hermesHome);
+    }
+  }
+
   void _toggleResponsiveDrawer(BuildContext context) {
     final layout = SidebarDrawerControllerScope.maybeOf(context);
     if (layout == null) return;
@@ -4892,13 +4908,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return buildConduitCenteredAdaptiveAppBar(
       context: context,
       tintColor: tintColor,
-      leading: ConduitAdaptiveAppBarIconButton(
-        key: const ValueKey('chat-sidebar-toggle'),
-        icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
-        iosSymbol: 'line.3.horizontal',
-        onPressed: () => _toggleResponsiveDrawer(context),
-        iconColor: tintColor,
-      ),
+      leading: hermesPhoneUsesDock(context, ref)
+          ? ConduitAdaptiveAppBarIconButton(
+              key: const ValueKey('chat-back-home'),
+              icon: Platform.isIOS
+                  ? CupertinoIcons.chevron_back
+                  : Icons.arrow_back_rounded,
+              iosSymbol: 'chevron.backward',
+              onPressed: () => _navigateBack(context),
+              iconColor: tintColor,
+            )
+          : ConduitAdaptiveAppBarIconButton(
+              key: const ValueKey('chat-sidebar-toggle'),
+              icon: Platform.isIOS
+                  ? CupertinoIcons.line_horizontal_3
+                  : Icons.menu,
+              iosSymbol: 'line.3.horizontal',
+              onPressed: () => _toggleResponsiveDrawer(context),
+              iconColor: tintColor,
+            ),
       title: title,
       actions: actionWidgets,
       cupertinoTrailing: cupertinoTrailing,
@@ -5809,6 +5837,15 @@ _ChatListStableLayoutMetadata _buildChatListStableLayoutMetadata({
   }
 
   final grouping = debugResolveAssistantGroupingForTesting(groupingRows);
+  // In a Hermes conversation only the newest answer carries copy / speak /
+  // retry; older answers keep them behind long-press, so the thread reads as
+  // messages instead of a column of toolbars.
+  final hermesConversation = messages.any(
+    (message) => message.metadata?['transport'] == kHermesTransport,
+  );
+  final newestActionOwner = hermesConversation
+      ? grouping.lastIndexWhere((placement) => placement.showActionBar)
+      : -1;
 
   for (var index = 0; index < messages.length; index++) {
     final message = messages[index];
@@ -5858,7 +5895,9 @@ _ChatListStableLayoutMetadata _buildChatListStableLayoutMetadata({
         versionModelIconUrls: List<String?>.unmodifiable(versionModelIconUrls),
         isArchivedVariant: isArchivedVariant,
         showModelHeader: placement.showModelHeader,
-        showActionBar: placement.showActionBar,
+        showActionBar:
+            placement.showActionBar &&
+            (!hermesConversation || index == newestActionOwner),
         groupMessageIds: List<String>.unmodifiable([
           for (final member in placement.groupIndices) messages[member].id,
         ]),

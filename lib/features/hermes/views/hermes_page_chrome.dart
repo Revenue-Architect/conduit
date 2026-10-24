@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nib_motion/nib_motion.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
@@ -24,7 +25,13 @@ class HermesPageChrome extends StatefulWidget {
     this.showHeader = true,
     this.titleMorphId,
     this.leading,
+    this.brandHeader = false,
   });
+
+  /// The title as the app's own masthead: large, at the left of the top bar
+  /// beside its actions, over the page's construction marks. Nothing scrolls
+  /// under it, so the page starts right below the bar.
+  final bool brandHeader;
 
   final String title;
   final String subtitle;
@@ -93,6 +100,53 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
       titleMorphId: widget.titleMorphId,
       palette: palette,
     );
+    // Status bar icons in the page's own contrast: dark on the white canvas,
+    // light on charcoal.
+    final overlay =
+        (Theme.of(context).brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark)
+            .copyWith(statusBarColor: Colors.transparent);
+    if (widget.brandHeader) {
+      return NibMotionConfig(
+        reducedMotion: context.reduceMotion,
+        entranceWarmup: Duration.zero,
+        child: Theme(
+          data: hermezVisualTheme(Theme.of(context)),
+          child: HermezRouteCanvas(
+            color: palette.canvas,
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: palette.canvas,
+                surfaceTintColor: Colors.transparent,
+                scrolledUnderElevation: 0,
+                systemOverlayStyle: overlay,
+                toolbarHeight: 64,
+                leading: widget.leading,
+                titleSpacing: widget.leading == null ? 22 : 4,
+                centerTitle: false,
+                actions: widget.actions,
+                // The marks run behind the status bar and the actions, from
+                // the top-right corner, as they did behind the large title.
+                flexibleSpace: const HermezTechnicalBackground(
+                  variant: HermezBackgroundVariant.editorial,
+                  child: SizedBox.expand(),
+                ),
+                title: HermezMorphText(
+                  widget.title,
+                  id: widget.titleMorphId,
+                  maxLines: 1,
+                  style: HermesPageChrome.titleStyle(palette)
+                      .copyWith(fontSize: 30, letterSpacing: -1.2),
+                ),
+              ),
+              body: SafeArea(top: false, child: widget.child),
+            ),
+          ),
+        ),
+      );
+    }
     return NibMotionConfig(
       reducedMotion: context.reduceMotion,
       entranceWarmup: Duration.zero,
@@ -106,6 +160,7 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
+              systemOverlayStyle: overlay,
               leading: widget.leading,
               actions: widget.actions,
               centerTitle: true,

@@ -40,6 +40,7 @@ import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
 import '../../features/hermes/kanban/hermes_kanban_page.dart';
 import '../../features/hermes/views/hermes_home_page.dart';
+import '../../features/hermes/views/hermes_tab_shell.dart';
 import '../../features/hermes/views/hermes_bot_detail_page.dart';
 import '../../features/hermes/views/hermes_attention_page.dart';
 import '../../features/push/views/approval_detail_page.dart';
@@ -795,9 +796,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       pageBuilder: (context, state) => _buildHermezPage(
         context: context,
         state: state,
-        // On phones Home is a physical sheet over the same side navigation
-        // as the chat: the menu button or an edge swipe slides it aside, and
-        // the HOME rail brings it back. Tablets keep Home as it was.
+        // On phones Home is the tab shell: Home, Chats, Work and You behind
+        // the bottom dock (drawn in the opposite theme, like the side
+        // navigation). Tablets keep Home with their persistent sidebar.
         child: Builder(
           builder: (context) =>
               state.uri.queryParameters['notification'] != null
@@ -811,10 +812,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 )
               : usesPersistentTabletSidebar(context)
               ? const HermesHomePage()
-              : const DrawerShellPage(
-                  mobileRailLabel: Text('HOME'),
-                  mobileRailSemanticLabel: 'Return to Home',
-                  child: HermesHomePage(),
+              : HermesTabShell(
+                  initialIndex: switch (state.uri.queryParameters['tab']) {
+                    'chats' => 1,
+                    'work' => 2,
+                    'you' => 3,
+                    _ => 0,
+                  },
                 ),
         ),
       ),

@@ -28,7 +28,12 @@ class HermezBotIcons {
 
   static File _mapFile(Directory dir) => File('${dir.path}/bot_icons.json');
 
-  static String _key(String name) => name.trim().toLowerCase();
+  /// One key per bot, whichever of its names a surface shows: the default
+  /// profile reads as "Chief", so both find the icon the owner chose for it.
+  static String _key(String name) {
+    final key = name.trim().toLowerCase();
+    return key == 'chief' ? 'default' : key;
+  }
 
   /// Loads the assignments; call once at startup.
   static Future<void> load() async {

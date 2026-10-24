@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -29,6 +30,12 @@ import 'sidebar_tab_registry.dart';
 /// This shell intentionally does not own an `AdaptiveRouteShell` because the
 /// child routes still need route-specific app bars, native tab bars, and
 /// fullscreen overlays.
+/// One navigation on a Hermes phone: the dock under Home's tabs. Tablets keep
+/// their persistent sidebar; other backends keep the sliding navigation.
+bool hermesPhoneUsesDock(BuildContext context, WidgetRef ref) =>
+    !usesPersistentTabletSidebar(context) &&
+    ref.watch(preferredBackendProvider) == PreferredBackend.hermes;
+
 class DrawerShellPage extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -106,6 +113,11 @@ class _DrawerShellPageState extends ConsumerState<DrawerShellPage> {
       });
     });
     final isTablet = usesPersistentTabletSidebar(context);
+    // Hermes on a phone navigates with the bottom dock on Home; a second,
+    // sliding navigation here would only duplicate it. Chats go back Home.
+    if (hermesPhoneUsesDock(context, ref)) {
+      return MacDesktopShortcuts(child: widget.child);
+    }
     final tabletWidth = ref.watch(sidebarTabletWidthProvider);
     final localizations = AppLocalizations.of(context)!;
     // On phones the navigation under the sliding surface is drawn in the

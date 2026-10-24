@@ -43,7 +43,7 @@ void main() {
     final bot = HermesBot.fromJson({'name': 'default'});
 
     check(bot).isNotNull();
-    check(bot!.title).equals('default');
+    check(bot!.title).equals('Chief'); // the default profile reads as Chief
     check(bot.chatSessionId).isNull();
     check(bot.preview).isNull();
     check(bot.hasAvatar).isFalse();
@@ -112,7 +112,7 @@ void main() {
 
     check(bot).isNotNull();
     check(bot!.name).equals('default');
-    check(bot.title).equals('default');
+    check(bot.title).equals('Chief');
     check(bot.description).isNull();
     check(bot.chatSessionId).isNull();
     check(bot.preview).equals('Can you show me an approval prompt');

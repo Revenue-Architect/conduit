@@ -1,15 +1,12 @@
 import 'package:conduit/core/services/navigation_service.dart';
-import 'package:conduit/features/hermes/kanban/hermes_kanban_summary_provider.dart';
 import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
-import 'package:conduit/features/hermes/motion/hermez_morph_origin.dart';
 import 'package:conduit/features/hermes/motion/hermez_panel_morph.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_session_totals_provider.dart';
 import 'package:conduit/features/hermes/sheets/hermez_modal_sheet.dart';
 import 'package:conduit/features/hermes/views/hermes_conversations_page.dart';
 import 'package:conduit/features/hermes/views/hermes_home_page.dart';
-import 'package:conduit/features/hermes/views/hermes_teams_page.dart';
 import 'package:conduit/features/hermes/widgets/hermes_home_presence.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,9 +51,6 @@ GoRouter _router() {
         builder: (context, state) => const HermesHomePage(),
       ),
       dest(Routes.hermesConversations, RouteNames.hermesConversations),
-      dest(Routes.hermesTeams, RouteNames.hermesTeams),
-      dest(Routes.hermesAttention, RouteNames.hermesAttention),
-      dest(Routes.hermesArtifacts, RouteNames.hermesArtifacts),
     ],
   );
 }
@@ -75,8 +69,6 @@ Future<void> _pumpHome(WidgetTester tester) async {
         hermesBotsProvider.overrideWith((ref) async => _bots),
         hermesHomeProfileJobsProvider.overrideWith((ref) async => []),
         hermesSessionsProvider.overrideWith(_Sessions.new),
-        hermesKanbanSummaryProvider.overrideWith((ref) async => null),
-        hermesTeamsProvider.overrideWith((ref) async => []),
         hermesHomePendingDecisionsProvider.overrideWith((ref) async => []),
       ],
       child: MaterialApp.router(routerConfig: router),
@@ -86,42 +78,6 @@ Future<void> _pumpHome(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('Recent See all grows the whole Recent block into '
-      'Conversations', (tester) async {
-    await _pumpHome(tester);
-    final block = tester.getRect(find.text('RECENT'));
-    await tester.tap(find.text('See all'));
-    await tester.pumpAndSettle();
-    final origin = _opened[RouteNames.hermesConversations];
-    expect(origin, isA<HermezMorphOrigin>());
-    final rect = (origin! as HermezMorphOrigin).resolve();
-    // The origin is the block (header and rows), not the small label.
-    expect(rect.top, lessThanOrEqualTo(block.top));
-    expect(rect.height, greaterThan(block.height * 3));
-  });
-
-  testWidgets('All teams grows the Teams block into Teams', (tester) async {
-    await _pumpHome(tester);
-    await tester.tap(find.text('All teams'));
-    await tester.pumpAndSettle();
-    expect(_opened[RouteNames.hermesTeams], isA<HermezMorphOrigin>());
-  });
-
-  testWidgets('Attention and Artifacts are objects that open with an '
-      'origin', (tester) async {
-    await _pumpHome(tester);
-    expect(find.text('ATTENTION'), findsOneWidget);
-    expect(find.text('Needs your input'), findsOneWidget);
-    await tester.tap(find.text('ATTENTION'));
-    await tester.pumpAndSettle();
-    expect(_opened[RouteNames.hermesAttention], isA<HermezMorphOrigin>());
-
-    await _pumpHome(tester);
-    await tester.tap(find.text('ARTIFACTS'));
-    await tester.pumpAndSettle();
-    expect(_opened[RouteNames.hermesArtifacts], isA<HermezMorphOrigin>());
-  });
-
   testWidgets('the + turns into a bot menu; choosing closes it', (
     tester,
   ) async {

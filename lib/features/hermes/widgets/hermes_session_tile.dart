@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
+import '../motion/hermez_motion.dart'
+    show HermezMotionSurface, HermezMotionWeight;
 import '../motion/hermez_motion_route.dart' show HermezRouteExits;
 import '../../../core/utils/debug_logger.dart';
 import '../../../l10n/app_localizations.dart';
@@ -33,7 +35,9 @@ import '../services/hermes_local_document_trust_store.dart';
 import '../services/hermes_message_mapper.dart';
 import '../services/hermes_pending_decision_store.dart';
 import '../services/hermes_session_provenance.dart';
+import 'hermes_home_avatar.dart';
 import 'hermez_bot_mark.dart';
+import 'hermez_live.dart' show HermezLiveText;
 import 'hermez_chat_palette.dart';
 import 'hermez_relative_time.dart';
 import 'hermez_surfaces.dart';
@@ -56,6 +60,44 @@ bool hermezTextLooksLikeErrorDump(String value) {
   return false;
 }
 
+/// The short time on an inbox row: "now", "12m", then the clock time today,
+/// "Yesterday", the weekday within a week, and the date after that.
+String hermesInboxTimeLabel(DateTime time, {DateTime? now}) {
+  final clock = (now ?? DateTime.now()).toLocal();
+  final local = time.toLocal();
+  final elapsed = clock.difference(local);
+  if (elapsed.inMinutes < 1) return 'now';
+  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes}m';
+  final days = DateTime(
+    clock.year,
+    clock.month,
+    clock.day,
+  ).difference(DateTime(local.year, local.month, local.day)).inDays;
+  if (days <= 0) {
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${local.hour >= 12 ? 'PM' : 'AM'}';
+  }
+  if (days == 1) return 'Yesterday';
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  if (days < 7) return weekdays[local.weekday - 1];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[local.month - 1]} ${local.day}';
+}
+
 /// A single Hermes session row, styled to match the chat conversation tiles —
 /// single-line title, selected highlight, and an in-progress spinner while a
 /// run is streaming. Shared by the Hermes sidebar tab and settings page.
@@ -65,12 +107,35 @@ class HermesSessionTile extends ConsumerWidget {
     this.nested = false,
     this.compact = false,
     this.highlight,
+    this.inbox = false,
+    this.name,
+    this.liveLine,
+    this.needsYou = false,
+    this.menu = true,
     super.key,
   });
 
   final HermesSessionSummary session;
   final bool nested;
   final bool compact;
+
+  /// A messenger row for Home's inbox: the bot's mark, a name and time, and
+  /// one line under them.
+  final bool inbox;
+
+  /// Inbox only: a name that replaces the session's title.
+  final String? name;
+
+  /// Inbox only: what an agent in this conversation is saying while it
+  /// really works. Replaces the preview, in the accent colour.
+  final String? liveLine;
+
+  /// Inbox only: Hermes is waiting on the owner in this conversation.
+  final bool needsYou;
+
+  /// Whether a long press offers fork, rename and delete. Off for a session
+  /// that is not in the session list.
+  final bool menu;
 
   /// A search query: the compact row then shows where it matched.
   final String? highlight;
@@ -86,6 +151,8 @@ class HermesSessionTile extends ConsumerWidget {
     final isGenerating =
         ref.watch(hermesActiveSessionProvider) == session.id &&
         ref.watch(isChatStreamingProvider);
+
+    if (inbox) return _inboxRow(context, ref);
 
     if (compact) {
       final palette = HermezChatPalette.forBrightness(
@@ -237,6 +304,132 @@ class HermesSessionTile extends ConsumerWidget {
               onTap: () => openHermesSession(context, ref, session),
             ),
     );
+  }
+
+  /// The messenger row (see [inbox]).
+  Widget _inboxRow(BuildContext context, WidgetRef ref) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final title = name ?? _displayTitle(context);
+    final live = liveLine;
+    final preview = _inboxPreview(title);
+    final when = session.updatedAt == null
+        ? null
+        : hermesInboxTimeLabel(session.updatedAt!);
+    final profile = session.profile;
+    // What sits under the name: the live line while an agent works, a plain
+    // flag while Hermes waits on the owner, else the last words.
+    // Without words to show: a row named for its bot (Chief, pinned) shows the
+    // chat's own title or an invitation; a chat named for its topic shows who
+    // it is with. Never the same words twice.
+    final ownTitle = _displayTitle(context).trim();
+    final botName = profile == null ? null : hermesProfileDisplayName(profile);
+    final quiet =
+        preview ??
+        (name != null
+            ? (ownTitle.isNotEmpty &&
+                      ownTitle != title &&
+                      ownTitle != profile &&
+                      ownTitle != botName
+                  ? ownTitle
+                  : 'Message $title…')
+            : (botName == title ? null : botName));
+    final subtitle = live != null
+        ? 'working · $live'
+        : needsYou
+        ? 'needs you'
+        : quiet;
+    final row = HermezMotionSurface(
+      weight: HermezMotionWeight.medium,
+      semanticLabel: [title, ?subtitle, ?when].join('. '),
+      onTap: () => openHermesSession(context, ref, session),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              HermesHomeAvatar(
+                profile: profile,
+                working: live != null,
+                needsYou: needsYou && live == null,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: HermezType.section(palette).copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (when != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            when,
+                            maxLines: 1,
+                            style: HermezType.meta(palette)
+                                .copyWith(fontSize: 11.5),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (subtitle != null)
+                      HermezLiveText(
+                        subtitle,
+                        live: live != null,
+                        style: live != null || needsYou
+                            ? HermezType.meta(palette).copyWith(
+                                color: palette.accent,
+                                fontWeight: FontWeight.w600,
+                              )
+                            : HermezType.meta(palette),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!menu) return row;
+    return ConduitContextMenu(
+      actions: _contextMenuActions(context, ref),
+      previewBuilder: buildConversationTileContextPreview,
+      child: row,
+    );
+  }
+
+  /// The last words of the conversation on one line, or null when there are
+  /// none worth showing (nothing, an error dump, or just the title again).
+  String? _inboxPreview(String title) {
+    var text = session.preview;
+    if (text == null) return null;
+    // The client capability note Conduit appends to a turn is for the model.
+    final hidden = text.indexOf('<hermez_client_capability>');
+    if (hidden >= 0) text = text.substring(0, hidden);
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    // A preview that only repeats the title (a chat named after its first
+    // message) says nothing new.
+    final stem = title.replaceAll('…', '').trim();
+    if (text.isEmpty ||
+        text == title ||
+        (stem.length >= 12 && text.startsWith(stem)) ||
+        hermezTextLooksLikeErrorDump(text)) {
+      return null;
+    }
+    return text;
   }
 
   /// The words around the first match in the preview, or null when only the
