@@ -9,6 +9,18 @@ import 'hermez_chat_palette.dart';
 
 /// A run control. The surface stays put and compresses; its label changes
 /// in place while the action runs.
+/// Pills inside the conversation (a turn's plan actions) are set a size
+/// below the composer's, so an action never outweighs the text it acts on.
+class HermezCompactPills extends InheritedWidget {
+  const HermezCompactPills({super.key, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HermezCompactPills>() != null;
+
+  @override
+  bool updateShouldNotify(HermezCompactPills oldWidget) => false;
+}
+
 class HermezRunPill extends StatelessWidget {
   const HermezRunPill({
     super.key,
@@ -31,9 +43,19 @@ class HermezRunPill extends StatelessWidget {
 
   static const padding = EdgeInsets.symmetric(horizontal: 14, vertical: 9);
   static const minHeight = 42.0;
+  static const _compactPadding = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 6,
+  );
 
-  static TextStyle labelStyle(Color color) =>
-      TextStyle(color: color, fontWeight: FontWeight.w700);
+  static EdgeInsets paddingOf(BuildContext context) =>
+      HermezCompactPills.of(context) ? _compactPadding : padding;
+
+  static TextStyle labelStyle(Color color, {bool compact = false}) => TextStyle(
+    color: color,
+    fontWeight: compact ? FontWeight.w600 : FontWeight.w700,
+    fontSize: compact ? 13 : null,
+  );
 
   static BoxDecoration surface(HermezChatPalette palette) => BoxDecoration(
     color: palette.canvas,
@@ -47,6 +69,7 @@ class HermezRunPill extends StatelessWidget {
       Theme.of(context).brightness,
     );
     final enabled = (onTap != null || onOpen != null) && !busy;
+    final compact = HermezCompactPills.of(context);
     final dark = emphasized;
     final foreground = dark
         ? const Color(0xFFF6F5F2)
@@ -63,8 +86,8 @@ class HermezRunPill extends StatelessWidget {
       originColor: dark ? const Color(0xFF17181C) : palette.canvas,
       originBorderColor: quiet ? null : palette.border,
       child: Container(
-        constraints: const BoxConstraints(minHeight: minHeight),
-        padding: padding,
+        constraints: BoxConstraints(minHeight: compact ? 34 : minHeight),
+        padding: compact ? _compactPadding : padding,
         decoration: dark
             ? BoxDecoration(
                 color: const Color(0xFF17181C),
@@ -78,16 +101,21 @@ class HermezRunPill extends StatelessWidget {
           children: [
             if (busy)
               SizedBox.square(
-                dimension: 16,
+                dimension: compact ? 14 : 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: foreground,
                 ),
               )
             else
-              Icon(icon, size: 18, color: foreground),
-            const SizedBox(width: 7),
-            Flexible(child: Text(label, style: labelStyle(foreground))),
+              Icon(icon, size: compact ? 15 : 18, color: foreground),
+            SizedBox(width: compact ? 6 : 7),
+            Flexible(
+              child: Text(
+                label,
+                style: labelStyle(foreground, compact: compact),
+              ),
+            ),
           ],
         ),
       ),

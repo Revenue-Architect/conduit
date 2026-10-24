@@ -678,8 +678,11 @@ class _HermesRunActivityOrbState extends State<HermesRunActivityOrb>
                         final text = widget.attention ? 'Input needed' : label;
                         // Working or waiting on you reads in the accent;
                         // a finished line settles to grey.
+                        // The turn's line heads everything unfolded under
+                        // it: one step above its rows (13.5), below the
+                        // answer's text.
                         final style = TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: widget.attention || !done
                               ? palette.accent
@@ -811,8 +814,8 @@ class _FullRunDetails extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: palette.accent,
                       ),
                     ),
@@ -955,7 +958,12 @@ class _RunSteps extends StatelessWidget {
       ...steps.where((step) => !isThought(step)).take(_shown),
     ];
     final rest = steps.length - shown.length;
-    final meta = TextStyle(fontSize: 12.5, height: 1.3, color: palette.ink);
+    final meta = TextStyle(
+      fontSize: 13.5,
+      height: 1.35,
+      fontWeight: FontWeight.w400,
+      color: palette.ink,
+    );
     Widget mark(HermesActivityRowState state) => switch (state) {
       HermesActivityRowState.running => const HermezLiveDot(
         state: HermezLiveState.working,
@@ -1002,7 +1010,7 @@ class _RunSteps extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: meta.copyWith(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       color: palette.muted,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),

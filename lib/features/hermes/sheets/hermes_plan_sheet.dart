@@ -11,6 +11,7 @@ import '../motion/hermez_motion.dart';
 import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../widgets/hermes_run_actions.dart' show HermezCompactPills;
 import '../widgets/hermes_plan_view.dart';
 import '../widgets/hermez_action_pills.dart';
 import '../widgets/hermez_chat_palette.dart';
@@ -254,7 +255,11 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
         ?subtitle,
         const SizedBox(height: 8),
         body,
-        if (footer != null) ...[const SizedBox(height: 8), footer],
+        // In the chat, the plan's actions sit a size below its steps.
+        if (footer != null) ...[
+          const SizedBox(height: 8),
+          HermezCompactPills(child: footer),
+        ],
       ],
     );
   }
@@ -298,6 +303,8 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
                     key: ValueKey('plan-${row.item.id}'),
                     item: row.item,
                     depth: row.depth,
+                    // Inside the chat, a step reads under the turn's line.
+                    dense: widget.inline,
                     // The plan as a timeline: each step joined to the next.
                     railAbove: i == 0
                         ? null

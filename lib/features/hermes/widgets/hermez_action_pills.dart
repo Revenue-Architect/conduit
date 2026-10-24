@@ -292,18 +292,25 @@ class _PillField extends StatelessWidget {
               child: Padding(
                 // Same insets as the pill, so the icon and label stay put.
                 padding: EdgeInsetsDirectional.fromSTEB(
-                  HermezRunPill.padding.left,
-                  HermezRunPill.padding.top,
+                  HermezRunPill.paddingOf(context).left,
+                  HermezRunPill.paddingOf(context).top,
                   48,
-                  HermezRunPill.padding.bottom,
+                  HermezRunPill.paddingOf(context).bottom,
                 ),
                 child: Row(
                   children: [
-                    Icon(action.icon, size: 18, color: palette.ink),
-                    const SizedBox(width: 7),
+                    Icon(
+                      action.icon,
+                      size: HermezCompactPills.of(context) ? 15 : 18,
+                      color: palette.ink,
+                    ),
+                    SizedBox(width: HermezCompactPills.of(context) ? 6 : 7),
                     Text(
                       action.label,
-                      style: HermezRunPill.labelStyle(palette.ink),
+                      style: HermezRunPill.labelStyle(
+                        palette.ink,
+                        compact: HermezCompactPills.of(context),
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

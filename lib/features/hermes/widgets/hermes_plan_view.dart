@@ -163,11 +163,13 @@ class HermesPlanRow extends StatelessWidget {
         item.status == HermesTodoStatus.cancelled;
     final style = HermezType.body(palette).copyWith(
       fontSize: dense ? 13.5 : 15,
-      height: 1.32,
+      height: 1.35,
       color: finished ? palette.muted : palette.ink,
+      // In the chat (dense) a step is regular weight, under the turn's
+      // semibold line; only the step in progress stands out.
       fontWeight: item.status == HermesTodoStatus.inProgress
-          ? FontWeight.w700
-          : FontWeight.w500,
+          ? (dense ? FontWeight.w600 : FontWeight.w700)
+          : (dense ? FontWeight.w400 : FontWeight.w500),
       decoration: item.status == HermesTodoStatus.cancelled
           ? TextDecoration.lineThrough
           : null,
