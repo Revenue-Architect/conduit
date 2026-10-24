@@ -37,6 +37,19 @@ class HermezStatusColors extends ThemeExtension<HermezStatusColors> {
 }
 
 /// Renderer-owned identity. Agent JSON cannot set colors or load visual assets.
+/// The theme A2UI and OpenUI programs render in. Programs carry no colours,
+/// so their panels are this theme's cards: in light mode they sit on the
+/// near-white canvas itself, set apart by the border token alone, not by a
+/// grey slab or a shadow. Dark mode is unchanged.
+ThemeData hermezGenerativeTheme(ThemeData base) {
+  final theme = hermezVisualTheme(base);
+  if (theme.brightness == Brightness.dark) return theme;
+  final palette = HermezChatPalette.forBrightness(Brightness.light);
+  return theme.copyWith(
+    cardTheme: theme.cardTheme.copyWith(color: palette.canvas),
+  );
+}
+
 ThemeData hermezVisualTheme(ThemeData base) {
   final dark = base.brightness == Brightness.dark;
   final palette = HermezChatPalette.forBrightness(base.brightness);

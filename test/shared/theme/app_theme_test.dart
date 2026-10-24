@@ -33,7 +33,7 @@ void main() {
     addTearDown(mixed.dispose);
     expect(
       hermes.read(appLightThemeProvider).scaffoldBackgroundColor,
-      const Color(0xFFF7F7F7),
+      TweakcnThemes.lightCanvas,
     );
     expect(
       mixed.read(appLightThemeProvider).scaffoldBackgroundColor,
@@ -44,7 +44,7 @@ void main() {
     final palette = TweakcnThemes.byId(null);
     expect(
       palette.variantFor(Brightness.light).background,
-      const Color(0xFFF7F7F7),
+      TweakcnThemes.lightCanvas,
     );
     expect(
       palette.variantFor(Brightness.light).primary,
@@ -61,13 +61,14 @@ void main() {
     expect(TweakcnThemes.byId('conduit').id, palette.id);
     final light = AppTheme.light(palette);
     final dark = AppTheme.dark(palette);
-    expect(light.scaffoldBackgroundColor, const Color(0xFFF7F7F7));
+    expect(light.scaffoldBackgroundColor, TweakcnThemes.lightCanvas);
     expect(
       palette.variantFor(Brightness.light).accent,
       const Color(0xFFEDEDED),
     );
     expect(light.colorScheme.primary, const Color(0xFFFF5A26));
-    expect(light.cardTheme.color, const Color(0xFFFFFFFF));
+    // Cards are a faint grey on the white canvas.
+    expect(light.cardTheme.color, TweakcnThemes.lightSurface);
     expect(dark.scaffoldBackgroundColor, const Color(0xFF111215));
     expect(dark.colorScheme.primary, const Color(0xFFFF6A36));
     expect(dark.cardTheme.color, const Color(0xFF24252A));

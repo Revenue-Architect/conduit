@@ -159,12 +159,18 @@ TweakcnThemeVariant _hermezWithSignal(
 
 class TweakcnThemes {
   /// Shared canvas for the light chat surface and its matching chrome fades.
-  static const Color lightCanvas = Color(0xFFFCFCFC);
+  /// Light mode is near-white; charcoal is the dark mode's canvas only. A2UI
+  /// and OpenUI panels sit on this same near-white (see
+  /// `hermezGenerativeTheme`).
+  static const Color lightCanvas = Color(0xFFFDFDFD);
+
+  /// On a white canvas a surface needs a faint grey to read as one.
+  static const Color lightSurface = Color(0xFFF5F5F6);
 
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
     background: lightCanvas,
     foreground: const Color(0xFF17181C), // graphite ink
-    card: const Color(0xFFFFFFFF),
+    card: lightSurface,
     cardForeground: const Color(0xFF17181C),
     popover: const Color(0xFFFFFFFF),
     popoverForeground: const Color(0xFF17181C),

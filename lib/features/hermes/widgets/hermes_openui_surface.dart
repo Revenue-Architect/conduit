@@ -167,7 +167,7 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
 
   @override
   Widget build(BuildContext context) => Theme(
-    data: hermezVisualTheme(Theme.of(context)),
+    data: hermezGenerativeTheme(Theme.of(context)),
     // A native/custom chat need not have a Scaffold or Material ancestor.
     // Bare form controls, chips and ListTiles still need an ink host even
     // when the generated program does not place them inside a Card.

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_client.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_page.dart';
 import 'package:conduit/features/hermes/views/hermes_artifacts_page.dart';
@@ -642,7 +643,8 @@ void main() {
       Theme.of(tester.element(find.text('New task').last))
           .dialogTheme
           .backgroundColor,
-      const Color(0xFFFFFFFF),
+      // Light surfaces are a faint grey on the white canvas.
+      TweakcnThemes.lightSurface,
     );
     await tester.tap(find.text('OPTIONS'));
     await tester.pumpAndSettle();

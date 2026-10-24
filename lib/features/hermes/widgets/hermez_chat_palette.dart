@@ -67,7 +67,7 @@ class HermezChatPalette {
           )
         : HermezChatPalette(
             canvas: TweakcnThemes.lightCanvas,
-            surface: const Color(0xFFFFFFFF),
+            surface: TweakcnThemes.lightSurface,
             ink: const Color(0xFF17181C),
             muted: const Color(0xFF666765),
             accent: accent,
