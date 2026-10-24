@@ -210,18 +210,24 @@ void main() {
               .first,
         );
         await tester.pumpWidget(header(false));
-        expect(avatarSize(), 56);
+        expect(avatarSize(), kHermesBotHeaderAvatar);
         await tester.pumpWidget(header(true));
         await tester.pump(const Duration(milliseconds: 110));
-        expect(avatarSize(), allOf(greaterThan(33), lessThan(56)));
+        expect(
+          avatarSize(),
+          allOf(
+            greaterThan(kHermesBotHeaderAvatarFolded),
+            lessThan(kHermesBotHeaderAvatar),
+          ),
+        );
         expect(nameOpacity().opacity, allOf(greaterThan(0), lessThan(1)));
         await tester.pumpAndSettle();
-        expect(avatarSize(), 33);
+        expect(avatarSize(), kHermesBotHeaderAvatarFolded);
         expect(nameOpacity().opacity, 0);
         expect(find.bySemanticsLabel('Chief'), findsOneWidget);
         await tester.pumpWidget(header(false, reduced: true));
         await tester.pump();
-        expect(avatarSize(), 56);
+        expect(avatarSize(), kHermesBotHeaderAvatar);
         expect(nameOpacity().opacity, 1);
         expect(tester.takeException(), isNull);
       } finally {
@@ -241,7 +247,7 @@ void main() {
             appBar: buildConduitCenteredAdaptiveAppBar(
               context: context,
               tintColor: Colors.black,
-              toolbarHeight: 64,
+              toolbarHeight: kHermesBotHeaderHeight,
               leading: const SizedBox.square(dimension: 44),
               actions: const [],
               title: debugBuildHermesBotToolbarTitleForTesting(
@@ -252,7 +258,7 @@ void main() {
                   color: '#8b5cf6',
                   imageKind: null,
                 ),
-                maxWidth: 240,
+                maxWidth: 400,
               ),
             ).appBar,
           ),
@@ -260,12 +266,12 @@ void main() {
       ),
     );
     final bar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(bar.toolbarHeight, 64);
+    expect(bar.toolbarHeight, kHermesBotHeaderHeight);
     final avatar = tester.getRect(
       find.byKey(const ValueKey('hermes-bot-toolbar-avatar')),
     );
     final bounds = tester.getRect(find.byType(AppBar));
-    expect(avatar.size, const Size.square(56));
+    expect(avatar.size, const Size.square(kHermesBotHeaderAvatar));
     expect(avatar.top, greaterThanOrEqualTo(bounds.top));
     expect(avatar.bottom, lessThanOrEqualTo(bounds.bottom));
     // The avatar, not the avatar-and-name group, is the toolbar's center.

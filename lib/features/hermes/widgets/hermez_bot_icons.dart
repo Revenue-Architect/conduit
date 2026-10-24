@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -123,6 +124,30 @@ class HermezBotIcons {
           },
       }),
     );
+  }
+
+  static const _frames = MethodChannel('com.conduit.app/video_frame');
+
+  /// Saves [video]'s first frame as the bot's still image, so its poster,
+  /// lists and Home all match the clip. Android only; false when it failed.
+  static Future<bool> useFirstFrame(String botName, File video) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final dir = await _folder();
+      final out = File(
+        '${dir.path}/still_${_key(botName)}_'
+        '${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      final saved = await _frames.invokeMethod<bool>('firstFrame', {
+        'path': video.path,
+        'out': out.path,
+      });
+      if (saved != true || !await out.exists()) return false;
+      await assign(botName, out);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Copies one gallery video into the app's folder, under a fresh name so
@@ -287,8 +312,14 @@ class _VideoRow extends StatelessWidget {
             TextButton(
               onPressed: () async {
                 final picked = await HermezBotIcons.importVideo();
-                if (picked != null) {
-                  await HermezBotIcons.assignVideo(botName, clip, picked);
+                if (picked == null) return;
+                await HermezBotIcons.assignVideo(botName, clip, picked);
+                // The idle clip's first frame becomes the still image; a
+                // working clip gives it only while there is no idle one.
+                if (clip == HermezBotClip.idle ||
+                    HermezBotIcons.videoFor(botName, HermezBotClip.idle) ==
+                        null) {
+                  await HermezBotIcons.useFirstFrame(botName, picked);
                 }
               },
               child: Text(file == null ? 'Choose' : 'Replace'),

@@ -280,9 +280,16 @@ HermesBotChatPresentation? chatHermesBotPresentation(
   );
 }
 
-/// How long the bot header takes to collapse or expand (56 dp ↔ 33 dp).
+/// How long the bot header takes to collapse or expand (98 dp ↔ 58 dp).
 @visibleForTesting
 const kHermesBotHeaderTransition = Duration(milliseconds: 300);
+
+/// The bot's face in a chat header: open, and folded while reading.
+const kHermesBotHeaderAvatar = 98.0;
+const kHermesBotHeaderAvatarFolded = 58.0;
+
+/// Room for the open face and a little air above and below it.
+const kHermesBotHeaderHeight = kHermesBotHeaderAvatar + 8;
 
 class _HermesBotToolbarTitle extends StatelessWidget {
   const _HermesBotToolbarTitle({
@@ -309,7 +316,7 @@ class _HermesBotToolbarTitle extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: SizedBox(
-          height: 64,
+          height: kHermesBotHeaderHeight,
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: compact ? 1 : 0),
             duration: context.reduceMotion
@@ -344,21 +351,30 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                 final mirror = trailing
                     .clamp(
                       0.0,
-                      math.max(0.0, constraints.maxWidth - 56 - trailing),
+                      math.max(
+                        0.0,
+                        constraints.maxWidth -
+                            kHermesBotHeaderAvatar -
+                            trailing,
+                      ),
                     )
                     .toDouble();
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(width: mirror),
-                    // A fixed 56 dp slot: the avatar shrinks about its own
+                    // A fixed 98 dp slot: the avatar shrinks about its own
                     // center.
                     SizedBox.square(
-                      dimension: 56,
+                      dimension: kHermesBotHeaderAvatar,
                       child: Center(
                         child: HermesBotAvatar(
                           key: const ValueKey('hermes-bot-toolbar-avatar'),
-                          size: 56 - 23 * collapse,
+                          size:
+                              kHermesBotHeaderAvatar -
+                              (kHermesBotHeaderAvatar -
+                                      kHermesBotHeaderAvatarFolded) *
+                                  collapse,
                           label: bot.title,
                           imageUrl: bot.avatar,
                           shape: bot.shape,
@@ -4891,7 +4907,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   double _chatToolbarHeight(BuildContext context) {
     final base = conduitAdaptiveToolbarHeightOf(context);
     final bot = _hermesBotPresentation(ref.read(activeConversationProvider));
-    return bot == null ? base : math.max(base, 64);
+    return bot == null ? base : math.max(base, kHermesBotHeaderHeight);
   }
 
   AdaptiveAppBar _buildAdaptiveChatAppBar({

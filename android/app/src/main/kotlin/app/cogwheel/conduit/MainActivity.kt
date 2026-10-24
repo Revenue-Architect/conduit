@@ -688,6 +688,44 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
         
+        // A bot avatar video's first frame, saved as its still image.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.conduit.app/video_frame"
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "firstFrame") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val source = call.argument<String>("path")
+            val out = call.argument<String>("out")
+            if (source == null || out == null) {
+                result.error("INVALID_ARGS", "path and out are required", null)
+                return@setMethodCallHandler
+            }
+            Thread {
+                val saved = try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(source)
+                        val frame = retriever.getFrameAtTime(
+                            0,
+                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                        )
+                        frame != null && FileOutputStream(out).use { stream ->
+                            frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                        }
+                    } finally {
+                        retriever.release()
+                    }
+                } catch (e: Exception) {
+                    Log.w("ConduitVideoFrame", "video first frame failed", e)
+                    false
+                }
+                runOnUiThread { result.success(saved) }
+            }.start()
+        }
+
         // Check if started with context
         handleIntent(intent)
     }

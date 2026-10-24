@@ -218,7 +218,7 @@ void main() {
       await tester.pump(kHermesBotHeaderTransition ~/ 2);
       expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
       await tester.pumpAndSettle();
-      expect(tester.getSize(avatar).width, 33);
+      expect(tester.getSize(avatar).width, kHermesBotHeaderAvatarFolded);
       expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
       // The avatar, not the avatar-and-name group, is the title's center.
       expect(expanded, closeTo(400, 0.5));
