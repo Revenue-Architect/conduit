@@ -30,61 +30,89 @@ class HermezDecisionFrame extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
+    // Part of the conversation, not a box over it: the accent dot and label
+    // head a thin neutral rail, and the question and answers hang under it,
+    // the same branch shape as delegated work and run steps.
     return Semantics(
       container: true,
       label: semanticsLabel,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        decoration: BoxDecoration(
-          color: palette.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: palette.accent.withValues(alpha: 0.55),
-            width: 1.5,
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Material(
           type: MaterialType.transparency,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      eyebrow.toUpperCase(),
-                      style: HermezType.technical(palette.ink),
-                    ),
-                  ),
-                  if (busy)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 8),
-                      child: SizedBox.square(
-                        dimension: 12,
-                        child: CircularProgressIndicator(strokeWidth: 1.5),
+              SizedBox(
+                height: 28,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 10,
+                      child: Center(
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                       ),
                     ),
-                  Text(status, style: HermezType.technical(palette.accent)),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        eyebrow.toUpperCase(),
+                        style: HermezType.technical(palette.ink),
+                      ),
+                    ),
+                    if (busy)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: SizedBox.square(
+                          dimension: 12,
+                          child: CircularProgressIndicator(strokeWidth: 1.5),
+                        ),
+                      ),
+                    Text(status, style: HermezType.technical(palette.accent)),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              ...children,
+              CustomPaint(
+                painter: _DecisionRail(palette.muted.withValues(alpha: 0.35)),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 0, 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _DecisionRail extends CustomPainter {
+  const _DecisionRail(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) => canvas.drawLine(
+    const Offset(5, 0),
+    Offset(5, size.height),
+    Paint()
+      ..color = color
+      ..strokeWidth = 1,
+  );
+
+  @override
+  bool shouldRepaint(_DecisionRail oldDelegate) => oldDelegate.color != color;
 }
 
 /// The action or command a decision is about, as a terminal line.
@@ -101,9 +129,8 @@ class HermezCommandBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: palette.canvas,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border.withValues(alpha: 0.8)),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         '> $text',
@@ -149,11 +176,7 @@ class HermezDecisionOption extends StatelessWidget {
       Theme.of(context).brightness,
     );
     final danger = Theme.of(context).colorScheme.error;
-    final edge = destructive
-        ? danger.withValues(alpha: 0.6)
-        : selected
-        ? palette.accent
-        : palette.border;
+    // A quiet fill, outlined only when held as the choice.
     return Opacity(
       opacity: enabled ? 1 : 0.55,
       child: HermezMotionSurface(
@@ -167,10 +190,12 @@ class HermezDecisionOption extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             decoration: BoxDecoration(
               color: selected
-                  ? palette.accent.withValues(alpha: 0.08)
+                  ? palette.accent.withValues(alpha: 0.10)
                   : palette.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: edge, width: selected ? 1.5 : 1),
+              borderRadius: BorderRadius.circular(12),
+              border: selected
+                  ? Border.all(color: palette.accent, width: 1.5)
+                  : null,
             ),
             child: Row(
               children: [

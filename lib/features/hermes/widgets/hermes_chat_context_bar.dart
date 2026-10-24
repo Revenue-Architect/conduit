@@ -11,15 +11,19 @@ import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../sheets/hermes_delegates_sheet.dart';
 import '../sheets/hermes_model_sheet.dart';
-import '../sheets/hermes_plan_sheet.dart';
+import '../sheets/hermes_plan_sheet.dart' show HermesPlanInline;
+import 'hermes_inline_delegation.dart'
+    show HermesDelegationProgress, HermesInlineDelegation;
+import 'hermes_turn_delegation.dart' show HermesDelegationScope;
 import 'hermes_plan_view.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_live.dart';
 
 /// Above the composer in every Hermes chat: what this chat is working on
 /// and with what. [Page] [Plan 3/7] [2 delegates] [Model · Effort].
-/// Each opens its own sheet; none of them changes anything by itself.
-class HermesChatContextBar extends ConsumerWidget {
+/// The plan and the delegates unfold in place above the row, attached to the
+/// composer; the model is a picker. None of them changes anything by itself.
+class HermesChatContextBar extends ConsumerStatefulWidget {
   const HermesChatContextBar({
     super.key,
     required this.sessionId,
@@ -35,8 +39,23 @@ class HermesChatContextBar extends ConsumerWidget {
   final HermesPageSummary? page;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionId = this.sessionId;
+  ConsumerState<HermesChatContextBar> createState() =>
+      _HermesChatContextBarState();
+}
+
+class _HermesChatContextBarState extends ConsumerState<HermesChatContextBar> {
+  /// Which tray is unfolded above the pills: 'plan', 'delegates' or none.
+  String? _open;
+
+  void _toggle(String tray) =>
+      setState(() => _open = _open == tray ? null : tray);
+
+  @override
+  Widget build(BuildContext context) {
+    final sessionId = widget.sessionId;
+    final profile = widget.profile;
+    final profileTitle = widget.profileTitle;
+    final page = widget.page;
     final snapshot = sessionId == null
         ? null
         : ref.watch(hermesAgenticStateProvider(sessionId)).value;
@@ -81,11 +100,11 @@ class HermesChatContextBar extends ConsumerWidget {
         _ContextPill(
           key: const ValueKey('ctx-page'),
           icon: Icons.article_outlined,
-          label: page!.title,
-          semanticLabel: 'Open the Page ${page!.title}',
+          label: page.title,
+          semanticLabel: 'Open the Page ${page.title}',
           onTap: () => NavigationService.router.pushNamed(
             RouteNames.spacePage,
-            pathParameters: {'spaceId': page!.spaceId, 'pageId': page!.id},
+            pathParameters: {'spaceId': page.spaceId, 'pageId': page.id},
           ),
         ),
       if (plan != null && !plan.isEmpty && sessionId != null)
@@ -98,30 +117,29 @@ class HermesChatContextBar extends ConsumerWidget {
           label: '${plan.completed}/${plan.total}',
           prefix: plan.hasActiveWork && !running ? 'Paused' : 'Plan',
           tabular: true,
+          // Real progress: steps Hermes marked done out of the plan's steps.
+          progress: plan.total == 0 ? null : plan.completed / plan.total,
+          selected: _open == 'plan',
           semanticLabel:
-              '${hermesPlanStatus(plan, running: running)}. Open the plan',
-          onOpen: (origin) => showHermesPlanSheet(
-            context,
-            sessionId: sessionId,
-            origin: origin,
-          ),
+              '${hermesPlanStatus(plan, running: running)}. '
+              '${_open == 'plan' ? 'Hide' : 'Show'} the plan',
+          onTap: () => _toggle('plan'),
         ),
-      if (workers.isNotEmpty && sessionId != null)
+      // Delegates appear while they work only: once each has replied, its
+      // branch in the conversation is the record.
+      if (liveWorkers > 0 && sessionId != null)
         _ContextPill(
           key: const ValueKey('ctx-delegates'),
-          leading: liveWorkers > 0
-              ? const HermezLiveDot(state: HermezLiveState.working, size: 6)
-              : null,
+          leading: const HermezLiveDot(state: HermezLiveState.working, size: 6),
           icon: Icons.call_split_rounded,
-          label: liveWorkers > 0 ? '$liveWorkers' : '${workers.length}',
-          prefix: liveWorkers > 0 ? 'Delegates' : 'Delegated',
+          label: '$liveWorkers',
+          prefix: 'Working',
           tabular: true,
-          semanticLabel: '${hermesDelegatesSummary(workers)}. Open delegates',
-          onOpen: (origin) => showHermesDelegatesSheet(
-            context,
-            sessionId: sessionId,
-            origin: origin,
-          ),
+          selected: _open == 'delegates',
+          semanticLabel:
+              '${hermesDelegatesSummary(workers)}. '
+              '${_open == 'delegates' ? 'Hide' : 'Show'} delegates',
+          onTap: () => _toggle('delegates'),
         ),
       _ContextPill(
         key: const ValueKey('ctx-model'),
@@ -142,7 +160,37 @@ class HermesChatContextBar extends ConsumerWidget {
         ),
       ),
     ];
-    return SizedBox(
+    final showPlan =
+        _open == 'plan' && sessionId != null && plan != null && !plan.isEmpty;
+    final showDelegates =
+        _open == 'delegates' && sessionId != null && liveWorkers > 0;
+    final tray = showPlan
+        ? HermesPlanInline(
+            key: const ValueKey('ctx-plan-tray'),
+            sessionId: sessionId,
+            onClose: () => setState(() => _open = null),
+          )
+        : showDelegates
+        ? HermesDelegationScope(
+            key: const ValueKey('ctx-delegates-tray'),
+            parentSessionId: sessionId,
+            parentLabel: 'Parent',
+            workers: workers,
+            builder: (load, open, artifact) => HermesInlineDelegation(
+              workers: workers,
+              parentSessionId: sessionId,
+              parentLabel: 'Parent',
+              turnKey: 'tray',
+              loadConversation: load,
+              onOpenSession: open,
+              loadArtifact: artifact,
+            ),
+          )
+        : null;
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final row = SizedBox(
       height: 40,
       child: ShaderMask(
         // The row's trailing edge dissolves instead of clipping a pill.
@@ -160,6 +208,37 @@ class HermesChatContextBar extends ConsumerWidget {
         ),
       ),
     );
+    // The tray grows up out of the row, over the conversation, and folds back
+    // into its pill. It scrolls on its own when the plan is long.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        HermezReveal(
+          visible: tray != null,
+          revealKey: ValueKey('ctx-tray-${_open ?? ''}'),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.42,
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: tray ?? const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
+        ),
+        row,
+      ],
+    );
   }
 }
 
@@ -175,9 +254,17 @@ class _ContextPill extends StatelessWidget {
     this.leading,
     this.chevron = false,
     this.tabular = false,
+    this.progress,
+    this.selected = false,
     this.onTap,
     this.onOpen,
   });
+
+  /// Its tray is unfolded: the pill turns to ink, like a pressed key.
+  final bool selected;
+
+  /// A small bar after the label, for a real done/total fraction.
+  final double? progress;
 
   final IconData icon;
   final String label;
@@ -198,8 +285,13 @@ class _ContextPill extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
+    // On the ink fill of an open tray, the pill's words turn light.
+    final ink = selected ? palette.surface : palette.ink;
+    final muted = selected
+        ? palette.surface.withValues(alpha: 0.72)
+        : palette.muted;
     final labelStyle = TextStyle(
-      color: palette.ink,
+      color: ink,
       fontSize: 13,
       height: 1.1,
       fontWeight: FontWeight.w700,
@@ -216,13 +308,15 @@ class _ContextPill extends StatelessWidget {
       originBorderColor: palette.border,
       onTap: onTap,
       onOpen: onOpen,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
         constraints: const BoxConstraints(minHeight: 34, maxWidth: 230),
         padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 10, 6),
+        // A quiet fill, no outline: these are controls, not cards.
         decoration: BoxDecoration(
-          color: palette.surface,
+          color: selected ? palette.ink : palette.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: palette.border.withValues(alpha: 0.9)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -231,14 +325,14 @@ class _ContextPill extends StatelessWidget {
               leading!,
               const SizedBox(width: 2),
             ] else ...[
-              Icon(icon, size: 15, color: palette.ink),
+              Icon(icon, size: 15, color: ink),
               const SizedBox(width: 6),
             ],
             if (prefix != null) ...[
               Text(
                 prefix!,
                 style: labelStyle.copyWith(
-                  color: palette.muted,
+                  color: muted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -252,12 +346,19 @@ class _ContextPill extends StatelessWidget {
                 style: labelStyle,
               ),
             ),
+            if (progress != null) ...[
+              const SizedBox(width: 7),
+              SizedBox(
+                width: 36,
+                child: HermesDelegationProgress(value: progress!),
+              ),
+            ],
             if (suffix.isNotEmpty) ...[
               const SizedBox(width: 5),
               Text(
                 suffix,
                 style: labelStyle.copyWith(
-                  color: palette.muted,
+                  color: muted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -268,11 +369,7 @@ class _ContextPill extends StatelessWidget {
             ],
             if (chevron) ...[
               const SizedBox(width: 2),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 17,
-                color: palette.muted,
-              ),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: muted),
             ],
           ],
         ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../models/hermes_todo.dart';
 import '../models/hermes_completed_run_snapshot.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_session.dart';
@@ -21,7 +22,7 @@ import '../widgets/hermes_session_tile.dart';
 import '../widgets/hermes_run_action_dialogs.dart';
 import '../widgets/hermes_run_actions.dart';
 import '../widgets/hermez_chat_palette.dart';
-import '../motion/hermez_morph_origin.dart';
+import '../motion/hermez_presence.dart' show HermezReveal;
 import 'hermes_page_chrome.dart';
 import '../providers/hermes_agentic_providers.dart';
 import '../services/hermes_activity_presenter.dart';
@@ -31,7 +32,6 @@ import '../sheets/hermes_plan_sheet.dart';
 import '../sheets/hermes_tool_inspector_sheet.dart';
 import '../widgets/hermes_plan_view.dart';
 import '../widgets/hermez_live.dart';
-import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_surfaces.dart';
 import '../motion/hermez_motion_surface.dart';
 import '../motion/hermez_motion_tokens.dart';
@@ -65,6 +65,7 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
     this.openChat = false,
     this.profile,
     this.embedded = false,
+    this.inline = false,
     this.answerMessages,
     this.currentAnswer = false,
     this.delegation,
@@ -79,6 +80,10 @@ class HermesLiveRunPage extends ConsumerStatefulWidget {
   /// Profile supplied by a scoped originating-session link; never changes credentials.
   final String? profile;
   final bool embedded;
+
+  /// Drawn inside the answer's own unfolded activity rather than as a page:
+  /// no chrome, no headline, no completion sheet; its parts sit on the rail.
+  final bool inline;
   final List<ChatMessage>? answerMessages;
   final bool currentAnswer;
   final HermesSubagentState? delegation;
@@ -301,6 +306,309 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
         child: const Center(child: CircularProgressIndicator()),
       );
     }
+    final Widget body = service is! HermesDesktopApiService
+        ? const Center(child: Text('Live run is unavailable.'))
+        : StreamBuilder<HermesDesktopTurnState>(
+            stream: service.turnStatesFor(widget.sessionId),
+            initialData: service.turnStateFor(widget.sessionId),
+            builder: (context, turn) {
+              final state = turn.data ?? HermesDesktopTurnState.idle;
+              final scoped = widget.answerMessages != null;
+              final localMessages = scoped
+                  ? ref.watch(chatMessagesProvider)
+                  : const <ChatMessage>[];
+              final liveAnswer = scoped && widget.currentAnswer
+                  ? hermesCurrentAnswerMessages(
+                      localMessages,
+                      widget.answerMessages!,
+                    )
+                  : const <ChatMessage>[];
+              final activeAnswer =
+                  !scoped ||
+                  (widget.currentAnswer &&
+                      (localMessages.isEmpty || liveAnswer.isNotEmpty));
+              final answerMessages = liveAnswer.isNotEmpty
+                  ? liveAnswer
+                  : widget.answerMessages;
+              final running =
+                  activeAnswer && state == HermesDesktopTurnState.running;
+              if (running) {
+                if (!_sawRunning) {
+                  _startedAt = DateTime.now();
+                  _completionPresented = false;
+                }
+                _sawRunning = true;
+              } else if (!activeAnswer) {
+                _sawRunning = false;
+              } else if (_sawRunning &&
+                  state == HermesDesktopTurnState.idle &&
+                  !_completionPresented) {
+                _completionPresented = true;
+                _sawRunning = false;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    setState(
+                      () => _historyFuture = service.readRunDetailsMessages(
+                        widget.sessionId,
+                      ),
+                    );
+                    if (!widget.inline) _presentCompletion(service, current);
+                  }
+                });
+              }
+              return FutureBuilder<List<Map<String, dynamic>>>(
+                key: ValueKey('history-${widget.sessionId}'),
+                future: _historyFuture,
+                builder: (context, history) {
+                  final messages =
+                      history.data ?? const <Map<String, dynamic>>[];
+                  final selected = scoped
+                      ? hermesAnswerTranscript(messages, answerMessages!)
+                      : messages;
+                  final statuses = <ChatStatusUpdate>[];
+                  // The stored mapper restores arguments/results into the
+                  // same status contracts the old Explored sheet rendered.
+                  for (final message in hermesMessagesToChatMessages(
+                    selected,
+                    sessionId: widget.sessionId,
+                  )) {
+                    statuses.addAll(message.statusHistory);
+                  }
+                  final localStatuses = [
+                    for (final message
+                        in answerMessages ?? const <ChatMessage>[])
+                      ...message.statusHistory,
+                  ];
+                  if (activeAnswer && localStatuses.isNotEmpty) {
+                    // A sheet left open during a turn receives new arguments
+                    // and results from the existing chat state, not a snapshot.
+                    statuses
+                      ..clear()
+                      ..addAll(localStatuses);
+                  } else if (statuses.isEmpty) {
+                    for (final message
+                        in answerMessages ?? const <ChatMessage>[]) {
+                      statuses.addAll(message.statusHistory);
+                    }
+                  }
+                  final stored = hermesTranscriptActivity(
+                    widget.sessionId,
+                    selected,
+                    sensitiveValues: service.config.sensitiveValues,
+                  );
+                  return StreamBuilder<List<HermesLiveActivityEvent>>(
+                    key: ValueKey('activity-${widget.sessionId}'),
+                    stream: service.activityFor(widget.sessionId),
+                    initialData: service.activitySnapshotFor(widget.sessionId),
+                    builder: (context, activity) {
+                      final live = activeAnswer
+                          ? HermesRunSummary.latest(
+                              activity.data ?? const [],
+                              running: running,
+                            ).events
+                          : const <HermesLiveActivityEvent>[];
+                      final events = mergeHermesRunHistory(
+                        stored,
+                        scoped ? live : activity.data ?? const [],
+                      );
+                      final children = <Widget>[
+                        _LiveHero(
+                          compact: widget.inline,
+                          sessionId: widget.sessionId,
+                          state: activeAnswer
+                              ? state
+                              : HermesDesktopTurnState.idle,
+                          events: events,
+                          startedAt: _startedAt,
+                          showAgentic: activeAnswer,
+                          model: hermesTranscriptModel(
+                            selected,
+                            sensitiveValues: service.config.sensitiveValues,
+                          ),
+                        ),
+                        if (!widget.inline) const SizedBox(height: 18),
+                        if (activeAnswer)
+                          _PendingRunRequests(sessionId: widget.sessionId),
+                        // Inline, the answer's line already offers it.
+                        if (!widget.inline &&
+                            activeAnswer &&
+                            running &&
+                            parseSteelViewerUrl(
+                                  ref.watch(hermesSteelViewerUrlProvider),
+                                ) !=
+                                null &&
+                            HermesRunSummary.conversation(
+                              events,
+                              running: running,
+                            ).tools.any(
+                              (tool) =>
+                                  HermesActivityPresenter.family(tool.name) ==
+                                  HermesActivityFamily.browser,
+                            ))
+                          HermesRunBrowserSection(
+                            viewerUrl: ref.watch(hermesSteelViewerUrlProvider),
+                            sessionId: widget.sessionId,
+                          ),
+                        if (history.connectionState == ConnectionState.waiting)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Text('Loading saved conversation activity…'),
+                          ),
+                        if (history.hasError)
+                          _RunSection(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Saved activity is unavailable. Live activity is still shown.',
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    _historyFuture = service
+                                        .readRunDetailsMessages(
+                                          widget.sessionId,
+                                        );
+                                  }),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (HermesActivityPresenter.rows(
+                              events,
+                              running: running,
+                            ).isNotEmpty ||
+                            statuses.isNotEmpty) ...[
+                          if (!widget.inline) ...[
+                            const HermesSectionTitle('Activity'),
+                            const SizedBox(height: 8),
+                          ],
+                          _RunSection(
+                            child: Builder(
+                              builder: (context) {
+                                final rows = HermesActivityPresenter.rows(
+                                  events,
+                                  running: running,
+                                );
+                                if (rows.isEmpty && statuses.isEmpty) {
+                                  return const Text(
+                                    'No tool steps were recorded. Conversation responses are below.',
+                                  );
+                                }
+                                return HermesUnifiedActivityTimeline(
+                                  rows: rows,
+                                  statuses: filterVisibleStatusUpdates(
+                                    hermesSafeRunStatuses(
+                                      statuses,
+                                      service.config.sensitiveValues,
+                                    ),
+                                    isStreaming: running,
+                                  ),
+                                  running: running,
+                                  // Inline, each row folds its own output open; no sheet.
+                                  onInspect: widget.inline
+                                      ? null
+                                      : (row, origin) =>
+                                            showHermesToolInspector(
+                                              context,
+                                              sessionId: widget.sessionId,
+                                              row: row,
+                                              origin: origin,
+                                            ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        for (final message
+                            in answerMessages ?? const <ChatMessage>[])
+                          if (message.error != null)
+                            _RunSection(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      HermesActivityPresenter.clean(
+                                            message.error?.content,
+                                            sensitiveValues:
+                                                service.config.sensitiveValues,
+                                            max: 2048,
+                                          ) ??
+                                          'This run reported an error.',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        // Opened from an answer, the conversation is right
+                        // behind this sheet; don't repeat it here.
+                        if (messages.isNotEmpty && answerMessages == null)
+                          _SavedConversationResults(
+                            key: ValueKey('results-${widget.sessionId}'),
+                            messages: messages,
+                            sensitiveValues: service.config.sensitiveValues,
+                          ),
+                        HermesRunActions(
+                          showSteer: running,
+                          onSteer: running
+                              ? (text) => _steer(service, text)
+                              : null,
+                          leading: [
+                            if (!widget.embedded && !widget.inline)
+                              HermezRunPill(
+                                label: 'View chat',
+                                icon: Icons.chat_bubble_outline_rounded,
+                                onTap: () =>
+                                    openHermesSession(context, ref, current),
+                              ),
+                          ],
+                          trailing: [
+                            if (running)
+                              HermezRunPill(
+                                label: 'Stop',
+                                icon: Icons.stop_circle_outlined,
+                                onTap: _busy
+                                    ? null
+                                    : () => setState(
+                                        () =>
+                                            _confirmingStop = !_confirmingStop,
+                                      ),
+                              ),
+                          ],
+                        ),
+                        HermesStopGuard(
+                          open: _confirmingStop && running,
+                          onKeepRunning: () =>
+                              setState(() => _confirmingStop = false),
+                          onStop: () => _stop(service),
+                        ),
+                      ];
+                      return widget.inline
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: children,
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
+                              children: children,
+                            );
+                    },
+                  );
+                },
+              );
+            },
+          );
+    // In the answer itself: the same run, unfolded under its line.
+    if (widget.inline) return body;
     return HermesPageChrome(
       // A new chat has no server title yet; never headline a placeholder.
       title: current.title == 'Untitled session'
@@ -325,291 +633,7 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
             label: const Text('Retry opening chat'),
           ),
       ],
-      child: service is! HermesDesktopApiService
-          ? const Center(child: Text('Live run is unavailable.'))
-          : StreamBuilder<HermesDesktopTurnState>(
-              stream: service.turnStatesFor(widget.sessionId),
-              initialData: service.turnStateFor(widget.sessionId),
-              builder: (context, turn) {
-                final state = turn.data ?? HermesDesktopTurnState.idle;
-                final scoped = widget.answerMessages != null;
-                final localMessages = scoped
-                    ? ref.watch(chatMessagesProvider)
-                    : const <ChatMessage>[];
-                final liveAnswer = scoped && widget.currentAnswer
-                    ? hermesCurrentAnswerMessages(
-                        localMessages,
-                        widget.answerMessages!,
-                      )
-                    : const <ChatMessage>[];
-                final activeAnswer =
-                    !scoped ||
-                    (widget.currentAnswer &&
-                        (localMessages.isEmpty || liveAnswer.isNotEmpty));
-                final answerMessages = liveAnswer.isNotEmpty
-                    ? liveAnswer
-                    : widget.answerMessages;
-                final running =
-                    activeAnswer && state == HermesDesktopTurnState.running;
-                if (running) {
-                  if (!_sawRunning) {
-                    _startedAt = DateTime.now();
-                    _completionPresented = false;
-                  }
-                  _sawRunning = true;
-                } else if (!activeAnswer) {
-                  _sawRunning = false;
-                } else if (_sawRunning &&
-                    state == HermesDesktopTurnState.idle &&
-                    !_completionPresented) {
-                  _completionPresented = true;
-                  _sawRunning = false;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(
-                        () => _historyFuture = service.readRunDetailsMessages(
-                          widget.sessionId,
-                        ),
-                      );
-                      _presentCompletion(service, current);
-                    }
-                  });
-                }
-                return FutureBuilder<List<Map<String, dynamic>>>(
-                  key: ValueKey('history-${widget.sessionId}'),
-                  future: _historyFuture,
-                  builder: (context, history) {
-                    final messages =
-                        history.data ?? const <Map<String, dynamic>>[];
-                    final selected = scoped
-                        ? hermesAnswerTranscript(messages, answerMessages!)
-                        : messages;
-                    final statuses = <ChatStatusUpdate>[];
-                    // The stored mapper restores arguments/results into the
-                    // same status contracts the old Explored sheet rendered.
-                    for (final message in hermesMessagesToChatMessages(
-                      selected,
-                      sessionId: widget.sessionId,
-                    )) {
-                      statuses.addAll(message.statusHistory);
-                    }
-                    final localStatuses = [
-                      for (final message
-                          in answerMessages ?? const <ChatMessage>[])
-                        ...message.statusHistory,
-                    ];
-                    if (activeAnswer && localStatuses.isNotEmpty) {
-                      // A sheet left open during a turn receives new arguments
-                      // and results from the existing chat state, not a snapshot.
-                      statuses
-                        ..clear()
-                        ..addAll(localStatuses);
-                    } else if (statuses.isEmpty) {
-                      for (final message
-                          in answerMessages ?? const <ChatMessage>[]) {
-                        statuses.addAll(message.statusHistory);
-                      }
-                    }
-                    final stored = hermesTranscriptActivity(
-                      widget.sessionId,
-                      selected,
-                      sensitiveValues: service.config.sensitiveValues,
-                    );
-                    return StreamBuilder<List<HermesLiveActivityEvent>>(
-                      key: ValueKey('activity-${widget.sessionId}'),
-                      stream: service.activityFor(widget.sessionId),
-                      initialData: service.activitySnapshotFor(
-                        widget.sessionId,
-                      ),
-                      builder: (context, activity) {
-                        final live = activeAnswer
-                            ? HermesRunSummary.latest(
-                                activity.data ?? const [],
-                                running: running,
-                              ).events
-                            : const <HermesLiveActivityEvent>[];
-                        final events = mergeHermesRunHistory(
-                          stored,
-                          scoped ? live : activity.data ?? const [],
-                        );
-                        return ListView(
-                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
-                          children: [
-                            _LiveHero(
-                              sessionId: widget.sessionId,
-                              state: activeAnswer
-                                  ? state
-                                  : HermesDesktopTurnState.idle,
-                              events: events,
-                              startedAt: _startedAt,
-                              showAgentic: activeAnswer,
-                              model: hermesTranscriptModel(
-                                selected,
-                                sensitiveValues: service.config.sensitiveValues,
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            if (activeAnswer)
-                              _PendingRunRequests(sessionId: widget.sessionId),
-                            if (activeAnswer &&
-                                running &&
-                                parseSteelViewerUrl(
-                                      ref.watch(hermesSteelViewerUrlProvider),
-                                    ) !=
-                                    null &&
-                                HermesRunSummary.conversation(
-                                  events,
-                                  running: running,
-                                ).tools.any(
-                                  (tool) =>
-                                      HermesActivityPresenter.family(
-                                        tool.name,
-                                      ) ==
-                                      HermesActivityFamily.browser,
-                                ))
-                              HermesRunBrowserSection(
-                                viewerUrl: ref.watch(
-                                  hermesSteelViewerUrlProvider,
-                                ),
-                                sessionId: widget.sessionId,
-                              ),
-                            if (history.connectionState ==
-                                ConnectionState.waiting)
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  'Loading saved conversation activity…',
-                                ),
-                              ),
-                            if (history.hasError)
-                              HermesPanel(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Saved activity is unavailable. Live activity is still shown.',
-                                    ),
-                                    TextButton(
-                                      onPressed: () => setState(() {
-                                        _historyFuture = service
-                                            .readRunDetailsMessages(
-                                              widget.sessionId,
-                                            );
-                                      }),
-                                      child: const Text('Retry'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (HermesActivityPresenter.rows(
-                                  events,
-                                  running: running,
-                                ).isNotEmpty ||
-                                statuses.isNotEmpty) ...[
-                              const HermesSectionTitle('Activity'),
-                              const SizedBox(height: 8),
-                              HermesPanel(
-                                child: Builder(
-                                  builder: (context) {
-                                    final rows = HermesActivityPresenter.rows(
-                                      events,
-                                      running: running,
-                                    );
-                                    if (rows.isEmpty && statuses.isEmpty) {
-                                      return const Text(
-                                        'No tool steps were recorded. Conversation responses are below.',
-                                      );
-                                    }
-                                    return HermesUnifiedActivityTimeline(
-                                      rows: rows,
-                                      statuses: filterVisibleStatusUpdates(
-                                        hermesSafeRunStatuses(
-                                          statuses,
-                                          service.config.sensitiveValues,
-                                        ),
-                                        isStreaming: running,
-                                      ),
-                                      running: running,
-                                      onInspect: (row, origin) =>
-                                          showHermesToolInspector(
-                                            context,
-                                            sessionId: widget.sessionId,
-                                            row: row,
-                                            origin: origin,
-                                          ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                            for (final message
-                                in answerMessages ?? const <ChatMessage>[])
-                              if (message.error != null)
-                                HermesPanel(
-                                  child: Text(
-                                    HermesActivityPresenter.clean(
-                                          message.error?.content,
-                                          sensitiveValues:
-                                              service.config.sensitiveValues,
-                                          max: 2048,
-                                        ) ??
-                                        'This run reported an error.',
-                                  ),
-                                ),
-                            // Opened from an answer, the conversation is right
-                            // behind this sheet; don't repeat it here.
-                            if (messages.isNotEmpty && answerMessages == null)
-                              _SavedConversationResults(
-                                key: ValueKey('results-${widget.sessionId}'),
-                                messages: messages,
-                                sensitiveValues: service.config.sensitiveValues,
-                              ),
-                            HermesRunActions(
-                              showSteer: running,
-                              onSteer: running
-                                  ? (text) => _steer(service, text)
-                                  : null,
-                              leading: [
-                                if (!widget.embedded)
-                                  HermezRunPill(
-                                    label: 'View chat',
-                                    icon: Icons.chat_bubble_outline_rounded,
-                                    onTap: () => openHermesSession(
-                                      context,
-                                      ref,
-                                      current,
-                                    ),
-                                  ),
-                              ],
-                              trailing: [
-                                if (running)
-                                  HermezRunPill(
-                                    label: 'Stop',
-                                    icon: Icons.stop_circle_outlined,
-                                    onTap: _busy
-                                        ? null
-                                        : () => setState(
-                                            () => _confirmingStop =
-                                                !_confirmingStop,
-                                          ),
-                                  ),
-                              ],
-                            ),
-                            HermesStopGuard(
-                              open: _confirmingStop && running,
-                              onKeepRunning: () =>
-                                  setState(() => _confirmingStop = false),
-                              onStop: () => _stop(service),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+      child: body,
     );
   }
 }
@@ -694,7 +718,12 @@ class _LiveHero extends ConsumerWidget {
     required this.startedAt,
     this.showAgentic = true,
     this.model,
+    this.compact = false,
   });
+
+  /// Inline under an answer: the line above already says the state, time and
+  /// model, and delegates have their own branches, so only the plan remains.
+  final bool compact;
 
   final String sessionId;
   final HermesDesktopTurnState state;
@@ -745,9 +774,11 @@ class _LiveHero extends ConsumerWidget {
             : run.isEmpty
             ? 'Nothing running'
             : 'Finished');
-    return HermesPanel(
-      // Mechanical linework only while the run is actually working.
-      backgroundVariant: running ? HermezBackgroundVariant.mechanical : null,
+    if (compact) {
+      if (plan == null) return const SizedBox.shrink();
+      return _InlinePlan(sessionId: sessionId, plan: plan, running: running);
+    }
+    return _RunSection(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -882,6 +913,10 @@ class _PendingRunRequests extends ConsumerStatefulWidget {
 
 class _PendingRunRequestsState extends ConsumerState<_PendingRunRequests>
     with WidgetsBindingObserver {
+  /// The question whose answer is unfolded; a lone question opens itself.
+  String? _open;
+  bool _chose = false;
+
   @override
   void initState() {
     super.initState();
@@ -919,41 +954,92 @@ class _PendingRunRequestsState extends ConsumerState<_PendingRunRequests>
     }
     final decisions = pending.value ?? const [];
     if (decisions.isEmpty) return const SizedBox.shrink();
+    final open = _chose
+        ? _open
+        : decisions.length == 1
+        ? decisions.single.requestId
+        : null;
+    // One line per question, accented: the answer's own line already says
+    // "Input needed", so no second heading here.
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: HermesPanel(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _RunSection(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Input needed'),
             for (final decision in decisions)
-              Builder(
-                builder: (rowContext) => RepaintBoundary(
-                  child: ListTile(
-                    title: Text(
-                      decision.prompt ?? 'Hermes needs your response',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () async {
-                      final resolved = await showHermesAttentionResolutionSheet(
-                        context,
-                        decision,
-                        origin: HermezMorphOrigin.of(
-                          rowContext,
-                          radius: 18,
-                          color: palette.surface,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RepaintBoundary(
+                    child: HermezMotionSurface(
+                      key: ValueKey('pending-${decision.requestId}'),
+                      semanticsExpanded: open == decision.requestId,
+                      semanticLabel:
+                          '${decision.prompt ?? 'Hermes needs your response'}. '
+                          'Answer',
+                      weight: HermezMotionWeight.light,
+                      originRadius: 12,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.help_outline_rounded,
+                              size: 17,
+                              color: palette.accent,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                decision.prompt ?? 'Hermes needs your response',
+                                style: HermezType.body(palette)
+                                    .copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            AnimatedRotation(
+                              turns: open == decision.requestId ? 0.25 : 0,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(
+                                Icons.chevron_right_rounded,
+                                size: 18,
+                                color: palette.muted,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                      if (resolved == true && mounted) {
-                        ref.invalidate(
-                          hermesPendingSessionDecisionsProvider(
-                            widget.sessionId,
-                          ),
-                        );
-                      }
-                    },
+                      ),
+                      onTap: () => setState(() {
+                        _chose = true;
+                        _open = open == decision.requestId
+                            ? null
+                            : decision.requestId;
+                      }),
+                    ),
                   ),
-                ),
+                  // Answered right here, under its question.
+                  HermezReveal(
+                    visible: open == decision.requestId,
+                    revealKey: ValueKey('answer-${decision.requestId}'),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(27, 4, 0, 12),
+                      child: HermesAttentionResolutionInline(
+                        decision: decision,
+                        onResolved: () {
+                          if (!mounted) return;
+                          setState(() => _open = null);
+                          ref.invalidate(
+                            hermesPendingSessionDecisionsProvider(
+                              widget.sessionId,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),
@@ -1066,6 +1152,8 @@ class _DelegatedRunViewState extends ConsumerState<_DelegatedRunView> {
                   expanded: true,
                   onToggle: () {},
                   compact: false,
+                  // The same unboxed thread branch the chat shows, opened.
+                  branch: true,
                   conversationRevision: _revision,
                   loadConversation: (w) =>
                       service.readDelegatedConversation(w, maximum: 1000),
@@ -1075,4 +1163,64 @@ class _DelegatedRunViewState extends ConsumerState<_DelegatedRunView> {
             ),
     );
   }
+}
+
+/// A section of the run sheet: content on the canvas, set apart by space
+/// rather than a box, in the same grammar as the conversation behind it.
+class _RunSection extends StatelessWidget {
+  const _RunSection({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: child);
+}
+
+/// The plan's preview under an answer; tapping it unfolds the whole plan in
+/// place, with its step actions, instead of opening a sheet.
+class _InlinePlan extends StatefulWidget {
+  const _InlinePlan({
+    required this.sessionId,
+    required this.plan,
+    required this.running,
+  });
+
+  final String sessionId;
+  final HermesTodoSnapshot plan;
+  final bool running;
+
+  @override
+  State<_InlinePlan> createState() => _InlinePlanState();
+}
+
+class _InlinePlanState extends State<_InlinePlan> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        HermesPlanPreview(
+          plan: widget.plan,
+          running: widget.running,
+          onOpen: (_) => setState(() => _open = !_open),
+        ),
+        HermezReveal(
+          visible: _open,
+          revealKey: ValueKey('inline-plan-${widget.sessionId}'),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: HermesPlanInline(
+              sessionId: widget.sessionId,
+              onClose: () => setState(() => _open = false),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

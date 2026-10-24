@@ -3934,59 +3934,54 @@ Tail keeps growing
     },
   );
 
-  testWidgets(
-    'over-cap settled mount compiles off-frame behind a skeleton',
-    (tester) async {
-      // A settled body past the synchronous-mount cap must not prepare or
-      // parse on the mount frame (the conversation-open freeze); it shows the
-      // approximate skeleton while the compile runs and fills in after.
-      final longSettled = StringBuffer();
-      var index = 0;
-      while (longSettled.length < 30000) {
-        longSettled.writeln('Deferred giant line $index with padding words.');
-        index += 1;
-      }
-      final content = longSettled.toString();
-      final compiler = _GatedSettledPrepareMarkdownCompileService();
-      addTearDown(() {
-        compiler.releaseFirst();
-        compiler.dispose();
-      });
+  testWidgets('over-cap settled mount compiles off-frame behind a skeleton', (
+    tester,
+  ) async {
+    // A settled body past the synchronous-mount cap must not prepare or
+    // parse on the mount frame (the conversation-open freeze); it shows the
+    // approximate skeleton while the compile runs and fills in after.
+    final longSettled = StringBuffer();
+    var index = 0;
+    while (longSettled.length < 30000) {
+      longSettled.writeln('Deferred giant line $index with padding words.');
+      index += 1;
+    }
+    final content = longSettled.toString();
+    final compiler = _GatedSettledPrepareMarkdownCompileService();
+    addTearDown(() {
+      compiler.releaseFirst();
+      compiler.dispose();
+    });
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            markdownCompileServiceProvider.overrideWithValue(compiler),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.light(TweakcnThemes.t3Chat),
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: StreamingMarkdownWidget(
-                  content: content,
-                  isStreaming: false,
-                  // Opt into the production mount path; the default
-                  // widget-test detection forces the synchronous path.
-                  debugTreatAsWidgetTest: false,
-                ),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [markdownCompileServiceProvider.overrideWithValue(compiler)],
+        child: MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StreamingMarkdownWidget(
+                content: content,
+                isStreaming: false,
+                // Opt into the production mount path; the default
+                // widget-test detection forces the synchronous path.
+                debugTreatAsWidgetTest: false,
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      check(tester.any(find.byType(MarkdownLoadingSkeleton))).isTrue();
-      check(
-        tester.any(find.textContaining('Deferred giant line 0')),
-      ).isFalse();
+    check(tester.any(find.byType(MarkdownLoadingSkeleton))).isTrue();
+    check(tester.any(find.textContaining('Deferred giant line 0'))).isFalse();
 
-      compiler.releaseFirst();
-      await tester.pumpAndSettle();
+    compiler.releaseFirst();
+    await tester.pumpAndSettle();
 
-      check(compiler.preparedInputs).deepEquals([content]);
-      check(tester.any(find.textContaining('Deferred giant line 0'))).isTrue();
-    },
-  );
+    check(compiler.preparedInputs).deepEquals([content]);
+    check(tester.any(find.textContaining('Deferred giant line 0'))).isTrue();
+  });
 
   testWidgets(
     'below-cap settled mount renders synchronously on the first frame',
@@ -4464,7 +4459,7 @@ Reasoning body
   });
 
   testWidgets(
-    'shows completed reasoning with separate header and body surfaces',
+    'completed reasoning unfolds in place under its header, no sheet',
     (tester) async {
       const content = '''
 <details type="reasoning" done="true" duration="5">
@@ -4474,77 +4469,18 @@ Reasoning body
 ''';
 
       await tester.pumpWidget(buildHarness(content));
+      expect(find.text('Reasoning body'), findsNothing);
       await tester.tap(find.text('Thought for 5 seconds'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const ValueKey<String>('reasoning-details-sheet-header')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey<String>('reasoning-details-sheet-body')),
-        findsOneWidget,
-      );
-      expect(find.byType(ConduitModalSheetSurface), findsNothing);
       expect(find.text('Reasoning body'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(
-            const ValueKey<String>('reasoning-details-sheet-body'),
-          ),
-          matching: find.text('Reasoning body'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(
-            const ValueKey<String>('reasoning-details-sheet-body'),
-          ),
-          matching: find.byKey(
-            const ValueKey<String>('reasoning-details-sheet-header'),
-          ),
-        ),
-        findsNothing,
-      );
+      expect(find.byType(DraggableScrollableSheet), findsNothing);
+
+      await tester.tap(find.text('Thought for 5 seconds'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reasoning body'), findsNothing);
     },
   );
-
-  testWidgets('keeps the reasoning sheet header pinned while content scrolls', (
-    tester,
-  ) async {
-    final reasoningBody = List<String>.generate(
-      80,
-      (index) => 'Reasoning step $index with enough text to fill the sheet.',
-    ).join('\n\n');
-    final content =
-        '''
-<details type="reasoning" done="true" duration="5">
-<summary>Thinking…</summary>
-$reasoningBody
-</details>
-''';
-
-    await tester.pumpWidget(buildHarness(content));
-    await tester.tap(find.text('Thought for 5 seconds'));
-    await tester.pumpAndSettle();
-
-    final header = find.byKey(
-      const ValueKey<String>('reasoning-details-sheet-header'),
-    );
-    final body = find.byKey(
-      const ValueKey<String>('reasoning-details-sheet-body'),
-    );
-
-    await tester.drag(body, const Offset(0, -700));
-    await tester.pumpAndSettle();
-    final pinnedTop = tester.getTopLeft(header).dy;
-
-    await tester.drag(body, const Offset(0, -300));
-    await tester.pumpAndSettle();
-
-    expect(tester.getTopLeft(header).dy, closeTo(pinnedTop, 0.5));
-  });
 
   testWidgets(
     'renders text that trails a closing details tag on the same line',
@@ -4563,83 +4499,84 @@ Reasoning body
     },
   );
 
-  testWidgets(
-    'keeps reasoning inline while streaming and moves it to the modal when done',
-    (tester) async {
-      var content = '''
+  testWidgets('keeps reasoning inline while streaming and after it is done', (
+    tester,
+  ) async {
+    var content = '''
 <details type="reasoning" done="false">
 <summary>Thinking…</summary>
 First step
 </details>
 ''';
-      late void Function(VoidCallback fn) rebuild;
+    late void Function(VoidCallback fn) rebuild;
 
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            theme: AppTheme.light(TweakcnThemes.t3Chat),
-            localizationsDelegates: conduitLocalizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(
-              body: StatefulBuilder(
-                builder: (context, setState) {
-                  rebuild = setState;
-                  return SingleChildScrollView(
-                    child: StreamingMarkdownWidget(
-                      content: content,
-                      isStreaming: true,
-                    ),
-                  );
-                },
-              ),
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          localizationsDelegates: conduitLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return SingleChildScrollView(
+                  child: StreamingMarkdownWidget(
+                    content: content,
+                    isStreaming: true,
+                  ),
+                );
+              },
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      expect(find.text('First step'), findsNothing);
+    expect(find.text('First step'), findsNothing);
 
-      await tester.tap(find.textContaining('Thinking'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Thinking'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('First step'), findsOneWidget);
-      expect(find.byType(DraggableScrollableSheet), findsNothing);
+    expect(find.text('First step'), findsOneWidget);
+    expect(find.byType(DraggableScrollableSheet), findsNothing);
 
-      rebuild(() {
-        content = '''
+    rebuild(() {
+      content = '''
 <details type="reasoning" done="false">
 <summary>Thinking…</summary>
 First step
 Second step
 </details>
 ''';
-      });
-      await tester.pumpAndSettle();
+    });
+    await tester.pumpAndSettle();
 
-      expect(find.text('Second step'), findsOneWidget);
-      expect(find.byType(DraggableScrollableSheet), findsNothing);
+    expect(find.text('Second step'), findsOneWidget);
+    expect(find.byType(DraggableScrollableSheet), findsNothing);
 
-      rebuild(() {
-        content = '''
+    rebuild(() {
+      content = '''
 <details type="reasoning" done="true" duration="5">
 <summary>Thinking…</summary>
 First step
 Second step
 </details>
 ''';
-      });
-      await tester.pumpAndSettle();
+    });
+    await tester.pumpAndSettle();
 
-      expect(find.text('Thought for 5 seconds'), findsOneWidget);
-      expect(find.text('Second step'), findsNothing);
+    expect(find.text('Thought for 5 seconds'), findsOneWidget);
+    // Opened while streaming, it stays open in place once done.
+    expect(find.text('Second step'), findsOneWidget);
 
-      await tester.tap(find.text('Thought for 5 seconds'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Thought for 5 seconds'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(DraggableScrollableSheet), findsOneWidget);
-      expect(find.text('Second step'), findsOneWidget);
-    },
-  );
+    // A tap folds it back in place; nothing opens over the chat.
+    expect(find.byType(DraggableScrollableSheet), findsNothing);
+    expect(find.text('Second step'), findsNothing);
+  });
 
   testWidgets(
     'restores expanded inline reasoning after the markdown subtree remounts',

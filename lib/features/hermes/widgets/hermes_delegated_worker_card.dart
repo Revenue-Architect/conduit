@@ -41,6 +41,25 @@ String hermesWorkerStatusLabel(HermesSubagentStatus status) => switch (status) {
   HermesSubagentStatus.unknown => 'Status unavailable',
 };
 
+/// How a branch reads in the conversation: "Working · 12s", "Replied in 9s ·
+/// mimo-v2.6-flash", "Stopped". Times are only what Hermes reported.
+String hermesWorkerBranchState(HermesSubagentState worker, DateTime now) {
+  final reported = worker.reportedStart || worker.durationSeconds != null;
+  final elapsed = reported ? _clock(hermesWorkerElapsed(worker, now)) : null;
+  final lead = switch (worker.status) {
+    HermesSubagentStatus.completed =>
+      elapsed == null ? 'Replied' : 'Replied in $elapsed',
+    HermesSubagentStatus.running =>
+      elapsed == null ? 'Working' : 'Working · $elapsed',
+    HermesSubagentStatus.waiting => 'Needs you',
+    _ => hermesWorkerStatusLabel(worker.status),
+  };
+  return [
+    lead,
+    if (worker.status.isTerminal && worker.model != null) worker.model!,
+  ].join(' · ');
+}
+
 /// "2 delegates working · 1 done" for existing run controls.
 String hermesDelegatesSummary(List<HermesSubagentState> workers) {
   final live = workers.live;
@@ -94,7 +113,11 @@ class HermesDelegatedWorkerCard extends ConsumerStatefulWidget {
     this.loadArtifact,
     this.compact = true,
     this.conversationRevision = 0,
+    this.branch = false,
   });
+
+  /// Drawn as a branch of the conversation (no box) rather than a card.
+  final bool branch;
 
   final HermesSubagentState worker;
   final String parentSessionId;
@@ -340,6 +363,14 @@ class _HermesDelegatedWorkerCardState
             (worker.kind == HermesDelegationKind.kanban &&
                 worker.taskId != null &&
                 worker.boardSlug != null));
+    if (widget.branch) {
+      return _branch(
+        palette,
+        worker,
+        openSession: openSession,
+        steerable: steerable,
+      );
+    }
     final borderColor = palette.border.withValues(alpha: 0.9);
     final radius = BorderRadius.circular(14);
 
@@ -451,115 +482,246 @@ class _HermesDelegatedWorkerCardState
                 ),
               ),
             ),
-            HermezReveal(
-              visible: widget.expanded,
-              revealKey: ValueKey('worker-content:${widget.worker.id}'),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    HermezSegments(
-                      labels: const ['Activity', 'Conversation'],
-                      index: _selectedTab,
-                      height: (24 + MediaQuery.textScalerOf(context).scale(14))
-                          .clamp(44, 100)
-                          .toDouble(),
-                      onChanged: _selectTab,
-                    ),
-                    const SizedBox(height: 10),
-                    if (_selectedTab == _activityTab)
-                      _activity(palette, worker)
-                    else
-                      _conversation(palette),
-                    if (openSession) ...[
-                      const SizedBox(height: 8),
-                      HermezMotionSurface(
-                        weight: HermezMotionWeight.light,
-                        semanticLabel:
-                            'Open ${worker.displayName} session. Back returns to ${widget.parentLabel}.',
-                        onOpen: _openSession,
-                        originRadius: 10,
-                        originColor: palette.surface,
-                        originBorderColor: palette.border,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 9,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+            _details(
+              palette,
+              worker,
+              openSession: openSession,
+              steerable: steerable,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The worker as a branch of the conversation: no box, one line that says
+  /// who is on it and what for, a second that says how it is going. The
+  /// chevron turns as the details unfold underneath.
+  Widget _branch(
+    HermezChatPalette palette,
+    HermesSubagentState worker, {
+    required bool openSession,
+    required bool steerable,
+  }) {
+    final state = hermesWorkerBranchState(worker, DateTime.now());
+    final attention =
+        worker.status == HermesSubagentStatus.waiting ||
+        worker.status.isProblem;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        HermezMotionSurface(
+          weight: HermezMotionWeight.light,
+          semanticLabel:
+              '${worker.displayName}. $state. ${widget.expanded ? 'Collapse' : 'Expand'} worker details.',
+          semanticsExpanded: widget.expanded,
+          onTap: widget.onToggle,
+          originRadius: 12,
+          originColor: palette.canvas,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  HermezBotMark(
+                    botName: worker.displayName,
+                    identity: hermezIdentityForName(worker.displayName),
+                    size: 22,
+                    label: worker.displayName,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text.rich(
+                          TextSpan(
                             children: [
-                              Icon(
-                                Icons.open_in_new_rounded,
-                                size: 16,
-                                color: palette.ink,
-                              ),
-                              const SizedBox(width: 7),
-                              Flexible(
-                                child: Text(
-                                  worker.kind == HermesDelegationKind.kanban
-                                      ? 'Open task result'
-                                      : 'Open ${worker.displayName} session',
-                                  style: HermezType.meta(palette).copyWith(
-                                    color: palette.ink,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              TextSpan(
+                                text: worker.displayName,
+                                style: TextStyle(
+                                  color: palette.ink,
+                                  fontWeight: FontWeight.w700,
                                 ),
+                              ),
+                              TextSpan(
+                                text: ' · ${worker.goal}',
+                                style: TextStyle(color: palette.muted),
                               ),
                             ],
                           ),
+                          maxLines: widget.expanded ? 3 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: HermezType.meta(palette)
+                              .copyWith(fontSize: 13.5),
                         ),
-                      ),
-                    ],
-                    if (widget.loadArtifact != null)
-                      for (var i = 0; i < worker.artifacts.length; i++)
-                        TextButton.icon(
-                          onPressed: () => _openArtifact(i),
-                          icon: const Icon(
-                            Icons.description_outlined,
-                            size: 17,
-                          ),
-                          label: Text('Result artifact ${i + 1}'),
-                        ),
-                    if (steerable) ...[
-                      const SizedBox(height: 10),
-                      HermezActionPills(
-                        actions: [
-                          HermezPillAction(
-                            label: 'Steer',
-                            icon: Icons.edit_outlined,
-                            hint: 'What should change?',
-                            onSubmit: (text) => _run(
-                              (service) => service.steerSubagent(
-                                widget.parentSessionId,
-                                worker.steerableId!,
-                                text,
-                              ),
-                              accepted: 'Direction queued. It reaches the delegate at its next step.',
-                              refused:
-                                  'The delegate could not take direction now.',
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            HermezLiveDot(
+                              state: hermesWorkerLiveState(worker.status),
+                              size: 6,
+                              semanticLabel: state,
                             ),
-                          ),
-                          HermezPillAction(
-                            label: 'Stop',
-                            icon: Icons.stop_circle_outlined,
-                            busy: _busy,
-                            onTap: _busy
-                                ? null
-                                : () => unawaited(_confirmStop()),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (_notice != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_notice!, style: HermezType.meta(palette)),
-                    ],
-                  ],
-                ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                state,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: HermezType.meta(palette).copyWith(
+                                  color: attention
+                                      ? palette.accent
+                                      : palette.muted,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: widget.expanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: palette.muted,
+                      size: 20,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+        ),
+        _details(
+          palette,
+          worker,
+          openSession: openSession,
+          steerable: steerable,
+          padding: const EdgeInsets.fromLTRB(31, 2, 0, 10),
+        ),
+      ],
+    );
+  }
+
+  /// The expanded part, shared by the boxed card and the thread branch:
+  /// Activity / Conversation, the child session, artifacts, steer and stop.
+  Widget _details(
+    HermezChatPalette palette,
+    HermesSubagentState worker, {
+    required bool openSession,
+    required bool steerable,
+    required EdgeInsets padding,
+  }) {
+    return HermezReveal(
+      visible: widget.expanded,
+      revealKey: ValueKey('worker-content:${widget.worker.id}'),
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            HermezSegments(
+              labels: const ['Activity', 'Conversation'],
+              index: _selectedTab,
+              height: (24 + MediaQuery.textScalerOf(context).scale(14))
+                  .clamp(44, 100)
+                  .toDouble(),
+              onChanged: _selectTab,
+            ),
+            const SizedBox(height: 10),
+            if (_selectedTab == _activityTab)
+              _activity(palette, worker)
+            else
+              _conversation(palette),
+            if (openSession) ...[
+              const SizedBox(height: 8),
+              HermezMotionSurface(
+                weight: HermezMotionWeight.light,
+                semanticLabel:
+                    'Open ${worker.displayName} session. Back returns to ${widget.parentLabel}.',
+                onOpen: _openSession,
+                originRadius: 10,
+                originColor: palette.surface,
+                originBorderColor: palette.border,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        size: 16,
+                        color: palette.ink,
+                      ),
+                      const SizedBox(width: 7),
+                      Flexible(
+                        child: Text(
+                          worker.kind == HermesDelegationKind.kanban
+                              ? 'Open task result'
+                              : 'Open ${worker.displayName} session',
+                          style: HermezType.meta(palette).copyWith(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            if (widget.loadArtifact != null)
+              for (var i = 0; i < worker.artifacts.length; i++)
+                TextButton.icon(
+                  onPressed: () => _openArtifact(i),
+                  icon: const Icon(Icons.description_outlined, size: 17),
+                  label: Text('Result artifact ${i + 1}'),
+                ),
+            if (steerable) ...[
+              const SizedBox(height: 10),
+              HermezActionPills(
+                actions: [
+                  HermezPillAction(
+                    label: 'Steer',
+                    icon: Icons.edit_outlined,
+                    hint: 'What should change?',
+                    onSubmit: (text) => _run(
+                      (service) => service.steerSubagent(
+                        widget.parentSessionId,
+                        worker.steerableId!,
+                        text,
+                      ),
+                      accepted: 'Direction queued. It reaches the delegate at its next step.',
+                      refused: 'The delegate could not take direction now.',
+                    ),
+                  ),
+                  HermezPillAction(
+                    label: 'Stop',
+                    icon: Icons.stop_circle_outlined,
+                    busy: _busy,
+                    onTap: _busy ? null : () => unawaited(_confirmStop()),
+                  ),
+                ],
+              ),
+            ],
+            if (_notice != null) ...[
+              const SizedBox(height: 8),
+              Text(_notice!, style: HermezType.meta(palette)),
+            ],
           ],
         ),
       ),

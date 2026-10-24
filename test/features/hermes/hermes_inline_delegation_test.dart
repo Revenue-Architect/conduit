@@ -64,21 +64,23 @@ void main() {
     (tester) async {
       await tester.pumpWidget(app());
       final before = tester.getTopLeft(find.byKey(const ValueKey('footer'))).dy;
-      await tester.tap(find.text('Delegated work'));
+      await tester.tap(find.byKey(const ValueKey('delegation-group')));
       await tester.pumpAndSettle();
       expect(
         tester.getTopLeft(find.byKey(const ValueKey('footer'))).dy,
         greaterThan(before),
       );
-      await tester.tap(find.text('Kai').first);
+      await tester.tap(find.textContaining('Kai').first);
       await tester.pumpAndSettle();
       expect(find.byType(HermezSegments), findsOneWidget);
-      await tester.ensureVisible(find.text('Ops').first);
-      await tester.tap(find.text('Ops').first);
+      await tester.ensureVisible(find.textContaining('Ops').first);
+      await tester.tap(find.textContaining('Ops').first);
       await tester.pumpAndSettle();
       expect(find.byType(HermezSegments), findsNWidgets(2));
-      await tester.ensureVisible(find.text('Delegated work'));
-      await tester.tap(find.text('Delegated work'));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('delegation-group')),
+      );
+      await tester.tap(find.byKey(const ValueKey('delegation-group')));
       await tester.pumpAndSettle();
       expect(
         tester.getTopLeft(find.byKey(const ValueKey('footer'))).dy,
@@ -112,9 +114,9 @@ void main() {
           },
         ),
       );
-      await tester.tap(find.text('Delegated work'));
+      await tester.tap(find.byKey(const ValueKey('delegation-group')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Kai').first);
+      await tester.tap(find.textContaining('Kai').first);
       await tester.pumpAndSettle();
       expect(reads, 0);
       await tester.tap(find.text('Conversation').first);

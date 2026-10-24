@@ -198,6 +198,89 @@ class HermezLiveText extends StatelessWidget {
   );
 }
 
+/// Text that is being worked on right now: a soft band of light passes over
+/// it, left to right, the way agent chats mark a live step. Still when motion
+/// is reduced or the app is in the background (TickerMode).
+class HermezShimmerText extends StatefulWidget {
+  const HermezShimmerText(
+    this.text, {
+    super.key,
+    required this.style,
+    this.maxLines = 1,
+  });
+
+  final String text;
+  final TextStyle style;
+  final int maxLines;
+
+  @override
+  State<HermezShimmerText> createState() => _HermezShimmerTextState();
+}
+
+class _HermezShimmerTextState extends State<HermezShimmerText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _band = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (still) {
+      _band.stop();
+    } else if (!_band.isAnimating) {
+      _band.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _band.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Semantics(
+      liveRegion: true,
+      child: Text(
+        widget.text,
+        maxLines: widget.maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: widget.style,
+      ),
+    );
+    if (!_band.isAnimating) return text;
+    final base = widget.style.color ?? DefaultTextStyle.of(context).style.color;
+    final light = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+    return AnimatedBuilder(
+      animation: _band,
+      child: text,
+      builder: (context, child) {
+        final x = -1.0 + 3.0 * _band.value;
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => LinearGradient(
+            begin: Alignment(x - 1, 0),
+            end: Alignment(x + 1, 0),
+            colors: [
+              base ?? light,
+              Color.lerp(base ?? light, light, 0.55)!,
+              base ?? light,
+            ],
+            stops: const [0.3, 0.5, 0.7],
+          ).createShader(bounds),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
 /// A count that changes in place: tabular, so neighbours never shift.
 class HermezRollingCount extends StatelessWidget {
   const HermezRollingCount({

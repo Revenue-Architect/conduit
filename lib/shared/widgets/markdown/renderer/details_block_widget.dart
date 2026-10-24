@@ -61,7 +61,9 @@ class _MarkdownDetailsBlockState extends State<MarkdownDetailsBlock> {
 
   bool get _supportsInlineExpansion => _detailsData.supportsInlineExpansion;
 
-  bool get _usesInlineExpansion => _supportsInlineExpansion && _isPending;
+  /// Thinking and tool details unfold in place under their header, running or
+  /// finished, as part of the conversation; nothing opens over the chat.
+  bool get _usesInlineExpansion => _supportsInlineExpansion;
 
   bool get _canExpand {
     if (!_isToolCall) {

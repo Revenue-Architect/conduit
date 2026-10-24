@@ -26,7 +26,10 @@ bool _projectHermesTurnEvent(
         if (text.isNotEmpty) add(HermesTokenDelta(text));
       }
     case 'thinking.delta':
-      break;
+      // The spinner verbs are noise; only Hermes' provider-wait notice (and
+      // its clearing) says something the chat should show.
+      final text = value('text');
+      if (text.isEmpty || text.startsWith('⏳')) add(HermesProviderWait(text));
     case 'reasoning.delta':
       final delta = value('delta').isNotEmpty ? value('delta') : value('text');
       if (delta.isNotEmpty) add(HermesReasoningDelta(delta));

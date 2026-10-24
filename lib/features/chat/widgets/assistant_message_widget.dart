@@ -1597,14 +1597,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         ? (Platform.isIOS ? CupertinoIcons.wifi_slash : Icons.wifi_off)
         : (Platform.isIOS ? CupertinoIcons.clock : Icons.schedule);
 
+    // A plain line in the answer's column, like the run's other states: the
+    // icon and its colour carry the state, not a tinted box.
     return Container(
       constraints: const BoxConstraints(maxWidth: 560),
-      padding: const EdgeInsets.all(Spacing.md),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.08),
-        border: Border.all(color: accentColor.withValues(alpha: 0.22)),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -1721,13 +1718,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         ? errorContent
         : 'An error occurred while generating this response.';
 
-    return Container(
-      padding: const EdgeInsets.all(Spacing.md),
-      decoration: BoxDecoration(
-        color: errorColor.withValues(alpha: 0.1),
-        border: Border.all(color: errorColor.withValues(alpha: 0.2)),
-        borderRadius: BorderRadius.circular(Spacing.sm),
-      ),
+    // A plain line in the error colour: part of the answer, not a box in it.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

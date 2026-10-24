@@ -322,6 +322,7 @@ int _hermesEventCharacters(
     maxCharacters + 1,
   ),
   HermesLifecycle(:final status) => status.length,
+  HermesProviderWait(:final text) => text.length,
   HermesFinalOutput(:final text) => text.length,
   HermesComposerPrefill(:final text) => text.length,
   HermesTodoUpdated(:final snapshot) => snapshot.items.fold<int>(

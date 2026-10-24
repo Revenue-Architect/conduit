@@ -28,9 +28,34 @@ Future<bool?> showHermesAttentionResolutionSheet(
   builder: (_) => _ResolutionSheet(decision: decision),
 );
 
-class _ResolutionSheet extends ConsumerStatefulWidget {
-  const _ResolutionSheet({required this.decision});
+/// The same request, answered in place under the run that asked it. Calls
+/// [onResolved] once Hermes accepts the answer; nothing is sent on collapse.
+class HermesAttentionResolutionInline extends StatelessWidget {
+  const HermesAttentionResolutionInline({
+    super.key,
+    required this.decision,
+    this.onResolved,
+  });
   final HermesPendingDesktopDecision decision;
+  final VoidCallback? onResolved;
+
+  @override
+  Widget build(BuildContext context) => _ResolutionSheet(
+    decision: decision,
+    inline: true,
+    onResolved: onResolved,
+  );
+}
+
+class _ResolutionSheet extends ConsumerStatefulWidget {
+  const _ResolutionSheet({
+    required this.decision,
+    this.inline = false,
+    this.onResolved,
+  });
+  final HermesPendingDesktopDecision decision;
+  final bool inline;
+  final VoidCallback? onResolved;
 
   @override
   ConsumerState<_ResolutionSheet> createState() => _ResolutionSheetState();
@@ -82,7 +107,7 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
           mcpAction: decision.mcpAction,
         );
       }
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) _done();
     } catch (_) {
       if (mounted) {
         setState(
@@ -91,6 +116,15 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Accepted: a sheet closes with the result, the inline form hands it on.
+  void _done() {
+    if (widget.inline) {
+      widget.onResolved?.call();
+    } else {
+      Navigator.pop(context, true);
     }
   }
 
@@ -159,12 +193,13 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
               'the conversation to see what it asked, then answer here.'
         : asked;
     final remaining = decision.expiresAt.difference(DateTime.now().toUtc());
-    return HermezModalSheet(
-      title: title,
-      eyebrow: 'Attention',
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    // Inline, the question's own row above is the header: who asked, where,
+    // and what are already on screen, so only the answer remains.
+    final inline = widget.inline;
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!inline) ...[
           Text(
             lead,
             style: HermezType.body(palette)
@@ -216,6 +251,8 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
             ],
           ),
           const SizedBox(height: 14),
+        ],
+        if (!inline) ...[
           Text(switch (kind) {
             HermesPendingDesktopDecisionKind.approval => 'COMMAND',
             HermesPendingDesktopDecisionKind.clarification => 'QUESTION',
@@ -236,180 +273,191 @@ class _ResolutionSheetState extends ConsumerState<_ResolutionSheet> {
                     : HermezType.body(palette),
               ),
             ),
-          if (kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Requested action: ${decision.mcpAction ?? 'setup'}',
-              style: HermezType.meta(palette),
-            ),
-          ],
-          if (kind == HermesPendingDesktopDecisionKind.connectorOperation &&
-              decision.connectionOperation != null)
-            HermesConnectionConsentCard(
-              operation: connectionOperation!,
-              onRespond: (targets, continueOperation) async {
-                final current = ref.read(hermesApiServiceProvider);
-                if (current is! HermesDesktopApiService) return false;
-                try {
-                  await current.respondToConnectionOperation(
-                    runtimeId: decision.runtimeId,
-                    storedSessionId: decision.storedSessionId,
-                    operationId: connectionOperation.opId,
-                    targets: targets,
-                    continueOperation: continueOperation,
-                  );
-                  if (context.mounted) Navigator.pop(context, true);
-                  return true;
-                } catch (_) {
-                  return false;
-                }
-              },
-              onOpenAuthorization: (targetName) async {
-                final current = ref.read(hermesApiServiceProvider);
-                if (current is HermesDesktopApiService) {
-                  await current.openConnectorAuthorization(
-                    runtimeId: decision.runtimeId,
-                    operationId: connectionOperation.opId,
-                    targetName: targetName,
-                  );
-                }
-              },
-              onWake: () async {
-                final current = ref.read(hermesApiServiceProvider);
-                if (current is HermesDesktopApiService) {
-                  await current.wakeConnectorOperation(
-                    runtimeId: decision.runtimeId,
-                    storedSessionId: decision.storedSessionId,
-                    operationId: connectionOperation.opId,
-                  );
-                }
-              },
-            ),
-          if (decision.choices.isNotEmpty) ...[
-            const SizedBox(height: 15),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                for (final choice in decision.choices)
-                  ChoiceChip(
-                    label: Text(choice),
-                    selected: _selected.contains(choice),
-                    onSelected: _busy
-                        ? null
-                        : (selected) => setState(() {
-                            if (!decision.multiSelect) _selected.clear();
-                            if (selected) {
-                              _selected.add(choice);
-                            } else {
-                              _selected.remove(choice);
-                            }
-                          }),
-                  ),
-              ],
-            ),
-          ],
-          if (kind == HermesPendingDesktopDecisionKind.clarification ||
-              sensitive) ...[
-            const SizedBox(height: 15),
-            TextField(
-              controller: _answer,
-              obscureText: sensitive,
-              enableSuggestions: !sensitive,
-              autocorrect: !sensitive,
-              enableIMEPersonalizedLearning: !sensitive,
-              decoration: InputDecoration(
-                labelText: sensitive ? 'Secure response' : 'Your answer',
-              ),
-            ),
-          ],
-          if (expired)
-            const Padding(
-              padding: EdgeInsets.only(top: 14),
-              child: Text('This request has expired. Reopen the conversation.'),
-            ),
-          HermezReveal(
-            visible: _error != null,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: Text(
-                _error ?? '',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+        ],
+        if (kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Requested action: ${decision.mcpAction ?? 'setup'}',
+            style: HermezType.meta(palette),
+          ),
+        ],
+        if (kind == HermesPendingDesktopDecisionKind.connectorOperation &&
+            decision.connectionOperation != null)
+          HermesConnectionConsentCard(
+            operation: connectionOperation!,
+            onRespond: (targets, continueOperation) async {
+              final current = ref.read(hermesApiServiceProvider);
+              if (current is! HermesDesktopApiService) return false;
+              try {
+                await current.respondToConnectionOperation(
+                  runtimeId: decision.runtimeId,
+                  storedSessionId: decision.storedSessionId,
+                  operationId: connectionOperation.opId,
+                  targets: targets,
+                  continueOperation: continueOperation,
+                );
+                if (context.mounted) _done();
+                return true;
+              } catch (_) {
+                return false;
+              }
+            },
+            onOpenAuthorization: (targetName) async {
+              final current = ref.read(hermesApiServiceProvider);
+              if (current is HermesDesktopApiService) {
+                await current.openConnectorAuthorization(
+                  runtimeId: decision.runtimeId,
+                  operationId: connectionOperation.opId,
+                  targetName: targetName,
+                );
+              }
+            },
+            onWake: () async {
+              final current = ref.read(hermesApiServiceProvider);
+              if (current is HermesDesktopApiService) {
+                await current.wakeConnectorOperation(
+                  runtimeId: decision.runtimeId,
+                  storedSessionId: decision.storedSessionId,
+                  operationId: connectionOperation.opId,
+                );
+              }
+            },
+          ),
+        if (decision.choices.isNotEmpty) ...[
+          const SizedBox(height: 15),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final choice in decision.choices)
+                ChoiceChip(
+                  label: Text(choice),
+                  selected: _selected.contains(choice),
+                  onSelected: _busy
+                      ? null
+                      : (selected) => setState(() {
+                          if (!decision.multiSelect) _selected.clear();
+                          if (selected) {
+                            _selected.add(choice);
+                          } else {
+                            _selected.remove(choice);
+                          }
+                        }),
+                ),
+            ],
+          ),
+        ],
+        if (kind == HermesPendingDesktopDecisionKind.clarification ||
+            sensitive) ...[
+          const SizedBox(height: 15),
+          TextField(
+            controller: _answer,
+            obscureText: sensitive,
+            enableSuggestions: !sensitive,
+            autocorrect: !sensitive,
+            enableIMEPersonalizedLearning: !sensitive,
+            decoration: InputDecoration(
+              labelText: sensitive ? 'Secure response' : 'Your answer',
             ),
           ),
         ],
-      ),
-      footer: kind == HermesPendingDesktopDecisionKind.connectorOperation
-          ? const SizedBox.shrink()
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        if (expired)
+          const Padding(
+            padding: EdgeInsets.only(top: 14),
+            child: Text('This request has expired. Reopen the conversation.'),
+          ),
+        HermezReveal(
+          visible: _error != null,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(
+              _error ?? '',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ),
+      ],
+    );
+    final footer = kind == HermesPendingDesktopDecisionKind.connectorOperation
+        ? const SizedBox.shrink()
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 6,
+                child: HermezActionTile(
+                  primary: true,
+                  showChevron: false,
+                  icon: Icons.check_rounded,
+                  busy: _busy,
+                  title: switch (kind) {
+                    HermesPendingDesktopDecisionKind.approval => 'Approve once',
+                    HermesPendingDesktopDecisionKind.mcpSetup => 'Connect',
+                    _ => 'Send response',
+                  },
+                  subtitle: switch (kind) {
+                    HermesPendingDesktopDecisionKind.approval =>
+                      'Run this once',
+                    HermesPendingDesktopDecisionKind.mcpSetup =>
+                      'Allow this server',
+                    _ => 'Hermes continues',
+                  },
+                  onTap: _busy
+                      ? null
+                      : () {
+                          final value = switch (kind) {
+                            HermesPendingDesktopDecisionKind.approval => 'once',
+                            HermesPendingDesktopDecisionKind.mcpSetup =>
+                              'approve',
+                            _ when _selected.isNotEmpty =>
+                              decision.multiSelect
+                                  ? jsonEncode(_selected.toList())
+                                  : _selected.single,
+                            _ => _answer.text.trim(),
+                          };
+                          if (value.isNotEmpty) _send(value);
+                        },
+                ),
+              ),
+              if (kind == HermesPendingDesktopDecisionKind.approval ||
+                  kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
+                const SizedBox(width: 8),
                 Expanded(
-                  flex: 6,
+                  flex: 5,
                   child: HermezActionTile(
-                    primary: true,
                     showChevron: false,
-                    icon: Icons.check_rounded,
-                    busy: _busy,
-                    title: switch (kind) {
-                      HermesPendingDesktopDecisionKind.approval =>
-                        'Approve once',
-                      HermesPendingDesktopDecisionKind.mcpSetup => 'Connect',
-                      _ => 'Send response',
-                    },
-                    subtitle: switch (kind) {
-                      HermesPendingDesktopDecisionKind.approval =>
-                        'Run this once',
-                      HermesPendingDesktopDecisionKind.mcpSetup =>
-                        'Allow this server',
-                      _ => 'Hermes continues',
-                    },
+                    icon: Icons.close_rounded,
+                    title: kind == HermesPendingDesktopDecisionKind.approval
+                        ? 'Deny'
+                        : 'Not now',
+                    subtitle: kind == HermesPendingDesktopDecisionKind.approval
+                        ? "Don't run"
+                        : 'Decline',
                     onTap: _busy
                         ? null
-                        : () {
-                            final value = switch (kind) {
-                              HermesPendingDesktopDecisionKind.approval =>
-                                'once',
-                              HermesPendingDesktopDecisionKind.mcpSetup =>
-                                'approve',
-                              _ when _selected.isNotEmpty =>
-                                decision.multiSelect
-                                    ? jsonEncode(_selected.toList())
-                                    : _selected.single,
-                              _ => _answer.text.trim(),
-                            };
-                            if (value.isNotEmpty) _send(value);
-                          },
+                        : () => _send(
+                            kind == HermesPendingDesktopDecisionKind.approval
+                                ? 'deny'
+                                : 'decline',
+                          ),
                   ),
                 ),
-                if (kind == HermesPendingDesktopDecisionKind.approval ||
-                    kind == HermesPendingDesktopDecisionKind.mcpSetup) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 5,
-                    child: HermezActionTile(
-                      showChevron: false,
-                      icon: Icons.close_rounded,
-                      title: kind == HermesPendingDesktopDecisionKind.approval
-                          ? 'Deny'
-                          : 'Not now',
-                      subtitle:
-                          kind == HermesPendingDesktopDecisionKind.approval
-                          ? "Don't run"
-                          : 'Decline',
-                      onTap: _busy
-                          ? null
-                          : () => _send(
-                              kind == HermesPendingDesktopDecisionKind.approval
-                                  ? 'deny'
-                                  : 'decline',
-                            ),
-                    ),
-                  ),
-                ],
               ],
-            ),
+            ],
+          );
+    if (!widget.inline) {
+      return HermezModalSheet(
+        title: title,
+        eyebrow: 'Attention',
+        body: body,
+        footer: footer,
+      );
+    }
+    // Inline: the question heads its own answer, on the run's rail.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [body, const SizedBox(height: 12), footer],
     );
   }
 }

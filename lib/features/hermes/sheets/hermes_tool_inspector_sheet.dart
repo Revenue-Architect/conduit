@@ -29,11 +29,34 @@ Future<void> showHermesToolInspector(
   builder: (_) => _HermesToolInspector(sessionId: sessionId, row: row),
 );
 
-class _HermesToolInspector extends ConsumerStatefulWidget {
-  const _HermesToolInspector({required this.sessionId, required this.row});
+/// The same step up close, unfolded under its line in the conversation
+/// instead of in a sheet: its facts, input and result, read from the
+/// transcript when it opens.
+class HermesToolInspectorInline extends StatelessWidget {
+  const HermesToolInspectorInline({
+    super.key,
+    required this.sessionId,
+    required this.row,
+  });
 
   final String sessionId;
   final HermesActivityRow row;
+
+  @override
+  Widget build(BuildContext context) =>
+      _HermesToolInspector(sessionId: sessionId, row: row, inline: true);
+}
+
+class _HermesToolInspector extends ConsumerStatefulWidget {
+  const _HermesToolInspector({
+    required this.sessionId,
+    required this.row,
+    this.inline = false,
+  });
+
+  final String sessionId;
+  final HermesActivityRow row;
+  final bool inline;
 
   @override
   ConsumerState<_HermesToolInspector> createState() =>
@@ -162,6 +185,63 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
         );
       },
     );
+    final facts = Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      children: [
+        if (row.duration != null)
+          _Fact(
+            label: 'Took',
+            value: HermesActivityPresenter.formatDuration(row.duration!),
+          ),
+        if (row.count > 1) _Fact(label: 'Runs', value: '${row.count}'),
+        if (row.summary != null) _Fact(label: 'Hermes', value: row.summary!),
+      ],
+    );
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (row.toolIds.length > 1) ...[
+          _RunSwitcher(
+            count: row.toolIds.length,
+            index: index,
+            onSelect: (i) {
+              if (i != _index) setState(() => _index = i);
+            },
+          ),
+          const SizedBox(height: 14),
+        ],
+        // Fade through, never cross-fade: two blocks of code laid over
+        // each other read as a glitch.
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOut,
+          layoutBuilder: (current, previous) =>
+              current ?? const SizedBox.shrink(),
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween(
+                begin: const Offset(0, 0.012),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          ),
+          child: body,
+        ),
+      ],
+    );
+    if (widget.inline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(padding: const EdgeInsets.only(bottom: 10), child: facts),
+          content,
+        ],
+      );
+    }
     return HermezModalSheet(
       eyebrow: '$status · ${row.toolName ?? 'tool'}',
       title: row.verb,
@@ -180,55 +260,8 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
               : Icon(hermesActivityIcon(row.family), color: palette.ink),
         ),
       ),
-      subtitle: Wrap(
-        spacing: 12,
-        runSpacing: 4,
-        children: [
-          if (row.duration != null)
-            _Fact(
-              label: 'Took',
-              value: HermesActivityPresenter.formatDuration(row.duration!),
-            ),
-          if (row.count > 1) _Fact(label: 'Runs', value: '${row.count}'),
-          if (row.summary != null) _Fact(label: 'Hermes', value: row.summary!),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // The switcher stays put; only the run's content changes.
-          if (row.toolIds.length > 1) ...[
-            _RunSwitcher(
-              count: row.toolIds.length,
-              index: index,
-              onSelect: (i) {
-                if (i != _index) setState(() => _index = i);
-              },
-            ),
-            const SizedBox(height: 14),
-          ],
-          // Fade through, never cross-fade: two blocks of code laid over
-          // each other read as a glitch. The old run leaves at once and the
-          // new one settles in.
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOut,
-            layoutBuilder: (current, previous) =>
-                current ?? const SizedBox.shrink(),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween(
-                  begin: const Offset(0, 0.012),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            ),
-            child: body,
-          ),
-        ],
-      ),
+      subtitle: facts,
+      body: content,
     );
   }
 }

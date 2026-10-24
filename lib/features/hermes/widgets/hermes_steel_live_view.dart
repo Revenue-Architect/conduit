@@ -27,57 +27,119 @@ class HermesRunBrowserSection extends StatefulWidget {
 class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
   bool _open = false;
   final _aperture = GlobalKey();
+  void _expand() => Navigator.of(context).push(
+    HermezRoute<void>(
+      motion: HermezRouteMotion.expand,
+      reducedMotion: context.reduceMotion,
+      origin: _aperture.currentContext == null
+          ? null
+          : HermezMorphOrigin.of(_aperture.currentContext!, radius: 16),
+      builder: (_) => HermesSteelFullScreenPage(
+        viewerUrl: widget.viewerUrl,
+        sessionId: widget.sessionId,
+      ),
+    ),
+  );
+
+  // One quiet line, like the run's other steps; the player unfolds under it.
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Wrap(
-        spacing: 8,
-        children: [
-          OutlinedButton.icon(
-            onPressed: () => setState(() => _open = !_open),
-            icon: const Icon(Icons.visibility_outlined),
-            label: Text(_open ? 'Close browser' : 'Watch browser'),
-          ),
-          if (_open)
-            TextButton.icon(
-              icon: const Icon(Icons.open_in_full),
-              label: const Text('Expand'),
-              onPressed: () => Navigator.of(context).push(
-                HermezRoute<void>(
-                  motion: HermezRouteMotion.expand,
-                  reducedMotion: context.reduceMotion,
-                  origin: _aperture.currentContext == null
-                      ? null
-                      : HermezMorphOrigin.of(
-                          _aperture.currentContext!,
-                          radius: 16,
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: HermezMotionSurface(
+                key: const ValueKey('hermes-watch-browser'),
+                semanticLabel: _open
+                    ? 'Close the browser'
+                    : 'Watch the browser',
+                semanticsExpanded: _open,
+                weight: HermezMotionWeight.light,
+                originRadius: 12,
+                onTap: () => setState(() => _open = !_open),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 40),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.language_rounded,
+                        size: 15,
+                        color: palette.ink,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Watch the browser',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: palette.ink,
+                          ),
                         ),
-                  builder: (_) => HermesSteelFullScreenPage(
-                    viewerUrl: widget.viewerUrl,
-                    sessionId: widget.sessionId,
+                      ),
+                      AnimatedRotation(
+                        turns: _open ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: palette.muted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-        ],
-      ),
-      if (_open) ...[
-        SizedBox(
-          key: _aperture,
-          height: 260,
-          child: _AfterArrival(
-            placeholder: const _BrowserAperture(),
-            child: HermesSteelLiveView(viewerUrl: widget.viewerUrl),
+            if (_open)
+              IconButton(
+                key: const ValueKey('hermes-browser-expand'),
+                tooltip: 'Full screen',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.open_in_full_rounded,
+                  size: 17,
+                  color: palette.muted,
+                ),
+                onPressed: _expand,
+              ),
+          ],
+        ),
+        HermezReveal(
+          visible: _open,
+          revealKey: ValueKey('steel-${widget.sessionId}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                key: _aperture,
+                height: 220,
+                child: _AfterArrival(
+                  placeholder: const _BrowserAperture(),
+                  child: HermesSteelLiveView(viewerUrl: widget.viewerUrl),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  'Watch only · Hermes controls this browser.',
+                  style: TextStyle(fontSize: 12, color: palette.muted),
+                ),
+              ),
+            ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text('Watch only · Hermes controls this browser.'),
-        ),
       ],
-    ],
-  );
+    );
+  }
 }
 
 /// Embeds Steel's own debug player. It creates no Hermes/Steel session and

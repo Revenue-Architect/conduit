@@ -86,10 +86,29 @@ Future<void> showHermesPlanSheet(
   builder: (_) => _HermesPlanSheet(sessionId: sessionId),
 );
 
-class _HermesPlanSheet extends ConsumerStatefulWidget {
-  const _HermesPlanSheet({required this.sessionId});
+/// The whole plan unfolded in place above the composer, the same steps and
+/// actions the sheet had. [onClose] folds it away once a draft is placed.
+class HermesPlanInline extends StatelessWidget {
+  const HermesPlanInline({super.key, required this.sessionId, this.onClose});
 
   final String sessionId;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) =>
+      _HermesPlanSheet(sessionId: sessionId, inline: true, onClose: onClose);
+}
+
+class _HermesPlanSheet extends ConsumerStatefulWidget {
+  const _HermesPlanSheet({
+    required this.sessionId,
+    this.inline = false,
+    this.onClose,
+  });
+
+  final String sessionId;
+  final bool inline;
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<_HermesPlanSheet> createState() => _HermesPlanSheetState();
@@ -127,7 +146,11 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
       // The draft is in the composer; close the sheet over it. A plain pop:
       // the field that sent it is still open, and its Back handling would
       // fold it instead of closing the sheet.
-      Navigator.of(context).pop();
+      if (widget.inline) {
+        widget.onClose?.call();
+      } else {
+        Navigator.of(context).pop();
+      }
     }
     return delivered;
   }
@@ -178,6 +201,37 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
     ];
   }
 
+  /// A sheet, or the same parts stacked in place when inline.
+  Widget _frame(
+    HermezChatPalette palette, {
+    required String eyebrow,
+    required String title,
+    Widget? subtitle,
+    required Widget body,
+    Widget? footer,
+  }) {
+    if (!widget.inline) {
+      return HermezModalSheet(
+        eyebrow: eyebrow,
+        title: title,
+        subtitle: subtitle,
+        body: body,
+        footer: footer,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(eyebrow, style: HermezType.technical(palette.muted)),
+        ?subtitle,
+        const SizedBox(height: 8),
+        body,
+        if (footer != null) ...[const SizedBox(height: 8), footer],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = HermezChatPalette.forBrightness(
@@ -188,7 +242,8 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
     final running = turn.value == HermesDesktopTurnState.running;
     final plan = state.value?.todo;
     final rows = plan?.outline ?? const <HermesTodoRow>[];
-    return HermezModalSheet(
+    return _frame(
+      palette,
       eyebrow: plan == null
           ? 'PLAN'
           : hermesPlanStatus(plan, running: running).toUpperCase(),

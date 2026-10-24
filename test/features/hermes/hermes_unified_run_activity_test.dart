@@ -175,7 +175,7 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
-      'finished answer has one control and its sheet contains tools at $scale',
+      'finished answer has one control and unfolds its full run in place at $scale',
       (tester) async {
         final service = HermesDesktopApiService(
           config: HermesConfig(
@@ -251,41 +251,35 @@ void main() {
         expect(find.byType(StreamingStatusWidget), findsNothing);
         expect(find.byType(ThinkingOrb), findsNothing);
         expect(find.text('Read file'), findsOneWidget);
+        // The line unfolds the steps in place; the full run is one tap on.
         await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
         await tester.pumpAndSettle();
-        expect(find.byType(HermesLiveRunPage), findsOneWidget);
-        final scroll = find
-            .descendant(
-              of: find
-                  .descendant(
-                    of: find.byType(HermesLiveRunPage),
-                    matching: find.byType(ListView),
-                  )
-                  .first,
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        // Tool output is folded under its row until asked for.
-        await tester.scrollUntilVisible(
-          find.text('Show output').first,
-          150,
-          scrollable: scroll,
+        expect(find.byType(HermesLiveRunPage), findsNothing);
+        expect(find.text('Full run details'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('hermes-run-full-details')),
         );
+        await tester.tap(find.byKey(const ValueKey('hermes-run-full-details')));
+        await tester.pumpAndSettle();
+        // The full run unfolds under its line: no sheet, no second page.
+        expect(find.byType(HermesLiveRunPage), findsOneWidget);
+        expect(find.byTooltip('Close run details'), findsNothing);
+        // Tool output is folded under its row until asked for.
         await tester.ensureVisible(find.text('Show output').first);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Show output').first);
         await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.textContaining('Actual saved file result'),
-          150,
-          scrollable: scroll,
-        );
         expect(find.byType(HermesUnifiedActivityTimeline), findsOneWidget);
         expect(find.textContaining('Actual saved file result'), findsOneWidget);
         expect(find.text('Steer'), findsNothing);
         expect(tester.takeException(), isNull);
-        await tester.tap(find.byTooltip('Close run details'));
+        // Folding it again leaves the line and its steps.
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('hermes-run-full-details')),
+        );
+        await tester.tap(find.byKey(const ValueKey('hermes-run-full-details')));
         await tester.pumpAndSettle();
+        expect(find.byType(HermesLiveRunPage), findsNothing);
         expect(
           find.byKey(const ValueKey('hermes-run-orb-toggle')),
           findsOneWidget,
@@ -295,7 +289,7 @@ void main() {
   }
 
   testWidgets(
-    'pending clarification stays prominent on idle orb and in sheet',
+    'pending clarification stays prominent and opens the run in place',
     (tester) async {
       final service = HermesDesktopApiService(
         config: const HermesConfig(
@@ -347,12 +341,9 @@ void main() {
         tester.widget<ThinkingOrb>(find.byType(ThinkingOrb)).state,
         OrbState.listening,
       );
-      await tester.tap(find.byKey(const ValueKey('hermes-run-orb-toggle')));
-      await tester.pumpAndSettle();
+      // The question is in the run itself, already unfolded under the line.
       expect(find.text('Which city?'), findsOneWidget);
-      await tester.tap(find.byTooltip('Close run details'));
-      await tester.pumpAndSettle();
-      expect(find.text('Input needed'), findsOneWidget);
+      expect(find.byType(HermesLiveRunPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

@@ -38,6 +38,9 @@ const int kMaxHermesProviderErrorCharacters = 512;
 const int _maxHermesProviderSecretCharacters = 8 * 1024;
 const int kMaxHermesToolNameCharacters = 80;
 const int kMaxHermesStatusDetailCharacters = 120;
+
+/// The status row that carries Hermes' "waiting on the model" notice.
+const String kHermesProviderWaitAction = 'hermes_provider_wait';
 const int kMaxHermesApprovalSummaryCharacters = 512;
 const int _maxHermesRecoveryStatusCharacters = 64;
 
@@ -1546,6 +1549,21 @@ void _handleEvent(
     case HermesLifecycle():
       // Lifecycle transitions are advisory; terminal ones also emit RunDone.
       break;
+
+    case HermesProviderWait(:final text):
+      // One hidden row that the activity line reads while it is open; the
+      // clearing notice closes it in place (see appendStatusUpdate).
+      final safe = text.isEmpty
+          ? null
+          : _sanitizeHermesStatusDetail(text, sensitiveValues: sensitiveValues);
+      appendStatus(
+        ChatStatusUpdate(
+          action: kHermesProviderWaitAction,
+          description: safe ?? '',
+          done: safe == null,
+          hidden: true,
+        ),
+      );
 
     case HermesRunError(:final message):
       updateMessage(

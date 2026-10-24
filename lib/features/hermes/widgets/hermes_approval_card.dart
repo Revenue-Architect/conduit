@@ -68,6 +68,55 @@ class _HermesApprovalCardState extends State<HermesApprovalCard> {
         state == HermesApprovalState.approved ||
         state == HermesApprovalState.denied;
     final enabled = state == HermesApprovalState.pending && !_sent;
+    // Once answered the card has done its job: it settles into one line of
+    // record in the conversation, the way a message reads after it is sent.
+    if (resolved) {
+      final approved = state == HermesApprovalState.approved;
+      final summary = (widget.summary ?? '').trim().split('\n').first;
+      return Semantics(
+        label:
+            '${approved ? l10n.hermesApprovalApproved : l10n.hermesApprovalDenied}. $summary',
+        excludeSemantics: true,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                approved ? Icons.check_rounded : Icons.block_rounded,
+                size: 16,
+                color: approved
+                    ? palette.muted
+                    : Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: approved ? 'You approved' : 'You denied',
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (summary.isNotEmpty)
+                        TextSpan(
+                          text: ' · $summary',
+                          style: TextStyle(color: palette.muted),
+                        ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     String label(String choice) => switch (choice) {
       'once' => l10n.hermesApprovalAllowOnce,

@@ -1106,11 +1106,14 @@ class CompiledMarkdownDetailsData {
   final bool hasDuration;
   final CompiledMarkdownToolCallData? toolCallData;
 
+  /// Thinking, code runs and tool calls all unfold in place in the
+  /// conversation, running or finished.
   bool get supportsInlineExpansion =>
       kind == CompiledMarkdownDetailsKind.reasoning ||
-      kind == CompiledMarkdownDetailsKind.codeInterpreter;
+      kind == CompiledMarkdownDetailsKind.codeInterpreter ||
+      kind == CompiledMarkdownDetailsKind.toolCall;
 
-  bool get usesInlineExpansion => supportsInlineExpansion && isPending;
+  bool get usesInlineExpansion => supportsInlineExpansion;
 
   bool get canExpand {
     if (kind != CompiledMarkdownDetailsKind.toolCall) {

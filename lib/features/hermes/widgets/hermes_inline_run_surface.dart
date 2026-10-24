@@ -36,7 +36,6 @@ import '../feedback/hermez_feedback.dart';
 /// One session-owned run control surface in the transcript's live footer.
 /// Browser viewing is lazy and watch-only; Hermes owns the active run.
 /// Whether the run has started a browser (Steel) tool.
-@visibleForTesting
 bool hermesRunUsedBrowser(HermesRunSummary run) => run.tools.any(
   (tool) => RegExp('browser|steel', caseSensitive: false).hasMatch(tool.name),
 );

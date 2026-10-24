@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'hermes_bot.dart' show hermesProfileDisplayName;
+
 /// A delegated worker's lifecycle, as Hermes' `subagent.*` events report it.
 enum HermesSubagentStatus {
   queued,
@@ -141,7 +143,8 @@ final class HermesSubagentState {
   final String? nativeControlId;
   final String? boardSlug;
 
-  String get displayName => name ?? childProfile ?? 'Delegate';
+  String get displayName =>
+      hermesProfileDisplayName(name ?? childProfile ?? 'Delegate');
   bool get supportsNativeControl => kind == HermesDelegationKind.native;
 
   /// The latest thing it reported, for a one-line glance.

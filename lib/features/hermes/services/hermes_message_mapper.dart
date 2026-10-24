@@ -164,14 +164,23 @@ List<ChatMessage> hermesMessagesToChatMessages(
       ...extracted.images.map<Map<String, dynamic>>(_imageFileDescriptor),
       ...restoredDocuments.files,
     ];
-    final statusHistory = acceptedRole == 'assistant'
+    final toolStarts = acceptedRole == 'assistant'
         ? _persistedHermesToolStarts(
             item,
             messageIndex: messages.length,
             pendingTools: pendingTools,
           )
         : const <ChatStatusUpdate>[];
-    if (content.isEmpty && files.isEmpty && statusHistory.isEmpty) continue;
+    if (content.isEmpty && files.isEmpty && toolStarts.isEmpty) continue;
+    // The model's saved thinking summary, so the answer's activity line keeps
+    // its "Thought" after a reload instead of vanishing with the live stream.
+    final thought = acceptedRole == 'assistant'
+        ? _persistedHermesReasoning(item)
+        : null;
+    // Appended, not prepended: pending tool rows are addressed by index.
+    final statusHistory = thought == null
+        ? toolStarts
+        : [...toolStarts, thought];
     final rawMetadata = item['metadata'];
     final itemMetadata = <String, dynamic>{};
     if (rawMetadata is Map) {
@@ -240,6 +249,25 @@ List<ChatMessage> hermesMessagesToChatMessages(
   }
 
   return messages;
+}
+
+/// Hermes stores a short reasoning summary per assistant row ("**Validating
+/// card layout**"). Bounded, single-spaced, and shaped like the live
+/// `reasoning` status so one renderer serves both.
+ChatStatusUpdate? _persistedHermesReasoning(Map<String, dynamic> item) {
+  final raw = item['reasoning'] ?? item['reasoning_content'];
+  if (raw is! String) return null;
+  final lines = [
+    for (final line in raw.split('\n').take(12))
+      if (line.replaceAll('*', '').trim() case final text when text.isNotEmpty)
+        text.length > 160 ? '${text.substring(0, 159)}…' : text,
+  ];
+  if (lines.isEmpty) return null;
+  return ChatStatusUpdate(
+    action: 'reasoning',
+    description: 'Thinking… ${lines.join('\n')}',
+    done: true,
+  );
 }
 
 List<ChatStatusUpdate> _persistedHermesToolStarts(

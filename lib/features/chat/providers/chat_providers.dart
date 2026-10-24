@@ -5602,10 +5602,12 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     updateMessageById(messageId, (current) {
       final history = [...current.statusHistory];
       final action = withTimestamp.action;
-      if (action == 'reasoning') {
+      if (action == 'reasoning' || action == kHermesProviderWaitAction) {
         final reasoningIndex = history.lastIndexWhere(
           (status) => status.action == action,
         );
+        // A provider-wait "clear" with nothing to clear is not news.
+        if (reasoningIndex < 0 && withTimestamp.done == true) return current;
         if (reasoningIndex >= 0) {
           if (_statusUpdatesEquivalent(
             history[reasoningIndex],
@@ -12604,8 +12606,9 @@ ChatMessage _appendHermesProjectionStatus(
       : update;
   final history = [...current.statusHistory];
   final action = withTimestamp.action;
-  if (action == 'reasoning') {
+  if (action == 'reasoning' || action == kHermesProviderWaitAction) {
     final index = history.lastIndexWhere((status) => status.action == action);
+    if (index < 0 && withTimestamp.done == true) return current;
     if (index >= 0) {
       if (_hermesProjectionStatusEquivalent(history[index], withTimestamp)) {
         return current;

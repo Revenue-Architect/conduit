@@ -125,6 +125,14 @@ final class HermesLifecycle extends HermesRunEvent {
   final String status;
 }
 
+/// Hermes' own notice that the model provider has gone quiet ("⏳ waiting on
+/// gpt-6-luna — …"), or an empty [text] once the provider answers again.
+final class HermesProviderWait extends HermesRunEvent {
+  const HermesProviderWait(this.text);
+
+  final String text;
+}
+
 /// The run's final/full output text (e.g. from `run.completed`). Used as a
 /// fallback when no incremental deltas were streamed, so the message is never
 /// left empty.

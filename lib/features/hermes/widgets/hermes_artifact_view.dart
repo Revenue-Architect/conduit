@@ -175,10 +175,10 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
   Widget _imageFrame(BuildContext context, Widget child) => Container(
     width: double.infinity,
     constraints: BoxConstraints(maxHeight: widget.maxImageHeight + 20),
+    // The picture is the content: rounded, no frame around it.
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      borderRadius: BorderRadius.circular(14),
     ),
     clipBehavior: Clip.antiAlias,
     child: child,
@@ -231,21 +231,16 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
     final extensionLabel = _extension.isEmpty
         ? 'FILE'
         : _extension.toUpperCase();
-    return Container(
+    // A file is a line in the answer: what it is, and what you can do with it.
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(_fileIcon, size: 30, color: colorScheme.primary),
-              const SizedBox(width: 12),
+              Icon(_fileIcon, size: 22, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,7 +251,6 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 3),
                     Text(
                       extensionLabel,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -269,33 +263,25 @@ class _HermesArtifactViewState extends ConsumerState<HermesArtifactView> {
               ),
               if (_isActionInProgress)
                 const Padding(
-                  padding: EdgeInsets.only(left: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 14),
                   child: SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
+                )
+              else ...[
+                IconButton(
+                  tooltip: 'Open',
+                  onPressed: () => _runAction(open: true),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 20),
                 ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: _isActionInProgress
-                    ? null
-                    : () => _runAction(open: true),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text('Open'),
-              ),
-              TextButton.icon(
-                onPressed: _isActionInProgress
-                    ? null
-                    : () => _runAction(open: false),
-                icon: const Icon(Icons.share_outlined, size: 18),
-                label: const Text('Share'),
-              ),
+                IconButton(
+                  tooltip: 'Share',
+                  onPressed: () => _runAction(open: false),
+                  icon: const Icon(Icons.ios_share_rounded, size: 20),
+                ),
+              ],
             ],
           ),
           if (_actionError != null) ...[

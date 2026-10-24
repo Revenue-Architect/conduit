@@ -58,11 +58,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('report.pdf'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
-    expect(find.text('Share'), findsOneWidget);
+    expect(find.byTooltip('Open'), findsOneWidget);
+    expect(find.byTooltip('Share'), findsOneWidget);
     expect(adapter.requests, isEmpty);
 
-    await tester.tap(find.text('Open'));
+    await tester.tap(find.byTooltip('Open'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -118,7 +118,7 @@ void main() {
     await tester.pump();
     expect(adapter.requests, isEmpty);
 
-    await tester.tap(find.text('Share'));
+    await tester.tap(find.byTooltip('Share'));
     await tester.pumpAndSettle();
 
     expect(adapter.requests, hasLength(1));
