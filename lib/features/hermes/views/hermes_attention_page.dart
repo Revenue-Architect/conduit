@@ -15,7 +15,7 @@ import '../widgets/hermez_technical_background.dart';
 import '../motion/hermez_morph_origin.dart';
 import 'hermes_page_chrome.dart';
 
-final _attentionDecisionsProvider =
+final hermesAttentionDecisionsProvider =
     FutureProvider.autoDispose<List<HermesPendingDesktopDecision>>((ref) async {
       final service = ref.watch(hermesApiServiceProvider);
       return service is HermesDesktopApiService
@@ -26,7 +26,7 @@ final _attentionDecisionsProvider =
 /// Chief's prepared initiative results still waiting on the owner. A decision
 /// (handled, dismissed, snoozed) archives the objective's chat on the server,
 /// and the default listing excludes archived chats.
-final _preparedProvider =
+final hermesAttentionPreparedProvider =
     FutureProvider.autoDispose<List<HermesSessionSummary>>((ref) async {
       final service = ref.watch(hermesApiServiceProvider);
       if (service is! HermesDesktopApiService) return <HermesSessionSummary>[];
@@ -46,7 +46,7 @@ final _preparedProvider =
 /// source label but are reports, not work waiting on the owner.
 final _objectiveChat = RegExp(r'^initiative-[0-9a-f]{24}$');
 
-final _failedJobsProvider =
+final hermesAttentionFailedJobsProvider =
     FutureProvider.autoDispose<List<(String, HermesJob)>>((ref) async {
       final service = ref.watch(hermesApiServiceProvider);
       final bots = await ref.watch(hermesBotsProvider.future);
@@ -84,9 +84,9 @@ class HermesAttentionPage extends ConsumerWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final decisions = ref.watch(_attentionDecisionsProvider);
-    final failedJobs = ref.watch(_failedJobsProvider);
-    final preparedWork = ref.watch(_preparedProvider);
+    final decisions = ref.watch(hermesAttentionDecisionsProvider);
+    final failedJobs = ref.watch(hermesAttentionFailedJobsProvider);
+    final preparedWork = ref.watch(hermesAttentionPreparedProvider);
     final pending =
         decisions.asData?.value ?? const <HermesPendingDesktopDecision>[];
     final failed = failedJobs.asData?.value ?? const <(String, HermesJob)>[];
@@ -105,19 +105,19 @@ class HermesAttentionPage extends ConsumerWidget {
         IconButton(
           tooltip: 'Refresh attention',
           onPressed: () {
-            ref.invalidate(_attentionDecisionsProvider);
-            ref.invalidate(_failedJobsProvider);
-            ref.invalidate(_preparedProvider);
+            ref.invalidate(hermesAttentionDecisionsProvider);
+            ref.invalidate(hermesAttentionFailedJobsProvider);
+            ref.invalidate(hermesAttentionPreparedProvider);
           },
           icon: const Icon(Icons.refresh_rounded),
         ),
       ],
       child: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(_attentionDecisionsProvider);
-          ref.invalidate(_failedJobsProvider);
-          ref.invalidate(_preparedProvider);
-          await ref.read(_attentionDecisionsProvider.future);
+          ref.invalidate(hermesAttentionDecisionsProvider);
+          ref.invalidate(hermesAttentionFailedJobsProvider);
+          ref.invalidate(hermesAttentionPreparedProvider);
+          await ref.read(hermesAttentionDecisionsProvider.future);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
@@ -147,21 +147,30 @@ class HermesAttentionPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 19),
-            if (decisions.isLoading || failedJobs.isLoading)
+            if (decisions.isLoading ||
+                failedJobs.isLoading ||
+                preparedWork.isLoading)
               const LinearProgressIndicator(minHeight: 2),
-            if (decisions.hasError || failedJobs.hasError)
+            if (decisions.hasError ||
+                failedJobs.hasError ||
+                preparedWork.hasError)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'Some attention sources are unavailable. Pull to retry.',
                 ),
               ),
+            // An unreachable source is not an empty one: never claim the queue
+            // is clear while any source is loading or failed.
             if (pending.isEmpty &&
                 failed.isEmpty &&
                 prepared.isEmpty &&
                 !decisions.isLoading &&
                 !failedJobs.isLoading &&
-                !preparedWork.isLoading)
+                !preparedWork.isLoading &&
+                !decisions.hasError &&
+                !failedJobs.hasError &&
+                !preparedWork.hasError)
               const HermesPanel(
                 child: Text('Nothing needs your attention right now.'),
               ),
@@ -246,7 +255,7 @@ class HermesAttentionPage extends ConsumerWidget {
                                   ),
                                 );
                             if (resolved == true) {
-                              ref.invalidate(_attentionDecisionsProvider);
+                              ref.invalidate(hermesAttentionDecisionsProvider);
                             }
                           },
                         ),

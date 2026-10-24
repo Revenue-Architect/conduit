@@ -61,6 +61,8 @@ import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_run_transport.dart' show kHermesTransport;
 import '../../hermes/services/hermes_decision_projection.dart';
 import '../../hermes/services/hermes_desktop_api_service.dart';
+import '../../hermes/services/hermes_backend_service.dart'
+    show HermesBackendService;
 import '../../hermes/services/hermes_a2ui_interaction_presentation.dart';
 import '../../hermes/services/hermes_local_document_trust_store.dart';
 import '../../hermes/services/hermes_message_mapper.dart';
@@ -116,6 +118,7 @@ import 'chat_turn_render_state.dart';
 import '../widgets/streaming_turn_footer.dart';
 import '../widgets/openwebui_prompt_overlay.dart';
 import '../widgets/chat_timeline_viewport.dart';
+import 'hermes_bot_header_collapse.dart';
 
 @visibleForTesting
 bool? chatResizeToAvoidBottomInset({
@@ -275,6 +278,10 @@ HermesBotChatPresentation? chatHermesBotPresentation(
   );
 }
 
+/// How long the bot header takes to collapse or expand (56 dp ↔ 33 dp).
+@visibleForTesting
+const kHermesBotHeaderTransition = Duration(milliseconds: 300);
+
 class _HermesBotToolbarTitle extends StatelessWidget {
   const _HermesBotToolbarTitle({
     required this.bot,
@@ -305,29 +312,42 @@ class _HermesBotToolbarTitle extends StatelessWidget {
             tween: Tween(end: compact ? 1 : 0),
             duration: context.reduceMotion
                 ? Duration.zero
-                : const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
+                : kHermesBotHeaderTransition,
+            // Symmetric and overshoot-free: the header settles, never bounces.
+            curve: Curves.easeInOutCubic,
             builder: (context, collapse, _) => Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                HermesBotAvatar(
-                  key: const ValueKey('hermes-bot-toolbar-avatar'),
-                  size: 56 - 23 * collapse,
-                  label: bot.title,
-                  imageUrl: bot.avatar,
-                  shape: bot.shape,
-                  color: bot.color,
-                  imageKind: bot.imageKind,
-                  active: active,
+                // A fixed 56 dp slot: the avatar shrinks about its own center.
+                SizedBox.square(
+                  dimension: 56,
+                  child: Center(
+                    child: HermesBotAvatar(
+                      key: const ValueKey('hermes-bot-toolbar-avatar'),
+                      size: 56 - 23 * collapse,
+                      label: bot.title,
+                      imageUrl: bot.avatar,
+                      shape: bot.shape,
+                      color: bot.color,
+                      imageKind: bot.imageKind,
+                      active: active,
+                    ),
+                  ),
                 ),
+                // The name keeps its slot while it fades, so the centered row
+                // never shifts the avatar sideways; only its size changes.
                 Flexible(
-                  child: ClipRect(
+                  child: IgnorePointer(
+                    ignoring: collapse > 0.5,
                     child: Align(
-                      widthFactor: 1 - collapse,
+                      widthFactor: 1,
                       alignment: Alignment.centerLeft,
                       child: Opacity(
-                        opacity: 1 - collapse,
+                        opacity: 1 -
+                            Curves.easeOut.transform(
+                              math.min(1.0, collapse / 0.7),
+                            ),
                         child: Padding(
                           padding: const EdgeInsets.only(left: Spacing.sm),
                           child: Text(
@@ -614,7 +634,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   ProviderSubscription<Object>? _authEpochSub;
   ProviderSubscription<ApiService?>? _apiOwnerSub;
   ProviderSubscription<AppDatabase?>? _databaseOwnerSub;
-  ProviderSubscription<AsyncValue<String>>? _hermesTranscriptSub;
+  ProviderSubscription<HermesBackendService?>? _hermesTranscriptSub;
+  // Direct, not through a StreamProvider: an AsyncValue provider swallows a
+  // repeat of the same session id, so a second refresh of the open chat
+  // (after a decision, a push, or a return to the app) would never arrive.
+  StreamSubscription<String>? _hermesTranscriptChanges;
   ProviderSubscription<bool>? _hermesStreamingSub;
   late final OpenWebUiLivePromptNotifier _livePromptNotifier;
   String? _pendingHermesTranscriptRefresh;
@@ -697,6 +721,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (_isUserInteractingWithScroll &&
         metrics.distanceFromLatest > _scrollButtonHideThreshold) {
       _bottomAnchorController.detachByUser();
+    }
+    if (_botHeader.tracksUserMotion) {
+      _botHeader.userScrolled(
+        metrics.distanceFromLatest,
+        atLatest: metrics.distanceFromLatest <= _scrollButtonHideThreshold,
+      );
     }
     final visibleMessageIds = metrics.visibleMessageIds.toSet();
     final shouldPrewarm =
@@ -1064,12 +1094,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         _scheduleViewportOwnerChanged();
       }
     });
-    _hermesTranscriptSub = ref.listenManual(
-      hermesDesktopTranscriptChangesProvider,
-      (_, next) => next.whenData(
-        (storedId) => unawaited(_refreshDesktopHermesTranscript(storedId)),
-      ),
-    );
+    _hermesTranscriptSub = ref.listenManual(hermesApiServiceProvider, (
+      _,
+      service,
+    ) {
+      unawaited(_hermesTranscriptChanges?.cancel());
+      _hermesTranscriptChanges = service is HermesDesktopApiService
+          ? service.transcriptChanges.listen(
+              (storedId) =>
+                  unawaited(_refreshDesktopHermesTranscript(storedId)),
+            )
+          : null;
+    }, fireImmediately: true);
     _hermesStreamingSub = ref.listenManual(isChatStreamingProvider, (
       wasStreaming,
       isStreaming,
@@ -1122,6 +1158,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _apiOwnerSub?.close();
     _databaseOwnerSub?.close();
     _hermesTranscriptSub?.close();
+    unawaited(_hermesTranscriptChanges?.cancel());
     _hermesStreamingSub?.close();
     _hermesTranscriptRefreshGeneration++;
     _markdownPrewarmThrottle.cancel();
@@ -1136,7 +1173,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       InteractionActivity.instance.endInteraction();
     }
     _timelineViewportController.dispose();
-    _botHeaderScrolling.dispose();
+    _botHeader.dispose();
     super.dispose();
   }
 
@@ -2264,6 +2301,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   /// User-initiated scroll to bottom (e.g. button tap).
   void _userScrollToBottom() {
     ConduitHaptics.lightImpact();
+    _botHeader.userRequestedLatest();
     if (debugShouldReleasePinnedTurnForManualNavigationForTesting(
       pinActive: _wantsPinToTop,
       userDragStarted: false,
@@ -2490,6 +2528,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         .cancelForConversation(outgoingId);
 
     _conversationOwnerGeneration += 1;
+    _botHeader.reset();
     markConversationRead(ref, outgoingId);
     markConversationRead(ref, conversationId);
     _saveCurrentScrollAnchor(conversationId: outgoingId);
@@ -3191,7 +3230,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         }
       },
       onUserDragStart: () {
-        _botHeaderScrolling.value = true;
+        _botHeader.userDragStarted(
+          _timelineViewportController.distanceFromLatest,
+        );
         InteractionActivity.instance.beginInteraction();
         final pinnedTurnWasActive = _wantsPinToTop;
         _hasUserScrolled = true;
@@ -3214,7 +3255,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         } catch (_) {}
       },
       onUserDragEnd: () {
-        _botHeaderScrolling.value = false;
         InteractionActivity.instance.endInteraction();
         _endScrollProfile(reason: 'idle');
         _isUserInteractingWithScroll = false;
@@ -3225,6 +3265,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   _scrollButtonHideThreshold
             : _timelineViewportController.distanceFromLatest <=
                   _scrollButtonHideThreshold;
+        _botHeader.userDragEnded(atLatest: naturallyReturnedToLatest);
         if (naturallyReturnedToLatest) {
           _resumeLatestPresentation();
         }
@@ -4745,7 +4786,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     layout.toggle();
   }
 
-  final _botHeaderScrolling = ValueNotifier(false);
+  final _botHeader = HermesBotHeaderCollapse();
   bool _isOpeningModelSelector = false;
 
   Future<void> _openModelSelector(BuildContext context) async {
@@ -4880,7 +4921,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (hermesBot != null) {
       final profile = _hermesChatProfile(ref.read(activeConversationProvider));
       return ValueListenableBuilder<bool>(
-        valueListenable: _botHeaderScrolling,
+        valueListenable: _botHeader.compact,
         builder: (context, scrolling, _) => _HermesBotToolbarTitle(
           bot: hermesBot,
           maxWidth: maxModelWidth,

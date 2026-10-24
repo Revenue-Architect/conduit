@@ -29,7 +29,7 @@ const Map<HermezBotIdentity, String> hermezBotMarkAssets = {
   HermezBotIdentity.strong: 'assets/icons/StrongBot.png',
 };
 
-/// A bot's mark: its artwork, fitted inside a [size] square.
+/// A bot's mark: its artwork, cut out as a [size] circle.
 class HermezBotMark extends StatelessWidget {
   const HermezBotMark({
     super.key,
@@ -59,28 +59,30 @@ class HermezBotMark extends StatelessWidget {
             : () => HermezBotIcons.showPicker(context, botName!),
         child: SizedBox.square(
           dimension: size,
-          child: ValueListenableBuilder(
-            valueListenable: HermezBotIcons.assigned,
-            builder: (context, _, _) {
-              final custom = HermezBotIcons.iconFor(botName);
-              return custom != null
-                  ? Image.file(
-                      custom,
-                      fit: BoxFit.contain,
-                      cacheWidth: pixels > 0 ? pixels : null,
-                      filterQuality: FilterQuality.medium,
-                      gaplessPlayback: true,
-                      excludeFromSemantics: true,
-                    )
-                  : Image.asset(
-                      hermezBotMarkAssets[identity]!,
-                      fit: BoxFit.contain,
-                      cacheWidth: pixels > 0 ? pixels : null,
-                      filterQuality: FilterQuality.medium,
-                      gaplessPlayback: true,
-                      excludeFromSemantics: true,
-                    );
-            },
+          child: ClipOval(
+            child: ValueListenableBuilder(
+              valueListenable: HermezBotIcons.assigned,
+              builder: (context, _, _) {
+                final custom = HermezBotIcons.iconFor(botName);
+                return custom != null
+                    ? Image.file(
+                        custom,
+                        fit: BoxFit.cover,
+                        cacheWidth: pixels > 0 ? pixels : null,
+                        filterQuality: FilterQuality.medium,
+                        gaplessPlayback: true,
+                        excludeFromSemantics: true,
+                      )
+                    : Image.asset(
+                        hermezBotMarkAssets[identity]!,
+                        fit: BoxFit.cover,
+                        cacheWidth: pixels > 0 ? pixels : null,
+                        filterQuality: FilterQuality.medium,
+                        gaplessPlayback: true,
+                        excludeFromSemantics: true,
+                      );
+              },
+            ),
           ),
         ),
       ),

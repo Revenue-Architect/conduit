@@ -34,7 +34,12 @@ void main() {
       expect(tester.getSize(find.byWidget(mark)), Size.square(mark.size));
     }
     expect(find.bySemanticsLabel('Bot x'), findsWidgets);
+    // Every mark is a circular cutout that fills its circle.
     final image = tester.widget<Image>(find.byType(Image).first);
-    expect(image.fit, BoxFit.contain);
+    expect(image.fit, BoxFit.cover);
+    expect(
+      find.descendant(of: marks.first, matching: find.byType(ClipOval)),
+      findsOneWidget,
+    );
   });
 }

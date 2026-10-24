@@ -324,6 +324,15 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         if (slash.submit == null) {
           await _detachStaged(binding.runtimeId, stagedPaths);
           finish();
+          // An owner decision changes the stored chat on the server (its
+          // confirmation is saved there), while the command and its reply only
+          // exist locally. Reload so the chat matches the server's order.
+          // Read-only commands (list, status) keep their local output.
+          if (RegExp(
+            r'^/initiative (approve|handled|dismiss|dismissed|rewrite|snooze|reopen|weights) ',
+          ).hasMatch(text.trimLeft())) {
+            requestTranscriptRefresh(storedId);
+          }
           return HermesResponseStream(
             events: controller.stream,
             sessionId: storedId,
