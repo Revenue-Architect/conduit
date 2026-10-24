@@ -12905,6 +12905,7 @@ Future<void> _dispatchHermesRunFromChat(
   CancelToken? preRegisteredCancelToken,
   Duration lateSessionCleanupDeadline = _hermesLateSessionCleanupDeadline,
 }) async {
+  ref = _detachedRef(ref);
   final releaseGeneration = holdLocalChatGeneration(ref);
   try {
     // Capture both ownership and session continuity before the first await. A
@@ -17145,6 +17146,13 @@ Future<void> _dispatchDirectRunFromChatWithTrackedOwner(
   }
 }
 
+/// A chat page's [WidgetRef] throws on every read once the page unmounts, and
+/// on a docked phone Back unmounts it while the reply is still streaming. A
+/// send outlives its page, so it reads through the page's container instead.
+dynamic _detachedRef(dynamic ref) => ref is WidgetRef
+    ? ProviderScope.containerOf(ref.context, listen: false)
+    : ref;
+
 Future<void> _sendMessageInternal(
   dynamic ref,
   String message,
@@ -17155,6 +17163,7 @@ Future<void> _sendMessageInternal(
   void Function(ChatSendPlaceholderHandle handle)?
   onAssistantPlaceholderCreated,
 ]) async {
+  ref = _detachedRef(ref);
   final conversationAtSendStart =
       ref.read(activeConversationProvider) as Conversation?;
   final sendMutationOwner = captureChatMutationOwner(
