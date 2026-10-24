@@ -151,7 +151,8 @@ void main() {
         header.userDragEnded(atLatest: false);
         for (var i = 0; i < 40; i++) {
           async.elapse(const Duration(milliseconds: 100));
-          if (header.tracksUserMotion) header.userScrolled(600, atLatest: false);
+          if (header.tracksUserMotion)
+            header.userScrolled(600, atLatest: false);
         }
         expect(header.tracksUserMotion, isFalse);
         header.dispose();
@@ -189,36 +190,42 @@ void main() {
     });
   });
 
-  testWidgets('the avatar keeps its horizontal center as the header collapses', (
-    tester,
-  ) async {
-    Widget header(bool compact) => MaterialApp(
-      theme: AppTheme.light(TweakcnThemes.t3Chat),
-      home: Scaffold(
-        body: Center(
-          child: debugBuildHermesBotToolbarTitleForTesting(
-            bot: (
-              title: 'Chief',
-              avatar: null,
-              shape: 'squircle',
-              color: '#8b5cf6',
-              imageKind: null,
+  testWidgets(
+    'the avatar keeps its horizontal center as the header collapses',
+    (tester) async {
+      Widget header(bool compact) => MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Scaffold(
+          body: Center(
+            child: debugBuildHermesBotToolbarTitleForTesting(
+              bot: (
+                title: 'Chief',
+                avatar: null,
+                shape: 'squircle',
+                color: '#8b5cf6',
+                imageKind: null,
+              ),
+              maxWidth: 320,
+              compact: compact,
             ),
-            maxWidth: 220,
-            compact: compact,
           ),
         ),
-      ),
-    );
-    final avatar = find.byKey(const ValueKey('hermes-bot-toolbar-avatar'));
-    await tester.pumpWidget(header(false));
-    final expanded = tester.getCenter(avatar).dx;
-    await tester.pumpWidget(header(true));
-    await tester.pump(kHermesBotHeaderTransition ~/ 2);
-    expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
-    await tester.pumpAndSettle();
-    expect(tester.getSize(avatar).width, 33);
-    expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
-    expect(kHermesBotHeaderTransition.inMilliseconds, inInclusiveRange(280, 320));
-  });
+      );
+      final avatar = find.byKey(const ValueKey('hermes-bot-toolbar-avatar'));
+      await tester.pumpWidget(header(false));
+      final expanded = tester.getCenter(avatar).dx;
+      await tester.pumpWidget(header(true));
+      await tester.pump(kHermesBotHeaderTransition ~/ 2);
+      expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(avatar).width, 33);
+      expect(tester.getCenter(avatar).dx, closeTo(expanded, 0.5));
+      // The avatar, not the avatar-and-name group, is the title's center.
+      expect(expanded, closeTo(400, 0.5));
+      expect(
+        kHermesBotHeaderTransition.inMilliseconds,
+        inInclusiveRange(280, 320),
+      );
+    },
+  );
 }

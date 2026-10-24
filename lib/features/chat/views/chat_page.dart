@@ -317,76 +317,98 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                 : kHermesBotHeaderTransition,
             // Symmetric and overshoot-free: the header settles, never bounces.
             curve: Curves.easeInOutCubic,
-            // The avatar sits at the title's center in both states: equal
-            // halves either side of it, the name in the right one. It never
-            // moves as the header collapses, and collapsed it is centered.
-            builder: (context, collapse, _) => Row(
-              children: [
-                const Expanded(child: SizedBox.shrink()),
-                // A fixed 56 dp slot: the avatar shrinks about its own center.
-                SizedBox.square(
-                  dimension: 56,
-                  child: Center(
-                    child: HermesBotAvatar(
-                      key: const ValueKey('hermes-bot-toolbar-avatar'),
-                      size: 56 - 23 * collapse,
-                      label: bot.title,
-                      imageUrl: bot.avatar,
-                      shape: bot.shape,
-                      color: bot.color,
-                      imageKind: bot.imageKind,
-                      active: active,
-                    ),
+            // The avatar is the title's center: what trails it (the name,
+            // the working dot) is mirrored by space before it. When the bar
+            // is too narrow for both, the mirror gives way first, so the name
+            // is never cut short just to center the avatar.
+            builder: (context, collapse, _) => LayoutBuilder(
+              builder: (context, constraints) {
+                final nameStyle = conduitAdaptiveToolbarLeadingTitleTextStyle(
+                  context,
+                ).copyWith(fontWeight: FontWeight.w600);
+                // Measured as the Text below lays it out: over the inherited
+                // default style.
+                final name = TextPainter(
+                  text: TextSpan(
+                    text: bot.title,
+                    style: DefaultTextStyle.of(context).style.merge(nameStyle),
                   ),
-                ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: IgnorePointer(
-                          ignoring: collapse > 0.5,
-                          // Collapsed, the name gives up its width so the
-                          // working dot sits by the avatar.
-                          child: ClipRect(
-                            child: Align(
-                              widthFactor: 1 - collapse,
-                              alignment: Alignment.centerLeft,
-                              child: Opacity(
-                                opacity:
-                                    1 -
-                                    Curves.easeOut.transform(
-                                      math.min(1.0, collapse / 0.7),
-                                    ),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: Spacing.sm,
+                  maxLines: 1,
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout();
+                final trailing =
+                    (name.width + Spacing.sm) * (1 - collapse) +
+                    (active ? Spacing.sm + 6 : 0);
+                name.dispose();
+                final mirror = trailing
+                    .clamp(
+                      0.0,
+                      math.max(0.0, constraints.maxWidth - 56 - trailing),
+                    )
+                    .toDouble();
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: mirror),
+                    // A fixed 56 dp slot: the avatar shrinks about its own
+                    // center.
+                    SizedBox.square(
+                      dimension: 56,
+                      child: Center(
+                        child: HermesBotAvatar(
+                          key: const ValueKey('hermes-bot-toolbar-avatar'),
+                          size: 56 - 23 * collapse,
+                          label: bot.title,
+                          imageUrl: bot.avatar,
+                          shape: bot.shape,
+                          color: bot.color,
+                          imageKind: bot.imageKind,
+                          active: active,
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      child: IgnorePointer(
+                        ignoring: collapse > 0.5,
+                        // Collapsed, the name gives up its width so the
+                        // working dot sits by the avatar.
+                        child: ClipRect(
+                          child: Align(
+                            widthFactor: 1 - collapse,
+                            alignment: Alignment.centerLeft,
+                            child: Opacity(
+                              opacity:
+                                  1 -
+                                  Curves.easeOut.transform(
+                                    math.min(1.0, collapse / 0.7),
                                   ),
-                                  child: Text(
-                                    bot.title,
-                                    key: const ValueKey(
-                                      'hermes-bot-toolbar-title',
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style:
-                                        conduitAdaptiveToolbarLeadingTitleTextStyle(
-                                          context,
-                                        ).copyWith(fontWeight: FontWeight.w600),
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: Spacing.sm,
+                                ),
+                                child: Text(
+                                  bot.title,
+                                  key: const ValueKey(
+                                    'hermes-bot-toolbar-title',
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: nameStyle,
                                 ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      if (active) ...[
-                        const SizedBox(width: Spacing.sm),
-                        const _HermesBotActivityDot(),
-                      ],
+                    ),
+                    if (active) ...[
+                      const SizedBox(width: Spacing.sm),
+                      const _HermesBotActivityDot(),
                     ],
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -1619,7 +1641,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         error: e,
         stackTrace: stackTrace,
       );
-      recoverFailedChatSend(ref, e, pendingSend);
+      // A Hermes reply can outlive this page; its own send path has already
+      // recorded the failure on the row, and a closed page's ref cannot read.
+      if (mounted) recoverFailedChatSend(ref, e, pendingSend);
     } finally {
       attachmentSendSettled.complete();
     }

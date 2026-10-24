@@ -127,11 +127,12 @@ class HermesWorkTeamRow extends ConsumerWidget {
     final service = ref.watch(hermesApiServiceProvider);
     // Any of the bot's chats, not only its own chat: a new chat with Chief
     // runs in a session of its own.
-    final running =
-        hermezBotRunning(service, bot) ||
-        watchHermesWorkingAgents(
-          ref,
-        ).any((agent) => agent.profile.toLowerCase() == bot.name.toLowerCase());
+    final working = watchHermesWorkingAgents(ref).any(
+      (agent) =>
+          hermesProfileDisplayName(agent.profile).toLowerCase() ==
+          hermesProfileDisplayName(bot.name).toLowerCase(),
+    );
+    final running = working || hermezBotRunning(service, bot);
     final title = hermesBotDisplayTitle(bot);
     final status = hermezBotStatus(bot, running: running);
     final morphId = hermezBotMorphId(bot.name);
