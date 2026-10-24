@@ -118,10 +118,10 @@ void main() {
 
     final open = [
       ...turn,
-      _event(HermesLiveActivityKind.toolStarted, 60, detail: 'browser'),
+      _event(HermesLiveActivityKind.toolStarted, 59, detail: 'browser'),
     ];
     final live = HermesRunSummary.recent(open, runs: 2, running: true);
     expect(live.events.first.timestamp.second, 50);
-    expect(live.events.last.timestamp.second, 60);
+    expect(live.events.last.timestamp.second, 59);
   });
 }
