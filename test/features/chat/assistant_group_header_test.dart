@@ -106,6 +106,36 @@ void main() {
       ).isFalse();
     });
 
+    test('a Hermes row holding only its thinking collapses', () {
+      final message = ChatMessage(
+        id: 'thought-only',
+        role: 'assistant',
+        content: '',
+        timestamp: DateTime.fromMillisecondsSinceEpoch(0),
+        statusHistory: const [reasoning],
+        metadata: const {
+          'transport': 'hermesRun',
+          'hermesSessionId': 'session-1',
+        },
+      );
+
+      check(
+        debugCanCollapseGroupedAssistantRowForTesting(
+          message,
+          showModelHeader: false,
+          showActionBar: false,
+        ),
+      ).isTrue();
+      // The row that hosts the turn's line never collapses.
+      check(
+        debugCanCollapseGroupedAssistantRowForTesting(
+          message,
+          showModelHeader: true,
+          showActionBar: false,
+        ),
+      ).isFalse();
+    });
+
     test('a composer-hosted Hermes prompt does not leave a message gap', () {
       final message = ChatMessage(
         id: 'prompt-only',

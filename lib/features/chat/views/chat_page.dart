@@ -3602,8 +3602,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final displayedMessage = groupIds.length > 1
         ? _messageWithGroupedHermesToolStatuses(rowRef, latestMessage, groupIds)
         : latestMessage;
-    if (displayedMessage.statusHistory.length <
-            latestMessage.statusHistory.length &&
+    // A Hermes continuation row with nothing to show (its tools moved to the
+    // line above, its thinking reads there too) is not a blank gap.
+    if ((displayedMessage.statusHistory.length <
+                latestMessage.statusHistory.length ||
+            (_isHermesRunRow(displayedMessage) &&
+                !latestMessage.isStreaming)) &&
         debugCanCollapseGroupedAssistantRowForTesting(
           displayedMessage,
           showModelHeader: rowMetadata.showModelHeader,
@@ -5518,6 +5522,11 @@ List<List<ChatStatusUpdate>> debugGroupHermesToolStatusesForTesting(
 bool _isHermesToolStatus(ChatStatusUpdate status) =>
     status.action?.startsWith('hermes_tool_') ?? false;
 
+bool _isHermesRunRow(ChatMessage message) =>
+    message.metadata?['transport'] == kHermesTransport &&
+    validateHermesOpaqueIdentifier(message.metadata?['hermesSessionId']) !=
+        null;
+
 @visibleForTesting
 bool debugCanCollapseGroupedAssistantRowForTesting(
   ChatMessage message, {
@@ -5531,7 +5540,11 @@ bool debugCanCollapseGroupedAssistantRowForTesting(
       (message.files?.isEmpty ?? true) &&
       (message.output?.isEmpty ?? true) &&
       (message.embeds?.isEmpty ?? true) &&
-      message.statusHistory.isEmpty &&
+      // A Hermes row's thinking and wait notes draw on the turn's line, not
+      // on the row; only its tool steps would be lost.
+      (_isHermesRunRow(message)
+          ? message.statusHistory.every((s) => !_isHermesToolStatus(s))
+          : message.statusHistory.isEmpty) &&
       message.followUps.isEmpty &&
       message.codeExecutions.isEmpty &&
       message.sources.isEmpty &&
