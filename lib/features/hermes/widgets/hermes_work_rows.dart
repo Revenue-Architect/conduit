@@ -8,6 +8,7 @@ import '../models/hermes_bot.dart';
 import '../motion/hermez_motion.dart';
 import '../providers/hermes_providers.dart';
 import 'hermes_home_avatar.dart';
+import 'hermes_home_working.dart' show watchHermesWorkingAgents;
 import 'hermez_bot_identity.dart';
 import 'hermez_bot_mark.dart';
 import 'hermez_chat_palette.dart';
@@ -124,7 +125,13 @@ class HermesWorkTeamRow extends ConsumerWidget {
       Theme.of(context).brightness,
     );
     final service = ref.watch(hermesApiServiceProvider);
-    final running = hermezBotRunning(service, bot);
+    // Any of the bot's chats, not only its own chat: a new chat with Chief
+    // runs in a session of its own.
+    final running =
+        hermezBotRunning(service, bot) ||
+        watchHermesWorkingAgents(
+          ref,
+        ).any((agent) => agent.profile.toLowerCase() == bot.name.toLowerCase());
     final title = hermesBotDisplayTitle(bot);
     final status = hermezBotStatus(bot, running: running);
     final morphId = hermezBotMorphId(bot.name);

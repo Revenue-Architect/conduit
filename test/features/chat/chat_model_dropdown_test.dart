@@ -268,7 +268,8 @@ void main() {
     expect(avatar.size, const Size.square(56));
     expect(avatar.top, greaterThanOrEqualTo(bounds.top));
     expect(avatar.bottom, lessThanOrEqualTo(bounds.bottom));
-    expect(avatar.center.dx, lessThan(400));
+    // The avatar, not the avatar-and-name group, is the toolbar's center.
+    expect(avatar.center.dx, closeTo(400, 0.5));
     expect(tester.takeException(), isNull);
     const cupertino = ConduitAdaptiveCupertinoNavigationBar(
       textScaler: TextScaler.noScaling,

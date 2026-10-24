@@ -565,6 +565,13 @@ class _HermesDelegatedWorkerCardState
                               state: hermesWorkerLiveState(worker.status),
                               size: 6,
                               semanticLabel: state,
+                              // A finished delegate keeps the accent, like
+                              // the run line's own finished mark.
+                              ink:
+                                  worker.status ==
+                                      HermesSubagentStatus.completed
+                                  ? palette.accent
+                                  : null,
                             ),
                             const SizedBox(width: 5),
                             Flexible(

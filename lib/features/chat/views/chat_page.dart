@@ -317,10 +317,12 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                 : kHermesBotHeaderTransition,
             // Symmetric and overshoot-free: the header settles, never bounces.
             curve: Curves.easeInOutCubic,
+            // The avatar sits at the title's center in both states: equal
+            // halves either side of it, the name in the right one. It never
+            // moves as the header collapses, and collapsed it is centered.
             builder: (context, collapse, _) => Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                const Expanded(child: SizedBox.shrink()),
                 // A fixed 56 dp slot: the avatar shrinks about its own center.
                 SizedBox.square(
                   dimension: 56,
@@ -337,40 +339,49 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                     ),
                   ),
                 ),
-                // The name keeps its slot while it fades, so the centered row
-                // never shifts the avatar sideways; only its size changes.
-                Flexible(
-                  child: IgnorePointer(
-                    ignoring: collapse > 0.5,
-                    child: Align(
-                      widthFactor: 1,
-                      alignment: Alignment.centerLeft,
-                      child: Opacity(
-                        opacity:
-                            1 -
-                            Curves.easeOut.transform(
-                              math.min(1.0, collapse / 0.7),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: IgnorePointer(
+                          ignoring: collapse > 0.5,
+                          child: Align(
+                            widthFactor: 1,
+                            alignment: Alignment.centerLeft,
+                            child: Opacity(
+                              opacity:
+                                  1 -
+                                  Curves.easeOut.transform(
+                                    math.min(1.0, collapse / 0.7),
+                                  ),
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: Spacing.sm,
+                                ),
+                                child: Text(
+                                  bot.title,
+                                  key: const ValueKey(
+                                    'hermes-bot-toolbar-title',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      conduitAdaptiveToolbarLeadingTitleTextStyle(
+                                        context,
+                                      ).copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
                             ),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: Spacing.sm),
-                          child: Text(
-                            bot.title,
-                            key: const ValueKey('hermes-bot-toolbar-title'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: conduitAdaptiveToolbarLeadingTitleTextStyle(
-                              context,
-                            ).copyWith(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
-                    ),
+                      if (active) ...[
+                        const SizedBox(width: Spacing.sm),
+                        const _HermesBotActivityDot(),
+                      ],
+                    ],
                   ),
                 ),
-                if (active) ...[
-                  const SizedBox(width: Spacing.sm),
-                  const _HermesBotActivityDot(),
-                ],
               ],
             ),
           ),

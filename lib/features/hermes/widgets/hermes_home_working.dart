@@ -96,6 +96,25 @@ String? hermesProfileOfSession(
   return service?.profileForSession(storedId);
 }
 
+/// The agents working now, each placed by the bot its session belongs to.
+List<HermesWorkingAgent> watchHermesWorkingAgents(WidgetRef ref) {
+  final service = ref.watch(hermesApiServiceProvider);
+  final work = ref.watch(hermesActiveWorkProvider);
+  final sessions =
+      ref.watch(hermesSessionsProvider).value ?? const <HermesSessionSummary>[];
+  final bots = ref.watch(hermesBotsProvider).value ?? const <HermesBot>[];
+  return hermesWorkingAgents(
+    work.value ?? const <HermesLiveSession>[],
+    stale: watchHermesHomeStale(ref),
+    profileOf: (id) => hermesProfileOfSession(
+      id,
+      sessions: sessions,
+      bots: bots,
+      service: service is HermesDesktopApiService ? service : null,
+    ),
+  );
+}
+
 /// Small overlapping avatars of the agents working now, for Home's header.
 /// Nothing when everything is idle. Tapping opens Active Work: each working
 /// agent and what it is saying, and each opens its conversation.
@@ -111,22 +130,7 @@ class HermesWorkingStack extends ConsumerWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final service = ref.watch(hermesApiServiceProvider);
-    final work = ref.watch(hermesActiveWorkProvider);
-    final sessions =
-        ref.watch(hermesSessionsProvider).value ??
-        const <HermesSessionSummary>[];
-    final bots = ref.watch(hermesBotsProvider).value ?? const <HermesBot>[];
-    final agents = hermesWorkingAgents(
-      work.value ?? const <HermesLiveSession>[],
-      stale: watchHermesHomeStale(ref),
-      profileOf: (id) => hermesProfileOfSession(
-        id,
-        sessions: sessions,
-        bots: bots,
-        service: service is HermesDesktopApiService ? service : null,
-      ),
-    );
+    final agents = watchHermesWorkingAgents(ref);
     final shown = agents.take(_maxShown).toList(growable: false);
     final extra = agents.length - shown.length;
     final names = [
