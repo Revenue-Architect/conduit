@@ -345,30 +345,34 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                       Flexible(
                         child: IgnorePointer(
                           ignoring: collapse > 0.5,
-                          child: Align(
-                            widthFactor: 1,
-                            alignment: Alignment.centerLeft,
-                            child: Opacity(
-                              opacity:
-                                  1 -
-                                  Curves.easeOut.transform(
-                                    math.min(1.0, collapse / 0.7),
+                          // Collapsed, the name gives up its width so the
+                          // working dot sits by the avatar.
+                          child: ClipRect(
+                            child: Align(
+                              widthFactor: 1 - collapse,
+                              alignment: Alignment.centerLeft,
+                              child: Opacity(
+                                opacity:
+                                    1 -
+                                    Curves.easeOut.transform(
+                                      math.min(1.0, collapse / 0.7),
+                                    ),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: Spacing.sm,
                                   ),
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  left: Spacing.sm,
-                                ),
-                                child: Text(
-                                  bot.title,
-                                  key: const ValueKey(
-                                    'hermes-bot-toolbar-title',
+                                  child: Text(
+                                    bot.title,
+                                    key: const ValueKey(
+                                      'hermes-bot-toolbar-title',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style:
+                                        conduitAdaptiveToolbarLeadingTitleTextStyle(
+                                          context,
+                                        ).copyWith(fontWeight: FontWeight.w600),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style:
-                                      conduitAdaptiveToolbarLeadingTitleTextStyle(
-                                        context,
-                                      ).copyWith(fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ),

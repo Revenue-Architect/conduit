@@ -46,10 +46,11 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     late final StreamSubscription<void> disconnectSubscription;
     // A new session announces its freshly built agent with an idle
     // session.info around the first prompt, before the turn has done anything.
-    // Only an idle report after the turn showed signs of life ends the stream;
-    // an earlier one is checked against the gateway instead.
+    // Only an idle report after the turn showed signs of life ends the stream.
+    // Every turn emits message events, so a real end always follows some.
+    // (Do not re-resume the session to check: a refreshing resume can rebind
+    // it to a new runtime id this stream would no longer hear.)
     var turnActivitySeen = false;
-    Timer? earlyIdleRecheck;
 
     bool hasAuthoritativeState() {
       final state =
@@ -62,7 +63,6 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     void finish({String? error, bool authoritativeIdle = false}) {
       if (terminal) return;
       terminal = true;
-      earlyIdleRecheck?.cancel();
       _firstTurnAwaitingActivity.remove(binding.storedId);
       _eventBuffer.deactivate(activeRuntimeId);
       if (authoritativeIdle && promptAcknowledged && hasAuthoritativeState()) {
@@ -268,22 +268,10 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
               runtimeId: binding.runtimeId,
             );
           } else if (!running && promptAcknowledged) {
-            if (!freshSession || turnActivitySeen) {
+            if (!freshSession ||
+                turnActivitySeen ||
+                cancelToken?.isCancelled == true) {
               finish(authoritativeIdle: true);
-            } else {
-              earlyIdleRecheck ??= Timer(const Duration(seconds: 5), () async {
-                if (terminal || turnActivitySeen) return;
-                try {
-                  final reconciled = await _resumeSnapshot(
-                    storedId,
-                    refresh: true,
-                  );
-                  if (reconciled.running == true) return;
-                } catch (_) {}
-                if (!terminal && !turnActivitySeen) {
-                  finish(authoritativeIdle: true);
-                }
-              });
             }
           }
         case 'error':
