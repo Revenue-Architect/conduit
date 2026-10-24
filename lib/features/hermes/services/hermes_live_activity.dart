@@ -92,6 +92,30 @@ final class HermesRunSummary {
     );
   }
 
+  /// The last [runs] runs in [history]: one turn of the conversation, which
+  /// Hermes' delegation wake-ups split into several runs. While [running],
+  /// the open run counts as one. Counts terminal events; never compares
+  /// clocks, since the phone's and the server's can disagree.
+  factory HermesRunSummary.recent(
+    List<HermesLiveActivityEvent> history, {
+    required int runs,
+    required bool running,
+  }) {
+    if (runs <= 1) return HermesRunSummary.latest(history, running: running);
+    final ends = [
+      for (var i = 0; i < history.length; i++)
+        if (history[i].isTerminal) i,
+    ];
+    if (!running && ends.isEmpty) {
+      return HermesRunSummary._(history, running: false);
+    }
+    final end = running ? history.length : ends.last + 1;
+    // The terminal event just before the turn's first run, if it is held.
+    final before = (running ? ends.length : ends.length - 1) - runs;
+    final start = before < 0 ? 0 : ends[before] + 1;
+    return HermesRunSummary._(history.sublist(start, end), running: running);
+  }
+
   final List<HermesLiveActivityEvent> events;
   final bool running;
 

@@ -99,4 +99,29 @@ void main() {
     expect(knowledge.skills.first.writtenByBot, isTrue);
     expect(HermesBotKnowledge.fromGraph(const {}).isEmpty, isTrue);
   });
+  test('a turn split by a delegation wake-up keeps both of its runs', () {
+    final turn = [
+      ...history,
+      _event(HermesLiveActivityKind.toolStarted, 50, detail: 'todo'),
+      _event(HermesLiveActivityKind.toolCompleted, 51, detail: 'todo'),
+      _event(HermesLiveActivityKind.completed, 53),
+    ];
+
+    final whole = HermesRunSummary.recent(turn, runs: 2, running: false);
+    expect(whole.events.first.timestamp.second, 10);
+    expect(whole.steps, 4);
+    expect(whole.elapsed(), const Duration(seconds: 43));
+    expect(
+      HermesRunSummary.recent(turn, runs: 1, running: false).steps,
+      HermesRunSummary.latest(turn, running: false).steps,
+    );
+
+    final open = [
+      ...turn,
+      _event(HermesLiveActivityKind.toolStarted, 60, detail: 'browser'),
+    ];
+    final live = HermesRunSummary.recent(open, runs: 2, running: true);
+    expect(live.events.first.timestamp.second, 50);
+    expect(live.events.last.timestamp.second, 60);
+  });
 }

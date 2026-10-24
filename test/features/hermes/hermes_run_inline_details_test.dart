@@ -1,4 +1,5 @@
 import 'package:conduit/core/models/chat_message.dart';
+import 'package:conduit/features/hermes/services/hermes_activity_presenter.dart';
 import 'package:conduit/features/hermes/services/hermes_message_mapper.dart';
 import 'package:conduit/features/hermes/services/hermes_run_transport.dart'
     show kHermesProviderWaitAction;
@@ -141,5 +142,30 @@ void main() {
       ], sessionId: 'session-1');
       expect(messages, isEmpty);
     });
+  });
+  test('a step names its verb and object once, without the plan restated', () {
+    HermesActivityRow row(String verb, HermesActivityFamily family) =>
+        HermesActivityRow(
+          key: verb,
+          verb: verb,
+          state: HermesActivityRowState.done,
+          family: family,
+          at: DateTime.utc(2026, 10, 24),
+          object: 'updating 3 task(s)',
+          toolName: 'todo',
+        );
+
+    expect(
+      hermesRunSteps([
+        row('Updated plan', HermesActivityFamily.plan),
+      ], const []).single.text,
+      'Updated plan',
+    );
+    expect(
+      hermesRunSteps([
+        row('Ran command', HermesActivityFamily.command),
+      ], const []).single.text,
+      'Ran command · updating 3 task(s)',
+    );
   });
 }

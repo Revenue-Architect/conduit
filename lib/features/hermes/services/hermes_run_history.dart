@@ -2,9 +2,16 @@ import 'dart:convert';
 
 import 'hermes_activity_presenter.dart';
 import 'hermes_identifier.dart';
+import 'hermes_inline_ui_capability.dart' show hermesIsDelegationResultNotice;
 import 'hermes_live_activity.dart';
 import '../../../core/models/chat_message.dart';
 import 'hermes_run_transport.dart' show sanitizeHermesProviderErrorMessage;
+
+/// The owner's own prompt, not Hermes' hidden delegation wake-up: the wake-up
+/// continues the answer it belongs to.
+bool _startsTurn(String? role, Object? content) =>
+    role == 'user' &&
+    !hermesIsDelegationResultNotice(content?.toString() ?? '');
 
 /// New assistant continuations belong to the same answer until another user
 /// turn begins. An old answer never inherits the latest answer's live controls.
@@ -13,7 +20,7 @@ List<ChatMessage> hermesCurrentAnswerMessages(
   List<ChatMessage> answer,
 ) {
   final boundary = transcript.lastIndexWhere(
-    (message) => message.role == 'user',
+    (message) => _startsTurn(message.role, message.content),
   );
   final tail = transcript
       .skip(boundary + 1)
@@ -98,11 +105,13 @@ List<Map<String, dynamic>> hermesAnswerTranscript(
     index = matches.single;
   }
   var start = index;
-  while (start > 0 && transcript[start - 1]['role'] != 'user') {
+  bool startsTurn(Map<String, dynamic> message) =>
+      _startsTurn(message['role']?.toString(), message['content']);
+  while (start > 0 && !startsTurn(transcript[start - 1])) {
     start--;
   }
   var end = index + 1;
-  while (end < transcript.length && transcript[end]['role'] != 'user') {
+  while (end < transcript.length && !startsTurn(transcript[end])) {
     end++;
   }
   return transcript.sublist(start, end);

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
@@ -85,7 +84,29 @@ class HermesMessageActivity extends ConsumerWidget {
             false);
     final statuses = [for (final message in messages) ...message.statusHistory];
     final running = state == HermesDesktopTurnState.running;
-    final run = HermesRunSummary.latest(events, running: running);
+    // The whole turn: a delegated answer continues in a run of its own after
+    // each wake-up, and the line speaks for all of them.
+    var run = HermesRunSummary.recent(
+      events,
+      runs: span.runs,
+      running: running,
+    );
+    final saved = hermesToolCallCount(const [], statuses);
+    if (!running && span.runs > 1 && saved > 0) {
+      int live(HermesRunSummary run) => hermesToolCallCount(
+        HermesActivityPresenter.rows(run.events, running: false),
+        const [],
+      );
+      // A wake-up run this connection never saw would pull the previous
+      // turn's run in: the saved answer bounds how much is this turn's.
+      for (var runs = span.runs - 1; runs >= 1 && live(run) > saved; runs--) {
+        run = HermesRunSummary.recent(events, runs: runs, running: false);
+      }
+      // Missing runs leave the live record short: the saved one speaks.
+      if (live(run) < saved) {
+        run = HermesRunSummary.recent(const [], runs: 1, running: false);
+      }
+    }
     // A stalled provider is said plainly rather than left as endless working.
     final summary =
         (running ? hermesProviderWaitLabel(statuses) : null) ??
@@ -124,9 +145,11 @@ class HermesMessageActivity extends ConsumerWidget {
       ?model,
       if (elapsed != null && elapsed.inSeconds > 0)
         formatHermesRunDuration(elapsed),
-      // Live events count this connection's steps; a saved turn counts its
-      // recorded tool steps. The larger is the honest count.
-      if (math.max(run.steps, hermesRunSteps(const [], statuses).length)
+      // Tool calls, counted the way the steps below list them.
+      if (hermesToolCallCount(
+            HermesActivityPresenter.rows(run.events, running: running),
+            statuses,
+          )
           case final steps when steps > 0)
         steps == 1 ? '1 step' : '$steps steps',
     ].join(' · ');
@@ -166,7 +189,9 @@ class HermesMessageActivity extends ConsumerWidget {
     final browser =
         running &&
             parseSteelViewerUrl(viewerUrl) != null &&
-            hermesRunUsedBrowser(run)
+            hermesRunUsedBrowser(
+              HermesRunSummary.latest(events, running: running),
+            )
         ? HermesRunBrowserSection(
             key: ValueKey('steel-section-$sessionId'),
             viewerUrl: viewerUrl,
@@ -200,7 +225,14 @@ class HermesMessageActivity extends ConsumerWidget {
 
 /// Where an answer's turn lies in the conversation, as comparable values so a
 /// streaming token elsewhere does not rebuild every answer's line.
-typedef HermesTurnSpan = ({List<String> ids, bool leadsElsewhere, bool latest});
+typedef HermesTurnSpan = ({
+  List<String> ids,
+  bool leadsElsewhere,
+  bool latest,
+
+  /// Hermes runs in the turn: the owner's prompt, plus one per wake-up.
+  int runs,
+});
 
 /// The assistant messages of the turn holding [anchorId]: from the owner's
 /// prompt to the next one, across Hermes' hidden delegation wake-ups.
@@ -208,7 +240,9 @@ typedef HermesTurnSpan = ({List<String> ids, bool leadsElsewhere, bool latest});
 /// turn already shows text, so that line, above, speaks for the turn.
 HermesTurnSpan hermesTurnSpanKey(List<ChatMessage> all, String anchorId) {
   final at = all.indexWhere((message) => message.id == anchorId);
-  if (at < 0) return (ids: const [], leadsElsewhere: false, latest: false);
+  if (at < 0) {
+    return (ids: const [], leadsElsewhere: false, latest: false, runs: 1);
+  }
   bool inTurn(ChatMessage message) =>
       message.role == 'assistant' ||
       (message.role == 'user' &&
@@ -235,7 +269,31 @@ HermesTurnSpan hermesTurnSpanKey(List<ChatMessage> all, String anchorId) {
     ids: _HermesIds([for (final message in turn) message.id]),
     leadsElsewhere: leadsElsewhere,
     latest: end == all.length - 1,
+    runs:
+        1 +
+        all
+            .sublist(start, end + 1)
+            .where((message) => message.role == 'user')
+            .length,
   );
+}
+
+/// Tool calls in a run, counted as its steps list them: the live rows' calls,
+/// else the saved answer's tool steps. Thoughts and notes are not steps.
+int hermesToolCallCount(
+  List<HermesActivityRow> rows,
+  List<ChatStatusUpdate> statuses,
+) {
+  if (rows.isNotEmpty) {
+    return rows
+        .where((row) => row.toolName != null)
+        .fold(0, (count, row) => count + row.count);
+  }
+  return statuses.where((status) {
+    if (status.hidden == true) return false;
+    final name = hermesStatusToolName(status);
+    return name != null && name.isNotEmpty;
+  }).length;
 }
 
 /// A list of ids that compares by value, for provider selection.
@@ -323,10 +381,17 @@ String hermesActivityLabel(
   }
   if (steps.isEmpty) return fallback;
   // While running, say what is happening now; afterwards, what happened.
-  // Reading a skill is preparation, not the work: it leads only when it is
+  // Reading a skill, finding a tool or keeping the plan is preparation, not
+  // the work (the plan shows under the line anyway): it leads only when it is
   // all there was.
-  bool prep(({String verb, int count}) step) =>
-      step.verb.endsWith(' skill') && step.verb.startsWith('Open');
+  bool prep(({String verb, int count}) step) => const {
+    'Opened skill',
+    'Opening skill',
+    'Found tool',
+    'Finding tool',
+    'Updated plan',
+    'Updating plan',
+  }.contains(step.verb);
   final work = steps.where((step) => !prep(step)).toList();
   final pool = work.isEmpty ? steps : work;
   final lead = running ? steps.last : pool.first;
@@ -784,12 +849,16 @@ List<HermesRunStep> hermesRunSteps(
     return [
       for (final row in rows)
         (
-          text: [
-            row.verb,
-            if (row.object != null && row.object!.trim().isNotEmpty)
-              row.object!.trim(),
-            if (row.count > 1) '×${row.count}',
-          ].join(' '),
+          // The plan itself shows under the line: its row needs no object.
+          text:
+              [
+                row.verb,
+                if (row.family != HermesActivityFamily.plan &&
+                    row.object != null &&
+                    row.object!.trim().isNotEmpty)
+                  row.object!.trim(),
+              ].join(' · ') +
+              (row.count > 1 ? ' ×${row.count}' : ''),
           state: row.state,
           row: row,
         ),
@@ -847,13 +916,20 @@ class _RunSteps extends StatelessWidget {
   final bool showSteps;
 
   static const int _shown = 8;
+  static const int _thoughtsShown = 6;
 
   @override
   Widget build(BuildContext context) {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final shown = steps.take(_shown).toList(growable: false);
+    // Thoughts come first; a long think must not push every tool step out.
+    bool isThought(HermesRunStep step) =>
+        step.state == HermesActivityRowState.note && step.row == null;
+    final shown = [
+      ...steps.where(isThought).take(_thoughtsShown),
+      ...steps.where((step) => !isThought(step)).take(_shown),
+    ];
     final rest = steps.length - shown.length;
     final meta = TextStyle(fontSize: 12.5, height: 1.3, color: palette.ink);
     Widget mark(HermesActivityRowState state) => switch (state) {
