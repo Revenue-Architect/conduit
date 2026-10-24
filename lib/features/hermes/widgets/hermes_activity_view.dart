@@ -139,7 +139,10 @@ class HermesActivityRowView extends StatelessWidget {
       height: 1.25,
     );
     final tile = dense ? 26.0 : 30.0;
-    final duration = row.duration;
+    // Too short to mean anything reads as missing ("0.0s"): not shown.
+    final duration = HermesActivityPresenter.durationLabel(row.duration) == null
+        ? null
+        : row.duration;
     final meta = <String>[
       if (row.object != null) row.object!,
       if (row.summary != null && row.object == null) row.summary!,

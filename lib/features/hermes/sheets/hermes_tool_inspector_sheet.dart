@@ -192,11 +192,9 @@ class _HermesToolInspectorState extends ConsumerState<_HermesToolInspector> {
       spacing: 12,
       runSpacing: 4,
       children: [
-        if (row.duration != null)
-          _Fact(
-            label: 'Took',
-            value: HermesActivityPresenter.formatDuration(row.duration!),
-          ),
+        if (HermesActivityPresenter.durationLabel(row.duration)
+            case final took?)
+          _Fact(label: 'Took', value: took),
         if (row.count > 1) _Fact(label: 'Runs', value: '${row.count}'),
         if (row.summary != null) _Fact(label: 'Hermes', value: row.summary!),
       ],
@@ -400,9 +398,9 @@ class _CodeSection extends StatefulWidget {
 
 /// A tool's input or result as a person reads it. The server fences output
 /// as untrusted for the model and prefixes a notice to it; people only need
-/// the output itself. A JSON object reads as its fields, with the text fields
-/// (code, output) on their own lines and their newlines real, instead of a
-/// line of escaped `\n`.
+/// the output itself. JSON reads as indented fields, lists as `- ` items and
+/// long or multi-line text on its own lines with real newlines, instead of a
+/// line of escaped JSON. One call's `calls` envelope reads as its arguments.
 String hermesReadableToolText(String raw) {
   var text = raw
       .replaceAll(RegExp(r'<untrusted_tool_result[^>]*>\s*'), '')
@@ -422,27 +420,85 @@ String hermesReadableToolText(String raw) {
   } catch (_) {
     return text;
   }
-  if (decoded is! Map || decoded.isEmpty) return text;
-  final lines = <String>[];
-  // What the tool said leads; bookkeeping (exit codes, paths) follows.
-  final keys = [
-    for (final key in const ['output', 'result', 'code', 'command', 'query'])
-      if (decoded.containsKey(key)) key,
-    for (final key in decoded.keys)
-      if (!const ['output', 'result', 'code', 'command', 'query'].contains(key))
-        '$key',
-  ];
-  for (final key in keys) {
-    final value = decoded[key];
-    if (value is String) {
-      final body = value.trimRight();
-      lines.add(body.contains('\n') ? '$key:\n$body' : '$key: $body');
-    } else {
-      lines.add('$key: ${jsonEncode(value)}');
+  if (decoded is Map && decoded.length == 1) {
+    final calls = decoded['calls'];
+    if (calls is List && calls.length == 1 && calls.single is Map) {
+      var arguments = (calls.single as Map)['arguments'];
+      if (arguments is String) {
+        try {
+          arguments = jsonDecode(arguments);
+        } catch (_) {}
+      }
+      if (arguments is Map || arguments is List) decoded = arguments;
     }
   }
-  text = lines.join('\n');
+  if (decoded is Map && decoded.isNotEmpty) {
+    return _readableMap(decoded, 0).join('\n');
+  }
+  if (decoded is List && decoded.isNotEmpty) {
+    return _readableList(decoded, 0).join('\n');
+  }
   return text;
+}
+
+// What the tool said leads; bookkeeping (exit codes, paths) follows.
+const _leadingToolFields = ['output', 'result', 'code', 'command', 'query'];
+
+// Deeper than this, a value stays compact JSON rather than a staircase.
+const _readableDepth = 4;
+
+String _readableScalar(Object? value) =>
+    value is String ? value.trimRight() : jsonEncode(value);
+
+bool _isScalar(Object? value) => value is! Map && value is! List;
+
+List<String> _readableMap(Map value, int depth) => [
+  for (final key in [
+    for (final key in _leadingToolFields)
+      if (value.containsKey(key)) key,
+    for (final key in value.keys)
+      if (!_leadingToolFields.contains(key)) '$key',
+  ])
+    ..._readableField(key, value[key], depth),
+];
+
+List<String> _readableField(String key, Object? value, int depth) {
+  final pad = '  ' * depth;
+  if (value is String) {
+    final body = value.trimRight();
+    if (!body.contains('\n') && body.length <= 80) return ['$pad$key: $body'];
+    // Top-level text keeps its own lines unindented, so it copies cleanly.
+    final inner = depth == 0 ? '' : '$pad  ';
+    return ['$pad$key:', for (final line in body.split('\n')) '$inner$line'];
+  }
+  if (_isScalar(value)) return ['$pad$key: ${_readableScalar(value)}'];
+  if (depth >= _readableDepth || (value is Map && value.isEmpty)) {
+    return ['$pad$key: ${jsonEncode(value)}'];
+  }
+  if (value is List) {
+    if (value.isEmpty) return ['$pad$key: []'];
+    if (value.every(_isScalar)) {
+      final joined = value.map(_readableScalar).join(', ');
+      if (joined.length <= 80 && !joined.contains('\n')) {
+        return ['$pad$key: $joined'];
+      }
+    }
+    return ['$pad$key:', ..._readableList(value, depth + 1)];
+  }
+  return ['$pad$key:', ..._readableMap(value as Map, depth + 1)];
+}
+
+List<String> _readableList(List value, int depth) {
+  final pad = '  ' * depth;
+  return [
+    for (final item in value)
+      if (item is Map && item.isNotEmpty && depth < _readableDepth) ...[
+        // The item's fields align under its first, after the "- ".
+        for (final (index, line) in _readableMap(item, depth + 1).indexed)
+          index == 0 ? '$pad- ${line.trimLeft()}' : line,
+      ] else
+        '$pad- ${_isScalar(item) ? _readableScalar(item) : jsonEncode(item)}',
+  ];
 }
 
 class _CodeSectionState extends State<_CodeSection> {

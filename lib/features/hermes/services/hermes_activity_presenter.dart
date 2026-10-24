@@ -550,6 +550,13 @@ abstract final class HermesActivityPresenter {
     return null;
   }
 
+  /// A tool's time as shown, or null when it is too short to mean anything:
+  /// a call under a tenth of a second would read as a missing "0.0s".
+  static String? durationLabel(Duration? value) =>
+      value == null || value.inMilliseconds < 100
+      ? null
+      : formatDuration(value);
+
   /// "1.2s", "42s", "3m 05s".
   static String formatDuration(Duration value) {
     final ms = value.inMilliseconds;
