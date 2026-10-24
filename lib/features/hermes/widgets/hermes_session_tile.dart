@@ -24,6 +24,8 @@ import '../models/hermes_config.dart';
 import '../models/hermes_model.dart';
 import '../models/hermes_session.dart';
 import '../models/hermes_bot.dart';
+import '../providers/hermes_agentic_providers.dart'
+    show hermesActiveWorkProvider;
 import '../providers/hermes_providers.dart';
 import '../services/hermes_backend_service.dart';
 import '../services/hermes_desktop_api_service.dart';
@@ -158,7 +160,34 @@ class HermesSessionTile extends ConsumerWidget {
       final palette = HermezChatPalette.forBrightness(
         Theme.of(context).brightness,
       );
-      final when = session.updatedAt == null
+      // Hermes' own word on which chats are working, not only the one open
+      // here; when a run ends, the list re-reads so its time is current.
+      final working =
+          isGenerating ||
+          ref.watch(
+            hermesActiveWorkProvider.select(
+              (work) =>
+                  work.value?.any(
+                    (live) => live.storedId == session.id && live.working,
+                  ) ??
+                  false,
+            ),
+          );
+      ref.listen(
+        hermesActiveWorkProvider.select(
+          (work) =>
+              work.value?.any(
+                (live) => live.storedId == session.id && live.working,
+              ) ??
+              false,
+        ),
+        (was, now) {
+          if (was == true && !now) ref.invalidate(hermesSessionsProvider);
+        },
+      );
+      final when = working
+          ? 'Working now'
+          : session.updatedAt == null
           ? null
           : hermezRelativeLabel(session.updatedAt!);
       return ConduitContextMenu(
@@ -226,7 +255,7 @@ class HermesSessionTile extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (isGenerating) ...[
+                  if (working) ...[
                     const SizedBox(width: Spacing.sm),
                     const SizedBox(
                       width: 16,
