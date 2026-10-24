@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/chat_message.dart';
 import '../../../core/services/navigation_service.dart';
+import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
+import '../../chat/widgets/streaming_status_widget.dart'
+    show hermesStatusToolName;
 import '../../spaces/models/spaces_models.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_subagent.dart';
@@ -9,6 +13,8 @@ import '../motion/hermez_motion.dart';
 import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../services/hermes_inline_ui_capability.dart'
+    show hermesIsDelegationResultNotice;
 import '../sheets/hermes_delegates_sheet.dart';
 import '../sheets/hermes_model_sheet.dart';
 import '../sheets/hermes_plan_sheet.dart' show HermesPlanInline;
@@ -92,7 +98,18 @@ class _HermesChatContextBarState extends ConsumerState<HermesChatContextBar> {
       draft?.reasoningEffort ?? info?.reasoningEffort,
     );
     final fast = draft?.fast ?? info?.fast ?? false;
-    final plan = snapshot?.todo;
+    // A finished plan belongs to the turn that wrote it; one with work left
+    // stays in view until it is done.
+    final latestTurnUsedPlan = ref.watch(
+      chatMessagesProvider.select(hermesLatestTurnUsedPlan),
+    );
+    final todo = snapshot?.todo;
+    final plan =
+        todo != null &&
+            !todo.isEmpty &&
+            (todo.hasActiveWork || latestTurnUsedPlan)
+        ? todo
+        : null;
     final workers = snapshot?.subagents ?? const <HermesSubagentState>[];
     final liveWorkers = workers.live;
     final pills = <Widget>[
@@ -376,4 +393,26 @@ class _ContextPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Whether the latest turn, from the owner's prompt through Hermes' delegation
+/// wake-ups, wrote or changed the plan.
+bool hermesLatestTurnUsedPlan(List<ChatMessage> messages) {
+  for (var i = messages.length - 1; i >= 0; i--) {
+    final message = messages[i];
+    if (message.role == 'user' &&
+        !hermesIsDelegationResultNotice(message.content)) {
+      return false;
+    }
+    if (message.role == 'assistant' &&
+        message.statusHistory.any(
+          (status) => const {
+            'todo',
+            'todo_list',
+          }.contains(hermesStatusToolName(status)),
+        )) {
+      return true;
+    }
+  }
+  return false;
 }
