@@ -92,6 +92,9 @@ class HermesMessageActivity extends ConsumerWidget {
       running: running,
     );
     final saved = hermesToolCallCount(const [], statuses);
+    // The steps and label come from these; the turn's time and outcome still
+    // come from [run], however much of it this connection saw.
+    var lineEvents = run.events;
     if (!running && span.runs > 1 && saved > 0) {
       int live(HermesRunSummary run) => hermesToolCallCount(
         HermesActivityPresenter.rows(run.events, running: false),
@@ -102,16 +105,15 @@ class HermesMessageActivity extends ConsumerWidget {
       for (var runs = span.runs - 1; runs >= 1 && live(run) > saved; runs--) {
         run = HermesRunSummary.recent(events, runs: runs, running: false);
       }
+      lineEvents = run.events;
       // Missing runs leave the live record short: the saved one speaks.
-      if (live(run) < saved) {
-        run = HermesRunSummary.recent(const [], runs: 1, running: false);
-      }
+      if (live(run) < saved) lineEvents = const [];
     }
     // A stalled provider is said plainly rather than left as endless working.
     final summary =
         (running ? hermesProviderWaitLabel(statuses) : null) ??
         hermesActivityLabel(
-          HermesActivityPresenter.rows(run.events, running: running),
+          HermesActivityPresenter.rows(lineEvents, running: running),
           statuses,
           running: running,
           fallback: hermesStatusSummary(context, statuses, running: running),
@@ -130,7 +132,7 @@ class HermesMessageActivity extends ConsumerWidget {
         !failed &&
         // Lifecycle events (started, completed) alone are not activity.
         run.subagents == 0 &&
-        HermesActivityPresenter.rows(run.events, running: false).isEmpty &&
+        HermesActivityPresenter.rows(lineEvents, running: false).isEmpty &&
         statuses.where((s) => s.hidden != true).isEmpty;
     final toolCount = run.tools.fold<int>(0, (n, t) => n + t.count);
     // The run's facts in one line: the run sheet's hero, without the box.
@@ -140,14 +142,24 @@ class HermesMessageActivity extends ConsumerWidget {
     final model = currentAnswer
         ? service.agenticSnapshotFor(sessionId).info?.model
         : null;
-    final elapsed = running ? null : run.elapsed();
+    // A turn this connection saw only part of still spans its saved steps.
+    final stamps = [for (final status in statuses) ?status.occurredAt]..sort();
+    final savedSpan = stamps.length < 2
+        ? null
+        : stamps.last.difference(stamps.first);
+    final liveSpan = running ? null : run.elapsed();
+    final elapsed = running
+        ? null
+        : liveSpan == null || (savedSpan != null && savedSpan > liveSpan)
+        ? savedSpan
+        : liveSpan;
     final meta = [
       ?model,
       if (elapsed != null && elapsed.inSeconds > 0)
         formatHermesRunDuration(elapsed),
       // Tool calls, counted the way the steps below list them.
       if (hermesToolCallCount(
-            HermesActivityPresenter.rows(run.events, running: running),
+            HermesActivityPresenter.rows(lineEvents, running: running),
             statuses,
           )
           case final steps when steps > 0)
@@ -206,7 +218,7 @@ class HermesMessageActivity extends ConsumerWidget {
         sessionId: sessionId,
         state: state,
         attention: attention,
-        events: run.events,
+        events: lineEvents,
         statuses: statuses,
         summary: summary,
         thought: thought,
@@ -362,9 +374,21 @@ String hermesActivityLabel(
   required bool running,
   String fallback = '',
 }) {
+  // Kinds of work, not rows: the plan updated three times is one thing done.
+  final byVerb = <String, int>{};
+  for (final row in rows) {
+    byVerb[row.verb] = (byVerb[row.verb] ?? 0) + row.count;
+  }
   final steps = <({String verb, int count})>[
-    for (final row in rows) (verb: row.verb, count: row.count),
+    for (final entry in byVerb.entries) (verb: entry.key, count: entry.value),
   ];
+  if (running && rows.isNotEmpty) {
+    // While running, the line says what is happening now: the latest row.
+    final last = rows.last;
+    steps
+      ..removeWhere((step) => step.verb == last.verb)
+      ..add((verb: last.verb, count: byVerb[last.verb]!));
+  }
   if (steps.isEmpty) {
     // Saved answers carry status updates, not live events.
     final counts = <String, int>{};
