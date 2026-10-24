@@ -84,11 +84,19 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
           event.type == 'mcp.setup.expire') {
         unawaited(_resolvePendingDecisionEvent(event));
       }
-      if (startedBuffering &&
-          (event.type == 'message.complete' ||
-              event.type.endsWith('.request') ||
-              (event.type == 'session.info' &&
-                  event.payload['running'] == false))) {
+      // A turn no stream of this connection follows (a delegation wake-up
+      // after its parent's stream ended, a run restored on reopen) settles
+      // here: the chat re-reads its transcript. A followed turn's stream does
+      // that itself, so its idle report is left to it.
+      final settledUnfollowed =
+          event.type == 'session.info' &&
+          event.payload['running'] == false &&
+          (event.sessionId?.isNotEmpty ?? false) &&
+          !_eventBuffer.isActive(event.sessionId!);
+      if (settledUnfollowed ||
+          startedBuffering &&
+              (event.type == 'message.complete' ||
+                  event.type.endsWith('.request'))) {
         final storedId = _storedIdForRuntime(event.sessionId);
         if (storedId != null) _emitTranscriptChange(storedId);
       }

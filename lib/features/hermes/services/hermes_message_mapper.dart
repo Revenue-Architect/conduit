@@ -301,14 +301,32 @@ List<ChatStatusUpdate> _persistedHermesToolStarts(
   for (final rawCall in rawCalls.take(64)) {
     if (rawCall is! Map) continue;
     final function = rawCall['function'];
-    final rawName = function is Map
+    var rawName = function is Map
         ? function['name']
         : rawCall['name'] ?? rawCall['tool_name'];
     if (rawName is! String || rawName.isEmpty) continue;
-    final safeName = _persistedHermesToolName(rawName);
-    final arguments = function is Map
+    var arguments = function is Map
         ? function['arguments']
         : rawCall['arguments'] ?? rawCall['args'];
+    // A deferred tool runs through Hermes' `tool_call` bridge: name the tool
+    // that actually ran, as the live rows do, not "Tool call".
+    if (rawName == 'tool_call') {
+      var bridged = arguments;
+      if (bridged is String) {
+        try {
+          bridged = jsonDecode(bridged);
+        } on FormatException {
+          bridged = null;
+        }
+      }
+      if (bridged is Map &&
+          bridged['name'] is String &&
+          (bridged['name'] as String).trim().isNotEmpty) {
+        rawName = (bridged['name'] as String).trim();
+        arguments = bridged['arguments'];
+      }
+    }
+    final safeName = _persistedHermesToolName(rawName);
     final safeArguments = _persistedHermesToolDetail(arguments);
     final statusIndex = statuses.length;
     statuses.add(

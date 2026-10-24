@@ -3969,6 +3969,9 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     if (!_hasStreamingAssistant || state.isEmpty) {
       return false;
     }
+    // A row restored to stand in for a run this page did not start owns no
+    // local state: the settled transcript replaces it once the run ends.
+    if (isRestoredHermesDesktopRunningMessage(state.last)) return false;
 
     final lastMessageId = state.last.id;
     // Direct and Hermes reservations/runs do not use the notifier's HTTP/socket

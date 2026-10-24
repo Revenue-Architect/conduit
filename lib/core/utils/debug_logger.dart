@@ -6,7 +6,8 @@ import 'package:flutter/foundation.dart';
 /// to keep Flutter's debug console readable while still providing
 /// machine-friendly key/value pairs for quick scanning.
 class DebugLogger {
-  static const bool _enabled = kDebugMode;
+  static const bool _enabled =
+      kDebugMode || bool.fromEnvironment('CONDUIT_DIAG');
 
   /// Log debug information.
   static void log(String message, {String? scope, Map<String, Object?>? data}) {

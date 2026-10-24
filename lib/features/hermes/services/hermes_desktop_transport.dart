@@ -91,6 +91,9 @@ final class HermesDesktopEventBuffer {
     return wasEmpty;
   }
 
+  /// Whether a turn stream is attached to [sessionId] right now.
+  bool isActive(String sessionId) => _active.contains(sessionId);
+
   List<HermesDesktopEvent> activate(String sessionId) {
     _active.add(sessionId);
     return _removeQueue(sessionId)?.toList(growable: false) ?? const [];
