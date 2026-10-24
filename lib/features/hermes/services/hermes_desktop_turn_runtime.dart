@@ -44,6 +44,12 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     final eventsBeforePromptAcknowledgement = Queue<HermesDesktopEvent>();
     late final StreamSubscription<HermesDesktopEvent> subscription;
     late final StreamSubscription<void> disconnectSubscription;
+    // A new session announces its freshly built agent with an idle
+    // session.info around the first prompt, before the turn has done anything.
+    // Only an idle report after the turn showed signs of life ends the stream;
+    // an earlier one is checked against the gateway instead.
+    var turnActivitySeen = false;
+    Timer? earlyIdleRecheck;
 
     bool hasAuthoritativeState() {
       final state =
@@ -56,6 +62,8 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     void finish({String? error, bool authoritativeIdle = false}) {
       if (terminal) return;
       terminal = true;
+      earlyIdleRecheck?.cancel();
+      _firstTurnAwaitingActivity.remove(binding.storedId);
       _eventBuffer.deactivate(activeRuntimeId);
       if (authoritativeIdle && promptAcknowledged && hasAuthoritativeState()) {
         _applyAuthoritativeRunning(
@@ -90,6 +98,16 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         if (seenEventOrder.length > 4096) {
           seenEventIds.remove(seenEventOrder.removeFirst());
         }
+      }
+      if (event.type.startsWith('message.') ||
+          event.type.startsWith('tool.') ||
+          event.type.startsWith('thinking.') ||
+          event.type.startsWith('reasoning.') ||
+          event.type.startsWith('subagent.') ||
+          event.type.endsWith('.request') ||
+          (event.type == 'session.info' && payload['running'] == true)) {
+        turnActivitySeen = true;
+        _firstTurnAwaitingActivity.remove(binding.storedId);
       }
       String value(String key) => payload[key]?.toString() ?? '';
       String firstValue(Iterable<String> keys) => keys
@@ -250,7 +268,23 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
               runtimeId: binding.runtimeId,
             );
           } else if (!running && promptAcknowledged) {
-            finish(authoritativeIdle: true);
+            if (!freshSession || turnActivitySeen) {
+              finish(authoritativeIdle: true);
+            } else {
+              earlyIdleRecheck ??= Timer(const Duration(seconds: 5), () async {
+                if (terminal || turnActivitySeen) return;
+                try {
+                  final reconciled = await _resumeSnapshot(
+                    storedId,
+                    refresh: true,
+                  );
+                  if (reconciled.running == true) return;
+                } catch (_) {}
+                if (!terminal && !turnActivitySeen) {
+                  finish(authoritativeIdle: true);
+                }
+              });
+            }
           }
         case 'error':
           if (promptAcknowledged) {
@@ -353,7 +387,10 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         throw cancelToken!.cancelError!;
       }
       eventsBeforePromptAcknowledgement.clear();
-      if (freshSession) _freshSessionIds.remove(storedId);
+      if (freshSession) {
+        _freshSessionIds.remove(storedId);
+        _firstTurnAwaitingActivity.add(binding.storedId);
+      }
       await _rpc.request<Object?>(
         'prompt.submit',
         params: {
@@ -380,7 +417,9 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
         );
       }
       promptAcknowledged = true;
-      if (hasAuthoritativeState()) {
+      // A new session has no reported state yet (session.create omits
+      // `running`), but the prompt it just accepted is running.
+      if (hasAuthoritativeState() || freshSession) {
         _applyAuthoritativeRunning(
           true,
           storedId: binding.storedId,

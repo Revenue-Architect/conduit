@@ -51,14 +51,19 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       final startedBuffering = _eventBuffer.add(event);
       _recordLiveActivity(event);
       _recordAgenticState(event);
-      if (event.type == 'session.info') {
+      final infoStoredId = event.type == 'session.info'
+          ? _storedIdForRuntime(event.sessionId)
+          : null;
+      if (event.type == 'session.info' &&
+          !(event.payload['running'] == false &&
+              _firstTurnAwaitingActivity.contains(infoStoredId))) {
         // Update BOTH keys. `session.create` can omit `running`, which parks
         // the stored id at unsupportedGateway; a runtime-only update never
         // clears that, so the second turn onward fails the safety gate with
         // "Hermes run failed." until a resume repairs the state.
         _applyAuthoritativeRunning(
           event.payload['running'],
-          storedId: _storedIdForRuntime(event.sessionId),
+          storedId: infoStoredId,
           runtimeId: event.sessionId,
         );
       }
@@ -358,6 +363,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
         _bindings.clear();
         _bindingSocketGenerations.clear();
         _freshSessionIds.clear();
+        _firstTurnAwaitingActivity.clear();
         await _ensureConnected();
         for (final storedId in storedIds) {
           await _resume(storedId);
@@ -370,6 +376,7 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
       _bindings.clear();
       _bindingSocketGenerations.clear();
       _freshSessionIds.clear();
+      _firstTurnAwaitingActivity.clear();
       _emitTurnState(HermesDesktopTurnState.reconnecting);
     }
   }

@@ -97,6 +97,20 @@ final class _GatewayHarness {
     }),
   );
 
+  /// Pushes any gateway event frame for [runtimeId].
+  void event(String runtimeId, String type, [Map<String, dynamic>? payload]) =>
+      incoming.add(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'method': 'event',
+          'params': {
+            'type': type,
+            'session_id': runtimeId,
+            'payload': payload ?? const <String, dynamic>{},
+          },
+        }),
+      );
+
   Future<void> dispose() => incoming.close();
 }
 
@@ -231,6 +245,70 @@ void main() {
           .equals(HermesDesktopTurnState.idle);
       check(service.turnStateFor('runtime-1'))
           .equals(HermesDesktopTurnState.idle);
+    },
+  );
+
+  test(
+    "a new chat's first run stays live through the session's idle build info",
+    () async {
+      final harness = _GatewayHarness();
+      final rpc = HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      );
+      final service = HermesDesktopApiService(
+        config: HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          mode: HermesBackendMode.desktopGateway,
+          desktopCredentials: HermesDesktopCredentials(
+            legacyToken: 'session-token',
+          ),
+        ),
+        dio: _statusDio(),
+        rpc: rpc,
+      );
+      addTearDown(() async {
+        service.close();
+        await harness.dispose();
+      });
+      harness.responder = (method) {
+        switch (method) {
+          case 'session.create':
+            return {
+              'session_id': 'runtime-new',
+              'stored_session_id': 'stored-new',
+              'message_count': 0,
+              'messages': const [],
+              'info': const {},
+            };
+          case 'prompt.submit':
+            // Hermes finishes building the new session's agent around the
+            // first prompt and says so with an idle session.info.
+            harness.sessionInfo('runtime-new', running: false);
+            return {'status': 'streaming'};
+        }
+        return const {};
+      };
+
+      final stored = await service.createDesktopSession();
+      final response = await service.streamDesktopResponse(
+        HermesChatInput.text('hi'),
+        sessionId: stored,
+        options: const HermesDesktopSessionOptions(),
+      );
+      var done = false;
+      final events = response.events.toList().whenComplete(() => done = true);
+      harness.sessionInfo('runtime-new', running: false);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      check(done).isFalse();
+      check(service.turnStateFor(stored))
+          .equals(HermesDesktopTurnState.running);
+
+      harness.event('runtime-new', 'message.start');
+      harness.sessionInfo('runtime-new', running: false);
+      await events.timeout(const Duration(seconds: 1));
+      check(service.turnStateFor(stored)).equals(HermesDesktopTurnState.idle);
     },
   );
 

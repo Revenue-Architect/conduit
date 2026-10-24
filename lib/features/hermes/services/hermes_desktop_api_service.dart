@@ -258,6 +258,11 @@ final class HermesDesktopApiService
   final Map<String, HermesSessionBinding> _bindings = {};
   final Map<String, int> _bindingSocketGenerations = {};
   final Set<String> _freshSessionIds = {};
+
+  /// New sessions whose first prompt is out but has shown no activity yet: an
+  /// idle session.info for them describes the freshly built agent, not the
+  /// turn, so it must not mark the chat idle.
+  final Set<String> _firstTurnAwaitingActivity = {};
   final Set<String> _forcedTranscriptRefreshes = {};
   final Map<String, DateTime> _transcriptRebinds = {};
   final Map<String, List<Map<String, dynamic>>> _lastTranscripts = {};
@@ -1070,6 +1075,7 @@ final class HermesDesktopApiService
     _bindings.clear();
     _bindingSocketGenerations.clear();
     _freshSessionIds.clear();
+    _firstTurnAwaitingActivity.clear();
     _lastTranscripts.clear();
     _appliedSessionOptions.clear();
     _sessionTurnStates.clear();
