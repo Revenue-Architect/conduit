@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
+import 'hermez_bot_icons.dart';
 import 'hermez_bot_mark.dart';
+import 'hermez_bot_video.dart';
 
 /// Renders Hermes' synced shape face, or its uploaded/photo avatar.
 class HermesBotAvatar extends StatefulWidget {
@@ -15,6 +17,7 @@ class HermesBotAvatar extends StatefulWidget {
     this.imageUrl,
     this.imageKind,
     this.active = false,
+    this.video = false,
     super.key,
   });
 
@@ -25,6 +28,11 @@ class HermesBotAvatar extends StatefulWidget {
   final String? imageUrl;
   final String? imageKind;
   final bool active;
+
+  /// Plays the bot's idle/working clip, when it has one, in place of its
+  /// still image. Only where one bot is in focus (the chat header), so lists
+  /// never run a decoder per row.
+  final bool video;
 
   @override
   State<HermesBotAvatar> createState() => _HermesBotAvatarState();
@@ -65,6 +73,13 @@ class _HermesBotAvatarState extends State<HermesBotAvatar>
     super.dispose();
   }
 
+  Widget _mark() => HermezBotMark(
+    identity: hermezIdentityForName(widget.label),
+    botName: widget.label,
+    size: widget.size,
+    label: widget.label,
+  );
+
   @override
   Widget build(BuildContext context) {
     // Hermez draws every bot with its own mark (the reference bot family),
@@ -83,12 +98,20 @@ class _HermesBotAvatarState extends State<HermesBotAvatar>
         child: child,
       ),
       child: RepaintBoundary(
-        child: HermezBotMark(
-          identity: hermezIdentityForName(widget.label),
-          botName: widget.label,
-          size: widget.size,
-          label: widget.label,
-        ),
+        child: !widget.video
+            ? _mark()
+            : ValueListenableBuilder(
+                valueListenable: HermezBotIcons.videos,
+                builder: (context, _, _) =>
+                    HermezBotIcons.hasVideo(widget.label)
+                    ? HermezBotVideoMark(
+                        botName: widget.label,
+                        size: widget.size,
+                        working: widget.active,
+                        poster: _mark(),
+                      )
+                    : _mark(),
+              ),
       ),
     );
   }

@@ -365,6 +365,7 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                           color: bot.color,
                           imageKind: bot.imageKind,
                           active: active,
+                          video: true,
                         ),
                       ),
                     ),
@@ -4926,7 +4927,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       maxModelWidth: maxModelWidth,
       showModelDropdown: showModelDropdown,
       hermesBot: hermesBot,
-      hermesBotActive: hermesBot != null && ref.watch(isChatStreamingProvider),
+      hermesBotActive: hermesBot != null && _hermesChatWorking(ref),
       hasConversation: hasMessages,
       hermezVisuals: _useHermezChatVisuals,
     );
@@ -4983,6 +4984,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       centerTitle: hermesBot != null,
       toolbarHeight: _chatToolbarHeight(context),
     );
+  }
+
+  /// This chat's bot is at work: its own Hermes session's turn is running
+  /// (thinking and tools included), or its reply is still streaming. Never
+  /// another chat's work, so the right bot animates.
+  bool _hermesChatWorking(WidgetRef ref) {
+    final sessionId = ref.watch(hermesActiveSessionProvider);
+    final running =
+        sessionId != null &&
+        ref.watch(hermesSessionTurnStateProvider(sessionId)).value ==
+            HermesDesktopTurnState.running;
+    return running || ref.watch(isChatStreamingProvider);
   }
 
   Widget _buildChatToolbarTitle({
