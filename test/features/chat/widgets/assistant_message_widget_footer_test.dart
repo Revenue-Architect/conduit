@@ -188,6 +188,9 @@ Widget _buildAssistantHarness(
   );
   return ProviderScope(
     overrides: [
+      // The message is in the open chat, as on the chat page: inline UI only
+      // sends from the reply that is still in its own conversation.
+      chatMessagesProvider.overrideWith(() => _SeededMessagesNotifier(message)),
       textToSpeechControllerProvider.overrideWith(
         _TestTextToSpeechController.new,
       ),
@@ -215,6 +218,15 @@ Widget _buildAssistantHarness(
       ),
     ),
   );
+}
+
+class _SeededMessagesNotifier extends ChatMessagesNotifier {
+  _SeededMessagesNotifier(this.message);
+
+  final ChatMessage message;
+
+  @override
+  List<ChatMessage> build() => [message];
 }
 
 bool _hasInProgressFadeAncestor(WidgetTester tester, Finder childFinder) {
