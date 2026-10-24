@@ -219,11 +219,38 @@ class _HermesPlanSheetState extends ConsumerState<_HermesPlanSheet> {
         footer: footer,
       );
     }
+    final onClose = widget.onClose;
+    final heading = Text(eyebrow, style: HermezType.technical(palette.muted));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(eyebrow, style: HermezType.technical(palette.muted)),
+        // Unfolded in place, the plan's own header folds it back, with the
+        // same turned chevron as every other line in the chat.
+        if (onClose == null)
+          heading
+        else
+          HermezMotionSurface(
+            key: const ValueKey('hermes-plan-fold'),
+            semanticLabel: 'Fold the plan',
+            semanticsExpanded: true,
+            weight: HermezMotionWeight.light,
+            originRadius: 8,
+            onTap: onClose,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 32),
+              child: Row(
+                children: [
+                  Expanded(child: heading),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 18,
+                    color: palette.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ?subtitle,
         const SizedBox(height: 8),
         body,

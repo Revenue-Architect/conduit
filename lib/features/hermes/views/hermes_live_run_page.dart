@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/theme/theme_extensions.dart' show ConduitMotionContext;
 import '../../../core/services/navigation_service.dart';
 import '../models/hermes_todo.dart';
 import '../models/hermes_completed_run_snapshot.dart';
@@ -1198,30 +1199,28 @@ class HermesInlinePlan extends StatefulWidget {
 class _InlinePlanState extends State<HermesInlinePlan> {
   bool _open = false;
 
+  // The full plan unfolds in place of its preview, never under it: one plan
+  // on screen, and its header folds it back.
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        HermesPlanPreview(
-          plan: widget.plan,
-          running: widget.running,
-          onOpen: (_) => setState(() => _open = !_open),
-        ),
-        HermezReveal(
-          visible: _open,
-          revealKey: ValueKey('inline-plan-${widget.sessionId}'),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: HermesPlanInline(
+    child: AnimatedSize(
+      duration: context.reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: _open
+          ? HermesPlanInline(
+              key: ValueKey('inline-plan-${widget.sessionId}'),
               sessionId: widget.sessionId,
               onClose: () => setState(() => _open = false),
+            )
+          : HermesPlanPreview(
+              plan: widget.plan,
+              running: widget.running,
+              onOpen: (_) => setState(() => _open = true),
             ),
-          ),
-        ),
-      ],
     ),
   );
 }
