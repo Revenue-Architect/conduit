@@ -312,6 +312,57 @@ void main() {
     },
   );
 
+  test(
+    "a new chat's silent first run still ends on a second idle report",
+    () async {
+      final harness = _GatewayHarness();
+      final rpc = HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      );
+      final service = HermesDesktopApiService(
+        config: HermesConfig(
+          enabled: true,
+          baseUrl: 'https://hermes.example',
+          mode: HermesBackendMode.desktopGateway,
+          desktopCredentials: HermesDesktopCredentials(
+            legacyToken: 'session-token',
+          ),
+        ),
+        dio: _statusDio(),
+        rpc: rpc,
+      );
+      addTearDown(() async {
+        service.close();
+        await harness.dispose();
+      });
+      harness.responder = (method) => switch (method) {
+        'session.create' => {
+          'session_id': 'runtime-quiet',
+          'stored_session_id': 'stored-quiet',
+          'message_count': 0,
+          'messages': const [],
+          'info': const {},
+        },
+        'prompt.submit' => {'status': 'streaming'},
+        _ => const {},
+      };
+
+      final stored = await service.createDesktopSession();
+      final response = await service.streamDesktopResponse(
+        HermesChatInput.text('hi'),
+        sessionId: stored,
+        options: const HermesDesktopSessionOptions(),
+      );
+      final events = response.events.toList();
+      // The build's report, then a turn that dies without a word.
+      harness.sessionInfo('runtime-quiet', running: false);
+      harness.sessionInfo('runtime-quiet', running: false);
+
+      await events.timeout(const Duration(seconds: 1));
+      check(service.turnStateFor(stored)).equals(HermesDesktopTurnState.idle);
+    },
+  );
+
   test('a running session.info reports the turn as running', () async {
     final harness = _GatewayHarness();
     final rpc = HermesDesktopRpcClient(

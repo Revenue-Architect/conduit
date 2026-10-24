@@ -47,10 +47,15 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
     // A new session announces its freshly built agent with an idle
     // session.info around the first prompt, before the turn has done anything.
     // Only an idle report after the turn showed signs of life ends the stream.
-    // Every turn emits message events, so a real end always follows some.
+    // Every turn emits message events, so a real end always follows some; a
+    // turn that fails closes with an error frame, which ends it anyway. The
+    // build reports once, so a second idle report with no activity is not
+    // the build: it ends a turn that died silently.
     // (Do not re-resume the session to check: a refreshing resume can rebind
     // it to a new runtime id this stream would no longer hear.)
     var turnActivitySeen = false;
+    var idleWithoutActivity = 0;
+    var replayingBeforeAcknowledgement = false;
 
     bool hasAuthoritativeState() {
       final state =
@@ -270,7 +275,9 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
           } else if (!running && promptAcknowledged) {
             if (!freshSession ||
                 turnActivitySeen ||
-                cancelToken?.isCancelled == true) {
+                cancelToken?.isCancelled == true ||
+                (!replayingBeforeAcknowledgement &&
+                    ++idleWithoutActivity > 1)) {
               finish(authoritativeIdle: true);
             }
           }
@@ -414,11 +421,13 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
           runtimeId: binding.runtimeId,
         );
       }
+      replayingBeforeAcknowledgement = true;
       for (final event in List<HermesDesktopEvent>.of(
         eventsBeforePromptAcknowledgement,
       )) {
         if (!terminal) handleEvent(event);
       }
+      replayingBeforeAcknowledgement = false;
       eventsBeforePromptAcknowledgement.clear();
     } catch (error) {
       DebugLogger.error(
@@ -446,11 +455,13 @@ extension _HermesDesktopTurnRuntime on HermesDesktopApiService {
               );
           if (accepted) {
             promptAcknowledged = true;
+            replayingBeforeAcknowledgement = true;
             for (final event in List<HermesDesktopEvent>.of(
               eventsBeforePromptAcknowledgement,
             )) {
               if (!terminal) handleEvent(event);
             }
+            replayingBeforeAcknowledgement = false;
             eventsBeforePromptAcknowledgement.clear();
             if (cancelToken?.isCancelled == true) {
               try {
