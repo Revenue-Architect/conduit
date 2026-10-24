@@ -1,4 +1,4 @@
-# Phone QA of builds 223–228 (2026-10-24, 16:08–17:46)
+# Phone QA of builds 223–229 (2026-10-24, 16:08–17:46)
 
 Tested on the owner's S25 over wireless adb, in light mode. These builds fix the findings in `QA-BUILD-222.md` (plan: `PLAN-BUILD-223-FIXES.md`), plus the issues the owner raised during the session. Build 227 was a diagnostic build (`--dart-define=CONDUIT_DIAG=true`) that logged every event the turn stream saw.
 
@@ -11,7 +11,7 @@ Tested on the owner's S25 over wireless adb, in light mode. These builds fix the
 | New: a new chat's run never ends after a delegation | **Fixed.** The 227 logs showed three orderings of the parent run's end and the wake-up run (see below). All three settle in 228, with both of Chief's answers shown. |
 | F2: the line describes only the last part of the turn | **Fixed.** It reads "Delegated and 7 more", and its meta is "48s · 11 steps" with the skill, tool-finding, todo and delegate steps listed. |
 | F4: raw tool JSON | Fixed in code and tests; not unfolded on the phone this time. |
-| F5: Steel player stuck on "Session connecting…" | **Fixed.** The player showed example.com live, and has a reload button. |
+| F5: Steel player stuck on "Session connecting…" | **Fixed in 229.** In 228, only a manual reopen joined the session (the owner caught this). In 229 the player reloads every 4 s while it still says it is connecting, at most 15 times. On the phone, the auto-opened player showed example.com live about 16 s in, untouched. |
 | F6: Chief pastes the Steel debug URL | **Fixed** in new chats (SOUL lines removed). |
 | F7: Scout dot black | **Fixed** (accent). |
 | F7: blank gap above the delegate branch | **Smaller** (from about 110 dp to about 50 dp). Not gone. |
