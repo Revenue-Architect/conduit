@@ -396,6 +396,7 @@ class _Fighter extends StatelessWidget {
         final compact = box.maxHeight < top + 420;
         final Widget figure = MangaPortrait(
           botName: bot.name,
+          pick: true,
           outline: stroke,
           outlineWidth: 2,
         );
@@ -720,6 +721,7 @@ class _Tile extends StatelessWidget {
             bottom: selected ? 14 : -4,
             child: MangaPortrait(
               botName: bot.name,
+              pick: true,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),

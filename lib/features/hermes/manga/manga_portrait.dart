@@ -17,6 +17,13 @@ import '../widgets/hermez_bot_icons.dart';
 abstract final class MangaCutouts {
   static final Map<String, Future<File?>> _pending = {};
 
+  /// The character selector's figure: the bot's own full-figure picture
+  /// when it has one (already transparent, used as it is), else its cut-out.
+  static Future<File?> forPick(String botName) {
+    final pick = HermezBotIcons.pickFor(botName);
+    return pick != null ? Future.value(pick) : forBot(botName);
+  }
+
   /// The cut-out for [botName]'s assigned image, or null without one.
   static Future<File?> forBot(String botName) {
     final source = HermezBotIcons.iconFor(botName);
@@ -180,7 +187,11 @@ class MangaPortrait extends StatelessWidget {
     this.outlineWidth = 1.5,
     this.alignment = Alignment.bottomCenter,
     this.fit = BoxFit.contain,
+    this.pick = false,
   });
+
+  /// On the character selector: prefer the bot's full-figure picture.
+  final bool pick;
 
   final String botName;
   final Color? outline;
@@ -193,7 +204,9 @@ class MangaPortrait extends StatelessWidget {
     // Reassigning a face redraws the figure.
     valueListenable: HermezBotIcons.assigned,
     builder: (context, _, _) => FutureBuilder<File?>(
-      future: MangaCutouts.forBot(botName),
+      future: pick
+          ? MangaCutouts.forPick(botName)
+          : MangaCutouts.forBot(botName),
       builder: (context, snapshot) {
         final file = snapshot.data;
         if (file == null) return const SizedBox.shrink();

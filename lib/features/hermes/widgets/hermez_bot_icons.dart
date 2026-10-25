@@ -68,6 +68,16 @@ class HermezBotIcons {
   static File? iconFor(String? botName) =>
       botName == null ? null : assigned.value[_key(botName)];
 
+  /// A full-figure picture for the character selector, placed beside the
+  /// icons as `pick_<bot>.png` (Chief is `pick_default.png`). The selector
+  /// falls back to [iconFor] without one; nothing else uses it.
+  static File? pickFor(String? botName) {
+    final dir = _dir;
+    if (dir == null || botName == null) return null;
+    final file = File('${dir.path}/pick_${_key(botName)}.png');
+    return file.existsSync() ? file : null;
+  }
+
   static Future<void> _loadVideos() async {
     try {
       final dir = await _folder();
