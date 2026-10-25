@@ -272,67 +272,100 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
               : SystemUiOverlayStyle.light,
           child: Scaffold(
             backgroundColor: field.field,
-            resizeToAvoidBottomInset: true,
+            // The keyboard does not resize the page: relaying out the stage
+            // every frame of the keyboard's slide is what stuttered. The
+            // tray alone rides the keyboard (see _KeyboardLift).
+            resizeToAvoidBottomInset: false,
             body: Column(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(painter: _Slash(field.deep)),
-                      ),
-                      ?pager,
-                      SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
-                          child: Row(
-                            children: [
-                              if (!widget.embedded)
-                                IconButton(
-                                  tooltip: 'Close',
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  icon: Icon(
-                                    Icons.close_rounded,
-                                    color: field.ink,
-                                  ),
-                                )
-                              else
-                                const SizedBox(height: 48),
-                              const Spacer(),
-                              _StatusPill(
-                                field: field,
-                                agent: working[_bot.name],
-                                bot: _bot,
-                              ),
-                            ],
+                  child: GestureDetector(
+                    // A tap on the stage puts the keyboard away.
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    child: RepaintBoundary(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: CustomPaint(painter: _Slash(field.deep)),
                           ),
-                        ),
+                          ?pager,
+                          SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+                              child: Row(
+                                children: [
+                                  if (!widget.embedded)
+                                    IconButton(
+                                      tooltip: 'Close',
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      icon: Icon(
+                                        Icons.close_rounded,
+                                        color: field.ink,
+                                      ),
+                                    )
+                                  else
+                                    const SizedBox(height: 48),
+                                  const Spacer(),
+                                  _StatusPill(
+                                    field: field,
+                                    agent: working[_bot.name],
+                                    bot: _bot,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                _Tray(
-                  bots: widget.bots,
-                  index: _index,
-                  field: field,
-                  working: working.keys.toSet(),
-                  controller: _task,
-                  onTile: _jump,
-                  onSend: _send,
-                  hint: 'Give ${_bot.title} a task',
-                  // As a tab the floating dock covers the bottom; with the
-                  // keyboard up the dock is under it, so no gap is kept.
-                  bottomClearance:
-                      widget.embedded &&
-                          MediaQuery.viewInsetsOf(context).bottom == 0
+                _KeyboardLift(
+                  // As a tab the floating dock sits under the tray.
+                  rest: widget.embedded
                       ? hermesDockClearance(context)
-                      : null,
+                      : math.max(MediaQuery.paddingOf(context).bottom, 12),
+                  child: _Tray(
+                    bots: widget.bots,
+                    index: _index,
+                    field: field,
+                    working: working.keys.toSet(),
+                    controller: _task,
+                    onTile: _jump,
+                    onSend: _send,
+                    hint: 'Give ${_bot.title} a task',
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Slides the tray up with the keyboard, frame for frame, without relaying
+/// out anything: a translation on top of a fixed layout. Only this widget
+/// listens to the keyboard's height, so nothing else rebuilds while it
+/// moves. [rest] is the room kept under the tray when the keyboard is down
+/// (the tab dock, or the gesture bar); the lift starts once the keyboard
+/// rises past it, so there is no jump.
+class _KeyboardLift extends StatelessWidget {
+  const _KeyboardLift({required this.rest, required this.child});
+
+  final double rest;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final lift = math.max(0.0, keyboard - rest);
+    return Padding(
+      padding: EdgeInsets.only(bottom: rest),
+      child: Transform.translate(offset: Offset(0, -lift), child: child),
     );
   }
 }
@@ -376,9 +409,8 @@ String? _role(HermesBot bot) {
   return role.isEmpty ? null : role[0].toUpperCase() + role.substring(1);
 }
 
-/// One fighter: name, role, last words, and the bot's cut-out figure. With
-/// the keyboard up the stage is short, so the name keeps to the left, the
-/// figure shrinks to the right and the role and bubble step aside.
+/// One fighter: name, role, last words, and the bot's cut-out figure. The
+/// layout never changes with the keyboard: the tray slides over the stage.
 class _Fighter extends StatelessWidget {
   const _Fighter({
     required this.bot,
@@ -425,8 +457,6 @@ class _Fighter extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, box) {
-        // The keyboard takes the bottom half: a short stage.
-        final compact = box.maxHeight < top + 420;
         final Widget figure = MangaPortrait(
           botName: bot.name,
           pick: true,
@@ -454,20 +484,17 @@ class _Fighter extends StatelessWidget {
                   ),
                 ),
               ),
-            AnimatedPositioned(
-              duration: MangaMotion.enter,
-              curve: MangaMotion.easeOut,
-              right: compact ? -box.maxWidth * .04 : -box.maxWidth * .15,
+            Positioned(
+              right: -box.maxWidth * .15,
               bottom: -4,
-              width: box.maxWidth * (compact ? .5 : .95),
-              height: box.maxHeight * (compact ? .8 : .72),
+              width: box.maxWidth * .95,
+              height: box.maxHeight * .72,
               child: arrive(figure, dy: 24),
             ),
             Positioned(
               left: 18,
               top: top + 56,
-              // Compact, the name keeps out of the figure's half.
-              width: box.maxWidth * (compact ? .52 : 1) - 36,
+              width: box.maxWidth - 36,
               child: arrive(
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,19 +508,15 @@ class _Fighter extends StatelessWidget {
                         style: MangaType.fighter(field.ink),
                       ),
                     ),
-                    AnimatedOpacity(
-                      opacity: compact ? 0 : 1,
-                      duration: MangaMotion.swap,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: SizedBox(
-                          width: 170,
-                          child: Text(
-                            _role(bot) ?? '',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: MangaType.line(field.ink),
-                          ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: SizedBox(
+                        width: 170,
+                        child: Text(
+                          _role(bot) ?? '',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: MangaType.line(field.ink),
                         ),
                       ),
                     ),
@@ -501,7 +524,7 @@ class _Fighter extends StatelessWidget {
                 ),
               ),
             ),
-            if (said != null && said.isNotEmpty && !compact)
+            if (said != null && said.isNotEmpty)
               Positioned(
                 left: 14,
                 top: top + 214,
@@ -607,11 +630,7 @@ class _Tray extends StatelessWidget {
     required this.onTile,
     required this.onSend,
     required this.hint,
-    this.bottomClearance,
   });
-
-  /// Room left under the tray (the tab dock's height), when set.
-  final double? bottomClearance;
 
   final List<HermesBot> bots;
   final int index;
@@ -626,8 +645,7 @@ class _Tray extends StatelessWidget {
   Widget build(BuildContext context) {
     final armed = controller.text.trim().isNotEmpty;
     final accent = MangaInk.light.accent;
-    final bottom =
-        bottomClearance ?? math.max(MediaQuery.paddingOf(context).bottom, 12.0);
+    const bottom = 6.0;
     return ColoredBox(
       color: field.tray,
       child: Padding(
