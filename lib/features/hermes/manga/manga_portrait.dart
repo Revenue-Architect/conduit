@@ -17,6 +17,26 @@ import '../widgets/hermez_bot_icons.dart';
 abstract final class MangaCutouts {
   static final Map<String, Future<File?>> _pending = {};
 
+  /// Files already resolved, so a figure built again (a page a swipe brings
+  /// into view, a pose wrapping it) paints on its first frame instead of
+  /// blinking empty while its future answers.
+  static final Map<String, File?> _ready = {};
+
+  static Future<File?> _once(String key, Future<File?> Function() load) =>
+      _pending.putIfAbsent(key, () async {
+        final file = await load();
+        _ready[key] = file;
+        return file;
+      });
+
+  /// The resolved file for [botName], when it is already known.
+  static File? readyFor(String botName, {bool pick = false}) {
+    final selector = pick ? HermezBotIcons.pickFor(botName) : null;
+    if (selector != null) return selector;
+    final source = HermezBotIcons.iconFor(botName);
+    return source == null ? null : _ready[source.path];
+  }
+
   /// The character selector's figure: the bot's own full-figure picture
   /// when it has one (already transparent, used as it is), else its cut-out.
   static Future<File?> forPick(String botName) {
@@ -24,14 +44,14 @@ abstract final class MangaCutouts {
     if (pick == null) return forBot(botName);
     // One future per file: a new one on every rebuild restarts the
     // FutureBuilder each frame of a swipe.
-    return _pending.putIfAbsent('pick:${pick.path}', () => Future.value(pick));
+    return _once('pick:${pick.path}', () async => pick);
   }
 
   /// The cut-out for [botName]'s assigned image, or null without one.
   static Future<File?> forBot(String botName) {
     final source = HermezBotIcons.iconFor(botName);
     if (source == null) return Future.value();
-    return _pending.putIfAbsent(source.path, () => _cut(source));
+    return _once(source.path, () => _cut(source));
   }
 
   static Future<File?> _cut(File source) async {
@@ -207,6 +227,7 @@ class MangaPortrait extends StatelessWidget {
     // Reassigning a face redraws the figure.
     valueListenable: HermezBotIcons.assigned,
     builder: (context, _, _) => FutureBuilder<File?>(
+      initialData: MangaCutouts.readyFor(botName, pick: pick),
       future: pick
           ? MangaCutouts.forPick(botName)
           : MangaCutouts.forBot(botName),

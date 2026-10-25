@@ -551,8 +551,9 @@ class _Fighter extends StatelessWidget {
           animation: typing,
           child: child,
           builder: (context, child) {
+            // The same wrappers at rest and in motion: swapping the tree
+            // when the pose starts rebuilt the figure, which blinked.
             final t = typing.value;
-            if (t == 0) return child!;
             final k = 1 + (scale - 1) * t;
             return Opacity(
               opacity: 1 - (1 - fade) * t,
