@@ -614,6 +614,7 @@ class _Tray extends StatelessWidget {
                         minLines: 1,
                         maxLines: 4,
                         textCapitalization: TextCapitalization.sentences,
+                        keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => onSend(),
                         style: MangaType.body(const Color(0xFF0E0E10)),
