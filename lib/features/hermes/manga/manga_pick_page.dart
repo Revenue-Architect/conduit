@@ -218,9 +218,34 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
     final working = {
       for (final agent in watchHermesWorkingAgents(ref)) agent.profile: agent,
     };
+    // Watched here, in build: the pager builds its pages later.
+    final words = {
+      for (final bot in widget.bots)
+        bot.name: ref.watch(mangaLastWordsProvider(bot.name)).value,
+    };
+    // Built once per state change, not once per frame: the swipe only moves
+    // the pages, so they ride along as the builder's child.
+    final pager = RepaintBoundary(
+      child: PageView.builder(
+        controller: _pages,
+        itemCount: widget.bots.length,
+        onPageChanged: (i) {
+          HapticFeedback.selectionClick();
+          setState(() => _index = i);
+        },
+        itemBuilder: (context, i) => _Fighter(
+          bot: widget.bots[i],
+          field: _field(i),
+          agent: working[widget.bots[i].name],
+          entrance: widget.entrance,
+          words: words[widget.bots[i].name],
+        ),
+      ),
+    );
     return AnimatedBuilder(
       animation: _pages,
-      builder: (context, _) {
+      child: pager,
+      builder: (context, pager) {
         final page = _pages.hasClients && _pages.position.haveDimensions
             ? (_pages.page ?? _index.toDouble())
             : _index.toDouble();
@@ -240,25 +265,7 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
                       Positioned.fill(
                         child: CustomPaint(painter: _Slash(field.deep)),
                       ),
-                      PageView.builder(
-                        controller: _pages,
-                        itemCount: widget.bots.length,
-                        onPageChanged: (i) {
-                          HapticFeedback.selectionClick();
-                          setState(() => _index = i);
-                        },
-                        itemBuilder: (context, i) => _Fighter(
-                          bot: widget.bots[i],
-                          field: _field(i),
-                          agent: working[widget.bots[i].name],
-                          entrance: widget.entrance,
-                          words: ref
-                              .watch(
-                                mangaLastWordsProvider(widget.bots[i].name),
-                              )
-                              .value,
-                        ),
-                      ),
+                      ?pager,
                       SafeArea(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),

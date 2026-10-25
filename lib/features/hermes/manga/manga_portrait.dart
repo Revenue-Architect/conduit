@@ -21,7 +21,10 @@ abstract final class MangaCutouts {
   /// when it has one (already transparent, used as it is), else its cut-out.
   static Future<File?> forPick(String botName) {
     final pick = HermezBotIcons.pickFor(botName);
-    return pick != null ? Future.value(pick) : forBot(botName);
+    if (pick == null) return forBot(botName);
+    // One future per file: a new one on every rebuild restarts the
+    // FutureBuilder each frame of a swipe.
+    return _pending.putIfAbsent('pick:${pick.path}', () => Future.value(pick));
   }
 
   /// The cut-out for [botName]'s assigned image, or null without one.
@@ -218,7 +221,10 @@ class MangaPortrait extends StatelessWidget {
           gaplessPlayback: true,
         );
         final stroke = outline;
-        if (stroke == null) return image;
+        // Drawn once and reused: a swipe only moves the figure, so its
+        // picture (and the outline's eight filtered copies) is not
+        // repainted every frame.
+        if (stroke == null) return RepaintBoundary(child: image);
         final d = outlineWidth;
         Widget shadow(double dx, double dy) => Transform.translate(
           offset: Offset(dx, dy),
@@ -227,19 +233,21 @@ class MangaPortrait extends StatelessWidget {
             child: image,
           ),
         );
-        return Stack(
-          fit: StackFit.passthrough,
-          children: [
-            shadow(d, 0),
-            shadow(-d, 0),
-            shadow(0, d),
-            shadow(0, -d),
-            shadow(d * .7, d * .7),
-            shadow(-d * .7, -d * .7),
-            shadow(d * .7, -d * .7),
-            shadow(-d * .7, d * .7),
-            image,
-          ],
+        return RepaintBoundary(
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              shadow(d, 0),
+              shadow(-d, 0),
+              shadow(0, d),
+              shadow(0, -d),
+              shadow(d * .7, d * .7),
+              shadow(-d * .7, -d * .7),
+              shadow(d * .7, -d * .7),
+              shadow(-d * .7, d * .7),
+              image,
+            ],
+          ),
         );
       },
     ),
