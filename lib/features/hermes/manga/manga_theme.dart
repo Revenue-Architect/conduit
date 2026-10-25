@@ -166,17 +166,19 @@ class MangaField {
   bool get lightField => ink.computeLuminance() < .2;
 
   static const _byBot = <String, MangaField>{
+    // Chief stands on white paper (the owner's call, 2026-10-24): his flame
+    // is the only orange on his screen.
     'default': MangaField(
-      Color(0xFFE8531C),
-      Color(0xFFB83A0E),
-      Color(0xFF120B08),
-      Color(0xFFFFF4EC),
+      Color(0xFFFFFFFF),
+      Color(0xFFEDEBE8),
+      Color(0xFF0E0E10),
+      Color(0xFFFFFFFF),
     ),
     'chief': MangaField(
-      Color(0xFFE8531C),
-      Color(0xFFB83A0E),
-      Color(0xFF120B08),
-      Color(0xFFFFF4EC),
+      Color(0xFFFFFFFF),
+      Color(0xFFEDEBE8),
+      Color(0xFF0E0E10),
+      Color(0xFFFFFFFF),
     ),
     'kai': MangaField(
       Color(0xFF2F6FE4),

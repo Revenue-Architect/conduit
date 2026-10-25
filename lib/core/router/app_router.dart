@@ -40,6 +40,7 @@ import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
 import '../../features/hermes/kanban/hermes_kanban_page.dart';
 import '../../features/hermes/views/hermes_home_page.dart';
+import '../../features/hermes/manga/manga_prefs.dart';
 import '../../features/hermes/views/hermes_tab_shell.dart';
 import '../../features/hermes/views/hermes_bot_detail_page.dart';
 import '../../features/hermes/views/hermes_attention_page.dart';
@@ -208,6 +209,16 @@ class RouterNotifier extends ChangeNotifier {
         ref.read(hermesConfigProvider).isUsable &&
         !ref.read(hermesSecretsLoadingProvider)) {
       _pendingHermesDestination = null;
+    }
+    // In the manga layout a cold start opens on Pick, the character
+    // selector, over Today, instead of a fresh chat. Only the launch
+    // hand-off from the splash changes; every other route to chat stands.
+    if (destination == Routes.chat &&
+        path == Routes.splash &&
+        !ref.read(mangaClassicLayoutProvider) &&
+        ref.read(preferredBackendProvider) == PreferredBackend.hermes &&
+        ref.read(hermesConfigProvider).isUsable) {
+      return '${Routes.hermesHome}?pick=1';
     }
     return destination;
   }
@@ -813,6 +824,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               : usesPersistentTabletSidebar(context)
               ? const HermesHomePage()
               : HermesTabShell(
+                  openPick: state.uri.queryParameters['pick'] != null,
                   initialIndex: switch (state.uri.queryParameters['tab']) {
                     'chats' => 1,
                     'work' => 2,

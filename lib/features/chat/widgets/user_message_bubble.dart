@@ -19,6 +19,8 @@ import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/file_type_utils.dart';
 import '../../../shared/utils/locale_display_formatters.dart';
 import '../../hermes/services/hermes_session_provenance.dart';
+import '../../hermes/manga/manga_prefs.dart';
+import '../../hermes/manga/manga_theme.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../providers/chat_providers.dart';
@@ -826,7 +828,13 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
       MediaQuery.sizeOf(context).width * 0.78,
       640.0,
     );
-    final bubbleBorderColor = hermezVisuals
+    // The manga layout sets the owner's words as a caption box: paper, a
+    // 2 dp ink stroke, square corners. Grey bubbles were the refused default.
+    final caption = hermezVisuals && !ref.watch(mangaClassicLayoutProvider);
+    final mangaInk = MangaInk.of(context);
+    final bubbleBorderColor = caption
+        ? mangaInk.ink
+        : hermezVisuals
         ? hermezPalette.userBubble
         : theme.chatBubbleUserText.withValues(
             alpha: theme.isDark ? 0.16 : 0.08,
@@ -873,13 +881,17 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                         key: const Key('user-message-bubble-surface'),
                         padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
                         decoration: BoxDecoration(
-                          color: hermezVisuals
+                          color: caption
+                              ? mangaInk.ground
+                              : hermezVisuals
                               ? hermezPalette.userBubble
                               : theme.chatBubbleUser,
-                          borderRadius: bubbleBorderRadius,
+                          borderRadius: caption
+                              ? BorderRadius.circular(4)
+                              : bubbleBorderRadius,
                           border: Border.all(
                             color: bubbleBorderColor,
-                            width: BorderWidth.thin,
+                            width: caption ? 2 : BorderWidth.thin,
                           ),
                         ),
                         child: _isEditing
@@ -925,7 +937,9 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                             : Text(
                                 visibleContent,
                                 style: AppTypography.chatMessageStyle.copyWith(
-                                  color: hermezVisuals
+                                  color: caption
+                                      ? mangaInk.ink
+                                      : hermezVisuals
                                       ? hermezPalette.onUserBubble
                                       : theme.chatBubbleUserText,
                                 ),

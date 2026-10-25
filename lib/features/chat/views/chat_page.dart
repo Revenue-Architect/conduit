@@ -1,3 +1,6 @@
+import '../../hermes/manga/manga_prefs.dart';
+import '../../hermes/manga/manga_theme.dart';
+import '../../hermes/manga/manga_widgets.dart' show SpeedLines;
 import '../../hermes/widgets/hermes_turn_delegation.dart';
 import '../../hermes/services/hermes_identifier.dart';
 import '../../push/views/approval_continuation_notice.dart';
@@ -331,19 +334,28 @@ class _HermesBotToolbarTitle extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                HermesBotAvatar(
-                  key: const ValueKey('hermes-bot-toolbar-avatar'),
+                _MangaWorkingRays(
+                  enabled: mangaLayoutOf(context),
+                  active: active,
                   size:
                       kHermesBotHeaderAvatar -
                       (kHermesBotHeaderAvatar - kHermesBotHeaderAvatarFolded) *
                           collapse,
-                  label: bot.title,
-                  imageUrl: bot.avatar,
-                  shape: bot.shape,
-                  color: bot.color,
-                  imageKind: bot.imageKind,
-                  active: active,
-                  video: true,
+                  child: HermesBotAvatar(
+                    key: const ValueKey('hermes-bot-toolbar-avatar'),
+                    size:
+                        kHermesBotHeaderAvatar -
+                        (kHermesBotHeaderAvatar -
+                                kHermesBotHeaderAvatarFolded) *
+                            collapse,
+                    label: bot.title,
+                    imageUrl: bot.avatar,
+                    shape: bot.shape,
+                    color: bot.color,
+                    imageKind: bot.imageKind,
+                    active: active,
+                    video: true,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -386,6 +398,66 @@ class _HermesBotToolbarTitle extends StatelessWidget {
           child: title,
         ),
       ),
+    );
+  }
+}
+
+/// Speed lines round the header face while the bot works: the manga page's
+/// sign for "working now". They fade in and out with the state (200 ms) and
+/// take no layout space.
+class _MangaWorkingRays extends StatelessWidget {
+  const _MangaWorkingRays({
+    required this.enabled,
+    required this.active,
+    required this.size,
+    required this.child,
+  });
+
+  /// The manga layout is on; the classic header has no rays at all.
+  final bool enabled;
+  final bool active;
+  final double size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    final ink = MangaInk.of(context);
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: -size * .45,
+          right: -size * .45,
+          top: -size * .12,
+          bottom: -size * .12,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: active ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              curve: MangaMotion.easeOut,
+              child: ShaderMask(
+                // Fades to nothing at the edges, so the rays read as a halo
+                // round the face rather than a box.
+                shaderCallback: (rect) => const RadialGradient(
+                  colors: [Colors.black, Colors.black, Colors.transparent],
+                  stops: [0, .55, 1],
+                ).createShader(rect),
+                blendMode: BlendMode.dstIn,
+                child: SpeedLines(
+                  centre: Alignment.center,
+                  ground: Colors.transparent,
+                  tone: ink.tone,
+                  rays: 40,
+                  clear: 0,
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
     );
   }
 }

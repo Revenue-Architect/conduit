@@ -22,7 +22,10 @@ import 'hermes_work_page.dart';
 int _lastHermesTab = 0;
 
 class HermesTabShell extends ConsumerStatefulWidget {
-  const HermesTabShell({super.key, this.initialIndex});
+  const HermesTabShell({super.key, this.initialIndex, this.openPick = false});
+
+  /// Open the manga layout's Pick over Today: the cold-start landing.
+  final bool openPick;
 
   /// The tab to open on; null reopens the tab last shown, so Back from a
   /// chat lands where the chat was opened from.
@@ -66,13 +69,13 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
             HermesHomePage(),
             ProfilePage(),
           ]
-        : const <Widget>[
+        : <Widget>[
             // Today is the team's day; Work is the hub of everything that is
             // not a conversation.
-            MangaTodayPage(),
-            HermesConversationsPage(),
-            HermesWorkPage(title: 'Work'),
-            ProfilePage(),
+            MangaTodayPage(openPickOnLaunch: widget.openPick),
+            const HermesConversationsPage(),
+            const HermesWorkPage(title: 'Work'),
+            const ProfilePage(),
           ];
     // The shell owns its system bars: arriving from the side navigation (drawn
     // in the opposite theme) must not leave its icon colours behind.

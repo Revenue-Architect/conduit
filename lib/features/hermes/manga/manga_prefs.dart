@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/persistence/preferences_store.dart';
@@ -34,5 +35,19 @@ class MangaLastBot extends Notifier<String?> {
     if (state == name) return;
     state = name;
     await PreferencesStore.put(_lastBotKey, name);
+  }
+}
+
+/// Whether the manga layout is on, for widgets below a page that already
+/// watches [mangaClassicLayoutProvider] (so they rebuild with it).
+/// Outside a ProviderScope (a widget pumped alone) it is the classic look.
+bool mangaLayoutOf(BuildContext context) {
+  try {
+    return !ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(mangaClassicLayoutProvider);
+  } on StateError {
+    return false;
   }
 }

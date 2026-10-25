@@ -11,6 +11,7 @@ import 'package:conduit/features/hermes/widgets/hermes_home_presence.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:conduit/features/hermes/manga/manga_prefs.dart';
 import 'package:go_router/go_router.dart';
 
 class _Sessions extends HermesSessionsController {
@@ -66,6 +67,7 @@ Future<void> _pumpHome(WidgetTester tester) async {
     ProviderScope(
       overrides: [
         hermesApiServiceProvider.overrideWithValue(null),
+        mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
         hermesBotsProvider.overrideWith((ref) async => _bots),
         hermesHomeProfileJobsProvider.overrideWith((ref) async => []),
         hermesSessionsProvider.overrideWith(_Sessions.new),
@@ -116,6 +118,7 @@ void main() {
         ProviderScope(
           overrides: [
             hermesApiServiceProvider.overrideWithValue(null),
+            mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
             hermesBotsProvider.overrideWith((ref) async => _bots),
             hermesSessionsProvider.overrideWith(_Sessions.new),
             hermesSessionTotalsProvider.overrideWith(
@@ -171,4 +174,10 @@ void main() {
       expect(find.text('kai chat 6'), findsOneWidget);
     });
   });
+}
+
+/// These tests cover the classic list layout.
+class _ClassicLayout extends MangaClassicLayout {
+  @override
+  bool build() => true;
 }

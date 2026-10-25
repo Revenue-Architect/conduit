@@ -29,7 +29,11 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
     required this.initial,
     required this.origin,
     required this.working,
+    this.instant = false,
   });
+
+  /// The app's landing: no reveal, Pick is simply the first screen.
+  final bool instant;
 
   final List<HermesBot> bots;
   final int initial;
@@ -52,7 +56,7 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
   bool get maintainState => true;
 
   @override
-  Duration get transitionDuration => MangaMotion.grow;
+  Duration get transitionDuration => instant ? Duration.zero : MangaMotion.grow;
 
   @override
   Duration get reverseTransitionDuration => MangaMotion.shrink;

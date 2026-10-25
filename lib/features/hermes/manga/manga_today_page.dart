@@ -82,7 +82,10 @@ List<HermesBot> mangaPageOrder(
 /// panel, two more report beside it, what needs you sits above the roster,
 /// and the task box at the bottom sends to the last bot picked.
 class MangaTodayPage extends ConsumerStatefulWidget {
-  const MangaTodayPage({super.key});
+  const MangaTodayPage({super.key, this.openPickOnLaunch = false});
+
+  /// The cold start lands on Pick over Today; closing it leaves Today.
+  final bool openPickOnLaunch;
 
   @override
   ConsumerState<MangaTodayPage> createState() => _MangaTodayPageState();
@@ -93,6 +96,10 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
   final _task = TextEditingController();
   final _focus = FocusNode();
   final _tileKeys = <String, GlobalKey>{};
+
+  /// Pick opens on launch once per app process, not on every rebuild of the
+  /// shell (a theme change rebuilds it).
+  static bool _launchPickShown = false;
 
   @override
   void initState() {
@@ -134,7 +141,11 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
         bots.firstOrNull;
   }
 
-  Future<void> _openPick(List<HermesBot> bots, HermesBot bot) async {
+  Future<void> _openPick(
+    List<HermesBot> bots,
+    HermesBot bot, {
+    bool launch = false,
+  }) async {
     final key = _tileKeys[bot.name];
     final box = key?.currentContext?.findRenderObject() as RenderBox?;
     final origin = box == null || !box.hasSize
@@ -146,6 +157,7 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
         bots: bots,
         initial: bots.indexOf(bot),
         origin: origin,
+        instant: launch,
         working: {
           for (final agent in watchWorkingSnapshot()) agent.profile: agent,
         },
@@ -213,6 +225,15 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
         ? const <HermesBot>[]
         : mangaPageOrder(bots, working);
     final taskBot = bots == null ? null : _taskBot(bots);
+    if (widget.openPickOnLaunch &&
+        !_launchPickShown &&
+        bots != null &&
+        taskBot != null) {
+      _launchPickShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openPick(bots, taskBot, launch: true);
+      });
+    }
     final clearance = hermesDockClearance(context);
 
     String? said(HermesBot bot) {
@@ -296,8 +317,10 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
                 child: LayoutBuilder(
                   builder: (context, box) => SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
+                    // Sideways, or with the keyboard up, the page keeps a
+                    // readable height and scrolls instead of crushing.
                     child: SizedBox(
-                      height: box.maxHeight,
+                      height: box.maxHeight < 380 ? 380 : box.maxHeight,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: order.isEmpty
