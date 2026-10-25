@@ -10,6 +10,7 @@ import '../models/hermes_bot.dart';
 import '../widgets/hermes_home_working.dart'
     show HermesWorkingAgent, watchHermesWorkingAgents;
 import '../widgets/hermes_tab_dock.dart' show hermesDockClearance;
+import '../widgets/hermez_bot_icons.dart';
 import 'manga_frame_probe.dart';
 import 'manga_pick_launch.dart' show mangaLastWordsProvider;
 import 'manga_portrait.dart';
@@ -190,6 +191,7 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
     _task.addListener(() => setState(() {}));
     widget.entrance.addStatusListener(_landed);
     WidgetsBinding.instance.addObserver(this);
+    HermezBotIcons.colors.addListener(_recolor);
     _probe.start();
     _focus.addListener(() {
       if (context.reduceMotion) {
@@ -222,6 +224,7 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
   void dispose() {
     widget.entrance.removeStatusListener(_landed);
     WidgetsBinding.instance.removeObserver(this);
+    HermezBotIcons.colors.removeListener(_recolor);
     _probe.stop();
     _typing.dispose();
     _focus.dispose();
@@ -275,10 +278,16 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
     );
   }
 
-  /// The pages, built once per bot list. Each page reads its own last words
-  /// and working state, so neither a page change (half-way through a swipe)
-  /// nor a keystroke rebuilds them.
-  late final Widget _pager = RepaintBoundary(
+  /// A bot's selector colour changed (its picker): rebuild the pages in
+  /// place, keeping the bot on screen.
+  void _recolor() => setState(() => _pager = _buildPager());
+
+  /// The pages, built once per bot list (and again only for a new colour).
+  /// Each page reads its own last words and working state, so neither a page
+  /// change (half-way through a swipe) nor a keystroke rebuilds them.
+  late Widget _pager = _buildPager();
+
+  Widget _buildPager() => RepaintBoundary(
     // The app dismisses the keyboard on any user scroll (main.dart); a swipe
     // to the next bot is not that kind of scroll, so its notification stops
     // here and the keyboard stays up while choosing who gets the task.
@@ -853,6 +862,9 @@ class _Tray extends StatelessWidget {
                         semanticLabel: bots[i].title,
                         scale: .94,
                         onTap: () => onTile(i),
+                        // The bot's picture, clips and selector colour.
+                        onLongPress: () =>
+                            HermezBotIcons.showPicker(context, bots[i].name),
                         child: _Tile(
                           bot: bots[i],
                           selected: i == index,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/hermez_bot_icons.dart';
+
 /// The manga redesign's page: white paper, ink, one orange that means
 /// "happening now or needs you". Tokens from
 /// docs/app-design-2026-10-24/DIRECTION.md.
@@ -166,19 +168,19 @@ class MangaField {
   bool get lightField => ink.computeLuminance() < .2;
 
   static const _byBot = <String, MangaField>{
-    // Chief stands on white paper (the owner's call, 2026-10-24): his flame
-    // is the only orange on his screen.
+    // Chief stands in the orange of the flame on his head (the owner's
+    // call, 2026-10-25).
     'default': MangaField(
-      Color(0xFFFFFFFF),
-      Color(0xFFEDEBE8),
-      Color(0xFF0E0E10),
-      Color(0xFFFFFFFF),
+      Color(0xFFE8702A),
+      Color(0xFFB04A14),
+      Color(0xFF120B08),
+      Color(0xFFFFF4EC),
     ),
     'chief': MangaField(
-      Color(0xFFFFFFFF),
-      Color(0xFFEDEBE8),
-      Color(0xFF0E0E10),
-      Color(0xFFFFFFFF),
+      Color(0xFFE8702A),
+      Color(0xFFB04A14),
+      Color(0xFF120B08),
+      Color(0xFFFFF4EC),
     ),
     'kai': MangaField(
       Color(0xFF2F6FE4),
@@ -215,19 +217,31 @@ class MangaField {
   /// The tray under the tiles and task box: the field's darkest note.
   Color get tray => Color.lerp(deep, const Color(0xFF0B0B0D), .78)!;
 
+  /// The bot's field: the colour the owner chose for it (the bot's picker,
+  /// "Selector background"), else its own, else for a bot added later its
+  /// avatar colour, else ink on bone.
   static MangaField forBot(String name, {String? avatarColor}) {
+    final chosen = HermezBotIcons.colorFor(name);
+    if (chosen != null) return MangaField.fromColor(chosen);
     final known = _byBot[name.toLowerCase()];
     if (known != null) return known;
-    // A bot added later: its own avatar colour, else ink on bone.
     final parsed = _parse(avatarColor);
     if (parsed == null) return _byBot['ops']!;
-    final hsl = HSLColor.fromColor(parsed);
-    final light = parsed.computeLuminance() > .45;
+    return MangaField.fromColor(parsed);
+  }
+
+  /// A whole field from one colour: a darker slash and tray, and whichever
+  /// of black or white ink reads better on it.
+  factory MangaField.fromColor(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    final l = color.computeLuminance();
+    // Contrast against white ink versus black ink (WCAG ratio).
+    final darkInk = (l + .05) / .05 > 1.05 / (l + .05);
     return MangaField(
-      parsed,
+      color,
       hsl.withLightness((hsl.lightness - .16).clamp(0, 1)).toColor(),
-      light ? const Color(0xFF0E0E10) : const Color(0xFFFFFFFF),
-      const Color(0xFFFFFFFF),
+      darkInk ? const Color(0xFF0E0E10) : const Color(0xFFFFFFFF),
+      Color.lerp(Colors.white, color, .06)!,
     );
   }
 
