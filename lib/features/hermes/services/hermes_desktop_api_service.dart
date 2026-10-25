@@ -622,10 +622,11 @@ final class HermesDesktopApiService
     );
   }
 
-  /// The newest thing the assistant said in a stored chat, as plain text,
-  /// for a speech bubble. Null when it has not answered yet.
-  Future<String?> latestAssistantText(String storedId) async {
-    if (validateHermesOpaqueIdentifier(storedId) == null) return null;
+  /// What the assistant said most recently in a stored chat, newest first,
+  /// as plain text (for a speech bubble). Empty when it has not answered.
+  Future<List<String>> latestAssistantTexts(String storedId) async {
+    if (validateHermesOpaqueIdentifier(storedId) == null) return const [];
+    final texts = <String>[];
     final rows = _objects(
       await _requestJson(
         'GET',
@@ -651,9 +652,9 @@ final class HermesDesktopApiService
                 .whereType<String>()
                 .join(' ')
           : null;
-      if (text != null && text.trim().isNotEmpty) return text;
+      if (text != null && text.trim().isNotEmpty) texts.add(text);
     }
-    return null;
+    return texts;
   }
 
   /// The stored transcript as the server saved it. A turn the server ran on

@@ -56,6 +56,8 @@ String? mangaSpeech(String? raw) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   if (text.isEmpty || text.startsWith('/') || text.length < 3) return null;
+  // Code is not speech: an OpenUI tree, a JSON blob, a call.
+  if (RegExp(r'[=(){}\[\]]').allMatches(text).length >= 3) return null;
   return text;
 }
 
@@ -76,8 +78,10 @@ final mangaLastWordsProvider = FutureProvider.family<String?, String>((
   ];
   for (final id in ids.take(3)) {
     try {
-      final text = mangaSpeech(await service.latestAssistantText(id));
-      if (text != null && !_instructions(text)) return text;
+      for (final reply in await service.latestAssistantTexts(id)) {
+        final text = mangaSpeech(reply);
+        if (text != null && !_instructions(text)) return text;
+      }
     } catch (_) {
       // One unreadable chat does not stop the next.
     }
