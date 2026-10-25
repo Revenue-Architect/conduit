@@ -48,7 +48,7 @@ Tested on the owner's Samsung S25 over wireless adb, in light mode, in one new C
 - Earlier builds showed it live, so this is either a regression or a network or viewer problem.
 - Check the viewer URL from the phone (the VPN icon was on).
 
-**F6. Hermes put the internal Steel debug URL in its answer.** It wrote "watch the browser live at http://100.88.112.22:8300/v1/sessions/debug". This is a prompt or SOUL issue on the server: the app already shows the browser, so the raw tailnet URL is noise.
+**F6. Hermes put the internal Steel debug URL in its answer.** It wrote "watch the browser live at the tailnet Steel debug URL". This is a prompt or SOUL issue on the server: the app already shows the browser, so the raw tailnet URL is noise.
 
 **F7. Smaller visual issues:**
 - **Big blank gap** of about 150 px between the plan block and the Scout branch in the plan turn. This may be the HANDOFF §7.2 gap.
