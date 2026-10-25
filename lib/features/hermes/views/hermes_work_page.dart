@@ -6,8 +6,6 @@ import '../../../core/services/navigation_service.dart';
 import '../../push/providers/push_providers.dart' show approvalsPendingProvider;
 import '../kanban/hermes_kanban_summary_provider.dart';
 import '../motion/hermez_motion.dart';
-import '../manga/manga_prefs.dart';
-import '../manga/manga_work_blocks.dart';
 import '../providers/hermes_providers.dart';
 import '../widgets/hermes_home_needs_you.dart';
 import '../widgets/hermes_home_presence.dart' show HermesNotifyPrompt;
@@ -34,11 +32,7 @@ String hermesWorkBoardMeta(HermesKanbanSummary board) =>
 /// by space: the team, the work Hermes does, what needs a decision, and
 /// Hermes itself. Each row says one true thing about where it leads.
 class HermesWorkPage extends ConsumerWidget {
-  const HermesWorkPage({super.key, this.title});
-
-  /// Overrides the docked "Conduit" masthead: the manga layout names this
-  /// tab Work, because Today is home there.
-  final String? title;
+  const HermesWorkPage({super.key});
 
   Future<void> _refresh(WidgetRef ref) async {
     ref
@@ -67,15 +61,14 @@ class HermesWorkPage extends ConsumerWidget {
     final approvals = ref.watch(approvalsPendingProvider).value;
     final needsYou = watchHermesNeedsYou(ref);
     final activeJobs = jobs?.where((item) => item.$2.enabled).length ?? 0;
-    final manga = !ref.watch(mangaClassicLayoutProvider) && title != null;
 
     // In the phone dock this hub is Home: the Conduit masthead, with what is
     // running and the + for a new chat at its right.
     final docked = HermesDockScope.maybeOf(context) != null;
     return HermesPageChrome(
-      title: title ?? (docked ? 'Conduit' : 'Work'),
+      title: docked ? 'Conduit' : 'Work',
       subtitle: 'Schedules, board, teams and files',
-      brandHeader: docked && title == null,
+      brandHeader: docked,
       actions: docked
           ? [
               const HermesWorkingStack(),
@@ -97,50 +90,43 @@ class HermesWorkPage extends ConsumerWidget {
               hermesDockClearance(listContext) + 16,
             ),
             children: [
-              // The manga Work leads with what needs you and what is
-              // running; the team lives on Today's roster.
-              if (manga) ...[
-                const MangaNeedsBlock(),
-                const MangaRunningBlock(),
-              ] else ...[
-                HermesWorkHeading(
-                  bots == null ? 'TEAM' : 'TEAM · ${bots.length}',
-                  first: true,
-                ),
-                HermezPresence(
-                  presenceKey: ValueKey(
-                    bots == null
-                        ? 'team-loading'
-                        : bots.isEmpty
-                        ? 'team-empty'
-                        : 'team',
-                  ),
-                  weight: HermezMotionWeight.medium,
-                  child: bots == null
-                      ? (botsAsync.hasError
-                            ? const SizedBox.shrink()
-                            : HermezSkeleton.rows(count: 3))
+              HermesWorkHeading(
+                bots == null ? 'TEAM' : 'TEAM · ${bots.length}',
+                first: true,
+              ),
+              HermezPresence(
+                presenceKey: ValueKey(
+                  bots == null
+                      ? 'team-loading'
                       : bots.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            'No Hermes bot profiles available.',
-                            style: HermezType.meta(palette),
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final bot in bots)
-                              HermesWorkTeamRow(
-                                key: ValueKey('team-${bot.name}'),
-                                bot: bot,
-                              ),
-                          ],
-                        ),
+                      ? 'team-empty'
+                      : 'team',
                 ),
-              ],
-              HermesWorkHeading(manga ? 'BOARDS AND FILES' : 'WORK'),
+                weight: HermezMotionWeight.medium,
+                child: bots == null
+                    ? (botsAsync.hasError
+                          ? const SizedBox.shrink()
+                          : HermezSkeleton.rows(count: 3))
+                    : bots.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No Hermes bot profiles available.',
+                          style: HermezType.meta(palette),
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final bot in bots)
+                            HermesWorkTeamRow(
+                              key: ValueKey('team-${bot.name}'),
+                              bot: bot,
+                            ),
+                        ],
+                      ),
+              ),
+              const HermesWorkHeading('WORK'),
               HermesWorkRow(
                 icon: Icons.schedule_rounded,
                 title: 'Scheduled agents',
@@ -194,18 +180,17 @@ class HermesWorkPage extends ConsumerWidget {
                 ),
               ),
               const HermesWorkHeading('DECISIONS'),
-              if (!manga)
-                HermesWorkRow(
-                  icon: Icons.notifications_none_rounded,
-                  title: 'Needs you',
-                  meta: needsYou.isEmpty
-                      ? 'Questions, prepared work and failed runs'
-                      : '${needsYou.length} waiting',
-                  onOpen: (origin) => context.pushNamed(
-                    RouteNames.hermesAttention,
-                    extra: origin,
-                  ),
+              HermesWorkRow(
+                icon: Icons.notifications_none_rounded,
+                title: 'Needs you',
+                meta: needsYou.isEmpty
+                    ? 'Questions, prepared work and failed runs'
+                    : '${needsYou.length} waiting',
+                onOpen: (origin) => context.pushNamed(
+                  RouteNames.hermesAttention,
+                  extra: origin,
                 ),
+              ),
               HermesWorkRow(
                 icon: Icons.verified_user_outlined,
                 title: 'Approvals',

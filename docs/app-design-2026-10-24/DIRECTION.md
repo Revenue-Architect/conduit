@@ -288,3 +288,10 @@ Content is taken from the owner's real data on 2026-10-24 (the screenshots in `b
   - Spaces
   - Artifacts
   - Teams
+
+## Outcome (2026-10-25)
+
+After using the redesign on the phone, the owner kept one piece:
+- **Pick, the coloured character selector, is the landing screen.** It opens on a cold start, shows each bot's last words, and starts a task.
+- **Every bot shows its still image** on Pick, not its video.
+- **Everything else is back to the previous design exactly:** Home, Chats, Work, You, the chat screen and the tab dock. The Classic layout switch is gone with it.

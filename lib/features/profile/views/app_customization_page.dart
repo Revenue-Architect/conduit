@@ -15,7 +15,6 @@ import '../../../core/utils/tts_voice_utils.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/theme/tweakcn_themes.dart';
 import '../../../shared/widgets/adaptive_selection_sheet.dart';
-import '../../hermes/manga/manga_prefs.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../../../core/models/tool.dart';
 import '../../../shared/widgets/conduit_components.dart';
@@ -89,8 +88,6 @@ class AppCustomizationPage extends ConsumerWidget {
           activeTheme,
         ),
         _sectionGap,
-        _buildClassicLayoutTile(context, ref),
-        _sectionGap,
         _buildLanguageSection(context, ref, currentLanguageCode, languageLabel),
       ],
       AppCustomizationSection.chat => <Widget>[
@@ -156,24 +153,6 @@ class AppCustomizationPage extends ConsumerWidget {
           children: [_buildPaletteSelector(context, ref, activeTheme)],
         ),
       ],
-    );
-  }
-
-  /// The rollback: the list screens from before the manga page.
-  Widget _buildClassicLayoutTile(BuildContext context, WidgetRef ref) {
-    final classic = ref.watch(mangaClassicLayoutProvider);
-    final notifier = ref.read(mangaClassicLayoutProvider.notifier);
-    return CustomizationTile(
-      leading: _buildIconBadge(
-        context,
-        Icons.view_agenda_outlined,
-        color: context.conduitTheme.buttonPrimary,
-      ),
-      title: 'Classic layout',
-      subtitle: 'The list screens from before the manga page',
-      trailing: AdaptiveSwitch(value: classic, onChanged: notifier.set),
-      showChevron: false,
-      onTap: () => notifier.set(!classic),
     );
   }
 

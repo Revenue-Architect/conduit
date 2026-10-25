@@ -2,12 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../models/hermes_bot.dart';
-import '../widgets/hermes_home_working.dart' show HermesWorkingAgent;
-import '../widgets/hermez_bot_icons.dart';
-import '../widgets/hermez_bot_video.dart';
+import '../widgets/hermes_home_working.dart'
+    show HermesWorkingAgent, watchHermesWorkingAgents;
+import 'manga_pick_launch.dart' show mangaLastWordsProvider;
 import 'manga_portrait.dart';
 import 'manga_theme.dart';
 import 'manga_widgets.dart';
@@ -29,13 +30,8 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
     required this.bots,
     required this.initial,
     required this.origin,
-    required this.working,
-    this.speech = const {},
     this.instant = false,
   });
-
-  /// What each bot last said, cleaned for its bubble (from Today).
-  final Map<String, String?> speech;
 
   /// The app's landing: no reveal, Pick is simply the first screen.
   final bool instant;
@@ -46,7 +42,6 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
   /// The tile it grows from, in global coordinates; null grows from the
   /// bottom centre.
   final Rect? origin;
-  final Map<String, HermesWorkingAgent> working;
 
   @override
   Color? get barrierColor => null;
@@ -71,13 +66,7 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) => MangaPickPage(
-    bots: bots,
-    initial: initial,
-    working: working,
-    speech: speech,
-    entrance: animation,
-  );
+  ) => MangaPickPage(bots: bots, initial: initial, entrance: animation);
 
   @override
   Widget buildTransitions(
@@ -143,27 +132,23 @@ class _CircleReveal extends CustomClipper<Path> {
 /// Pick your fighter. The picked bot fills the screen in its own colour,
 /// name huge, last words in a bubble; swipe for the next bot, and give the
 /// task from the bottom.
-class MangaPickPage extends StatefulWidget {
+class MangaPickPage extends ConsumerStatefulWidget {
   const MangaPickPage({
     super.key,
     required this.bots,
     required this.initial,
-    required this.working,
     required this.entrance,
-    this.speech = const {},
   });
 
   final List<HermesBot> bots;
   final int initial;
-  final Map<String, HermesWorkingAgent> working;
-  final Map<String, String?> speech;
   final Animation<double> entrance;
 
   @override
-  State<MangaPickPage> createState() => _MangaPickPageState();
+  ConsumerState<MangaPickPage> createState() => _MangaPickPageState();
 }
 
-class _MangaPickPageState extends State<MangaPickPage> {
+class _MangaPickPageState extends ConsumerState<MangaPickPage> {
   late final PageController _pages = PageController(
     initialPage: widget.initial.clamp(0, widget.bots.length - 1),
   );
@@ -230,6 +215,9 @@ class _MangaPickPageState extends State<MangaPickPage> {
 
   @override
   Widget build(BuildContext context) {
+    final working = {
+      for (final agent in watchHermesWorkingAgents(ref)) agent.profile: agent,
+    };
     return AnimatedBuilder(
       animation: _pages,
       builder: (context, _) {
@@ -262,10 +250,13 @@ class _MangaPickPageState extends State<MangaPickPage> {
                         itemBuilder: (context, i) => _Fighter(
                           bot: widget.bots[i],
                           field: _field(i),
-                          agent: widget.working[widget.bots[i].name],
+                          agent: working[widget.bots[i].name],
                           entrance: widget.entrance,
-                          words: widget.speech[widget.bots[i].name],
-                          current: i == _index,
+                          words: ref
+                              .watch(
+                                mangaLastWordsProvider(widget.bots[i].name),
+                              )
+                              .value,
                         ),
                       ),
                       SafeArea(
@@ -284,7 +275,7 @@ class _MangaPickPageState extends State<MangaPickPage> {
                               const Spacer(),
                               _StatusPill(
                                 field: field,
-                                agent: widget.working[_bot.name],
+                                agent: working[_bot.name],
                                 bot: _bot,
                               ),
                             ],
@@ -298,7 +289,7 @@ class _MangaPickPageState extends State<MangaPickPage> {
                   bots: widget.bots,
                   index: _index,
                   field: field,
-                  working: widget.working.keys.toSet(),
+                  working: working.keys.toSet(),
                   controller: _task,
                   onTile: _jump,
                   onSend: _send,
@@ -352,11 +343,9 @@ String? _role(HermesBot bot) {
   return role.isEmpty ? null : role[0].toUpperCase() + role.substring(1);
 }
 
-/// One fighter: name, role, last words, and the bot itself: its idle (or
-/// working) clip in a square ink panel when it has one, else its cut-out
-/// figure. With the keyboard up the stage is short, so the name keeps to
-/// the left, the figure shrinks to the right and the role and bubble step
-/// aside.
+/// One fighter: name, role, last words, and the bot's cut-out figure. With
+/// the keyboard up the stage is short, so the name keeps to the left, the
+/// figure shrinks to the right and the role and bubble step aside.
 class _Fighter extends StatelessWidget {
   const _Fighter({
     required this.bot,
@@ -364,7 +353,6 @@ class _Fighter extends StatelessWidget {
     required this.agent,
     required this.entrance,
     required this.words,
-    required this.current,
   });
 
   final HermesBot bot;
@@ -374,9 +362,6 @@ class _Fighter extends StatelessWidget {
 
   /// What the bot last said, cleaned for a bubble.
   final String? words;
-
-  /// The fighter on screen: only it plays its clip.
-  final bool current;
 
   @override
   Widget build(BuildContext context) {
@@ -403,47 +388,17 @@ class _Fighter extends StatelessWidget {
             ),
           );
     final top = MediaQuery.paddingOf(context).top;
-    final hasClip =
-        HermezBotIcons.videoFor(bot.name, HermezBotClip.idle) != null ||
-        HermezBotIcons.videoFor(bot.name, HermezBotClip.working) != null;
     final said = words;
 
     return LayoutBuilder(
       builder: (context, box) {
         // The keyboard takes the bottom half: a short stage.
         final compact = box.maxHeight < top + 420;
-        final panelSide = compact
-            ? math.max(
-                80.0,
-                math.min(box.maxWidth * .4, box.maxHeight - top - 70),
-              )
-            : math.min(box.maxWidth * .66, box.maxHeight * .5);
-        final Widget figure = hasClip
-            ? Transform.rotate(
-                angle: -2 * math.pi / 180,
-                child: Container(
-                  width: panelSide,
-                  height: panelSide,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: stroke, width: 3),
-                  ),
-                  child: current
-                      ? HermezBotVideoMark(
-                          botName: bot.name,
-                          size: panelSide - 6,
-                          working: agent != null,
-                          square: true,
-                          poster: _Still(bot: bot),
-                        )
-                      : _Still(bot: bot),
-                ),
-              )
-            : MangaPortrait(
-                botName: bot.name,
-                outline: stroke,
-                outlineWidth: 2,
-              );
+        final Widget figure = MangaPortrait(
+          botName: bot.name,
+          outline: stroke,
+          outlineWidth: 2,
+        );
         return Stack(
           children: [
             if (agent != null)
@@ -465,26 +420,15 @@ class _Fighter extends StatelessWidget {
                   ),
                 ),
               ),
-            if (hasClip)
-              AnimatedPositioned(
-                duration: MangaMotion.enter,
-                curve: MangaMotion.easeOut,
-                right: compact ? 16 : 18,
-                bottom: compact ? 12 : 28,
-                width: panelSide,
-                height: panelSide,
-                child: arrive(figure, dy: 24),
-              )
-            else
-              AnimatedPositioned(
-                duration: MangaMotion.enter,
-                curve: MangaMotion.easeOut,
-                right: compact ? -box.maxWidth * .04 : -box.maxWidth * .15,
-                bottom: -4,
-                width: box.maxWidth * (compact ? .5 : .95),
-                height: box.maxHeight * (compact ? .8 : .72),
-                child: arrive(figure, dy: 24),
-              ),
+            AnimatedPositioned(
+              duration: MangaMotion.enter,
+              curve: MangaMotion.easeOut,
+              right: compact ? -box.maxWidth * .04 : -box.maxWidth * .15,
+              bottom: -4,
+              width: box.maxWidth * (compact ? .5 : .95),
+              height: box.maxHeight * (compact ? .8 : .72),
+              child: arrive(figure, dy: 24),
+            ),
             Positioned(
               left: 18,
               top: top + 56,
@@ -562,21 +506,6 @@ class _Fighter extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-/// The bot's still (the clip's first frame), filling the panel.
-class _Still extends StatelessWidget {
-  const _Still({required this.bot});
-
-  final HermesBot bot;
-
-  @override
-  Widget build(BuildContext context) {
-    final file = HermezBotIcons.iconFor(bot.name);
-    return file == null
-        ? const SizedBox.expand()
-        : Image.file(file, fit: BoxFit.cover, gaplessPlayback: true);
   }
 }
 

@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../manga/manga_portrait.dart';
-import '../manga/manga_prefs.dart';
-import '../manga/manga_theme.dart';
-import '../manga/manga_widgets.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
 import '../providers/hermes_session_totals_provider.dart';
 import '../widgets/hermes_session_tile.dart';
-import '../widgets/hermes_tab_dock.dart' show hermesDockClearance;
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_surfaces.dart';
@@ -53,36 +48,21 @@ class _HermesConversationsPageState
     final recent = ref.watch(hermesSessionsProvider);
     final totals = ref.watch(hermesSessionTotalsProvider).asData?.value;
     final bot = _bot;
-    final manga = !ref.watch(mangaClassicLayoutProvider);
-    final all = totals?.values.fold<int>(0, (sum, n) => sum + n);
     return HermesPageChrome(
-      title: manga ? 'Chats' : 'Conversations',
-      subtitle: manga
-          ? (all == null ? '' : '$all chats')
-          : 'Every chat, organized by bot.',
+      title: 'Conversations',
+      subtitle: 'Every chat, organized by bot.',
       child: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            manga ? 14 : 18,
-            0,
-            manga ? 14 : 18,
-            manga ? 36 + hermesDockClearance(context) : 36,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 36),
           children: [
             if (bots.isNotEmpty) ...[
-              manga
-                  ? _FaceFilter(
-                      bots: bots,
-                      selected: bot,
-                      onSelected: (name) => setState(() => _bot = name),
-                    )
-                  : _BotFilter(
-                      bots: bots,
-                      selected: bot,
-                      onSelected: (name) => setState(() => _bot = name),
-                    ),
-              SizedBox(height: manga ? 4 : 16),
+              _BotFilter(
+                bots: bots,
+                selected: bot,
+                onSelected: (name) => setState(() => _bot = name),
+              ),
+              const SizedBox(height: 16),
             ],
             if (bot == null)
               ..._allBots(context, palette, bots, recent, totals)
@@ -212,84 +192,6 @@ class _BotFilter extends StatelessWidget {
   );
 }
 
-/// The manga layout's filter: "All", then each bot's face. A tap narrows
-/// the list; the chosen chip fills with ink.
-class _FaceFilter extends StatelessWidget {
-  const _FaceFilter({
-    required this.bots,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<HermesBot> bots;
-  final String? selected;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final ink = MangaInk.of(context);
-    Widget chip({
-      required bool on,
-      required String label,
-      required VoidCallback onTap,
-      Widget? face,
-    }) => Padding(
-      padding: const EdgeInsetsDirectional.only(end: 6),
-      child: MangaPress(
-        semanticLabel: label,
-        haptic: true,
-        scale: .94,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: MangaMotion.swap,
-          curve: MangaMotion.easeOut,
-          height: 48,
-          width: face == null ? null : 44,
-          padding: face == null
-              ? const EdgeInsets.symmetric(horizontal: 16)
-              : EdgeInsets.zero,
-          alignment: Alignment.center,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: on ? ink.ink : ink.raised,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: ink.ink, width: ink.border),
-          ),
-          child:
-              face ??
-              Text(label, style: MangaType.title(on ? ink.ground : ink.ink)),
-        ),
-      ),
-    );
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          chip(
-            on: selected == null,
-            label: 'All',
-            onTap: () => onSelected(null),
-          ),
-          for (final bot in bots)
-            chip(
-              on: selected == bot.name,
-              label: bot.title,
-              onTap: () => onSelected(bot.name),
-              face: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: MangaPortrait(
-                  botName: bot.name,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// One bot's heading and its conversations.
 class _BotGroup extends StatelessWidget {
   const _BotGroup({
@@ -324,81 +226,6 @@ class _BotGroup extends StatelessWidget {
         : sessions.take(limit!).toList(growable: false);
     final count = total ?? sessions.length;
     final more = onSeeAll != null && count > shown.length;
-    if (mangaLayoutOf(context)) {
-      final ink = MangaInk.of(context);
-      // The manga group: the bot's face breaks over a thick ink rule, its
-      // name in the panel face, then plain rows on the paper.
-      return Padding(
-        padding: const EdgeInsets.only(top: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: ink.ink, width: ink.border),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (bot != null)
-                    SizedBox(
-                      width: 56,
-                      height: 52,
-                      child: OverflowBox(
-                        maxHeight: 62,
-                        alignment: Alignment.topCenter,
-                        child: Transform.translate(
-                          offset: const Offset(0, 8),
-                          child: MangaPortrait(
-                            botName: bot.name,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
-                          ),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: title,
-                              style: MangaType.panel(ink.ink),
-                            ),
-                            TextSpan(
-                              text: '  $count',
-                              style: MangaType.meta(ink.ink3),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (more)
-                    MangaPress(
-                      semanticLabel: 'See all of $title',
-                      onTap: onSeeAll,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 0, 6),
-                        child: Text('See all', style: MangaType.line(ink.ink)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) Divider(height: 1, thickness: 1, color: ink.rule),
-              HermesSessionTile(session: shown[i], compact: true),
-            ],
-          ],
-        ),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(

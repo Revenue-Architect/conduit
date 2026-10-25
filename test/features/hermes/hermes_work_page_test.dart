@@ -17,7 +17,6 @@ import 'package:conduit/features/push/providers/push_providers.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:conduit/features/hermes/manga/manga_prefs.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,7 +104,6 @@ Future<void> _pumpWork(
     ProviderScope(
       overrides: [
         hermesApiServiceProvider.overrideWithValue(null),
-        mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
         hermesBotsProvider.overrideWith((ref) async => _bots),
         hermesHomeProfileJobsProvider.overrideWith((ref) async => jobs),
         hermesKanbanSummaryProvider.overrideWith((ref) async => kanban),
@@ -244,10 +242,4 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
-}
-
-/// These tests cover the classic list layout.
-class _ClassicLayout extends MangaClassicLayout {
-  @override
-  bool build() => true;
 }

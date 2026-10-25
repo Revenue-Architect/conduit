@@ -11,8 +11,6 @@ import 'hermes_home_avatar.dart';
 import 'hermes_home_working.dart' show watchHermesWorkingAgents;
 import 'hermez_bot_identity.dart';
 import 'hermez_bot_mark.dart';
-import '../manga/manga_prefs.dart';
-import '../manga/manga_theme.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_surfaces.dart';
 
@@ -31,28 +29,6 @@ class HermesWorkHeading extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    if (mangaLayoutOf(context)) {
-      // The panel face over a thick ink rule, in sentence case.
-      final ink = MangaInk.of(context);
-      final text = label.isEmpty
-          ? label
-          : label[0] + label.substring(1).toLowerCase();
-      return Padding(
-        padding: EdgeInsets.only(top: first ? 8 : 28, bottom: 2),
-        child: Semantics(
-          header: true,
-          child: Container(
-            padding: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: ink.ink, width: ink.border),
-              ),
-            ),
-            child: Text(text, style: MangaType.panel(ink.ink)),
-          ),
-        ),
-      );
-    }
     return Padding(
       padding: EdgeInsets.only(top: first ? 4 : 26, bottom: 4),
       child: Semantics(
@@ -90,8 +66,6 @@ class HermesWorkRow extends StatelessWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final manga = mangaLayoutOf(context);
-    final ink = MangaInk.of(context);
     return HermezMotionSurface(
       weight: HermezMotionWeight.medium,
       semanticLabel: '$title. $meta',
@@ -105,22 +79,10 @@ class HermesWorkRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
-              if (manga)
-                // A square glyph tile with an ink border: the panel shape,
-                // small.
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: ink.ink, width: ink.border),
-                  ),
-                  child: Icon(icon, size: 22, color: ink.ink),
-                )
-              else
-                SizedBox.square(
-                  dimension: 32,
-                  child: Icon(icon, size: 22, color: palette.ink),
-                ),
+              SizedBox.square(
+                dimension: 32,
+                child: Icon(icon, size: 22, color: palette.ink),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -129,20 +91,14 @@ class HermesWorkRow extends StatelessWidget {
                     HermezMorphText(
                       title,
                       id: titleMorphId,
-                      style: manga
-                          ? MangaType.panel(ink.ink)
-                          : HermezType.section(palette).copyWith(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
+                      style: HermezType.section(palette)
+                          .copyWith(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                     Text(
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: manga
-                          ? MangaType.meta(ink.ink2)
-                          : HermezType.meta(palette),
+                      style: HermezType.meta(palette),
                     ),
                   ],
                 ),

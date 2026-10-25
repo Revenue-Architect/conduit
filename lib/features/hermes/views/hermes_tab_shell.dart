@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,9 +8,8 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
-import '../manga/manga_nav_bar.dart';
-import '../manga/manga_prefs.dart';
-import '../manga/manga_today_page.dart';
+import '../manga/manga_pick_launch.dart' show openMangaPick;
+import '../providers/hermes_providers.dart' show hermesBotsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
 import 'hermes_conversations_page.dart';
@@ -24,7 +25,7 @@ int _lastHermesTab = 0;
 class HermesTabShell extends ConsumerStatefulWidget {
   const HermesTabShell({super.key, this.initialIndex, this.openPick = false});
 
-  /// Open the manga layout's Pick over Today: the cold-start landing.
+  /// Open Pick, the character selector, over Home: the cold-start landing.
   final bool openPick;
 
   /// The tab to open on; null reopens the tab last shown, so Back from a
@@ -39,10 +40,28 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
   late int _index = widget.initialIndex ?? _lastHermesTab;
   int _previous = 0;
 
+  /// Pick opens on launch once per app process, not on every rebuild.
+  static bool _launchPickShown = false;
+
   @override
   void initState() {
     super.initState();
     _lastHermesTab = _index;
+    if (widget.openPick && !_launchPickShown) {
+      _launchPickShown = true;
+      unawaited(_openPickWhenReady());
+    }
+  }
+
+  /// Waits for the bot list (Pick needs it), then lands on Pick.
+  Future<void> _openPickWhenReady() async {
+    try {
+      await ref.read(hermesBotsProvider.future);
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    await openMangaPick(context, ref, instant: true);
   }
 
   void _select(int index) {
@@ -58,25 +77,13 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
   Widget build(BuildContext context) {
     // The same list Work's Needs you shows, so the dot and the section agree.
     final needsYou = watchHermesNeedsYou(ref).any((item) => item.actionable);
-    // The manga page unless the owner switched back to the classic lists.
-    final classic = ref.watch(mangaClassicLayoutProvider);
-    final pages = classic
-        ? const <Widget>[
-            // Home is the hub; Work is what needs the owner and what is
-            // running.
-            HermesWorkPage(),
-            HermesConversationsPage(),
-            HermesHomePage(),
-            ProfilePage(),
-          ]
-        : <Widget>[
-            // Today is the team's day; Work is the hub of everything that is
-            // not a conversation.
-            MangaTodayPage(openPickOnLaunch: widget.openPick),
-            const HermesConversationsPage(),
-            const HermesWorkPage(title: 'Work'),
-            const ProfilePage(),
-          ];
+    final pages = const <Widget>[
+      // Home is the hub; Work is what needs the owner and what is running.
+      HermesWorkPage(),
+      HermesConversationsPage(),
+      HermesHomePage(),
+      ProfilePage(),
+    ];
     // The shell owns its system bars: arriving from the side navigation (drawn
     // in the opposite theme) must not leave its icon colours behind.
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -114,11 +121,12 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _dock(
-                  classic: classic,
+                child: HermesTabDock(
+                  index: _index,
+                  onSelect: _select,
                   destinations: [
-                    HermesDockDestination(
-                      label: classic ? 'Home' : 'Today',
+                    const HermesDockDestination(
+                      label: 'Home',
                       icon: Icons.home_outlined,
                       selectedIcon: Icons.home_rounded,
                     ),
@@ -147,21 +155,6 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
       ),
     );
   }
-
-  Widget _dock({
-    required bool classic,
-    required List<HermesDockDestination> destinations,
-  }) => classic
-      ? HermesTabDock(
-          index: _index,
-          onSelect: _select,
-          destinations: destinations,
-        )
-      : MangaNavBar(
-          index: _index,
-          onSelect: _select,
-          destinations: destinations,
-        );
 }
 
 /// Settles a tab into place when it becomes the shown one: a short slide from

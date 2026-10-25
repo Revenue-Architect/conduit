@@ -18,11 +18,7 @@ class HermezBotVideoMark extends StatefulWidget {
     required this.size,
     required this.working,
     required this.poster,
-    this.square = false,
   });
-
-  /// A square frame (a manga panel) instead of the round face.
-  final bool square;
 
   final String botName;
   final double size;
@@ -141,9 +137,6 @@ class _HermezBotVideoMarkState extends State<HermezBotVideoMark>
     super.dispose();
   }
 
-  Widget _clip(Widget child) =>
-      widget.square ? ClipRect(child: child) : ClipOval(child: child);
-
   @override
   Widget build(BuildContext context) {
     final wanted = _wanted;
@@ -156,9 +149,9 @@ class _HermezBotVideoMarkState extends State<HermezBotVideoMark>
           widget.poster,
           if (wanted != null && size != null && !size.isEmpty)
             IgnorePointer(
-              child: _clip(
-                // The same crop for every clip: centred, filling the frame.
-                FittedBox(
+              child: ClipOval(
+                // The same crop for every clip: centred, filling the circle.
+                child: FittedBox(
                   fit: BoxFit.cover,
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(

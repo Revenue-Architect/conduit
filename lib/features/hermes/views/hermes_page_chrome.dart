@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nib_motion/nib_motion.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../feedback/hermez_feedback.dart';
-import '../manga/manga_prefs.dart';
-import '../manga/manga_theme.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_technical_background.dart';
@@ -18,7 +15,7 @@ import '../widgets/hermez_visual_theme.dart';
 /// The large title scrolls away with the content; once it has gone under
 /// the app bar a compact title takes its place over a hairline, the way a
 /// large-title page settles on iOS.
-class HermesPageChrome extends ConsumerStatefulWidget {
+class HermesPageChrome extends StatefulWidget {
   const HermesPageChrome({
     super.key,
     required this.title,
@@ -60,10 +57,10 @@ class HermesPageChrome extends ConsumerStatefulWidget {
   );
 
   @override
-  ConsumerState<HermesPageChrome> createState() => _HermesPageChromeState();
+  State<HermesPageChrome> createState() => _HermesPageChromeState();
 }
 
-class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
+class _HermesPageChromeState extends State<HermesPageChrome> {
   final ScrollController _outer = ScrollController();
 
   /// 0 while the large title shows, 1 once it is under the app bar.
@@ -97,19 +94,12 @@ class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
     );
     // Hermez is on screen: start interface audio in the background (once).
     HermezFeedback.instance.warmUp();
-    // The manga layout sets every page title in the page's own face, on
-    // plain paper: no construction marks behind it.
-    final manga = !ref.watch(mangaClassicLayoutProvider);
-    final mangaInk = MangaInk.of(context);
-    final canvas = manga ? mangaInk.ground : palette.canvas;
-    final header = manga
-        ? MangaPageHeader(title: widget.title, subtitle: widget.subtitle)
-        : HermezPageHeader(
-            title: widget.title,
-            subtitle: widget.subtitle,
-            titleMorphId: widget.titleMorphId,
-            palette: palette,
-          );
+    final header = HermezPageHeader(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      titleMorphId: widget.titleMorphId,
+      palette: palette,
+    );
     // Status bar icons in the page's own contrast: dark on the white canvas,
     // light on charcoal.
     final overlay =
@@ -163,7 +153,7 @@ class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
       child: Theme(
         data: hermezVisualTheme(Theme.of(context)),
         child: HermezRouteCanvas(
-          color: canvas,
+          color: palette.canvas,
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -180,8 +170,8 @@ class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
                       builder: (context, t, _) => IgnorePointer(
                         child: ColoredBox(
                           color: Color.lerp(
-                            canvas.withValues(alpha: 0),
-                            canvas,
+                            palette.canvas.withValues(alpha: 0),
+                            palette.canvas,
                             t,
                           )!,
                           child: Align(
@@ -211,14 +201,12 @@ class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
                               widget.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: manga
-                                  ? MangaType.panel(mangaInk.ink)
-                                  : TextStyle(
-                                      color: palette.ink,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.3,
-                                    ),
+                              style: TextStyle(
+                                color: palette.ink,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                              ),
                             ),
                           ),
                         ),
@@ -240,75 +228,6 @@ class _HermesPageChromeState extends ConsumerState<HermesPageChrome> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// The manga layout's page title: the display face at the margin, the
-/// subtitle quiet at the right, nothing behind them.
-class MangaPageHeader extends StatelessWidget {
-  const MangaPageHeader({
-    super.key,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final ink = MangaInk.of(context);
-    final heading = Semantics(
-      header: true,
-      child: Text(
-        title,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: MangaType.display(ink.ink),
-      ),
-    );
-    final meta = Text(
-      subtitle,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: MangaType.meta(ink.ink2),
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-      child: LayoutBuilder(
-        // The subtitle sits at the right only while the title keeps a wide
-        // column; narrow or large text, it goes under the title.
-        builder: (context, box) =>
-            subtitle.isEmpty ||
-                box.maxWidth < 360 ||
-                MediaQuery.textScalerOf(context).scale(1) > 1.3
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  heading,
-                  if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), meta],
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(child: heading),
-                  const SizedBox(width: 12),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      widthFactor: 1,
-                      child: DefaultTextStyle.merge(
-                        textAlign: TextAlign.right,
-                        child: meta,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }
