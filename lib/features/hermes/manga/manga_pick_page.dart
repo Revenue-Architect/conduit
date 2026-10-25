@@ -512,7 +512,7 @@ class _StatusPill extends StatelessWidget {
         ? 'Working'
         : last == null
         ? 'Idle'
-        : 'Idle · last ${mangaWhen(last)}';
+        : 'Idle · ${mangaLastSeen(mangaWhen(last))}';
     return AnimatedSwitcher(
       duration: MangaMotion.swap,
       switchInCurve: MangaMotion.easeOut,

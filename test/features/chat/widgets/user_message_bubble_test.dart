@@ -19,6 +19,7 @@ import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/shared/utils/conversation_context_menu.dart';
 import 'package:conduit/shared/widgets/skeleton_loader.dart';
+import 'package:conduit/features/hermes/manga/manga_prefs.dart';
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -199,6 +200,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the manga layout sets the owner words as a caption box', (
+    WidgetTester tester,
+  ) async {
+    final message = ChatMessage(
+      id: 'user-caption',
+      role: 'user',
+      content: 'Short user prompt',
+      timestamp: DateTime.utc(2026, 3, 28, 10),
+    );
+
+    await tester.pumpWidget(buildHarness(message));
+    await tester.pump();
+
+    final decoration =
+        tester
+                .widget<Container>(
+                  find.byKey(const Key('user-message-bubble-surface')),
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(decoration.borderRadius, BorderRadius.circular(4));
+    expect((decoration.border! as Border).top.width, 2);
+  });
+
   testWidgets('uses the redesigned rounded user bubble surface', (
     WidgetTester tester,
   ) async {
@@ -209,7 +234,14 @@ void main() {
       timestamp: DateTime.utc(2026, 3, 28, 10),
     );
 
-    await tester.pumpWidget(buildHarness(message));
+    await tester.pumpWidget(
+      buildHarness(
+        message,
+        overrides: [
+          mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
+        ],
+      ),
+    );
     await tester.pump();
 
     final bubble = tester.widget<Container>(
@@ -451,4 +483,10 @@ class _FakeAttachmentInfoApiService extends ApiService {
     fileContentCalls++;
     throw StateError('must not download local descriptor bytes');
   }
+}
+
+/// The rounded bubble belongs to the classic layout.
+class _ClassicLayout extends MangaClassicLayout {
+  @override
+  bool build() => true;
 }

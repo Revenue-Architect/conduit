@@ -830,7 +830,7 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
     );
     // The manga layout sets the owner's words as a caption box: paper, a
     // 2 dp ink stroke, square corners. Grey bubbles were the refused default.
-    final caption = hermezVisuals && !ref.watch(mangaClassicLayoutProvider);
+    final caption = !ref.watch(mangaClassicLayoutProvider);
     final mangaInk = MangaInk.of(context);
     final bubbleBorderColor = caption
         ? mangaInk.ink

@@ -314,7 +314,7 @@ String mangaWhen(DateTime at, {DateTime? now}) {
   final current = now ?? DateTime.now();
   final local = at.toLocal();
   final ago = current.difference(local);
-  if (ago.inMinutes < 1) return 'now';
+  if (ago.inMinutes < 1) return 'just now';
   if (ago.inMinutes < 60) return '${ago.inMinutes} min';
   final sameDay =
       local.year == current.year &&
@@ -340,3 +340,6 @@ String mangaWhen(DateTime at, {DateTime? now}) {
   ];
   return '${months[local.month - 1]} ${local.day}';
 }
+
+/// "just now", else "last 4 min" / "last 20:08" / "last Oct 20".
+String mangaLastSeen(String when) => when == 'just now' ? when : 'last $when';

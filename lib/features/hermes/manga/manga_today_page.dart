@@ -258,7 +258,7 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
         return null;
       }
       final last = bot.lastActive;
-      return last == null ? null : 'last ${mangaWhen(last, now: now)}';
+      return last == null ? null : mangaLastSeen(mangaWhen(last, now: now));
     }
 
     Widget panelFor(HermesBot bot, {required bool hero}) {
