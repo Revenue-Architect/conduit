@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -200,8 +201,14 @@ Float32List _box(Float32List src, int w, int h) {
 }
 
 /// A bot's figure, cut out, optionally with an ink outline that ties it to
-/// the page's borders. Shows nothing until the cut is ready (it is cached,
-/// so that is the first launch only).
+/// the page's borders.
+///
+/// With an outline, the figure and its outline are baked once into a single
+/// image at the size it is shown (see [_MangaOutlined]): on Android Flutter
+/// renders with Impeller, which does not keep a repaint boundary as pixels,
+/// so an outline drawn as eight filtered copies was redrawn on every frame
+/// of a swipe. [decodeWidth] decodes a small portrait (a tile) at that width
+/// instead of the file's full size.
 class MangaPortrait extends StatelessWidget {
   const MangaPortrait({
     super.key,
@@ -211,6 +218,7 @@ class MangaPortrait extends StatelessWidget {
     this.alignment = Alignment.bottomCenter,
     this.fit = BoxFit.contain,
     this.pick = false,
+    this.decodeWidth,
   });
 
   /// On the character selector: prefer the bot's full-figure picture.
@@ -221,6 +229,9 @@ class MangaPortrait extends StatelessWidget {
   final double outlineWidth;
   final Alignment alignment;
   final BoxFit fit;
+
+  /// Logical width to decode at; null decodes the file's full size.
+  final double? decodeWidth;
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder(
@@ -234,43 +245,172 @@ class MangaPortrait extends StatelessWidget {
       builder: (context, snapshot) {
         final file = snapshot.data;
         if (file == null) return const SizedBox.shrink();
-        final image = Image.file(
-          file,
-          fit: fit,
-          alignment: alignment,
-          filterQuality: FilterQuality.medium,
-          gaplessPlayback: true,
-        );
         final stroke = outline;
-        // Drawn once and reused: a swipe only moves the figure, so its
-        // picture (and the outline's eight filtered copies) is not
-        // repainted every frame.
-        if (stroke == null) return RepaintBoundary(child: image);
-        final d = outlineWidth;
-        Widget shadow(double dx, double dy) => Transform.translate(
-          offset: Offset(dx, dy),
-          child: ColorFiltered(
-            colorFilter: ColorFilter.mode(stroke, BlendMode.srcIn),
-            child: image,
-          ),
-        );
+        if (stroke != null) {
+          return _MangaOutlined(
+            file: file,
+            stroke: stroke,
+            width: outlineWidth,
+            alignment: alignment,
+          );
+        }
+        final width = decodeWidth;
+        final ImageProvider provider = width == null
+            ? FileImage(file)
+            : ResizeImage(
+                FileImage(file),
+                width: (width * MediaQuery.devicePixelRatioOf(context)).round(),
+              );
         return RepaintBoundary(
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: [
-              shadow(d, 0),
-              shadow(-d, 0),
-              shadow(0, d),
-              shadow(0, -d),
-              shadow(d * .7, d * .7),
-              shadow(-d * .7, -d * .7),
-              shadow(d * .7, -d * .7),
-              shadow(-d * .7, d * .7),
-              image,
-            ],
+          child: Image(
+            image: provider,
+            fit: fit,
+            alignment: alignment,
+            filterQuality: FilterQuality.medium,
+            gaplessPlayback: true,
           ),
         );
       },
     ),
   );
+}
+
+/// The figure and its outline as one image, baked at the shown pixel size
+/// and cached, so a frame draws a single texture.
+class _MangaOutlined extends StatelessWidget {
+  const _MangaOutlined({
+    required this.file,
+    required this.stroke,
+    required this.width,
+    required this.alignment,
+  });
+
+  final File file;
+  final Color stroke;
+  final double width;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (!box.hasBoundedWidth || !box.hasBoundedHeight) {
+          return const SizedBox.shrink();
+        }
+        final key = _BakeKey(
+          file.path,
+          stroke.toARGB32(),
+          (width * dpr).round(),
+          (box.maxWidth * dpr).round(),
+          (box.maxHeight * dpr).round(),
+        );
+        return FutureBuilder<ui.Image?>(
+          initialData: _MangaBakery.ready[key],
+          future: _MangaBakery.bake(key),
+          builder: (context, snapshot) {
+            final image = snapshot.data;
+            if (image == null) return const SizedBox.shrink();
+            return RawImage(
+              image: image,
+              scale: dpr,
+              fit: BoxFit.contain,
+              alignment: alignment,
+              filterQuality: FilterQuality.medium,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+@immutable
+class _BakeKey {
+  const _BakeKey(this.path, this.colour, this.stroke, this.width, this.height);
+
+  final String path;
+  final int colour;
+  final int stroke;
+  final int width;
+  final int height;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _BakeKey &&
+      other.path == path &&
+      other.colour == colour &&
+      other.stroke == stroke &&
+      other.width == width &&
+      other.height == height;
+
+  @override
+  int get hashCode => Object.hash(path, colour, stroke, width, height);
+}
+
+/// Bakes outlined figures. A handful are kept (six bots, a few sizes); the
+/// oldest goes when more arrive.
+abstract final class _MangaBakery {
+  static final Map<_BakeKey, Future<ui.Image?>> _pending = {};
+  static final Map<_BakeKey, ui.Image?> ready = {};
+  static const _keep = 12;
+
+  static Future<ui.Image?> bake(_BakeKey key) =>
+      _pending.putIfAbsent(key, () async {
+        final image = await _render(key);
+        ready[key] = image;
+        while (_pending.length > _keep) {
+          final oldest = _pending.keys.first;
+          _pending.remove(oldest);
+          ready.remove(oldest);
+        }
+        return image;
+      });
+
+  static Future<ui.Image?> _render(_BakeKey key) async {
+    try {
+      final bytes = await File(key.path).readAsBytes();
+      // Decode straight to the shown size (fit inside the box, keeping the
+      // aspect), leaving room for the outline.
+      final probe = await ui.instantiateImageCodec(bytes);
+      final first = (await probe.getNextFrame()).image;
+      final iw = first.width, ih = first.height;
+      first.dispose();
+      final room = key.stroke * 2;
+      final scale = math.min((key.width - room) / iw, (key.height - room) / ih);
+      final w = math.max(1, (iw * scale).round());
+      final h = math.max(1, (ih * scale).round());
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: w,
+        targetHeight: h,
+      );
+      final figure = (await codec.getNextFrame()).image;
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final d = key.stroke.toDouble();
+      final ink = Paint()
+        ..colorFilter = ColorFilter.mode(Color(key.colour), BlendMode.srcIn);
+      for (final o in [
+        Offset(d, 0),
+        Offset(-d, 0),
+        Offset(0, d),
+        Offset(0, -d),
+        Offset(d * .7, d * .7),
+        Offset(-d * .7, -d * .7),
+        Offset(d * .7, -d * .7),
+        Offset(-d * .7, d * .7),
+      ]) {
+        canvas.drawImage(figure, Offset(d, d) + o, ink);
+      }
+      canvas.drawImage(figure, Offset(d, d), Paint());
+      final picture = recorder.endRecording();
+      final baked = await picture.toImage(w + room, h + room);
+      picture.dispose();
+      figure.dispose();
+      return baked;
+    } catch (_) {
+      return null;
+    }
+  }
 }

@@ -19,7 +19,9 @@ Future<void> openMangaPick(
   WidgetRef ref, {
   bool instant = false,
 }) async {
-  final bots = ref.read(hermesBotsProvider).value ?? const <HermesBot>[];
+  final bots = mangaPickOrder(
+    ref.read(hermesBotsProvider).value ?? const <HermesBot>[],
+  );
   if (bots.isEmpty) return;
   final chief = bots.indexWhere((b) => b.name == hermesChiefProfile);
   final result = await Navigator.of(context).push(
@@ -33,6 +35,16 @@ Future<void> openMangaPick(
   if (result == null || !context.mounted) return;
   await mangaSendTask(context, ref, result.bot, result.text);
 }
+
+/// The selector's order: Chief first, then the rest by name. Fixed, so bots
+/// do not trade places as they are used (Hermes lists the most recently
+/// active first).
+List<HermesBot> mangaPickOrder(List<HermesBot> bots) => [...bots]
+  ..sort((a, b) {
+    if (a.name == hermesChiefProfile) return -1;
+    if (b.name == hermesChiefProfile) return 1;
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  });
 
 /// Starts a new conversation with [bot], opens it, and sends [text] as its
 /// first message.
@@ -62,7 +74,10 @@ String? mangaSpeech(String? raw) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
   // A short reply ("OK", "Done.") is still something the bot said.
-  if (text.isEmpty || text.startsWith('/')) return null;
+  // A system notice cut off before its closing bracket is not speech.
+  if (text.isEmpty || text.startsWith('/') || text.startsWith('[')) {
+    return null;
+  }
   // Code is not speech: an OpenUI tree, a JSON blob, a call.
   if (RegExp(r'[=(){}\[\]]').allMatches(text).length >= 3) return null;
   return text;
@@ -120,11 +135,12 @@ class MangaPickTab extends ConsumerWidget {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final chief = bots.indexWhere((b) => b.name == hermesChiefProfile);
+    final ordered = mangaPickOrder(bots);
+    final chief = ordered.indexWhere((b) => b.name == hermesChiefProfile);
     return MangaPickPage(
       // A new roster starts a fresh pager.
-      key: ValueKey(bots.map((b) => b.name).join(',')),
-      bots: bots,
+      key: ValueKey(ordered.map((b) => b.name).join(',')),
+      bots: ordered,
       initial: chief < 0 ? 0 : chief,
       entrance: kAlwaysCompleteAnimation,
       onSend: (bot, text) => mangaSendTask(context, ref, bot, text),

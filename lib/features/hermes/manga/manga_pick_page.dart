@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +10,7 @@ import '../models/hermes_bot.dart';
 import '../widgets/hermes_home_working.dart'
     show HermesWorkingAgent, watchHermesWorkingAgents;
 import '../widgets/hermes_tab_dock.dart' show hermesDockClearance;
+import 'manga_frame_probe.dart';
 import 'manga_pick_launch.dart' show mangaLastWordsProvider;
 import 'manga_portrait.dart';
 import 'manga_theme.dart';
@@ -179,12 +181,16 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
   static double _keyboard = 0;
   bool _keyboardUp = false;
 
+  /// Frame timings in diagnostic builds; nothing otherwise.
+  final _probe = MangaFrameProbe('selector');
+
   @override
   void initState() {
     super.initState();
     _task.addListener(() => setState(() {}));
     widget.entrance.addStatusListener(_landed);
     WidgetsBinding.instance.addObserver(this);
+    _probe.start();
     _focus.addListener(() {
       if (context.reduceMotion) {
         _typing.value = _focus.hasFocus ? 1 : 0;
@@ -216,6 +222,7 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
   void dispose() {
     widget.entrance.removeStatusListener(_landed);
     WidgetsBinding.instance.removeObserver(this);
+    _probe.stop();
     _typing.dispose();
     _focus.dispose();
     _pages.dispose();
@@ -268,19 +275,15 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final working = {
-      for (final agent in watchHermesWorkingAgents(ref)) agent.profile: agent,
-    };
-    // Watched here, in build: the pager builds its pages later.
-    final words = {
-      for (final bot in widget.bots)
-        bot.name: ref.watch(mangaLastWordsProvider(bot.name)).value,
-    };
-    // Built once per state change, not once per frame: the swipe only moves
-    // the pages, so they ride along as the builder's child.
-    final pager = RepaintBoundary(
+  /// The pages, built once per bot list. Each page reads its own last words
+  /// and working state, so neither a page change (half-way through a swipe)
+  /// nor a keystroke rebuilds them.
+  late final Widget _pager = RepaintBoundary(
+    // The app dismisses the keyboard on any user scroll (main.dart); a swipe
+    // to the next bot is not that kind of scroll, so its notification stops
+    // here and the keyboard stays up while choosing who gets the task.
+    child: NotificationListener<UserScrollNotification>(
+      onNotification: (_) => true,
       child: PageView.builder(
         controller: _pages,
         itemCount: widget.bots.length,
@@ -291,24 +294,36 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
         itemBuilder: (context, i) => _Fighter(
           bot: widget.bots[i],
           field: _field(i),
-          agent: working[widget.bots[i].name],
           entrance: widget.entrance,
-          words: words[widget.bots[i].name],
           typing: _typing,
-          // The stage the keyboard and tray leave visible: the full stage,
-          // plus the room under the tray, less the keyboard.
-          keyboard: _keyboard > 0
-              ? _keyboard
-              : MediaQuery.sizeOf(context).height * .45,
-          rest: widget.embedded
-              ? hermesDockClearance(context)
-              : math.max(MediaQuery.paddingOf(context).bottom, 12),
+          embedded: widget.embedded,
         ),
       ),
-    );
+    ),
+  );
+
+  /// The tray's height, measured once laid out (it does not change with
+  /// the keyboard), so the stage can stop above it.
+  double _trayHeight = 196;
+
+  void _onTraySize(Size size) {
+    if ((size.height - _trayHeight).abs() < .5) return;
+    setState(() => _trayHeight = size.height);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final working = {
+      for (final agent in watchHermesWorkingAgents(ref)) agent.profile: agent,
+    };
+    // As a tab the floating dock sits under the tray; as a route, the
+    // gesture bar.
+    final rest = widget.embedded
+        ? hermesDockClearance(context)
+        : math.max(MediaQuery.paddingOf(context).bottom, 12.0);
     return AnimatedBuilder(
       animation: _pages,
-      child: pager,
+      child: _pager,
       builder: (context, pager) {
         final page = _pages.hasClients && _pages.position.haveDimensions
             ? (_pages.page ?? _index.toDouble())
@@ -320,62 +335,63 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
               : SystemUiOverlayStyle.light,
           child: Scaffold(
             backgroundColor: field.field,
-            // The keyboard does not resize the page: relaying out the stage
-            // every frame of the keyboard's slide is what stuttered. The
-            // tray alone rides the keyboard (see _KeyboardLift).
+            // The keyboard does not resize the page: only the tray moves
+            // with it (see _TraySlot), so the stage never re-lays out.
             resizeToAvoidBottomInset: false,
-            body: Column(
+            body: Stack(
               children: [
-                Expanded(
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: _trayHeight,
                   child: GestureDetector(
-                    // A tap on the stage puts the keyboard away.
+                    // A tap on the stage puts the keyboard away; a drag
+                    // (a swipe to the next bot) does not.
                     behavior: HitTestBehavior.translucent,
                     onTap: () => FocusScope.of(context).unfocus(),
-                    child: RepaintBoundary(
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: CustomPaint(painter: _Slash(field.deep)),
-                          ),
-                          ?pager,
-                          SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
-                              child: Row(
-                                children: [
-                                  if (!widget.embedded)
-                                    IconButton(
-                                      tooltip: 'Close',
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      icon: Icon(
-                                        Icons.close_rounded,
-                                        color: field.ink,
-                                      ),
-                                    )
-                                  else
-                                    const SizedBox(height: 48),
-                                  const Spacer(),
-                                  _StatusPill(
-                                    field: field,
-                                    agent: working[_bot.name],
-                                    bot: _bot,
-                                  ),
-                                ],
-                              ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(painter: _Slash(field.deep)),
+                        ),
+                        ?pager,
+                        SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+                            child: Row(
+                              children: [
+                                if (!widget.embedded)
+                                  IconButton(
+                                    tooltip: 'Close',
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      color: field.ink,
+                                    ),
+                                  )
+                                else
+                                  const SizedBox(height: 48),
+                                const Spacer(),
+                                _StatusPill(
+                                  field: field,
+                                  agent: working[_bot.name],
+                                  bot: _bot,
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                _KeyboardLift(
-                  // As a tab the floating dock sits under the tray.
-                  rest: widget.embedded
-                      ? hermesDockClearance(context)
-                      : math.max(MediaQuery.paddingOf(context).bottom, 12),
+                _TraySlot(
+                  rest: rest,
+                  onSize: _onTraySize,
                   child: _Tray(
+                    floor: rest,
                     bots: widget.bots,
                     index: _index,
                     field: field,
@@ -396,26 +412,65 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage>
   }
 }
 
-/// Slides the tray up with the keyboard, frame for frame, without relaying
-/// out anything: a translation on top of a fixed layout. Only this widget
-/// listens to the keyboard's height, so nothing else rebuilds while it
-/// moves. [rest] is the room kept under the tray when the keyboard is down
-/// (the tab dock, or the gesture bar); the lift starts once the keyboard
-/// rises past it, so there is no jump.
-class _KeyboardLift extends StatelessWidget {
-  const _KeyboardLift({required this.rest, required this.child});
+/// Places the tray: at rest on the bottom edge (its padding keeps the
+/// content above the dock or gesture bar), and with the keyboard up, on
+/// top of it. The tray is laid
+/// out where it is drawn, so taps reach it (a translated tray was drawn
+/// above the keyboard but hit-tested at the bottom). Only this widget
+/// listens to the keyboard's height; it reports the tray's size once.
+class _TraySlot extends StatelessWidget {
+  const _TraySlot({
+    required this.rest,
+    required this.onSize,
+    required this.child,
+  });
 
   final double rest;
+  final ValueChanged<Size> onSize;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    final lift = math.max(0.0, keyboard - rest);
-    return Padding(
-      padding: EdgeInsets.only(bottom: rest),
-      child: Transform.translate(offset: Offset(0, -lift), child: child),
+    return Positioned(
+      left: 0,
+      right: 0,
+      // At rest the tray reaches the bottom edge, its own colour filling the
+      // room under the dock; with the keyboard up it sits on the keyboard.
+      bottom: math.max(0, keyboard - rest),
+      child: _SizeReporter(onSize: onSize, child: child),
     );
+  }
+}
+
+class _SizeReporter extends SingleChildRenderObjectWidget {
+  const _SizeReporter({required this.onSize, super.child});
+
+  final ValueChanged<Size> onSize;
+
+  @override
+  _RenderSizeReporter createRenderObject(BuildContext context) =>
+      _RenderSizeReporter(onSize);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderSizeReporter render) {
+    render.onSize = onSize;
+  }
+}
+
+class _RenderSizeReporter extends RenderProxyBox {
+  _RenderSizeReporter(this.onSize);
+
+  ValueChanged<Size> onSize;
+  Size? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (size == _reported) return;
+    _reported = size;
+    final now = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onSize(now));
   }
 }
 
@@ -462,35 +517,40 @@ String? _role(HermesBot bot) {
 /// layout never changes with the keyboard: the tray slides over the stage,
 /// and a typing pose moves the name, figure and bubble into the stage that
 /// stays visible, with transforms only.
-class _Fighter extends StatelessWidget {
+class _Fighter extends ConsumerWidget {
   const _Fighter({
     required this.bot,
     required this.field,
-    required this.agent,
     required this.entrance,
-    required this.words,
     required this.typing,
-    required this.keyboard,
-    required this.rest,
+    required this.embedded,
   });
 
   final HermesBot bot;
   final MangaField field;
-  final HermesWorkingAgent? agent;
   final Animation<double> entrance;
 
-  /// What the bot last said, cleaned for a bubble.
-  final String? words;
-
-  /// The typing pose (0 rest, 1 keyboard up), and what it needs to fit the
-  /// stage the keyboard leaves: the keyboard's height and the room kept
-  /// under the tray at rest.
+  /// The typing pose: 0 at rest, 1 with the keyboard up.
   final Animation<double> typing;
-  final double keyboard;
-  final double rest;
+
+  /// The Chats tab (the dock sits under the tray) rather than a route.
+  final bool embedded;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // This page's own data, so the pager around it never rebuilds for it.
+    final words = ref.watch(mangaLastWordsProvider(bot.name)).value;
+    final agent = watchHermesWorkingAgents(ref)
+        .where((a) => a.profile == bot.name)
+        .firstOrNull;
+    // To fit the stage the keyboard leaves: the keyboard's height (learned
+    // when it first opens) and the room kept under the tray at rest.
+    final keyboard = _MangaPickPageState._keyboard > 0
+        ? _MangaPickPageState._keyboard
+        : MediaQuery.sizeOf(context).height * .45;
+    final rest = embedded
+        ? hermesDockClearance(context)
+        : math.max(MediaQuery.paddingOf(context).bottom, 12.0);
     final reduce = context.reduceMotion;
     final stroke = field.lightField ? const Color(0xFF0E0E10) : field.tray;
     // The name and figure arrive after the colour: the reveal is the event,
@@ -744,6 +804,7 @@ class _StatusPill extends StatelessWidget {
 /// The dark tray: six tiles to jump between fighters, and the task box.
 class _Tray extends StatelessWidget {
   const _Tray({
+    required this.floor,
     required this.bots,
     required this.index,
     required this.field,
@@ -754,6 +815,10 @@ class _Tray extends StatelessWidget {
     required this.onSend,
     required this.hint,
   });
+
+  /// Room under the tray's content that its colour still fills: the dock
+  /// (as a tab) or the gesture bar (as a route).
+  final double floor;
 
   final List<HermesBot> bots;
   final int index;
@@ -769,7 +834,7 @@ class _Tray extends StatelessWidget {
   Widget build(BuildContext context) {
     final armed = controller.text.trim().isNotEmpty;
     final accent = MangaInk.light.accent;
-    const bottom = 6.0;
+    final bottom = 6.0 + floor;
     return ColoredBox(
       color: field.tray,
       child: Padding(
@@ -835,19 +900,27 @@ class _Tray extends StatelessWidget {
                       semanticLabel: 'Send',
                       onTap: armed ? onSend : null,
                       scale: .92,
-                      child: AnimatedContainer(
+                      // Deep ink at rest, orange once there is a task: only
+                      // the arming animates; the ink follows the swipe.
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(end: armed ? 1 : 0),
                         duration: MangaMotion.swap,
                         curve: MangaMotion.easeOut,
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          // Deep ink at rest, orange once there is a task.
-                          color: armed ? accent : field.tray,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.arrow_forward_rounded,
-                          color: armed ? const Color(0xFF0E0E10) : field.paper,
+                        builder: (context, t, _) => Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: Color.lerp(field.tray, accent, t),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color.lerp(
+                              field.paper,
+                              const Color(0xFF0E0E10),
+                              t,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -883,9 +956,9 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rest = Color.lerp(field.tray, Colors.white, .08)!;
-    return AnimatedContainer(
-      duration: MangaMotion.swap,
-      curve: MangaMotion.easeOut,
+    // No animation of its own: the colour already follows the swipe frame
+    // by frame, and an animation retargeted every frame only lagged.
+    return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: selected ? field.field : rest,
@@ -907,6 +980,8 @@ class _Tile extends StatelessWidget {
               pick: true,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
+              // Decoded at tile size, not the file's full resolution.
+              decodeWidth: 72,
             ),
           ),
           if (selected)
