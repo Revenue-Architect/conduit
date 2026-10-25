@@ -288,8 +288,8 @@ const kHermesBotHeaderTransition = Duration(milliseconds: 300);
 const kHermesBotHeaderAvatar = 98.0;
 const kHermesBotHeaderAvatarFolded = 58.0;
 
-/// Room for the open face and a little air above and below it.
-const kHermesBotHeaderHeight = kHermesBotHeaderAvatar + 8;
+/// Room for the open face, the name under it, and a little air above.
+const kHermesBotHeaderHeight = 10 + kHermesBotHeaderAvatar + 4 + 22 + 6;
 
 class _HermesBotToolbarTitle extends StatelessWidget {
   const _HermesBotToolbarTitle({
@@ -324,99 +324,42 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                 : kHermesBotHeaderTransition,
             // Symmetric and overshoot-free: the header settles, never bounces.
             curve: Curves.easeInOutCubic,
-            // The avatar is the title's center: what trails it (the name,
-            // the working dot) is mirrored by space before it. When the bar
-            // is too narrow for both, the mirror gives way first, so the name
-            // is never cut short just to center the avatar.
-            builder: (context, collapse, _) => LayoutBuilder(
-              builder: (context, constraints) {
-                final nameStyle = conduitAdaptiveToolbarLeadingTitleTextStyle(
-                  context,
-                ).copyWith(fontWeight: FontWeight.w600);
-                // Measured as the Text below lays it out: over the inherited
-                // default style.
-                final name = TextPainter(
-                  text: TextSpan(
-                    text: bot.title,
-                    style: DefaultTextStyle.of(context).style.merge(nameStyle),
-                  ),
-                  maxLines: 1,
-                  textDirection: Directionality.of(context),
-                  textScaler: MediaQuery.textScalerOf(context),
-                )..layout();
-                final trailing =
-                    (name.width + Spacing.sm) * (1 - collapse) +
-                    (active ? Spacing.sm + 6 : 0);
-                name.dispose();
-                final mirror = trailing
-                    .clamp(
-                      0.0,
-                      math.max(
-                        0.0,
-                        constraints.maxWidth -
-                            kHermesBotHeaderAvatar -
-                            trailing,
-                      ),
-                    )
-                    .toDouble();
-                return Row(
+            // Everything centred: the avatar, and the name right under it.
+            // The working dot sits beside the name, mirrored by space on the
+            // other side so the name stays centred too.
+            builder: (context, collapse, _) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HermesBotAvatar(
+                  key: const ValueKey('hermes-bot-toolbar-avatar'),
+                  size:
+                      kHermesBotHeaderAvatar -
+                      (kHermesBotHeaderAvatar - kHermesBotHeaderAvatarFolded) *
+                          collapse,
+                  label: bot.title,
+                  imageUrl: bot.avatar,
+                  shape: bot.shape,
+                  color: bot.color,
+                  imageKind: bot.imageKind,
+                  active: active,
+                  video: true,
+                ),
+                const SizedBox(height: 4),
+                Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(width: mirror),
-                    // A fixed 98 dp slot: the avatar shrinks about its own
-                    // center.
-                    SizedBox.square(
-                      dimension: kHermesBotHeaderAvatar,
-                      child: Center(
-                        child: HermesBotAvatar(
-                          key: const ValueKey('hermes-bot-toolbar-avatar'),
-                          size:
-                              kHermesBotHeaderAvatar -
-                              (kHermesBotHeaderAvatar -
-                                      kHermesBotHeaderAvatarFolded) *
-                                  collapse,
-                          label: bot.title,
-                          imageUrl: bot.avatar,
-                          shape: bot.shape,
-                          color: bot.color,
-                          imageKind: bot.imageKind,
-                          active: active,
-                          video: true,
-                        ),
-                      ),
-                    ),
+                    if (active) const SizedBox(width: Spacing.sm + 6),
                     Flexible(
-                      child: IgnorePointer(
-                        ignoring: collapse > 0.5,
-                        // Collapsed, the name gives up its width so the
-                        // working dot sits by the avatar.
-                        child: ClipRect(
-                          child: Align(
-                            widthFactor: 1 - collapse,
-                            alignment: Alignment.centerLeft,
-                            child: Opacity(
-                              opacity:
-                                  1 -
-                                  Curves.easeOut.transform(
-                                    math.min(1.0, collapse / 0.7),
-                                  ),
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  left: Spacing.sm,
-                                ),
-                                child: Text(
-                                  bot.title,
-                                  key: const ValueKey(
-                                    'hermes-bot-toolbar-title',
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: nameStyle,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      child: Text(
+                        bot.title,
+                        key: const ValueKey('hermes-bot-toolbar-title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: conduitAdaptiveToolbarLeadingTitleTextStyle(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
                     if (active) ...[
@@ -424,8 +367,8 @@ class _HermesBotToolbarTitle extends StatelessWidget {
                       const _HermesBotActivityDot(),
                     ],
                   ],
-                );
-              },
+                ),
+              ],
             ),
           ),
         ),

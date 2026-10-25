@@ -174,67 +174,67 @@ void main() {
     ).equals(1);
   });
 
-  testWidgets(
-    'bot identity shrinks and hides the name without losing its label',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      try {
-        Widget header(bool compact, {bool reduced = false}) => MaterialApp(
-          theme: AppTheme.light(TweakcnThemes.t3Chat),
-          home: Scaffold(
-            body: MediaQuery(
-              data: MediaQueryData(disableAnimations: reduced),
-              child: debugBuildHermesBotToolbarTitleForTesting(
-                bot: (
-                  title: 'Chief',
-                  avatar: null,
-                  shape: 'squircle',
-                  color: '#8b5cf6',
-                  imageKind: null,
-                ),
-                maxWidth: 200,
-                compact: compact,
+  testWidgets('bot identity shrinks and keeps its name centred under it', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      Widget header(bool compact, {bool reduced = false}) => MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Scaffold(
+          body: MediaQuery(
+            data: MediaQueryData(disableAnimations: reduced),
+            child: debugBuildHermesBotToolbarTitleForTesting(
+              bot: (
+                title: 'Chief',
+                avatar: null,
+                shape: 'squircle',
+                color: '#8b5cf6',
+                imageKind: null,
               ),
+              maxWidth: 200,
+              compact: compact,
             ),
           ),
-        );
-        double avatarSize() => tester
-            .getSize(find.byKey(const ValueKey('hermes-bot-toolbar-avatar')))
-            .width;
-        Opacity nameOpacity() => tester.widget<Opacity>(
-          find
-              .ancestor(
-                of: find.byKey(const ValueKey('hermes-bot-toolbar-title')),
-                matching: find.byType(Opacity),
-              )
-              .first,
-        );
-        await tester.pumpWidget(header(false));
-        expect(avatarSize(), kHermesBotHeaderAvatar);
-        await tester.pumpWidget(header(true));
-        await tester.pump(const Duration(milliseconds: 110));
-        expect(
-          avatarSize(),
-          allOf(
-            greaterThan(kHermesBotHeaderAvatarFolded),
-            lessThan(kHermesBotHeaderAvatar),
-          ),
-        );
-        expect(nameOpacity().opacity, allOf(greaterThan(0), lessThan(1)));
-        await tester.pumpAndSettle();
-        expect(avatarSize(), kHermesBotHeaderAvatarFolded);
-        expect(nameOpacity().opacity, 0);
-        expect(find.bySemanticsLabel('Chief'), findsOneWidget);
-        await tester.pumpWidget(header(false, reduced: true));
-        await tester.pump();
-        expect(avatarSize(), kHermesBotHeaderAvatar);
-        expect(nameOpacity().opacity, 1);
-        expect(tester.takeException(), isNull);
-      } finally {
-        semantics.dispose();
-      }
-    },
-  );
+        ),
+      );
+      double avatarSize() => tester
+          .getSize(find.byKey(const ValueKey('hermes-bot-toolbar-avatar')))
+          .width;
+      final name = find.byKey(const ValueKey('hermes-bot-toolbar-title'));
+      final avatar = find.byKey(const ValueKey('hermes-bot-toolbar-avatar'));
+      await tester.pumpWidget(header(false));
+      expect(avatarSize(), kHermesBotHeaderAvatar);
+      await tester.pumpWidget(header(true));
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(
+        avatarSize(),
+        allOf(
+          greaterThan(kHermesBotHeaderAvatarFolded),
+          lessThan(kHermesBotHeaderAvatar),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(avatarSize(), kHermesBotHeaderAvatarFolded);
+      // The name stays, right under the avatar, both centred.
+      expect(name, findsOneWidget);
+      expect(
+        tester.getTopLeft(name).dy,
+        greaterThan(tester.getBottomLeft(avatar).dy),
+      );
+      expect(
+        tester.getCenter(name).dx,
+        closeTo(tester.getCenter(avatar).dx, 0.5),
+      );
+      expect(find.bySemanticsLabel('Chief'), findsOneWidget);
+      await tester.pumpWidget(header(false, reduced: true));
+      await tester.pump();
+      expect(avatarSize(), kHermesBotHeaderAvatar);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
 
   testWidgets('larger bot icon fits the centered toolbar without clipping', (
     tester,

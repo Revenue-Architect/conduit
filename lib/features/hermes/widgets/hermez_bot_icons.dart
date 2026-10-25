@@ -209,8 +209,10 @@ class HermezBotIcons {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      // Tall enough for the icons and both video rows; scrolls when not.
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -222,7 +224,7 @@ class HermezBotIcons {
               ),
               const SizedBox(height: 12),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
+                constraints: const BoxConstraints(maxHeight: 240),
                 child: GridView.count(
                   shrinkWrap: true,
                   crossAxisCount: 4,
