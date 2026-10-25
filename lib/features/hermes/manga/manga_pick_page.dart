@@ -8,6 +8,7 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../models/hermes_bot.dart';
 import '../widgets/hermes_home_working.dart'
     show HermesWorkingAgent, watchHermesWorkingAgents;
+import '../widgets/hermes_tab_dock.dart' show hermesDockClearance;
 import 'manga_pick_launch.dart' show mangaLastWordsProvider;
 import 'manga_portrait.dart';
 import 'manga_theme.dart';
@@ -138,11 +139,19 @@ class MangaPickPage extends ConsumerStatefulWidget {
     required this.bots,
     required this.initial,
     required this.entrance,
+    this.onSend,
   });
 
   final List<HermesBot> bots;
   final int initial;
   final Animation<double> entrance;
+
+  /// Set when Pick is the Chats tab rather than a route: the task goes here
+  /// (the field clears), there is no close button, and the tray sits above
+  /// the floating tab dock.
+  final void Function(HermesBot bot, String text)? onSend;
+
+  bool get embedded => onSend != null;
 
   @override
   ConsumerState<MangaPickPage> createState() => _MangaPickPageState();
@@ -201,6 +210,13 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
     final text = _task.text.trim();
     if (text.isEmpty) return;
     HapticFeedback.mediumImpact();
+    final onSend = widget.onSend;
+    if (onSend != null) {
+      _task.clear();
+      FocusScope.of(context).unfocus();
+      onSend(_bot, text);
+      return;
+    }
     Navigator.of(context).pop(MangaPickResult(_bot, text));
   }
 
@@ -271,14 +287,17 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
                           padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
                           child: Row(
                             children: [
-                              IconButton(
-                                tooltip: 'Close',
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  color: field.ink,
-                                ),
-                              ),
+                              if (!widget.embedded)
+                                IconButton(
+                                  tooltip: 'Close',
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  icon: Icon(
+                                    Icons.close_rounded,
+                                    color: field.ink,
+                                  ),
+                                )
+                              else
+                                const SizedBox(height: 48),
                               const Spacer(),
                               _StatusPill(
                                 field: field,
@@ -301,6 +320,13 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
                   onTile: _jump,
                   onSend: _send,
                   hint: 'Give ${_bot.title} a task',
+                  // As a tab the floating dock covers the bottom; with the
+                  // keyboard up the dock is under it, so no gap is kept.
+                  bottomClearance:
+                      widget.embedded &&
+                          MediaQuery.viewInsetsOf(context).bottom == 0
+                      ? hermesDockClearance(context)
+                      : null,
                 ),
               ],
             ),
@@ -479,13 +505,15 @@ class _Fighter extends StatelessWidget {
               Positioned(
                 left: 14,
                 top: top + 214,
-                width: math.min(206, box.maxWidth * .52),
+                width: math.min(240, box.maxWidth * .6),
                 child: arrive(
                   MangaBubble(
                     fill: Colors.white,
                     stroke: stroke,
                     strokeWidth: 2.5,
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                    // An oval's text box is narrower than the oval: about
+                    // 70% of its width, so the margins are generous.
+                    padding: const EdgeInsets.fromLTRB(34, 20, 34, 24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -579,7 +607,11 @@ class _Tray extends StatelessWidget {
     required this.onTile,
     required this.onSend,
     required this.hint,
+    this.bottomClearance,
   });
+
+  /// Room left under the tray (the tab dock's height), when set.
+  final double? bottomClearance;
 
   final List<HermesBot> bots;
   final int index;
@@ -594,7 +626,8 @@ class _Tray extends StatelessWidget {
   Widget build(BuildContext context) {
     final armed = controller.text.trim().isNotEmpty;
     final accent = MangaInk.light.accent;
-    final bottom = math.max(MediaQuery.paddingOf(context).bottom, 12.0);
+    final bottom =
+        bottomClearance ?? math.max(MediaQuery.paddingOf(context).bottom, 12.0);
     return ColoredBox(
       color: field.tray,
       child: Padding(

@@ -105,3 +105,29 @@ final mangaLastWordsProvider = FutureProvider.family<String?, String>((
   final text = mangaSpeech(bot?.preview);
   return text != null && !_instructions(text) ? text : null;
 });
+
+/// The Chats tab: the character selector, always one tap away. Chief comes
+/// first; a task given here starts a new conversation with that bot.
+class MangaPickTab extends ConsumerWidget {
+  const MangaPickTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bots = ref.watch(hermesBotsProvider).value ?? const <HermesBot>[];
+    if (bots.isEmpty) {
+      return const ColoredBox(
+        color: Colors.white,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final chief = bots.indexWhere((b) => b.name == hermesChiefProfile);
+    return MangaPickPage(
+      // A new roster starts a fresh pager.
+      key: ValueKey(bots.map((b) => b.name).join(',')),
+      bots: bots,
+      initial: chief < 0 ? 0 : chief,
+      entrance: kAlwaysCompleteAnimation,
+      onSend: (bot, text) => mangaSendTask(context, ref, bot, text),
+    );
+  }
+}

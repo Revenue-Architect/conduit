@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,12 +6,9 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
-import '../manga/manga_pick_launch.dart' show openMangaPick;
-import '../models/hermes_bot.dart';
-import '../providers/hermes_providers.dart' show hermesBotsProvider;
+import '../manga/manga_pick_launch.dart' show MangaPickTab;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
-import 'hermes_conversations_page.dart';
 import 'hermes_home_page.dart';
 import 'hermes_work_page.dart';
 
@@ -26,7 +21,7 @@ int _lastHermesTab = 0;
 class HermesTabShell extends ConsumerStatefulWidget {
   const HermesTabShell({super.key, this.initialIndex, this.openPick = false});
 
-  /// Open Pick, the character selector, over Home: the cold-start landing.
+  /// Land on Chats (the character selector): the cold-start landing.
   final bool openPick;
 
   /// The tab to open on; null reopens the tab last shown, so Back from a
@@ -38,48 +33,9 @@ class HermesTabShell extends ConsumerStatefulWidget {
 }
 
 class _HermesTabShellState extends ConsumerState<HermesTabShell> {
-  late int _index = widget.initialIndex ?? _lastHermesTab;
+  // A cold start lands on Chats, the character selector.
+  late int _index = widget.openPick ? 1 : widget.initialIndex ?? _lastHermesTab;
   int _previous = 0;
-
-  /// Pick opens on launch once per app process, not on every rebuild.
-  static bool _launchPickShown = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _lastHermesTab = _index;
-    if (widget.openPick && !_launchPickShown) {
-      _launchPickShown = true;
-      _openPickWhenReady();
-    }
-  }
-
-  /// Waits for the bot list (Pick needs it), then lands on Pick. On a cold
-  /// start the first load can fail before the connection is ready, so this
-  /// listens until a list arrives instead of trying once; it gives up after
-  /// 20 s, or once the owner has moved off Home.
-  void _openPickWhenReady() {
-    if (ref.read(hermesBotsProvider).value?.isNotEmpty ?? false) {
-      _landOnPick();
-      return;
-    }
-    late final ProviderSubscription<AsyncValue<List<HermesBot>>> sub;
-    final deadline = Timer(const Duration(seconds: 20), () => sub.close());
-    sub = ref.listenManual(hermesBotsProvider, (_, next) {
-      if (next.value?.isNotEmpty ?? false) {
-        deadline.cancel();
-        sub.close();
-        _landOnPick();
-      }
-    });
-  }
-
-  void _landOnPick() {
-    if (!mounted || _index != 0) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) openMangaPick(context, ref, instant: true);
-    });
-  }
 
   void _select(int index) {
     if (index == _index) return;
@@ -97,7 +53,8 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
     final pages = const <Widget>[
       // Home is the hub; Work is what needs the owner and what is running.
       HermesWorkPage(),
-      HermesConversationsPage(),
+      // Chats is the character selector: pick a bot, give it a task.
+      MangaPickTab(),
       HermesHomePage(),
       ProfilePage(),
     ];
