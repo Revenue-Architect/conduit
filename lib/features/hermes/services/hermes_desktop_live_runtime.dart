@@ -93,12 +93,18 @@ extension _HermesDesktopLiveRuntime on HermesDesktopApiService {
           event.payload['running'] == false &&
           (event.sessionId?.isNotEmpty ?? false) &&
           !_eventBuffer.isActive(event.sessionId!);
-      if (settledUnfollowed ||
+      final storedId = _storedIdForRuntime(event.sessionId);
+      if (storedId != null && settledUnfollowed) {
+        // The stored transcript, not the runtime's history: a bot chat's
+        // history read can still lack the turn that just settled, and the
+        // chat drops a reload that lays out shorter than what it shows (the
+        // reply then waited for the owner's next message).
+        requestTranscriptRefresh(storedId);
+      } else if (storedId != null &&
           startedBuffering &&
-              (event.type == 'message.complete' ||
-                  event.type.endsWith('.request'))) {
-        final storedId = _storedIdForRuntime(event.sessionId);
-        if (storedId != null) _emitTranscriptChange(storedId);
+          (event.type == 'message.complete' ||
+              event.type.endsWith('.request'))) {
+        _emitTranscriptChange(storedId);
       }
     });
     _emitTurnState(HermesDesktopTurnState.idle);

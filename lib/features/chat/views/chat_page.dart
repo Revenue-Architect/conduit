@@ -1200,11 +1200,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (active == null ||
         !isNativeHermesConversation(active) ||
         active.metadata['hermesSessionId'] != storedId) {
+      DebugLogger.log('skip-other-chat', scope: 'hermes/transcript');
       return;
     }
     final visibleTail = ref.read(chatMessagesProvider).lastOrNull;
     if (ref.read(isChatStreamingProvider) &&
         !isRestoredHermesDesktopRunningMessage(visibleTail)) {
+      DebugLogger.log('deferred-streaming', scope: 'hermes/transcript');
       _pendingHermesTranscriptRefresh = storedId;
       return;
     }
@@ -1293,9 +1295,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 !isRestoredHermesDesktopRunningPlaceholder(message),
           )
           .length;
+      DebugLogger.log(
+        'loaded',
+        scope: 'hermes/transcript',
+        data: {
+          'forced': forced,
+          'raw': raw.length,
+          'current': currentAuthoritativeCount,
+          'candidate': candidateAuthoritativeCount,
+          'running':
+              service.turnStateFor(storedId) == HermesDesktopTurnState.running,
+        },
+      );
       if (!forced &&
           currentAuthoritativeCount > 0 &&
           candidateAuthoritativeCount < currentAuthoritativeCount) {
+        DebugLogger.log('rejected-shorter', scope: 'hermes/transcript');
         return;
       }
       ref.read(chatMessagesProvider.notifier).setMessages(messages);

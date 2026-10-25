@@ -738,6 +738,50 @@ void main() {
     },
   );
 
+  test('a delegation wake-up that settles unfollowed reloads the stored transcript', () async {
+    final harness = _GatewayHarness();
+    final service = HermesDesktopApiService(
+      config: HermesConfig(
+        enabled: true,
+        baseUrl: 'https://hermes.example',
+        mode: HermesBackendMode.desktopGateway,
+        desktopCredentials: HermesDesktopCredentials(
+          legacyToken: 'session-token',
+        ),
+      ),
+      dio: _statusDio(),
+      rpc: HermesDesktopRpcClient(
+        channelFactory: (_, _, {httpClient}) => harness.channel,
+      ),
+    );
+    addTearDown(() async {
+      service.close();
+      await harness.dispose();
+    });
+    harness.responder = (method) => switch (method) {
+      'session.create' => {
+        'session_id': 'runtime-1',
+        'stored_session_id': 'stored-1',
+        'messages': const [],
+        'info': const {'running': false},
+      },
+      _ => const {},
+    };
+    await service.createDesktopSession();
+    final changes = <String>[];
+    final sub = service.transcriptChanges.listen(changes.add);
+    addTearDown(sub.cancel);
+
+    // Chief answers Ops' result in a turn no stream of this app follows.
+    // A bot chat's own history read lags that turn (device, 2026-10-25), so
+    // the chat must reload the stored transcript, not its runtime history.
+    harness.sessionInfo('runtime-1', running: false);
+    await Future<void>.delayed(Duration.zero);
+
+    check(changes).contains('stored-1');
+    check(service.consumeForcedTranscriptRefresh('stored-1')).isTrue();
+  });
+
   test('an existing bot session binds its profile before resume', () async {
     SharedPreferences.setMockInitialValues({});
     PreferencesStore.debugOverride(await SharedPreferences.getInstance());
