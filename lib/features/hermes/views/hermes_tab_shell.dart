@@ -6,6 +6,9 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
+import '../manga/manga_nav_bar.dart';
+import '../manga/manga_prefs.dart';
+import '../manga/manga_today_page.dart';
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
 import 'hermes_conversations_page.dart';
@@ -52,13 +55,25 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
   Widget build(BuildContext context) {
     // The same list Work's Needs you shows, so the dot and the section agree.
     final needsYou = watchHermesNeedsYou(ref).any((item) => item.actionable);
-    final pages = const <Widget>[
-      // Home is the hub; Work is what needs the owner and what is running.
-      HermesWorkPage(),
-      HermesConversationsPage(),
-      HermesHomePage(),
-      ProfilePage(),
-    ];
+    // The manga page unless the owner switched back to the classic lists.
+    final classic = ref.watch(mangaClassicLayoutProvider);
+    final pages = classic
+        ? const <Widget>[
+            // Home is the hub; Work is what needs the owner and what is
+            // running.
+            HermesWorkPage(),
+            HermesConversationsPage(),
+            HermesHomePage(),
+            ProfilePage(),
+          ]
+        : const <Widget>[
+            // Today is the team's day; Work is the hub of everything that is
+            // not a conversation.
+            MangaTodayPage(),
+            HermesConversationsPage(),
+            HermesWorkPage(title: 'Work'),
+            ProfilePage(),
+          ];
     // The shell owns its system bars: arriving from the side navigation (drawn
     // in the opposite theme) must not leave its icon colours behind.
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -96,12 +111,11 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: HermesTabDock(
-                  index: _index,
-                  onSelect: _select,
+                child: _dock(
+                  classic: classic,
                   destinations: [
-                    const HermesDockDestination(
-                      label: 'Home',
+                    HermesDockDestination(
+                      label: classic ? 'Home' : 'Today',
                       icon: Icons.home_outlined,
                       selectedIcon: Icons.home_rounded,
                     ),
@@ -130,6 +144,21 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
       ),
     );
   }
+
+  Widget _dock({
+    required bool classic,
+    required List<HermesDockDestination> destinations,
+  }) => classic
+      ? HermesTabDock(
+          index: _index,
+          onSelect: _select,
+          destinations: destinations,
+        )
+      : MangaNavBar(
+          index: _index,
+          onSelect: _select,
+          destinations: destinations,
+        );
 }
 
 /// Settles a tab into place when it becomes the shown one: a short slide from

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conduit explorations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Roboto+Flex:opsz,wght@8..144,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.css">
+<link rel="stylesheet" href="android.css">
+<style>
+  :root { --orange: #FF5A26; --orange-d: #FF6A36; }
+  svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+  /* ================= A. Character select (play, colour field) ================= */
+  .fs { --field: #E8531C; --field-deep: #B83A0E; --ink: #120B08; --paper: #FFF4EC;
+        background: var(--field); color: var(--ink); font-family: "Archivo", sans-serif; }
+  .fs .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+  .fs .top { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 0; }
+  .fs .top .k { font: 700 13px/1 "Archivo"; font-stretch: 100%; letter-spacing: .02em; }
+  .fs .top .run { display: flex; align-items: center; gap: 8px; font: 600 13px/1 "Archivo"; background: var(--ink); color: var(--paper); padding: 9px 12px 9px 10px; border-radius: 999px; }
+  .fs .top .run i { width: 8px; height: 8px; border-radius: 50%; background: var(--field); display: block; }
+  .fs .stage { position: relative; flex: 1; min-height: 0; }
+  .fs .stage .portrait { position: absolute; right: -54px; bottom: -6px; width: 380px; }
+  .fs .stage .slash { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 0 46%, var(--field-deep) 46% 62%, transparent 62%); opacity: .55; }
+  .fs .stage .name { position: absolute; left: 20px; top: 18px; font-weight: 900; font-style: italic; font-stretch: 125%; font-size: 76px; line-height: .86; letter-spacing: -.035em; text-transform: uppercase; }
+  .fs .stage .role { position: absolute; left: 22px; top: 106px; width: 150px; font: 500 15px/1.3 "Archivo"; }
+  .fs .stage .did { position: absolute; left: 20px; bottom: 22px; width: 196px; background: var(--ink); color: var(--paper); padding: 14px 14px 12px; border-radius: 4px 18px 18px 18px; }
+  .fs .did b { display: block; font: 700 12px/1 "Archivo"; letter-spacing: .04em; color: #FF9B73; margin-bottom: 8px; }
+  .fs .did p { margin: 0; font: 400 15px/1.32 "Archivo"; }
+  .fs .did span { display: block; margin-top: 8px; font: 500 13px/1 "Archivo"; opacity: .7; }
+  .fs .roster { display: flex; gap: 8px; padding: 14px 20px 0; background: var(--ink); }
+  .fs .roster .b { flex: 1; min-width: 0; aspect-ratio: .74; border-radius: 10px; background: #2A1E19; position: relative; overflow: hidden; }
+  .fs .roster .b img { position: absolute; left: -4px; bottom: -2px; width: 120%; }
+  .fs .roster .b.on { outline: 3px solid var(--field); outline-offset: -3px; background: var(--field); }
+  .fs .roster .b em { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px 4px; background: var(--ink); font: 800 italic 11px/1 "Archivo"; font-stretch: 112%; color: var(--paper); text-transform: uppercase; letter-spacing: .02em; }
+  .fs .roster .b.on em { background: var(--field); color: var(--ink); }
+  .fs .roster .b .dot { position: absolute; right: 6px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--field); box-shadow: 0 0 0 2px #2A1E19; }
+  .fs .dock { background: var(--ink); padding: 14px 20px 34px; }
+  .fs .field { display: flex; align-items: center; gap: 10px; background: var(--paper); border-radius: 26px; padding: 6px 6px 6px 18px; min-height: 56px; }
+  .fs .field span:not(.go) { flex: 1; font: 500 17px/1.2 "Archivo"; color: #6B5A51; }
+  .fs .go { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--field); color: var(--ink); display: grid; place-items: center; }
+  .fs .meta { display: flex; justify-content: space-between; color: #CDB8AC; font: 500 13px/1 "Archivo"; padding: 12px 4px 0; }
+  .fs .meta b { color: #FF9B73; font-weight: 700; }
+
+  /* ================= B. Manga chapter (printed, light) ================= */
+  .mg { --paper: #FFFFFF; --ink: #0E0E10; --ink-2: #4A4A50; --tone: #E9E9EC; --spot: #FF5A26;
+        background: var(--paper); color: var(--ink); font-family: "Bricolage Grotesque", sans-serif; }
+  .mg .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; padding: 0 14px; }
+  .mg .mast { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 4px 10px; }
+  .mg .mast h1 { margin: 0; font-weight: 800; font-stretch: 75%; font-size: 44px; line-height: .9; letter-spacing: -.03em; }
+  .mg .mast span { font: 500 13px/1.2 "Bricolage Grotesque"; color: var(--ink-2); text-align: right; }
+  .mg .page { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.25fr 1fr; grid-template-rows: 1.5fr 1fr .62fr; gap: 7px; }
+  .mg .p { position: relative; border: 2.5px solid var(--ink); overflow: hidden; background: var(--paper); }
+  .mg .p img { position: absolute; }
+  .mg .p1 { grid-row: 1; grid-column: 1 / 3; clip-path: polygon(0 0, 100% 0, 100% 88%, 0 100%); background: radial-gradient(circle at 78% 60%, #fff 0 22%, transparent 23%), repeating-conic-gradient(from 0deg at 78% 60%, #fff 0 4deg, var(--tone) 4deg 7deg); }
+  .mg .p1 img { right: 4px; bottom: 0; width: 210px; }
+  .mg .bubble { position: absolute; background: #fff; border: 2.5px solid var(--ink); border-radius: 50%/46%; padding: 14px 20px; font: 600 16px/1.22 "Bricolage Grotesque"; text-align: center; }
+  .mg .p1 .bubble { left: 14px; top: 16px; width: 190px; }
+  .mg .bubble::after { content: ""; position: absolute; right: -14px; bottom: 16px; border: 9px solid transparent; border-left: 18px solid var(--ink); transform: rotate(18deg); }
+  .mg .p1 .who { position: absolute; left: 16px; bottom: 30px; font-weight: 800; font-stretch: 75%; font-size: 30px; line-height: 1; letter-spacing: -.02em; }
+  .mg .p1 .who small { display: block; font: 500 13px/1.3 "Bricolage Grotesque"; letter-spacing: 0; color: var(--ink-2); margin-top: 4px; }
+  .mg .live { position: absolute; right: 12px; top: 12px; background: var(--spot); color: var(--ink); font: 800 13px/1 "Bricolage Grotesque"; font-stretch: 75%; letter-spacing: .04em; padding: 7px 9px; transform: rotate(4deg); }
+  .mg .p2 img, .mg .p3 img { right: -8px; bottom: -4px; width: 104px; }
+  .mg .p2 .say, .mg .p3 .say { position: absolute; left: 10px; top: 10px; right: 70px; font: 500 14px/1.25 "Bricolage Grotesque"; }
+  .mg .say b { display: block; font-weight: 800; font-stretch: 75%; font-size: 19px; margin-bottom: 4px; }
+  .mg .p4 { grid-column: 1 / 3; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 14px; }
+  .mg .p4 .n { font-weight: 800; font-stretch: 75%; font-size: 40px; color: var(--spot); line-height: 1; }
+  .mg .p4 p { margin: 0; flex: 1; font: 500 14px/1.3 "Bricolage Grotesque"; }
+  .mg .p4 p b { font-weight: 700; }
+  .mg .ask { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; border: 2.5px solid var(--ink); border-radius: 28px; padding: 6px 6px 6px 18px; min-height: 56px; }
+  .mg .ask img { flex: none; width: 30px; height: 30px; border-radius: 50%; object-fit: cover; object-position: top; background: var(--tone); }
+  .mg .ask span:not(.go) { flex: 1; font: 500 17px/1.2 "Bricolage Grotesque"; color: var(--ink-2); }
+  .mg .ask .go { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--spot); color: #fff; display: grid; place-items: center; }
+  .mg .nav { display: flex; justify-content: space-around; padding: 10px 0 26px; font: 600 12px/1 "Bricolage Grotesque"; color: var(--ink-2); }
+  .mg .nav div { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 64px; }
+  .mg .nav .on { color: var(--ink); }
+  .mg .nav .on svg { stroke-width: 2.4; }
+
+  /* ================= C. Dispatch board (place, dark) ================= */
+  .db { --ground: #0F1012; --raised: #191A1D; --ink: #F3F1EC; --ink-2: #A9A7A1; --ink-3: #8C8B86; --rule: #2A2B2F; --live: #FF6A36;
+        background: var(--ground); color: var(--ink); font-family: "Barlow", sans-serif; }
+  .db .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+  .db .head { display: flex; justify-content: space-between; align-items: flex-end; padding: 14px 20px 0; }
+  .db .head h1 { margin: 0; font: 700 40px/1 "Barlow Condensed"; letter-spacing: -.01em; text-transform: uppercase; }
+  .db .head span { font: 500 14px/1.2 "Barlow"; color: var(--ink-2); text-align: right; }
+  .db .now { margin: 22px 20px 0; position: relative; }
+  .db .now .lbl { font: 600 13px/1 "Barlow Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--live); }
+  .db .now h2 { margin: 8px 0 0; font: 700 34px/1.02 "Barlow Condensed"; max-width: 240px; }
+  .db .now img { position: absolute; right: -6px; top: -14px; width: 118px; }
+  .db .route { position: relative; height: 48px; margin: 16px 20px 0; }
+  .db .route .ln { position: absolute; left: 6px; right: 6px; top: 13px; height: 4px; background: var(--rule); border-radius: 2px; }
+  .db .route .ln i { display: block; width: 58%; height: 100%; background: var(--live); border-radius: 2px; }
+  .db .route .st { position: absolute; top: 7px; width: 16px; height: 16px; border-radius: 50%; background: var(--ground); border: 3px solid var(--rule); }
+  .db .route .st.d { border-color: var(--live); background: var(--live); }
+  .db .route .st.c { border-color: var(--live); }
+  .db .route .t { position: absolute; top: 30px; font: 500 12px/1 "Barlow"; color: var(--ink-2); transform: translateX(-30%); white-space: nowrap; }
+  .db .route .t.c { color: var(--ink); font-weight: 600; }
+  .db .board { margin: 22px 0 0; padding: 0 20px; flex: 1; min-height: 0; overflow: hidden; }
+  .db .board .bh { display: flex; justify-content: space-between; font: 600 13px/1 "Barlow Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+  .db .row { display: grid; grid-template-columns: 46px 34px 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+  .db .row time { font: 600 15px/1 "Barlow Condensed"; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .db .row .f { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: var(--raised); }
+  .db .row .f img { width: 100%; }
+  .db .row p { margin: 0; font: 500 15px/1.25 "Barlow"; }
+  .db .row p small { display: block; font-size: 13px; color: var(--ink-2); }
+  .db .row .s { font: 600 13px/1 "Barlow Condensed"; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .db .row .s.bad { color: var(--live); }
+  .db .dock { padding: 12px 16px 0; background: linear-gradient(transparent, var(--ground) 18%); }
+  .db .field { display: flex; align-items: center; gap: 10px; background: var(--raised); border: 1px solid var(--rule); border-radius: 28px; padding: 6px 6px 6px 8px; min-height: 56px; }
+  .db .field .f { flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #26272B; }
+  .db .field .f img { width: 100%; }
+  .db .field span:not(.go):not(.f) { flex: 1; font: 500 17px/1.2 "Barlow"; color: var(--ink-2); }
+  .db .go { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--live); color: #160A05; display: grid; place-items: center; }
+  .db .nav { display: flex; justify-content: space-around; padding: 10px 0 26px; font: 600 12px/1 "Barlow"; color: var(--ink-3); }
+  .db .nav div { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 64px; }
+  .db .nav .on { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- A. Character select -->
+<section class="screen fs" data-name="a-character-select" data-time="20:36" data-home="light">
+  <div class="body">
+    <div class="top">
+      <span class="k">Who's on it?</span>
+      <span class="run"><i></i>Chief is working · 4 min</span>
+    </div>
+    <div class="stage">
+      <div class="slash"></div>
+      <img class="portrait" src="assets/chief-cut.png" alt="Chief">
+      <div class="name">Chief</div>
+      <div class="role">Runs the team. Plans, delegates, checks the work.</div>
+      <div class="did"><b>LAST DONE · 13M</b><p>Checked Umbrel health. 47 containers up, Kuma and Beszel green.</p><span>+3 more today</span></div>
+    </div>
+    <div class="roster">
+      <div class="b on"><img src="assets/chief-cut.png" alt=""><em>Chief</em></div>
+      <div class="b"><img src="assets/kai-cut.png" alt=""><em>kai</em></div>
+      <div class="b"><img src="assets/ops-cut.png" alt=""><em>ops</em><span class="dot"></span></div>
+      <div class="b"><img src="assets/hermuse-cut.png" alt=""><em>herm</em></div>
+      <div class="b"><img src="assets/architect-cut.png" alt=""><em>arch</em></div>
+      <div class="b"><img src="assets/scout-cut.png" alt=""><em>scout</em></div>
+    </div>
+    <div class="dock">
+      <div class="field"><span>Give Chief a task</span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+      <div class="meta"><span>gpt-6-luna · High</span><span><b>2 need you</b> · Work</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- B. Manga chapter -->
+<section class="screen mg" data-name="b-manga-chapter" data-time="20:36">
+  <div class="body">
+    <div class="mast"><h1>Today, ch. 24</h1><span>Fri 24 Oct<br>6 bots · 11 runs</span></div>
+    <div class="page">
+      <div class="p p1">
+        <span class="live">ON IT · 4 MIN</span>
+        <div class="bubble">Writing next week's plan from the open threads.</div>
+        <img src="assets/chief-cut.png" alt="Chief">
+        <div class="who">Chief<small>initiative-engine</small></div>
+      </div>
+      <div class="p p2"><div class="say"><b>kai</b>Built the OpenUI greeting card.</div><img src="assets/kai-cut.png" alt="kai"></div>
+      <div class="p p3"><div class="say"><b>scout</b>Replied PONG. Plan done.</div><img src="assets/scout-cut.png" alt="scout"></div>
+      <div class="p p4"><span class="n">2</span><p><b>Need you.</b> open-threads-research failed. DonorPerfect note for Georgia is ready to review.</p><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+    </div>
+    <div class="ask"><img src="assets/chief-cut.png" alt=""><span>Tell Chief what to do</span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+    <div class="nav">
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- C. Dispatch board -->
+<section class="screen db" data-name="c-dispatch-board" data-theme="dark" data-time="20:36">
+  <div class="body">
+    <div class="head"><h1>Conduit</h1><span>Fri 24 Oct<br>20:36</span></div>
+    <div class="now">
+      <div class="lbl">Now running</div>
+      <h2>Chief is writing next week's plan</h2>
+      <img src="assets/chief-cut.png" alt="Chief">
+    </div>
+    <div class="route">
+      <div class="ln"><i></i></div>
+      <span class="st d" style="left:0"></span><span class="st d" style="left:30%"></span><span class="st c" style="left:57%"></span><span class="st" style="left:calc(100% - 16px)"></span>
+      <span class="t" style="left:4px;transform:none">Threads</span><span class="t" style="left:31%">Sorted</span><span class="t c" style="left:58%">Drafting</span><span class="t" style="right:0;left:auto;transform:none">Review</span>
+    </div>
+    <div class="board">
+      <div class="bh"><span>Earlier today</span><span>11 runs</span></div>
+      <div class="row"><time>20:23</time><span class="f"><img src="assets/chief-cut.png" alt=""></span><p>Checked Umbrel health<small>47 containers up</small></p><span class="s">Done</span></div>
+      <div class="row"><time>20:08</time><span class="f"><img src="assets/kai-cut.png" alt=""></span><p>OpenUI greeting card<small>kai</small></p><span class="s">Done</span></div>
+      <div class="row"><time>19:41</time><span class="f"><img src="assets/chief-cut.png" alt=""></span><p>open-threads-research<small>Timed out at step 3</small></p><span class="s bad">Failed</span></div>
+      <div class="row"><time>18:00</time><span class="f"><img src="assets/chief-cut.png" alt=""></span><p>Browsed example.com, iana.org<small>Two titles read</small></p><span class="s">Done</span></div>
+    </div>
+    <div class="dock">
+      <div class="field"><span class="f"><img src="assets/chief-cut.png" alt=""></span><span>New task for Chief</span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+    </div>
+    <div class="nav">
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Board</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<script src="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.js"></script>
+</body>
+</html>

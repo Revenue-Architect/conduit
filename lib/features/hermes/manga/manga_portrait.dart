@@ -1,0 +1,234 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+
+import '../widgets/hermez_bot_icons.dart';
+
+/// Bot portraits cut from their white squares, so a figure stands in a
+/// panel (or on its Pick field) instead of sitting on a white tile. A
+/// portrait that already has transparency is used as it is.
+///
+/// The cut is made once per image file and cached beside it as
+/// `cut_<file>.png`; assigning a new image makes a new cut.
+abstract final class MangaCutouts {
+  static final Map<String, Future<File?>> _pending = {};
+
+  /// The cut-out for [botName]'s assigned image, or null without one.
+  static Future<File?> forBot(String botName) {
+    final source = HermezBotIcons.iconFor(botName);
+    if (source == null) return Future.value();
+    return _pending.putIfAbsent(source.path, () => _cut(source));
+  }
+
+  static Future<File?> _cut(File source) async {
+    try {
+      final name = source.uri.pathSegments.last.replaceAll('.', '_');
+      final out = File('${source.parent.path}/cut_$name.png');
+      if (await out.exists()) return out;
+      final bytes = await source.readAsBytes();
+      // Decoded no wider than 900 px: enough for a full-width Pick portrait
+      // at 3x, without decoding a 1254 px original every time.
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 900);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final width = image.width, height = image.height;
+      final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      image.dispose();
+      if (raw == null) return source;
+      final rgba = raw.buffer.asUint8List();
+      final cut = await Isolate.run(() => mangaCutRgba(rgba, width, height));
+      if (cut == null) return source;
+      final completer = Completer<ui.Image>();
+      ui.decodeImageFromPixels(
+        cut,
+        width,
+        height,
+        ui.PixelFormat.rgba8888,
+        completer.complete,
+      );
+      final cutImage = await completer.future;
+      final png = await cutImage.toByteData(format: ui.ImageByteFormat.png);
+      cutImage.dispose();
+      if (png == null) return source;
+      await out.writeAsBytes(png.buffer.asUint8List(), flush: true);
+      return out;
+    } catch (_) {
+      // A portrait that cannot be cut shows as it is.
+      return source;
+    }
+  }
+}
+
+/// Removes the near-white background connected to the image's edges.
+/// Returns null when there is nothing to cut (the image is already
+/// transparent at its corners). The mask is smoothed and eroded 2 px so no
+/// pale fringe is left round the hair, then softened for antialiasing.
+Uint8List? mangaCutRgba(Uint8List rgba, int w, int h) {
+  int at(int x, int y) => (y * w + x) * 4;
+  final corner = at(1, 1);
+  if (rgba[corner + 3] < 200) return null;
+  bool paper(int i) =>
+      rgba[i + 3] > 200 &&
+      rgba[i] >= 205 &&
+      rgba[i + 1] >= 205 &&
+      rgba[i + 2] >= 205;
+
+  // Flood the paper from every edge pixel.
+  final bg = Uint8List(w * h);
+  final stack = <int>[];
+  void seed(int x, int y) {
+    final p = y * w + x;
+    if (bg[p] == 0 && paper(p * 4)) {
+      bg[p] = 1;
+      stack.add(p);
+    }
+  }
+
+  for (var x = 0; x < w; x++) {
+    seed(x, 0);
+    seed(x, h - 1);
+  }
+  for (var y = 0; y < h; y++) {
+    seed(0, y);
+    seed(w - 1, y);
+  }
+  while (stack.isNotEmpty) {
+    final p = stack.removeLast();
+    final x = p % w, y = p ~/ w;
+    if (x > 0) seed(x - 1, y);
+    if (x < w - 1) seed(x + 1, y);
+    if (y > 0) seed(x, y - 1);
+    if (y < h - 1) seed(x, y + 1);
+  }
+
+  // Figure mask (1 = keep), blurred and re-thresholded to smooth stair steps.
+  var mask = Float32List(w * h);
+  for (var p = 0; p < w * h; p++) {
+    mask[p] = bg[p] == 1 ? 0 : 1;
+  }
+  mask = _box(_box(mask, w, h), w, h);
+  final keep = Uint8List(w * h);
+  for (var p = 0; p < w * h; p++) {
+    keep[p] = mask[p] > .55 ? 1 : 0;
+  }
+  // Erode 2 px: drops the pale ring the flood leaves round the hair.
+  final eroded = Uint8List(w * h);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var all = 1;
+      for (var dy = -2; dy <= 2 && all == 1; dy++) {
+        final yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (var dx = -2; dx <= 2; dx++) {
+          final xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          if (keep[yy * w + xx] == 0) {
+            all = 0;
+            break;
+          }
+        }
+      }
+      eroded[y * w + x] = all;
+    }
+  }
+  var alpha = Float32List(w * h);
+  for (var p = 0; p < w * h; p++) {
+    alpha[p] = eroded[p].toDouble();
+  }
+  alpha = _box(alpha, w, h);
+  final out = Uint8List.fromList(rgba);
+  for (var p = 0; p < w * h; p++) {
+    out[p * 4 + 3] = (out[p * 4 + 3] * alpha[p]).round().clamp(0, 255);
+  }
+  return out;
+}
+
+Float32List _box(Float32List src, int w, int h) {
+  final out = Float32List(w * h);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var sum = 0.0;
+      var n = 0;
+      for (var dy = -1; dy <= 1; dy++) {
+        final yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (var dx = -1; dx <= 1; dx++) {
+          final xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          sum += src[yy * w + xx];
+          n++;
+        }
+      }
+      out[y * w + x] = sum / n;
+    }
+  }
+  return out;
+}
+
+/// A bot's figure, cut out, optionally with an ink outline that ties it to
+/// the page's borders. Shows nothing until the cut is ready (it is cached,
+/// so that is the first launch only).
+class MangaPortrait extends StatelessWidget {
+  const MangaPortrait({
+    super.key,
+    required this.botName,
+    this.outline,
+    this.outlineWidth = 1.5,
+    this.alignment = Alignment.bottomCenter,
+    this.fit = BoxFit.contain,
+  });
+
+  final String botName;
+  final Color? outline;
+  final double outlineWidth;
+  final Alignment alignment;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder(
+    // Reassigning a face redraws the figure.
+    valueListenable: HermezBotIcons.assigned,
+    builder: (context, _, _) => FutureBuilder<File?>(
+      future: MangaCutouts.forBot(botName),
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+        if (file == null) return const SizedBox.shrink();
+        final image = Image.file(
+          file,
+          fit: fit,
+          alignment: alignment,
+          filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+        );
+        final stroke = outline;
+        if (stroke == null) return image;
+        final d = outlineWidth;
+        Widget shadow(double dx, double dy) => Transform.translate(
+          offset: Offset(dx, dy),
+          child: ColorFiltered(
+            colorFilter: ColorFilter.mode(stroke, BlendMode.srcIn),
+            child: image,
+          ),
+        );
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            shadow(d, 0),
+            shadow(-d, 0),
+            shadow(0, d),
+            shadow(0, -d),
+            shadow(d * .7, d * .7),
+            shadow(-d * .7, -d * .7),
+            shadow(d * .7, -d * .7),
+            shadow(-d * .7, d * .7),
+            image,
+          ],
+        );
+      },
+    ),
+  );
+}

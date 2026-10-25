@@ -1,0 +1,20 @@
+/* S25 Ultra frame over the app-designer kit: 412 x 892 dp, punch-hole
+   camera instead of the Dynamic Island, gesture handle, Android status bar. */
+:root {
+  --screen-w: 412px;
+  --screen-h: 892px;
+  --safe-top: 40px;
+  --safe-bottom: 20px;
+  --sf: "Roboto Flex", Roboto, system-ui, sans-serif;
+}
+.screen { border-radius: 38px; font-family: var(--sf); }
+.ac-status {
+  height: var(--safe-top);
+  padding: 2px 26px 0 28px;
+  font: 500 15px/1 "Roboto Flex", Roboto, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+.ac-island { top: 13px; width: 13px; height: 13px; border-radius: 50%; }
+.ac-home { bottom: 7px; width: 108px; height: 4px; }
+.mini { width: calc(412px * var(--mini, .4)); height: calc(892px * var(--mini, .4)); border-radius: calc(38px * var(--mini, .4)); }
+.mini > .mini-screen { width: 412px; height: 892px; }

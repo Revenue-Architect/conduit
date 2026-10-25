@@ -32,7 +32,11 @@ String hermesWorkBoardMeta(HermesKanbanSummary board) =>
 /// by space: the team, the work Hermes does, what needs a decision, and
 /// Hermes itself. Each row says one true thing about where it leads.
 class HermesWorkPage extends ConsumerWidget {
-  const HermesWorkPage({super.key});
+  const HermesWorkPage({super.key, this.title});
+
+  /// Overrides the docked "Conduit" masthead: the manga layout names this
+  /// tab Work, because Today is home there.
+  final String? title;
 
   Future<void> _refresh(WidgetRef ref) async {
     ref
@@ -66,9 +70,9 @@ class HermesWorkPage extends ConsumerWidget {
     // running and the + for a new chat at its right.
     final docked = HermesDockScope.maybeOf(context) != null;
     return HermesPageChrome(
-      title: docked ? 'Conduit' : 'Work',
+      title: title ?? (docked ? 'Conduit' : 'Work'),
       subtitle: 'Schedules, board, teams and files',
-      brandHeader: docked,
+      brandHeader: docked && title == null,
       actions: docked
           ? [
               const HermesWorkingStack(),

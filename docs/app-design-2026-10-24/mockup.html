@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conduit redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@1,125,900&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Roboto+Flex:opsz,wght@8..144,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.css">
+<link rel="stylesheet" href="android.css">
+<style>
+:root {
+  --ground: #FFFFFF; --raised: #F2F2F4; --ink: #0E0E10; --ink-2: #4A4A50; --ink-3: #6C6C73;
+  --rule: #DCDCE0; --accent: #FF5A26; --accent-text: #C23A0B; --on-accent: #0E0E10; --border: 2.5px;
+  --tone: #E4E4E8;
+  --bg: "Bricolage Grotesque", sans-serif;
+}
+.screen[data-theme="dark"] {
+  --ground: #0B0B0D; --raised: #18181B; --ink: #F4F3EF; --ink-2: #B4B3AE; --ink-3: #8E8D88;
+  --rule: #2C2C30; --accent: #FF6A36; --accent-text: #FF8A5E; --border: 2px; --tone: #26262B;
+}
+.screen { background: var(--ground); color: var(--ink); font-family: var(--bg); }
+.body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; flex: none; }
+svg.s { width: 18px; height: 18px; }
+
+/* type scale */
+.display { font-weight: 800; font-stretch: 75%; font-size: 44px; line-height: .92; letter-spacing: -.03em; margin: 0; }
+.hero { font-weight: 800; font-stretch: 75%; font-size: 28px; line-height: 1; letter-spacing: -.02em; }
+.pname { font-weight: 800; font-stretch: 75%; font-size: 19px; line-height: 1.05; letter-spacing: -.01em; }
+.bodyt { font: 400 17px/1.4 var(--bg); }
+.line { font: 500 14px/1.3 var(--bg); }
+.meta { font: 500 13px/1.3 var(--bg); color: var(--ink-2); }
+.stamp { font: 800 12px/1 var(--bg); font-stretch: 75%; letter-spacing: .05em; text-transform: uppercase; background: var(--accent); color: var(--on-accent); padding: 6px 8px; }
+
+.mast { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 18px 12px; }
+.mast .meta { text-align: right; }
+
+/* panels */
+.p { position: relative; border: var(--border) solid var(--ink); overflow: hidden; background: var(--ground); }
+.p > img.fig { position: absolute; }
+.speed { background:
+  radial-gradient(circle at var(--cx, 76%) var(--cy, 62%), var(--ground) 0 20%, transparent 21%),
+  repeating-conic-gradient(from 0deg at var(--cx, 76%) var(--cy, 62%), var(--ground) 0 4deg, var(--tone) 4deg 7deg); }
+.bubble { position: absolute; background: var(--ground); border: var(--border) solid var(--ink); border-radius: 50%/46%; padding: 13px 18px; font: 600 14px/1.26 var(--bg); text-align: center; color: var(--ink); }
+.bubble.r::after { content: ""; position: absolute; right: -15px; bottom: 14px; border: 8px solid transparent; border-left: 18px solid var(--ink); transform: rotate(18deg); }
+
+/* nav */
+.nav { display: flex; justify-content: space-around; padding: 12px 0 22px; border-top: 1px solid var(--rule); background: var(--ground); font: 600 12px/1 var(--bg); color: var(--ink-3); }
+.nav div { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 72px; }
+.nav svg.i { width: 24px; height: 24px; stroke-width: 2.1; box-sizing: content-box; padding: 4px 20px; border-radius: 16px; }
+.nav .on svg.i { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.nav .on { color: var(--ink); }
+.nav .on svg { stroke-width: 2.5; }
+
+/* task box */
+.task { display: flex; align-items: center; gap: 10px; border: var(--border) solid var(--ink); border-radius: 30px; padding: 5px 5px 5px 6px; min-height: 56px; background: var(--ground); }
+.task .av { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: var(--raised); flex: none; }
+.task .av img { width: 112%; margin: 2px 0 0 -6%; }
+.task .ph { flex: 1; font: 400 17px/1.2 var(--bg); color: var(--ink-3); }
+.go { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: var(--ground); display: grid; place-items: center; flex: none; }
+.ghost { width: 44px; height: 44px; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+
+/* roster strip */
+.roster { display: flex; gap: 6px; padding: 0 14px; }
+.roster .b { flex: 1; min-width: 0; height: 58px; border: var(--border) solid var(--ink); position: relative; overflow: hidden; background: var(--raised); }
+.roster .b img { position: absolute; left: 50%; bottom: -4px; width: 64px; transform: translateX(-50%); }
+.roster .b.on { background: var(--ink); }
+.roster .b .d { position: absolute; right: 4px; top: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--ground); }
+
+/* ===== Today ===== */
+.today .page { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1.5fr 1fr; gap: 6px; padding: 0 14px; }
+.today .p1 { grid-column: 1 / 3; }
+.today .p1 img.fig { right: 6px; bottom: 0; width: 200px; }
+.today .p1 .bubble { left: 12px; top: 14px; width: 184px; }
+.today .p1 .stamp { position: absolute; right: 10px; top: 10px; transform: rotate(4deg); }
+.today .p1 .who { position: absolute; left: 14px; bottom: 14px; }
+.today .p1 .who .meta { margin-top: 4px; }
+.today .sm .say { position: absolute; left: 10px; top: 9px; right: 10px; }
+.today .sm .say .pname { margin-bottom: 4px; }
+.today .sm img.fig { right: -6px; bottom: -6px; width: 100px; }
+.today .sm .t { position: absolute; left: 10px; bottom: 9px; }
+.today .sm .stamp { position: absolute; left: 10px; bottom: 9px; }
+.today .need { background: var(--ink); color: var(--ground); display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 14px; border: var(--border) solid var(--ink); }
+.today .need .x { flex: 1; } .today .need .x b { display: block; font: 600 17px/1.25 var(--bg); } .today .need .x span { font: 500 13px/1.3 var(--bg); opacity: .8; }
+.today .need .hero { color: var(--accent); font-size: 44px; }
+.screen[data-theme="dark"] .today .need .hero, .screen[data-theme="dark"].today .need .hero { color: #C23A0B; }
+.today .dock { padding: 24px 14px 12px; display: flex; flex-direction: column; gap: 12px; }
+.dock .roster { padding: 0; }
+
+/* ===== Pick ===== */
+.pick { --field: #E8531C; --deep: #B83A0E; --fink: #120B08; --paper: #FFF4EC; background: var(--field); color: var(--fink); }
+.pick .top { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 0 8px; }
+.pick .close { width: 48px; height: 48px; display: grid; place-items: center; }
+.pick .pill { display: flex; align-items: center; gap: 8px; font: 600 13px/1 var(--bg); background: var(--fink); color: var(--paper); padding: 9px 12px 9px 10px; border-radius: 999px; }
+.pick .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--paper); display: block; }
+.pick .stage { position: relative; flex: 1; min-height: 0; }
+.pick .slash { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 0 44%, var(--deep) 44% 61%, transparent 61%); opacity: .5; }
+.pick .portrait { position: absolute; right: -58px; bottom: -4px; width: 384px; filter: drop-shadow(1.5px 0 0 var(--fink)) drop-shadow(-1.5px 0 0 var(--fink)) drop-shadow(0 1.5px 0 var(--fink)) drop-shadow(0 -1.5px 0 var(--fink)) drop-shadow(1px 1px 0 var(--fink)) drop-shadow(-1px -1px 0 var(--fink)); }
+.pick .rays { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(90deg, transparent 0 46%, #000 58%); mask-image: linear-gradient(90deg, transparent 0 46%, #000 58%); background: repeating-conic-gradient(from 0deg at 70% 64%, transparent 0 5deg, rgba(14,14,16,.12) 5deg 8deg); }
+.pick .name { position: absolute; left: 18px; top: 8px; font: italic 900 78px/.86 "Archivo"; font-stretch: 125%; letter-spacing: -.035em; text-transform: uppercase; }
+.pick .role { position: absolute; left: 20px; top: 92px; width: 156px; font: 500 14px/1.3 var(--bg); }
+.pick .did { position: absolute; left: 14px; top: 196px; width: 196px; background: #fff; color: #0E0E10; padding: 18px 20px; border: 2.5px solid var(--fink); border-radius: 50%/46%; text-align: center; }
+.pick .did::after { content: ""; position: absolute; right: -17px; top: 44%; border: 8px solid transparent; border-left: 18px solid var(--fink); transform: rotate(-8deg); }
+.pick .did b { display: block; font: 800 12px/1 var(--bg); font-stretch: 75%; letter-spacing: .06em; text-transform: uppercase; color: #4A4A50; margin-bottom: 6px; }
+.pick .did p { margin: 0; font: 500 14px/1.32 var(--bg); }
+.pick .did span { display: block; margin-top: 6px; font: 600 12px/1 var(--bg); color: #4A4A50; }
+.pick .tray { background: var(--fink); padding: 12px 14px 26px; display: flex; flex-direction: column; gap: 12px; }
+.pick .tiles { display: flex; gap: 6px; }
+.pick .tiles .b { flex: 1; min-width: 0; height: 74px; border-radius: 10px; background: #2A1E19; position: relative; overflow: hidden; }
+.pick .tiles .b img { position: absolute; left: 50%; bottom: 14px; width: 74px; transform: translateX(-50%); }
+.pick .tiles .b:not(.on) em { display: none; }
+.pick .tiles .b em { background: inherit; position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 0 4px; text-align: center; font: italic 900 11px/1 "Archivo"; font-stretch: 125%; text-transform: uppercase; color: var(--paper); background: #2A1E19; }
+.pick .tiles .b.on { background: var(--field); outline: 2px solid var(--paper); outline-offset: -2px; }
+.pick .tiles .b.on em { background: var(--field); color: var(--fink); }
+.pick .tiles .d { position: absolute; right: 5px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: #FF6A36; border: 2px solid #2A1E19; }
+.pick .field { display: flex; align-items: center; gap: 6px; background: var(--paper); border-radius: 28px; padding: 5px 5px 5px 6px; min-height: 56px; }
+.pick .field .ph { flex: 1; font: 400 17px/1.2 var(--bg); color: #6B5A51; padding-left: 4px; }
+.pick .field .ghost { color: #4A3A32; }
+.pick .send { width: 46px; height: 46px; border-radius: 50%; background: var(--fink); color: var(--paper); display: grid; place-items: center; flex: none; }
+.pick .model { display: flex; justify-content: space-between; align-items: center; color: #D9C7BD; font: 500 13px/1 var(--bg); padding: 0 2px; }
+.pick .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 12px; border: 1px solid currentColor; border-radius: 8px; color: var(--paper); font: 600 13px/1 var(--bg); }
+.pick .chip svg { width: 16px; height: 16px; }
+
+.screen.pick { container-type: size; }
+@container (max-width: 400px) { .screen.pick .portrait { width: 330px; right: -70px; } .screen.pick .role { width: 136px; } }
+/* ===== Chat ===== */
+.chat .hdr { display: flex; flex-direction: column; align-items: center; padding: 10px 0 10px; position: relative; border-bottom: 1px solid var(--rule); }
+.chat .hdr .back { position: absolute; left: 6px; top: 8px; width: 48px; height: 48px; display: grid; place-items: center; }
+.chat .hdr .more { position: absolute; right: 6px; top: 8px; width: 48px; height: 48px; display: grid; place-items: center; }
+.chat .hdr .av { position: relative; z-index: 1; width: 58px; height: 58px; border-radius: 50%; border: var(--border) solid var(--ink); overflow: hidden; background: var(--raised); }
+.chat .hdr .rays { position: absolute; left: 50%; top: 4px; width: 112px; height: 70px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, transparent 0 40%, var(--ground) 70%), repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 10deg, var(--tone) 10deg 20deg); }
+.chat .hdr .av img { width: 116%; margin: 3px 0 0 -8%; }
+.chat .hdr .nm { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; margin-top: 5px; font: 800 17px/1 var(--bg); font-stretch: 75%; }
+.chat .hdr .nm i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: block; }
+.chat .scroll { flex: 1; min-height: 0; overflow: hidden; padding: 14px 18px 0; display: flex; flex-direction: column; gap: 16px; }
+.chat .you { align-self: flex-end; max-width: 85%; position: relative; border: 2px solid var(--ink); padding: 11px 14px; font: 400 17px/1.38 var(--bg); background: var(--ground); border-radius: 4px; }
+.turn { display: flex; flex-direction: column; gap: 8px; }
+.turn .tl { display: flex; align-items: center; gap: 8px; font: 600 14px/1.2 var(--bg); color: var(--accent-text); }
+.turn .tl .orb { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; }
+.turn .tl .m { color: var(--ink-3); font: 400 12px/1 var(--bg); margin-left: auto; }
+.plan { border-left: 2px solid var(--accent); padding: 2px 0 2px 12px; display: flex; flex-direction: column; gap: 6px; }
+.plan .cap { font: 700 11px/1 var(--bg); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.plan .r { display: flex; gap: 8px; align-items: center; font: 400 13.5px/1.3 var(--bg); color: var(--ink-2); }
+.plan .r.cur { font-weight: 600; color: var(--ink); }
+.plan .r .c { width: 14px; height: 14px; flex: none; }
+.branch { display: flex; align-items: center; gap: 8px; font: 400 13.5px/1.3 var(--bg); color: var(--ink-2); margin-left: 14px; }
+.branch img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; object-position: top; background: var(--raised); }
+.branch b { color: var(--ink); font-weight: 600; }
+.chat .ans { font: 400 17px/1.45 var(--bg); margin: 0; }
+.a2 { border: var(--border) solid var(--ink); padding: 12px 14px 14px; }
+.a2 .h { display: flex; justify-content: space-between; align-items: baseline; }
+.a2 ol { list-style: none; margin: 10px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.a2 li { display: grid; grid-template-columns: 40px 1fr; font: 400 17px/1.3 var(--bg); }
+.a2 li b { font-weight: 700; font-stretch: 75%; }
+.a2 .btns { display: flex; gap: 8px; }
+.btn { height: 44px; padding: 0 18px; border-radius: 22px; display: inline-flex; align-items: center; font: 600 14px/1 var(--bg); border: var(--border) solid var(--ink); }
+.btn.f { background: var(--ink); color: var(--ground); }
+.chat .dock { padding: 10px 14px 24px; }
+.stop { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; flex: none; }
+.stop i { width: 13px; height: 13px; background: var(--ground); border-radius: 2px; display: block; }
+
+/* ===== Chats ===== */
+.chats .filter { display: flex; gap: 6px; padding: 0 14px 4px; }
+.chats .filter span { height: 48px; width: 44px; border-radius: 24px; border: var(--border) solid var(--ink); display: grid; place-items: center; overflow: hidden; background: var(--raised); flex: none; }
+.chats .filter span img { width: 50px; margin-top: 12px; }
+.chats .filter .all { width: auto !important; padding: 0 14px; background: var(--ink); color: var(--ground); font: 700 14px/1 var(--bg); }
+.chats .list { flex: 1; min-height: 0; overflow: hidden; padding: 0 18px; }
+.chats .g { display: flex; align-items: flex-end; gap: 10px; padding: 24px 0 6px; border-bottom: var(--border) solid var(--ink); }
+.chats .g img { width: 56px; height: 56px; object-fit: cover; object-position: top; margin-bottom: -10px; }
+.chats .g .cnt { margin-left: 6px; font: 600 14px/1 var(--bg); font-stretch: 100%; letter-spacing: 0; color: var(--ink-3); }
+.chats .g .all { font: 600 14px/1 var(--bg); color: var(--ink); padding: 24px 0 2px 16px; }
+.chats .g .pname { flex: 1; }
+.chats .row { padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.chats .row .t { font: 600 17px/1.25 var(--bg); }
+.chats .row .meta { margin-top: 3px; }
+.chats .row.on { position: relative; margin: 0 -18px; padding: 11px 18px; background: radial-gradient(circle at 92% 50%, var(--ground) 0 10%, transparent 11%), repeating-conic-gradient(from 0deg at 92% 50%, var(--ground) 0 4deg, var(--tone) 4deg 7deg); }
+.chats .row.on .stamp { position: absolute; right: 18px; top: 14px; }
+
+/* ===== Work ===== */
+.work .scroll { flex: 1; min-height: 0; overflow: hidden; padding: 0 14px 24px; display: flex; flex-direction: column; gap: 7px; }
+.work .needs { background: var(--ink); color: var(--ground); padding: 14px 14px 14px; display: flex; flex-direction: column; gap: 12px; border: var(--border) solid var(--ink); }
+.work .needs .top { display: flex; align-items: baseline; gap: 10px; }
+.work .needs .hero { color: var(--accent); font-size: 44px; }
+.work .item { border-top: 1px solid #3A3A40; padding-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.work .item .t { font: 600 17px/1.25 var(--bg); }
+.work .item .m { font: 500 13px/1.3 var(--bg); color: #C8C7C2; }
+.work .item .btns { display: flex; gap: 8px; margin-top: 8px; }
+.work .item .btn { border-color: var(--ground); color: var(--ground); height: 40px; }
+.work .item .btn.f { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.work .run { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 76px; }
+.work .run img.fig { position: static; width: 64px; margin-bottom: -16px; align-self: flex-end; }
+.work .run .x { flex: 1; }
+.work .sec { padding: 20px 4px 4px; font: 800 19px/1 var(--bg); font-stretch: 75%; }
+.work .row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--rule); }
+.work .row .x { flex: 1; }
+.work .row .t { font-weight: 800; font-stretch: 75%; font-size: 19px; line-height: 1.1; }
+.work .row > svg.i:first-child, .you .row > svg.i:first-child { box-sizing: content-box; width: 26px; height: 26px; stroke-width: 2.3; padding: 6px; border: var(--border) solid var(--ink); }
+.fade { height: 32px; margin-top: -32px; position: relative; background: linear-gradient(transparent, var(--ground)); pointer-events: none; }
+
+/* ===== Storyboard ===== */
+.board { background: #EDEDEA; padding: 28px 22px; display: flex; flex-direction: column; gap: 16px; }
+.board h2 { margin: 0; font: 800 28px/1 var(--bg); font-stretch: 75%; color: #0E0E10; }
+.board .frames { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; justify-items: center; }
+.board figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.board figcaption { font: 500 13px/1.3 var(--bg); color: #3A3A40; width: 176px; }
+.board figcaption b { color: #0E0E10; }
+
+/* ===== You ===== */
+.you .scroll { flex: 1; min-height: 0; overflow: hidden; padding: 0 14px; }
+.you .sec { padding: 22px 4px 6px; font-weight: 800; font-stretch: 75%; font-size: 19px; border-bottom: var(--border) solid var(--ink); }
+.you .row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--rule); }
+.you .row .x { flex: 1; }
+.you .row .t { font: 600 17px/1.25 var(--bg); }
+.sw { width: 52px; height: 32px; border-radius: 16px; border: 2px solid var(--ink-2); position: relative; flex: none; }
+.sw i { position: absolute; left: 6px; top: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink-2); }
+
+/* ===== Icon ===== */
+.app-icon { background: #FF5A26; }
+</style>
+</head>
+<body>
+
+<!-- 1. Today -->
+<section class="screen today" data-name="1-today" data-time="20:36">
+  <div class="body">
+    <div class="mast"><h1 class="display">Today</h1><span class="meta">Fri 24 Oct<br>11 runs</span></div>
+    <div class="page">
+      <div class="p p1 speed">
+        <span class="stamp">On it · 4 min</span>
+        <div class="bubble r">Writing next week's plan from the open threads.</div>
+        <img class="fig" src="assets/chief-cut.png" alt="Chief">
+        <div class="who"><div class="hero">Chief</div><div class="meta">initiative-engine · step 3 of 5</div></div>
+      </div>
+      <div class="p sm"><div class="say"><div class="pname">kai</div><div class="line">Built the OpenUI greeting card.</div></div><img class="fig" src="assets/kai-cut.png" alt="kai"><span class="t meta">20:08</span></div>
+      <div class="p sm speed" style="--cx:80%;--cy:80%"><div class="say"><div class="pname">scout</div><div class="line">Checking the DonorPerfect API docs for Chief.</div></div><img class="fig" src="assets/scout-cut.png" alt="scout"><span class="stamp">On it</span></div>
+    </div>
+    <div class="dock">
+      <div class="need"><span class="hero">2</span><div class="x"><b>open-threads-research failed</b><span>+1 note ready to review</span></div><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="roster">
+        <div class="b on"><img src="assets/chief-cut.png" alt="Chief"><span class="d"></span></div>
+        <div class="b"><img src="assets/kai-cut.png" alt="kai"></div>
+        <div class="b"><img src="assets/ops-cut.png" alt="ops"></div>
+        <div class="b"><img src="assets/hermuse-cut.png" alt="hermuse"></div>
+        <div class="b"><img src="assets/architect-cut.png" alt="architect"></div>
+        <div class="b"><img src="assets/scout-cut.png" alt="scout"><span class="d"></span></div>
+      </div>
+      <div class="task"><span class="av"><img src="assets/chief-cut.png" alt=""></span><span class="ph">Tell Chief what to do</span><span class="ghost" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+    </div>
+    <div class="nav" data-system>
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Pick -->
+<section class="screen pick" data-name="2-pick-chief" data-time="20:36" data-home="light">
+  <div class="body">
+    <div class="top">
+      <span class="close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      <span class="pill"><i></i>Working · 4 min</span>
+    </div>
+    <div class="stage">
+      <div class="slash"></div><div class="rays"></div>
+      <img class="portrait" src="assets/chief-cut.png" alt="Chief">
+      <div class="name">Chief</div>
+      <div class="role">Runs the team. Plans, delegates, checks the work.</div>
+      <div class="did"><b>Last done · 13m</b><p>Checked Umbrel health. 47 containers up, all green.</p><span>+3 more today ›</span></div>
+    </div>
+    <div class="tray">
+      <div class="tiles">
+        <div class="b on"><img src="assets/chief-cut.png" alt=""><em>Chief</em><span class="d"></span></div>
+        <div class="b k"><img src="assets/kai-cut.png" alt=""><em>kai</em></div>
+        <div class="b o"><img src="assets/ops-cut.png" alt=""><em>ops</em></div>
+        <div class="b h"><img src="assets/hermuse-cut.png" alt=""><em>hermuse</em></div>
+        <div class="b a"><img src="assets/architect-cut.png" alt=""><em>architect</em></div>
+        <div class="b s"><img src="assets/scout-cut.png" alt=""><em>scout</em><span class="d"></span></div>
+      </div>
+      <div class="model"><span class="chip">gpt-6-luna · High<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span>Swipe to switch</span></div>
+      <div class="field"><span class="ghost" aria-label="Attach"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="ph">Give Chief a task</span><span class="ghost" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="send"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+      
+    </div>
+  </div>
+</section>
+
+<!-- 3. Signature storyboard -->
+<section class="screen board" data-name="3-pick-storyboard" data-chrome="none" data-scroll>
+  <h2>Pick your fighter</h2>
+  <div class="frames">
+    <figure>
+      <div class="mini" style="--mini:.42"><div class="mini-screen today" data-time="20:36" style="background:#fff;font-family:var(--bg)">
+        <div class="body">
+          <div class="mast"><h1 class="display">Today</h1></div>
+          <div style="flex:1"></div>
+          <div class="dock" style="padding:12px 14px 120px"><div class="roster">
+            <div class="b on"><img src="assets/chief-cut.png" alt=""></div><div class="b" style="outline:6px solid #2F6FE4;outline-offset:-3px;transform:scale(1.08)"><img src="assets/kai-cut.png" alt=""></div><div class="b"><img src="assets/ops-cut.png" alt=""></div><div class="b"><img src="assets/hermuse-cut.png" alt=""></div><div class="b"><img src="assets/architect-cut.png" alt=""></div><div class="b"><img src="assets/scout-cut.png" alt=""></div>
+          </div></div>
+        </div></div></div>
+      <figcaption><b>0 ms.</b> Tap kai in the roster. Tile lifts 1.06. Selection haptic.</figcaption>
+    </figure>
+    <figure>
+      <div class="mini" style="--mini:.42"><div class="mini-screen" data-time="20:36" style="background:#fff">
+        <div style="position:absolute;left:170px;top:640px;width:440px;height:440px;border-radius:50%;background:#2F6FE4;transform:translate(-50%,-50%) scale(2.4)"></div>
+        <img src="assets/kai-cut.png" alt="" style="position:absolute;left:120px;top:380px;width:240px">
+      </div></div>
+      <figcaption><b>120–380 ms.</b> kai's cobalt floods out from the tile. The portrait grows into place.</figcaption>
+    </figure>
+    <figure>
+      <div class="mini" style="--mini:.42"><div class="mini-screen pick" data-chrome="light" data-time="20:36" style="--field:#2F6FE4;--deep:#1D4BA8;--fink:#0B1530;--paper:#F2F6FF;background:#2F6FE4;color:#fff">
+        <div class="body">
+          <div class="stage" style="flex:1;position:relative"><div class="slash"></div><img class="portrait" src="assets/kai-cut.png" alt=""><div class="name" style="top:60px">kai</div></div>
+          <div class="tray" style="background:#0B1530"><div class="tiles"><div class="b" style="background:#18213D"><img src="assets/chief-cut.png" alt=""></div><div class="b on" style="background:#2F6FE4"><img src="assets/kai-cut.png" alt=""><em style="background:#2F6FE4;color:#fff">kai</em></div><div class="b" style="background:#18213D"><img src="assets/ops-cut.png" alt=""></div><div class="b" style="background:#18213D"><img src="assets/hermuse-cut.png" alt=""></div><div class="b" style="background:#18213D"><img src="assets/architect-cut.png" alt=""></div><div class="b" style="background:#18213D"><img src="assets/scout-cut.png" alt=""></div></div><div class="field" style="background:#F2F6FF"><span class="ph" style="color:#4A5675">Give kai a task</span><span class="send" style="background:#0B1530;color:#fff"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div></div>
+        </div></div></div>
+      <figcaption><b>380 ms.</b> "KAI" lands. Idle clip plays. Light impact. Swipe wipes to the next bot.</figcaption>
+    </figure>
+    <figure>
+      <div class="mini" style="--mini:.42"><div class="mini-screen today" data-time="20:37" style="background:#fff;font-family:var(--bg)">
+        <div class="body"><div class="mast"><h1 class="display">Today</h1></div>
+          <div class="page" style="grid-template-rows:1fr 1.4fr;flex:none;height:560px">
+            <div class="p sm speed" style="grid-column:1/3;--cx:78%;--cy:70%"><div class="bubble r" style="left:14px;top:20px;width:200px">Building the week view as an OpenUI card.</div><img class="fig" src="assets/kai-cut.png" alt="" style="right:10px;bottom:-4px;width:190px"></div>
+            <div class="p p1 speed" style="grid-column:1/3"><img class="fig" src="assets/chief-cut.png" alt="" style="width:170px"></div>
+          </div></div></div></div>
+      <figcaption><b>On send.</b> The screen shrinks into kai's new panel, with speed lines. Clip goes to working. Medium impact.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 4. Chat, live run -->
+<section class="screen chat" data-name="4-chat-live" data-time="20:36" data-dense>
+  <div class="body">
+    <div class="hdr">
+      <span class="back" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></span>
+      <div class="rays"></div><div class="av"><img src="assets/chief-cut.png" alt="Chief"></div>
+      <div class="nm">Chief<i></i></div>
+      <span class="more" aria-label="New chat"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h8M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4z"/></svg></span>
+    </div>
+    <div class="scroll" data-scrolls>
+      <div class="you">Plan next week from the open threads, then have scout check the DonorPerfect docs.</div>
+      <div class="turn">
+        <div class="tl"><span class="orb"></span>Delegated and 4 more<span class="m">3m 12s</span></div>
+        <div class="plan">
+          <span class="cap">Plan · 2 of 4</span>
+          <div class="r"><svg class="c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg>Read the 9 open threads</div>
+          <div class="r"><svg class="c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg>Sorted them by who they wait on</div>
+          <div class="r cur"><svg class="c" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#FF5A26" stroke-width="2.4"/><circle cx="12" cy="12" r="3" fill="#FF5A26"/></svg>Drafting the week</div>
+          <div class="r"><svg class="c" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>Review it with you</div>
+        </div>
+        <div class="branch"><img src="assets/scout-cut.png" alt=""><b>scout</b> Checking DonorPerfect API docs</div>
+      </div>
+      <p class="ans">So far: 9 open threads, 3 of them waiting on you. I'm putting the DonorPerfect key first, because Georgia's import is blocked on it.</p>
+      <div class="a2">
+        <div class="h"><span class="pname">Next week, draft</span><span class="meta">3 days</span></div>
+        <ol><li><b>Mon</b>Replace the DonorPerfect key</li><li><b>Tue</b>Run Georgia's import</li><li><b>Wed</b>Close 4 stale threads</li></ol>
+        <div class="btns"><span class="btn f">Looks right</span><span class="btn">Change it</span></div>
+      </div>
+    </div>
+    <div class="dock"><div class="task"><span class="ghost"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="ph">Reply to Chief</span><span class="stop" aria-label="Stop"><i></i></span></div></div>
+  </div>
+</section>
+
+<!-- 5. Chats -->
+<section class="screen chats" data-name="5-chats" data-time="20:36">
+  <div class="body">
+    <div class="mast"><h1 class="display">Chats</h1><span class="meta">892 chats</span></div>
+    <div class="filter" data-scrolls>
+      <span class="all">All</span>
+      <span><img src="assets/chief-cut.png" alt="Chief"></span><span><img src="assets/kai-cut.png" alt="kai"></span><span><img src="assets/ops-cut.png" alt="ops"></span><span><img src="assets/hermuse-cut.png" alt="hermuse"></span><span><img src="assets/architect-cut.png" alt="architect"></span><span><img src="assets/scout-cut.png" alt="scout"></span>
+    </div>
+    <div class="list" data-scrolls>
+      <div class="g"><img src="assets/chief-cut.png" alt=""><span class="pname">Chief<span class="cnt">775</span></span><span class="all">See all</span></div>
+      <div class="row on"><div class="t">initiative-engine · Oct 24 20:23</div><div class="meta">4 min · 16 messages</div><span class="stamp">On it</span></div>
+      <div class="row"><div class="t">Hermez client capability description</div><div class="meta">13m · 2 messages</div></div>
+      <div class="row"><div class="t">Umbrel health · Oct 24</div><div class="meta">13m · 8 messages</div></div>
+      <div class="g"><img src="assets/kai-cut.png" alt=""><span class="pname">kai<span class="cnt">86</span></span><span class="all">See all</span></div>
+      <div class="row"><div class="t">Begin conversation</div><div class="meta">11m · 2 messages</div></div>
+      <div class="row"><div class="t">Hermez openui greeting</div><div class="meta">28m · 45 messages</div></div>
+      <div class="g"><img src="assets/ops-cut.png" alt=""><span class="pname">ops<span class="cnt">31</span></span><span class="all">See all</span></div>
+      <div class="row"><div class="t">Restart core-litellm after config change</div><div class="meta">4d · 6 messages</div></div>
+      <div class="g"><img src="assets/hermuse-cut.png" alt=""><span class="pname">hermuse<span class="cnt">12</span></span><span class="all">See all</span></div>
+      <div class="row"><div class="t">Moodboard for the Kaizen spring drop</div><div class="meta">6d · 9 messages</div></div>
+    </div>
+    <div class="fade"></div>
+    <div class="nav" data-system>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Work -->
+<section class="screen work" data-name="6-work" data-time="20:36">
+  <div class="body">
+    <div class="mast"><h1 class="display">Work</h1><span class="meta">2 running</span></div>
+    <div class="scroll" data-scrolls>
+      <div class="needs">
+        <div class="top"><span class="hero">2</span><span class="pname">need you</span></div>
+        <div class="item"><span class="t">open-threads-research</span><span class="m">Chief · failed at step 3 of 5 · 19:41</span><div class="btns"><span class="btn f">Retry</span><span class="btn">Open</span></div></div>
+        <div class="item"><span class="t">DonorPerfect key replacement note for Georgia</span><span class="m">Chief · ready for review · 20:02</span><div class="btns"><span class="btn f">Review</span></div></div>
+      </div>
+      <div class="p run speed" style="--cx:12%;--cy:80%"><img class="fig" src="assets/chief-cut.png" alt=""><div class="x"><div class="t pname">initiative-engine</div><div class="meta">Chief · 4 min · step 3 of 5</div></div><span class="stamp">On it</span></div>
+      <div class="p run speed" style="--cx:12%;--cy:80%"><img class="fig" src="assets/scout-cut.png" alt=""><div class="x"><div class="t pname">DonorPerfect API docs</div><div class="meta">scout · for Chief · 1 min</div></div><span class="stamp">On it</span></div>
+      <div class="row" style="margin-top:12px"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><div class="x"><div class="t">Scheduled agents</div><div class="meta">10 active · next kai inbox sweep at 21:00</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v10M15 4v6"/></svg><div class="x"><div class="t">Kanban</div><div class="meta">7 tasks · 7 done</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7"/></svg><div class="x"><div class="t">Spaces</div><div class="meta">Pages you and Hermes work on</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h6l2 2h8v10H4z"/></svg><div class="x"><div class="t">Artifacts</div><div class="meta">Files Hermes made</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+    </div>
+    <div class="fade"></div>
+    <div class="nav" data-system>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Today, dark -->
+<section class="screen today" data-name="7-today-dark" data-theme="dark" data-time="23:12">
+  <div class="body">
+    <div class="mast"><h1 class="display">Today</h1><span class="meta">Fri 24 Oct<br>14 runs</span></div>
+    <div class="page">
+      <div class="p p1 speed">
+        <span class="stamp">On it · 1 min</span>
+        <div class="bubble r">Sweeping the inbox for anything from Georgia.</div>
+        <img class="fig" src="assets/kai-cut.png" alt="kai">
+        <div class="who"><div class="hero">kai</div><div class="meta">inbox sweep · scheduled</div></div>
+      </div>
+      <div class="p sm"><div class="say"><div class="pname">Chief</div><div class="line">Next week is planned. 3 days, DonorPerfect first.</div></div><img class="fig" src="assets/chief-cut.png" alt="Chief"><span class="t meta">21:04</span></div>
+      <div class="p sm"><div class="say"><div class="pname">scout</div><div class="line">DonorPerfect keys rotate in Settings, not the API.</div></div><img class="fig" src="assets/scout-cut.png" alt="scout"><span class="t meta">20:44</span></div>
+    </div>
+    <div class="dock">
+      <div class="need"><span class="hero">1</span><div class="x"><b>DonorPerfect note for Georgia</b><span>1 needs you · ready to review</span></div><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="roster">
+        <div class="b on"><img src="assets/chief-cut.png" alt="Chief"></div>
+        <div class="b"><img src="assets/kai-cut.png" alt="kai"><span class="d"></span></div>
+        <div class="b"><img src="assets/ops-cut.png" alt="ops"></div>
+        <div class="b"><img src="assets/hermuse-cut.png" alt="hermuse"></div>
+        <div class="b"><img src="assets/architect-cut.png" alt="architect"></div>
+        <div class="b"><img src="assets/scout-cut.png" alt="scout"></div>
+      </div>
+      <div class="task"><span class="av"><img src="assets/chief-cut.png" alt=""></span><span class="ph">Tell Chief what to do</span><span class="ghost" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="go"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+    </div>
+    <div class="nav" data-system>
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Pick, kai, dark-field bot -->
+<section class="screen pick" data-name="8-pick-kai" data-time="20:37" data-chrome="light" style="--field:#2F6FE4;--deep:#1D4BA8;--fink:#0B1530;--paper:#F2F6FF;color:#fff">
+  <div class="body">
+    <div class="top">
+      <span class="close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      <span class="pill" style="background:#0B1530"><i style="background:#9DB9F2"></i>Idle · last 28m ago</span>
+    </div>
+    <div class="stage">
+      <div class="slash"></div>
+      <img class="portrait" src="assets/kai-cut.png" alt="kai">
+      <div class="name">kai</div>
+      <div class="role">Builds the UI. OpenUI cards, screens, the small stuff.</div>
+      <div class="did"><b>Last done · 28m</b><p>Built the OpenUI greeting card for Hermez.</p><span>2 runs today ›</span></div>
+    </div>
+    <div class="tray" style="background:#0B1530">
+      <div class="tiles">
+        <div class="b" style="background:#18213D"><img src="assets/chief-cut.png" alt=""><span class="d" style="border-color:#18213D"></span></div>
+        <div class="b on" style="background:#2F6FE4;outline-color:#F2F6FF"><img src="assets/kai-cut.png" alt=""><em style="background:#2F6FE4;color:#fff">kai</em></div>
+        <div class="b o" style="background:#18213D"><img src="assets/ops-cut.png" alt=""><em>ops</em></div>
+        <div class="b h" style="background:#18213D"><img src="assets/hermuse-cut.png" alt=""><em>hermuse</em></div>
+        <div class="b a" style="background:#18213D"><img src="assets/architect-cut.png" alt=""><em>architect</em></div>
+        <div class="b s" style="background:#18213D"><img src="assets/scout-cut.png" alt=""><em>scout</em><span class="d" style="border-color:#18213D"></span></div>
+      </div>
+      <div class="model" style="color:#B9C8E6"><span class="chip">gpt-6-luna · Medium<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span>Swipe to switch</span></div>
+      <div class="field" style="background:#F2F6FF"><span class="ghost" style="color:#2B3756"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="ph" style="color:#0B1530">Turn next week's plan into an OpenUI card</span><span class="ghost" style="color:#2B3756"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="send" style="background:#FF5A26;color:#0E0E10"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></div>
+      
+    </div>
+  </div>
+</section>
+
+<!-- 9. You -->
+<section class="screen you" data-name="9-you" data-time="20:36">
+  <div class="body">
+    <div class="mast"><h1 class="display">You</h1><span class="meta">Umbrel · connected</span></div>
+    <div class="scroll" data-scrolls>
+      <div class="sec">Look</div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg><div class="x"><div class="t">Theme</div><div class="meta">Follow the system</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14"/><path d="M4 10h16"/></svg><div class="x"><div class="t">Classic layout</div><div class="meta">Pre-manga list screens</div></div><span class="sw" role="switch" aria-checked="false"><i></i></span></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4"/><path d="M5 20c1.5-4 4-5 7-5s5.5 1 7 5"/></svg><div class="x"><div class="t">Bots</div><div class="meta">Faces, idle and working clips, Pick colours</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sec">Chat</div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg><div class="x"><div class="t">Models and quick actions</div><div class="meta">gpt-6-luna · High by default</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><div class="x"><div class="t">Audio</div><div class="meta">Dictation and spoken replies</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20h4"/></svg><div class="x"><div class="t">Notifications</div><div class="meta">UnifiedPush · 8 of 8 categories on</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sec">Connections</div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><path d="M4 12h5l2-5 2 10 2-5h5"/></svg><div class="x"><div class="t">Hermes Agent</div><div class="meta">Self-hosted on the Umbrel</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 11l7.4-3.8M8.3 13l7.4 3.8"/></svg><div class="x"><div class="t">Direct connections</div><div class="meta">OpenAI-compatible APIs and Ollama</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg><div class="x"><div class="t">Open WebUI</div><div class="meta">Add a self-hosted server</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="row"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg><div class="x"><div class="t">About</div><div class="meta">Version, links and support</div></div><svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+    </div>
+    <div class="fade"></div>
+    <div class="nav" data-system>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8h-5v-5H9v5H4z"/></svg>Today</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/></svg>Chats</div>
+      <div><svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Work</div>
+      <div class="on"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>You</div>
+    </div>
+  </div>
+</section>
+
+<!-- Icon -->
+<section class="app-icon" data-name="icon">
+  <svg viewBox="0 0 344 344" width="344" height="344" style="display:block">
+    <rect width="344" height="344" fill="#FF5A26"/><g transform="translate(172 162) scale(.86) translate(-172 -162)">
+    <path d="M172 62 L196 104 L246 88 L232 134 L282 152 L238 176 L262 220 L212 214 L204 262 L172 228 L140 262 L132 214 L82 220 L106 176 L62 152 L112 134 L98 88 L148 104 Z" fill="#FFFFFF" stroke="#0E0E10" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M150 140 L192 166 L150 192" fill="none" stroke="#0E0E10" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </svg>
+</section>
+
+<script src="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.js"></script>
+</body>
+</html>

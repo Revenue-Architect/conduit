@@ -181,6 +181,19 @@ flutter:
     - assets/flutter_tex.css
     - assets/vad/
 
+  # Manga redesign faces (OFL; licences in assets/fonts/). Bricolage is
+  # variable (wght, wdth, opsz); Archivo is a static Black Italic Expanded
+  # instance used only for the bot's name on Pick.
+  fonts:
+    - family: BricolageGrotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque.ttf
+    - family: ArchivoBlackItalicExpanded
+      fonts:
+        - asset: assets/fonts/ArchivoBlackItalicExpanded.ttf
+          weight: 900
+          style: italic
+
 flutter_native_splash:
   # Splash background matches the light theme; `color_dark` handles dark mode.
   color: "#FFFFFF"
