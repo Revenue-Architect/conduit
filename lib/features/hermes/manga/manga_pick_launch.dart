@@ -61,7 +61,8 @@ String? mangaSpeech(String? raw) {
       .replaceAll(RegExp(r'[*_`#>]+'), '')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
-  if (text.isEmpty || text.startsWith('/') || text.length < 3) return null;
+  // A short reply ("OK", "Done.") is still something the bot said.
+  if (text.isEmpty || text.startsWith('/')) return null;
   // Code is not speech: an OpenUI tree, a JSON blob, a call.
   if (RegExp(r'[=(){}\[\]]').allMatches(text).length >= 3) return null;
   return text;
