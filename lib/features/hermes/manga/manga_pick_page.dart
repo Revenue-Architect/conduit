@@ -157,18 +157,54 @@ class MangaPickPage extends ConsumerStatefulWidget {
   ConsumerState<MangaPickPage> createState() => _MangaPickPageState();
 }
 
-class _MangaPickPageState extends ConsumerState<MangaPickPage> {
+class _MangaPickPageState extends ConsumerState<MangaPickPage>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final PageController _pages = PageController(
     initialPage: widget.initial.clamp(0, widget.bots.length - 1),
   );
   final _task = TextEditingController();
+  final _focus = FocusNode();
   late int _index = widget.initial.clamp(0, widget.bots.length - 1);
+
+  /// The typing pose: 0 at rest, 1 while the task box has the keyboard.
+  /// One short transform-only move, so the stage never re-lays out.
+  late final AnimationController _typing = AnimationController(
+    vsync: this,
+    duration: MangaMotion.enter,
+    reverseDuration: MangaMotion.exit,
+  );
+
+  /// The keyboard's full height, learned the first time it opens (until
+  /// then a typical phone's), so the pose knows how much stage is left.
+  static double _keyboard = 0;
+  bool _keyboardUp = false;
 
   @override
   void initState() {
     super.initState();
     _task.addListener(() => setState(() {}));
     widget.entrance.addStatusListener(_landed);
+    WidgetsBinding.instance.addObserver(this);
+    _focus.addListener(() {
+      if (context.reduceMotion) {
+        _typing.value = _focus.hasFocus ? 1 : 0;
+      } else if (_focus.hasFocus) {
+        _typing.animateTo(1, curve: MangaMotion.easeOut);
+      } else {
+        _typing.animateBack(0, curve: MangaMotion.easeOut);
+      }
+    });
+  }
+
+  @override
+  void didChangeMetrics() {
+    final view = View.of(context);
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    if (inset > _keyboard) _keyboard = inset;
+    // Back or the keyboard's own hide button closes it without taking the
+    // focus away: leave the typing pose with it.
+    if (_keyboardUp && inset == 0 && _focus.hasFocus) _focus.unfocus();
+    _keyboardUp = inset > 0;
   }
 
   void _landed(AnimationStatus status) {
@@ -179,6 +215,9 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
   @override
   void dispose() {
     widget.entrance.removeStatusListener(_landed);
+    WidgetsBinding.instance.removeObserver(this);
+    _typing.dispose();
+    _focus.dispose();
     _pages.dispose();
     _task.dispose();
     super.dispose();
@@ -255,6 +294,15 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
           agent: working[widget.bots[i].name],
           entrance: widget.entrance,
           words: words[widget.bots[i].name],
+          typing: _typing,
+          // The stage the keyboard and tray leave visible: the full stage,
+          // plus the room under the tray, less the keyboard.
+          keyboard: _keyboard > 0
+              ? _keyboard
+              : MediaQuery.sizeOf(context).height * .45,
+          rest: widget.embedded
+              ? hermesDockClearance(context)
+              : math.max(MediaQuery.paddingOf(context).bottom, 12),
         ),
       ),
     );
@@ -333,6 +381,7 @@ class _MangaPickPageState extends ConsumerState<MangaPickPage> {
                     field: field,
                     working: working.keys.toSet(),
                     controller: _task,
+                    focus: _focus,
                     onTile: _jump,
                     onSend: _send,
                     hint: 'Give ${_bot.title} a task',
@@ -410,7 +459,9 @@ String? _role(HermesBot bot) {
 }
 
 /// One fighter: name, role, last words, and the bot's cut-out figure. The
-/// layout never changes with the keyboard: the tray slides over the stage.
+/// layout never changes with the keyboard: the tray slides over the stage,
+/// and a typing pose moves the name, figure and bubble into the stage that
+/// stays visible, with transforms only.
 class _Fighter extends StatelessWidget {
   const _Fighter({
     required this.bot,
@@ -418,6 +469,9 @@ class _Fighter extends StatelessWidget {
     required this.agent,
     required this.entrance,
     required this.words,
+    required this.typing,
+    required this.keyboard,
+    required this.rest,
   });
 
   final HermesBot bot;
@@ -427,6 +481,13 @@ class _Fighter extends StatelessWidget {
 
   /// What the bot last said, cleaned for a bubble.
   final String? words;
+
+  /// The typing pose (0 rest, 1 keyboard up), and what it needs to fit the
+  /// stage the keyboard leaves: the keyboard's height and the room kept
+  /// under the tray at rest.
+  final Animation<double> typing;
+  final double keyboard;
+  final double rest;
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +524,47 @@ class _Fighter extends StatelessWidget {
           outline: stroke,
           outlineWidth: 2,
         );
+        // Where things go while typing. The visible stage is the stage plus
+        // the room under the tray, less the keyboard. The name shrinks into
+        // the top left, the figure into the right half below the pill, the
+        // bubble into the left column under the name.
+        final w = box.maxWidth, h = box.maxHeight;
+        final visible = math.max(160.0, h + rest - keyboard);
+        const nameScale = .6;
+        final figureTop = top + 56.0;
+        final figureRestTop = h - 4 - h * .72;
+        final figureScale = ((visible - figureTop - 6) / (h * .72)).clamp(
+          .25,
+          1.0,
+        );
+        final figureDx = w * .78 - w * .675;
+        final bubbleTop = top + 56 + 72 * nameScale + 14;
+        final bubbleScale = .8;
+        Widget pose(
+          Widget child, {
+          required Alignment origin,
+          double dx = 0,
+          double dy = 0,
+          double scale = 1,
+          double fade = 1,
+        }) => AnimatedBuilder(
+          animation: typing,
+          child: child,
+          builder: (context, child) {
+            final t = typing.value;
+            if (t == 0) return child!;
+            final k = 1 + (scale - 1) * t;
+            return Opacity(
+              opacity: 1 - (1 - fade) * t,
+              child: Transform(
+                alignment: origin,
+                transform: Matrix4.translationValues(dx * t, dy * t, 0)
+                  ..scaleByDouble(k, k, 1, 1),
+                child: child,
+              ),
+            );
+          },
+        );
         return Stack(
           children: [
             if (agent != null)
@@ -489,7 +591,13 @@ class _Fighter extends StatelessWidget {
               bottom: -4,
               width: box.maxWidth * .95,
               height: box.maxHeight * .72,
-              child: arrive(figure, dy: 24),
+              child: pose(
+                arrive(figure, dy: 24),
+                origin: Alignment.topCenter,
+                dx: figureDx,
+                dy: figureTop - figureRestTop,
+                scale: figureScale,
+              ),
             ),
             Positioned(
               left: 18,
@@ -499,24 +607,32 @@ class _Fighter extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        bot.title.toUpperCase(),
-                        maxLines: 1,
-                        style: MangaType.fighter(field.ink),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: SizedBox(
-                        width: 170,
+                    pose(
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
                         child: Text(
-                          _role(bot) ?? '',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: MangaType.line(field.ink),
+                          bot.title.toUpperCase(),
+                          maxLines: 1,
+                          style: MangaType.fighter(field.ink),
+                        ),
+                      ),
+                      origin: Alignment.topLeft,
+                      scale: nameScale,
+                    ),
+                    pose(
+                      origin: Alignment.topLeft,
+                      fade: 0,
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: SizedBox(
+                          width: 170,
+                          child: Text(
+                            _role(bot) ?? '',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: MangaType.line(field.ink),
+                          ),
                         ),
                       ),
                     ),
@@ -529,34 +645,39 @@ class _Fighter extends StatelessWidget {
                 left: 14,
                 top: top + 214,
                 width: math.min(240, box.maxWidth * .6),
-                child: arrive(
-                  MangaBubble(
-                    fill: Colors.white,
-                    stroke: stroke,
-                    strokeWidth: 2.5,
-                    // An oval's text box is narrower than the oval: about
-                    // 70% of its width, so the margins are generous.
-                    padding: const EdgeInsets.fromLTRB(34, 20, 34, 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          agent != null
-                              ? 'ON IT NOW'
-                              : bot.lastActive == null
-                              ? 'LAST SAID'
-                              : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
-                          style: MangaType.stamp(const Color(0xFF4A4A50)),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          said,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: MangaType.line(const Color(0xFF0E0E10)),
-                        ),
-                      ],
+                child: pose(
+                  origin: Alignment.topLeft,
+                  dy: bubbleTop - (top + 214),
+                  scale: bubbleScale,
+                  arrive(
+                    MangaBubble(
+                      fill: Colors.white,
+                      stroke: stroke,
+                      strokeWidth: 2.5,
+                      // An oval's text box is narrower than the oval: about
+                      // 70% of its width, so the margins are generous.
+                      padding: const EdgeInsets.fromLTRB(34, 20, 34, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            agent != null
+                                ? 'ON IT NOW'
+                                : bot.lastActive == null
+                                ? 'LAST SAID'
+                                : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
+                            style: MangaType.stamp(const Color(0xFF4A4A50)),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            said,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: MangaType.line(const Color(0xFF0E0E10)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -627,6 +748,7 @@ class _Tray extends StatelessWidget {
     required this.field,
     required this.working,
     required this.controller,
+    required this.focus,
     required this.onTile,
     required this.onSend,
     required this.hint,
@@ -637,6 +759,7 @@ class _Tray extends StatelessWidget {
   final MangaField field;
   final Set<String> working;
   final TextEditingController controller;
+  final FocusNode focus;
   final ValueChanged<int> onTile;
   final VoidCallback onSend;
   final String hint;
@@ -689,6 +812,7 @@ class _Tray extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: controller,
+                        focusNode: focus,
                         minLines: 1,
                         maxLines: 4,
                         textCapitalization: TextCapitalization.sentences,
