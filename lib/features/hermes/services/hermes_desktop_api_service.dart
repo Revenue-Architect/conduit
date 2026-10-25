@@ -622,6 +622,40 @@ final class HermesDesktopApiService
     );
   }
 
+  /// The newest thing the assistant said in a stored chat, as plain text,
+  /// for a speech bubble. Null when it has not answered yet.
+  Future<String?> latestAssistantText(String storedId) async {
+    if (validateHermesOpaqueIdentifier(storedId) == null) return null;
+    final rows = _objects(
+      await _requestJson(
+        'GET',
+        '/api/sessions/${Uri.encodeComponent(storedId)}/messages',
+        query: {
+          'limit': 12,
+          'offset': 0,
+          'order': 'latest',
+          ..._sessionScope(storedId),
+        },
+      ),
+      'messages',
+    );
+    for (final row in rows) {
+      if (row['role'] != 'assistant') continue;
+      final raw = row['content'];
+      final text = raw is String
+          ? raw
+          : raw is List
+          ? raw
+                .whereType<Map>()
+                .map((part) => part['text'])
+                .whereType<String>()
+                .join(' ')
+          : null;
+      if (text != null && text.trim().isNotEmpty) return text;
+    }
+    return null;
+  }
+
   /// The stored transcript as the server saved it. A turn the server ran on
   /// its own (an approval wake) is in the store but not in this connection's
   /// runtime history, so reloads requested for such turns read from here.

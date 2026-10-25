@@ -13,7 +13,8 @@ import '../models/hermes_bot.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_agentic_providers.dart';
 import '../providers/hermes_providers.dart';
-import '../services/hermes_desktop_api_service.dart' show HermesLiveSession;
+import '../services/hermes_desktop_api_service.dart'
+    show HermesDesktopApiService, HermesLiveSession;
 import '../sheets/hermes_active_work_sheet.dart' show hermesSummaryForSession;
 import '../widgets/hermes_home_composer.dart' show startHermesBotConversation;
 import '../widgets/hermes_home_inbox.dart' show hermesChiefProfile;
@@ -57,6 +58,32 @@ String? mangaSpeech(String? raw) {
   if (text.isEmpty || text.startsWith('/') || text.length < 3) return null;
   return text;
 }
+
+/// What [profile] last said to the owner: the newest reply in its most
+/// recent chat that a person started (scheduled runs talk to no one).
+final mangaLastWordsProvider = FutureProvider.family<String?, String>((
+  ref,
+  profile,
+) async {
+  final service = ref.watch(hermesApiServiceProvider);
+  if (service is! HermesDesktopApiService) return null;
+  final sessions = ref.watch(hermesSessionsProvider).value ?? const [];
+  final bots = ref.watch(hermesBotsProvider).value ?? const [];
+  final ids = [
+    for (final s in sessions)
+      if (s.profile == profile && s.source != 'cron') s.id,
+    ?bots.where((b) => b.name == profile).firstOrNull?.chatSessionId,
+  ];
+  for (final id in ids.take(3)) {
+    try {
+      final text = mangaSpeech(await service.latestAssistantText(id));
+      if (text != null && !_instructions(text)) return text;
+    } catch (_) {
+      // One unreadable chat does not stop the next.
+    }
+  }
+  return null;
+});
 
 /// The bots in page order: working ones first, in Hermes' order, then by
 /// last activity.
@@ -310,23 +337,14 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
     String? said(HermesBot bot) {
       final agent = byProfile[bot.name];
       if (agent != null) return agent.line;
-      // A scheduled run's preview is its standing instructions, not
-      // something the bot said: people's chats first, then the bot's own
-      // chat, then any run, and the description only as a last resort.
-      final mine = sessions.where((s) => s.profile == bot.name).toList();
-      final candidates = [
-        for (final s in mine)
-          if (s.source != 'cron') s.preview,
-        bot.preview,
-        for (final s in mine)
-          if (s.source == 'cron') s.preview,
-        bot.description,
-      ];
-      for (final candidate in candidates) {
-        final text = mangaSpeech(candidate);
-        if (text != null && !_instructions(text)) return text;
-      }
-      return mangaSpeech(bot.description);
+      // The bot's newest reply to the owner. Session previews are each
+      // chat's first message (the owner's prompt, or a scheduled run's
+      // standing instructions), so they are only a fallback, and the
+      // description never is: it is already the bot's role line.
+      final words = ref.watch(mangaLastWordsProvider(bot.name)).value;
+      if (words != null) return words;
+      final text = mangaSpeech(bot.preview);
+      return text != null && !_instructions(text) ? text : null;
     }
 
     _said = said;
