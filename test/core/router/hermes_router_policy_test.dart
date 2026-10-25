@@ -11,6 +11,7 @@ import 'package:conduit/features/direct_connections/models/direct_connection_pro
 import 'package:conduit/features/direct_connections/providers/direct_connection_providers.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit/features/hermes/manga/manga_prefs.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -323,6 +324,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             reviewerModeProvider.overrideWithValue(false),
+            mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
             activeServerProvider.overrideWith(
               (_) async => _retainedOpenWebUiServer,
             ),
@@ -553,6 +555,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           reviewerModeProvider.overrideWithValue(false),
+          mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
           activeServerProvider.overrideWith((_) => pendingServer.future),
           preferredBackendProvider.overrideWith(
             _FixedPreferredBackendController.new,
@@ -588,6 +591,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           reviewerModeProvider.overrideWithValue(false),
+          mangaClassicLayoutProvider.overrideWith(_ClassicLayout.new),
           activeServerProvider.overrideWith(
             (_) => Future<ServerConfig?>.error(StateError('storage failed')),
           ),
@@ -621,6 +625,41 @@ void main() {
       when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
       check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
     });
+  });
+
+  test('the manga layout opens a cold start on Pick over Today', () async {
+    final container = ProviderContainer(
+      overrides: [
+        reviewerModeProvider.overrideWithValue(false),
+        activeServerProvider.overrideWith(
+          (_) => Future<ServerConfig?>.error(StateError('storage failed')),
+        ),
+        preferredBackendProvider.overrideWith(
+          _FixedPreferredBackendController.new,
+        ),
+        hermesConfigProvider.overrideWith(
+          () => _FixedHermesConfigController(_usableHermes),
+        ),
+        authStateManagerProvider.overrideWith(
+          _AuthenticatedAuthStateManager.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authStateManagerProvider.future);
+    await expectLater(
+      container.read(activeServerProvider.future),
+      throwsStateError,
+    );
+
+    final state = _MockGoRouterState();
+    final notifier = container.read(routerNotifierProvider);
+    when(() => state.uri).thenReturn(Uri.parse(Routes.splash));
+    check(notifier.redirect(_MockBuildContext(), state))
+        .equals('${Routes.hermesHome}?pick=1');
+    // Only the launch changes: signing in still lands on the chat.
+    when(() => state.uri).thenReturn(Uri.parse(Routes.authentication));
+    check(notifier.redirect(_MockBuildContext(), state)).equals(Routes.chat);
   });
 
   group('Direct-primary route policy', () {
@@ -909,4 +948,10 @@ void main() {
       },
     );
   });
+}
+
+/// These cases describe the classic layout's landing on the chat.
+class _ClassicLayout extends MangaClassicLayout {
+  @override
+  bool build() => true;
 }

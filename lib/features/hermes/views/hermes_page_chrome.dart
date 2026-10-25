@@ -260,29 +260,55 @@ class MangaPageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ink = MangaInk.of(context);
+    final heading = Semantics(
+      header: true,
+      child: Text(
+        title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: MangaType.display(ink.ink),
+      ),
+    );
+    final meta = Text(
+      subtitle,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: MangaType.meta(ink.ink2),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(title, style: MangaType.display(ink.ink)),
-            ),
-          ),
-          if (subtitle.isNotEmpty)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 170),
-              child: Text(
-                subtitle,
-                textAlign: TextAlign.right,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: MangaType.meta(ink.ink2),
+      child: LayoutBuilder(
+        // The subtitle sits at the right only while the title keeps a wide
+        // column; narrow or large text, it goes under the title.
+        builder: (context, box) =>
+            subtitle.isEmpty ||
+                box.maxWidth < 360 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  heading,
+                  if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), meta],
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(child: heading),
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      widthFactor: 1,
+                      child: DefaultTextStyle.merge(
+                        textAlign: TextAlign.right,
+                        child: meta,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-        ],
       ),
     );
   }
