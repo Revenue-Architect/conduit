@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../chat/providers/chat_providers.dart' show sendMessageWithContainer;
+import '../../chat/services/voice_input_service.dart'
+    show voiceInputServiceProvider;
 import '../models/hermes_bot.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_agentic_providers.dart';
@@ -108,9 +112,70 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
     _task.addListener(() => setState(() {}));
   }
 
+  StreamSubscription<String>? _voiceSub;
+  bool _recording = false;
+  String _voiceBase = '';
+
+  /// Dictation into the task box, the same service the chat composer uses:
+  /// tap to talk, tap again to stop; the words land in the box to edit or
+  /// send.
+  Future<void> _toggleVoice() async {
+    final voice = ref.read(voiceInputServiceProvider);
+    if (_recording) {
+      await _stopVoice();
+      return;
+    }
+    try {
+      if (!await voice.initialize()) throw StateError('unavailable');
+      final stream = await voice.beginListening();
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      _voiceBase = _task.text;
+      setState(() => _recording = true);
+      await _voiceSub?.cancel();
+      _voiceSub = stream.listen(
+        (text) {
+          final next = _voiceBase.trim().isEmpty
+              ? text
+              : '${_voiceBase.trimRight()} $text';
+          _task.value = TextEditingValue(
+            text: next,
+            selection: TextSelection.collapsed(offset: next.length),
+          );
+        },
+        onDone: () {
+          if (mounted) setState(() => _recording = false);
+        },
+        onError: (_) {
+          if (mounted) setState(() => _recording = false);
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _recording = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voice input is not available right now.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _stopVoice() async {
+    try {
+      await ref.read(voiceInputServiceProvider).stopListening();
+    } finally {
+      if (mounted) setState(() => _recording = false);
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _voiceSub?.cancel();
+    if (_recording) {
+      unawaited(ref.read(voiceInputServiceProvider).stopListening());
+    }
     _task.dispose();
     _focus.dispose();
     super.dispose();
@@ -158,6 +223,7 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
         initial: bots.indexOf(bot),
         origin: origin,
         instant: launch,
+        speech: {for (final b in bots) b.name: _said(b)},
         working: {
           for (final agent in watchWorkingSnapshot()) agent.profile: agent,
         },
@@ -172,9 +238,14 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
       _lastWorking;
   List<HermesWorkingAgent> _lastWorking = const [];
 
+  /// The page's "what did this bot last say", kept for Pick's bubbles.
+  String? Function(HermesBot bot) _said = (_) => null;
+
   Future<void> _send(HermesBot bot) async {
     final text = _task.text.trim();
     if (text.isEmpty) return;
+    if (_recording) await _stopVoice();
+    if (!mounted) return;
     HapticFeedback.mediumImpact();
     _task.clear();
     _focus.unfocus();
@@ -239,15 +310,26 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
     String? said(HermesBot bot) {
       final agent = byProfile[bot.name];
       if (agent != null) return agent.line;
-      final latest = sessions
-          .where((s) => s.profile == bot.name && (s.preview ?? '').isNotEmpty)
-          .firstOrNull;
-      for (final candidate in [latest?.preview, bot.preview, bot.description]) {
+      // A scheduled run's preview is its standing instructions, not
+      // something the bot said: people's chats first, then the bot's own
+      // chat, then any run, and the description only as a last resort.
+      final mine = sessions.where((s) => s.profile == bot.name).toList();
+      final candidates = [
+        for (final s in mine)
+          if (s.source != 'cron') s.preview,
+        bot.preview,
+        for (final s in mine)
+          if (s.source == 'cron') s.preview,
+        bot.description,
+      ];
+      for (final candidate in candidates) {
         final text = mangaSpeech(candidate);
-        if (text != null) return text;
+        if (text != null && !_instructions(text)) return text;
       }
-      return null;
+      return mangaSpeech(bot.description);
     }
+
+    _said = said;
 
     String? caption(HermesBot bot) {
       final agent = byProfile[bot.name];
@@ -389,6 +471,8 @@ class _MangaTodayPageState extends ConsumerState<MangaTodayPage>
                       bot: taskBot,
                       controller: _task,
                       focus: _focus,
+                      recording: _recording,
+                      onMic: _toggleVoice,
                       onAvatar: () => _openPick(bots!, taskBot),
                       onSend: () => _send(taskBot),
                     ),
@@ -768,6 +852,8 @@ class _TaskBox extends StatelessWidget {
     required this.focus,
     required this.onAvatar,
     required this.onSend,
+    required this.recording,
+    required this.onMic,
   });
 
   final HermesBot bot;
@@ -775,6 +861,11 @@ class _TaskBox extends StatelessWidget {
   final FocusNode focus;
   final VoidCallback onAvatar;
   final VoidCallback onSend;
+
+  /// Dictating now: the mic shows a stop square on orange, because the
+  /// orange means something is happening.
+  final bool recording;
+  final VoidCallback onMic;
 
   @override
   Widget build(BuildContext context) {
@@ -836,7 +927,34 @@ class _TaskBox extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
+            MangaPress(
+              semanticLabel: recording ? 'Stop dictation' : 'Dictate',
+              onTap: onMic,
+              scale: .92,
+              child: AnimatedContainer(
+                duration: MangaMotion.swap,
+                curve: MangaMotion.easeOut,
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: recording
+                      ? ink.accent
+                      : ink.accent.withValues(alpha: 0),
+                  shape: BoxShape.circle,
+                ),
+                child: AnimatedSwitcher(
+                  duration: MangaMotion.swap,
+                  switchInCurve: MangaMotion.easeOut,
+                  child: Icon(
+                    recording ? Icons.stop_rounded : Icons.mic_none_rounded,
+                    key: ValueKey(recording),
+                    size: 22,
+                    color: recording ? ink.onAccent : ink.ink2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
             MangaPress(
               semanticLabel: 'Send to ${bot.title}',
               onTap: armed ? onSend : null,
@@ -863,3 +981,10 @@ class _TaskBox extends StatelessWidget {
     );
   }
 }
+
+/// Standing instructions read as orders, not as something a bot said:
+/// "Do not…", "Use…", "You are…", "Run…".
+bool _instructions(String text) => RegExp(
+  r"^(do not|don't|use |you are|run |always |never |follow |check |the receiving)",
+  caseSensitive: false,
+).hasMatch(text);

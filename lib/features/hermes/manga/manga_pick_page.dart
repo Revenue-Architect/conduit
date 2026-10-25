@@ -6,8 +6,9 @@ import 'package:flutter/services.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../models/hermes_bot.dart';
 import '../widgets/hermes_home_working.dart' show HermesWorkingAgent;
+import '../widgets/hermez_bot_icons.dart';
+import '../widgets/hermez_bot_video.dart';
 import 'manga_portrait.dart';
-import 'manga_today_page.dart' show mangaSpeech;
 import 'manga_theme.dart';
 import 'manga_widgets.dart';
 
@@ -29,8 +30,12 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
     required this.initial,
     required this.origin,
     required this.working,
+    this.speech = const {},
     this.instant = false,
   });
+
+  /// What each bot last said, cleaned for its bubble (from Today).
+  final Map<String, String?> speech;
 
   /// The app's landing: no reveal, Pick is simply the first screen.
   final bool instant;
@@ -70,6 +75,7 @@ class MangaPickRoute extends PageRoute<MangaPickResult> {
     bots: bots,
     initial: initial,
     working: working,
+    speech: speech,
     entrance: animation,
   );
 
@@ -144,11 +150,13 @@ class MangaPickPage extends StatefulWidget {
     required this.initial,
     required this.working,
     required this.entrance,
+    this.speech = const {},
   });
 
   final List<HermesBot> bots;
   final int initial;
   final Map<String, HermesWorkingAgent> working;
+  final Map<String, String?> speech;
   final Animation<double> entrance;
 
   @override
@@ -256,6 +264,8 @@ class _MangaPickPageState extends State<MangaPickPage> {
                           field: _field(i),
                           agent: widget.working[widget.bots[i].name],
                           entrance: widget.entrance,
+                          words: widget.speech[widget.bots[i].name],
+                          current: i == _index,
                         ),
                       ),
                       SafeArea(
@@ -342,13 +352,19 @@ String? _role(HermesBot bot) {
   return role.isEmpty ? null : role[0].toUpperCase() + role.substring(1);
 }
 
-/// One fighter: name, role, last words, portrait.
+/// One fighter: name, role, last words, and the bot itself: its idle (or
+/// working) clip in a square ink panel when it has one, else its cut-out
+/// figure. With the keyboard up the stage is short, so the name keeps to
+/// the left, the figure shrinks to the right and the role and bubble step
+/// aside.
 class _Fighter extends StatelessWidget {
   const _Fighter({
     required this.bot,
     required this.field,
     required this.agent,
     required this.entrance,
+    required this.words,
+    required this.current,
   });
 
   final HermesBot bot;
@@ -356,12 +372,18 @@ class _Fighter extends StatelessWidget {
   final HermesWorkingAgent? agent;
   final Animation<double> entrance;
 
+  /// What the bot last said, cleaned for a bubble.
+  final String? words;
+
+  /// The fighter on screen: only it plays its clip.
+  final bool current;
+
   @override
   Widget build(BuildContext context) {
     final reduce = context.reduceMotion;
-    final words = mangaSpeech(agent?.line) ?? mangaSpeech(bot.preview);
-    // The name and portrait arrive after the colour: the reveal is the
-    // event, the content settles in behind it, 12 px and a fade.
+    final stroke = field.lightField ? const Color(0xFF0E0E10) : field.tray;
+    // The name and figure arrive after the colour: the reveal is the event,
+    // the content settles in behind it, 12 px and a fade.
     final settle = CurvedAnimation(
       parent: entrance,
       curve: const Interval(.35, 1, curve: MangaMotion.easeOut),
@@ -380,117 +402,181 @@ class _Fighter extends StatelessWidget {
               ),
             ),
           );
+    final top = MediaQuery.paddingOf(context).top;
+    final hasClip =
+        HermezBotIcons.videoFor(bot.name, HermezBotClip.idle) != null ||
+        HermezBotIcons.videoFor(bot.name, HermezBotClip.working) != null;
+    final said = words;
 
     return LayoutBuilder(
-      builder: (context, box) => Stack(
-        children: [
-          if (agent != null)
-            Positioned.fill(
-              child: ShaderMask(
-                // Rays only on the portrait's side: the name and role stay on
-                // a calm field.
-                shaderCallback: (rect) => const LinearGradient(
-                  colors: [Colors.transparent, Colors.black],
-                  stops: [.46, .6],
-                ).createShader(rect),
-                blendMode: BlendMode.dstIn,
-                child: SpeedLines(
-                  centre: const Alignment(.4, .3),
-                  ground: Colors.transparent,
-                  tone: const Color(0x1F0E0E10),
-                  rays: 60,
-                  clear: 0,
+      builder: (context, box) {
+        // The keyboard takes the bottom half: a short stage.
+        final compact = box.maxHeight < top + 420;
+        final panelSide = compact
+            ? math.max(
+                80.0,
+                math.min(box.maxWidth * .4, box.maxHeight - top - 70),
+              )
+            : math.min(box.maxWidth * .66, box.maxHeight * .5);
+        final Widget figure = hasClip
+            ? Transform.rotate(
+                angle: -2 * math.pi / 180,
+                child: Container(
+                  width: panelSide,
+                  height: panelSide,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: stroke, width: 3),
+                  ),
+                  child: current
+                      ? HermezBotVideoMark(
+                          botName: bot.name,
+                          size: panelSide - 6,
+                          working: agent != null,
+                          square: true,
+                          poster: _Still(bot: bot),
+                        )
+                      : _Still(bot: bot),
                 ),
-              ),
-            ),
-          Positioned(
-            right: -box.maxWidth * .15,
-            bottom: -4,
-            width: box.maxWidth * .95,
-            height: box.maxHeight * .72,
-            child: arrive(
-              MangaPortrait(
+              )
+            : MangaPortrait(
                 botName: bot.name,
-                outline: field.lightField
-                    ? const Color(0xFF0E0E10)
-                    : field.tray,
+                outline: stroke,
                 outlineWidth: 2,
-              ),
-              dy: 24,
-            ),
-          ),
-          Positioned(
-            left: 18,
-            top: MediaQuery.paddingOf(context).top + 56,
-            right: 18,
-            child: arrive(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      bot.title.toUpperCase(),
-                      maxLines: 1,
-                      style: MangaType.fighter(field.ink),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_role(bot) case final role?)
-                    SizedBox(
-                      width: 170,
-                      child: Text(
-                        role,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: MangaType.line(field.ink),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (words != null && words.isNotEmpty)
-            Positioned(
-              left: 14,
-              top: MediaQuery.paddingOf(context).top + 214,
-              width: math.min(206, box.maxWidth * .52),
-              child: arrive(
-                MangaBubble(
-                  fill: Colors.white,
-                  stroke: field.lightField
-                      ? const Color(0xFF0E0E10)
-                      : field.tray,
-                  strokeWidth: 2.5,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        agent != null
-                            ? 'ON IT NOW'
-                            : bot.lastActive == null
-                            ? 'LAST SAID'
-                            : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
-                        style: MangaType.stamp(const Color(0xFF4A4A50)),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        words,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: MangaType.line(const Color(0xFF0E0E10)),
-                      ),
-                    ],
+              );
+        return Stack(
+          children: [
+            if (agent != null)
+              Positioned.fill(
+                child: ShaderMask(
+                  // Rays only on the figure's side: the name and role stay on
+                  // a calm field.
+                  shaderCallback: (rect) => const LinearGradient(
+                    colors: [Colors.transparent, Colors.black],
+                    stops: [.46, .6],
+                  ).createShader(rect),
+                  blendMode: BlendMode.dstIn,
+                  child: const SpeedLines(
+                    centre: Alignment(.4, .3),
+                    ground: Colors.transparent,
+                    tone: Color(0x1F0E0E10),
+                    rays: 60,
+                    clear: 0,
                   ),
                 ),
               ),
+            if (hasClip)
+              AnimatedPositioned(
+                duration: MangaMotion.enter,
+                curve: MangaMotion.easeOut,
+                right: compact ? 16 : 18,
+                bottom: compact ? 12 : 28,
+                width: panelSide,
+                height: panelSide,
+                child: arrive(figure, dy: 24),
+              )
+            else
+              AnimatedPositioned(
+                duration: MangaMotion.enter,
+                curve: MangaMotion.easeOut,
+                right: compact ? -box.maxWidth * .04 : -box.maxWidth * .15,
+                bottom: -4,
+                width: box.maxWidth * (compact ? .5 : .95),
+                height: box.maxHeight * (compact ? .8 : .72),
+                child: arrive(figure, dy: 24),
+              ),
+            Positioned(
+              left: 18,
+              top: top + 56,
+              // Compact, the name keeps out of the figure's half.
+              width: box.maxWidth * (compact ? .52 : 1) - 36,
+              child: arrive(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        bot.title.toUpperCase(),
+                        maxLines: 1,
+                        style: MangaType.fighter(field.ink),
+                      ),
+                    ),
+                    AnimatedOpacity(
+                      opacity: compact ? 0 : 1,
+                      duration: MangaMotion.swap,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: SizedBox(
+                          width: 170,
+                          child: Text(
+                            _role(bot) ?? '',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: MangaType.line(field.ink),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-        ],
-      ),
+            if (said != null && said.isNotEmpty && !compact)
+              Positioned(
+                left: 14,
+                top: top + 214,
+                width: math.min(206, box.maxWidth * .52),
+                child: arrive(
+                  MangaBubble(
+                    fill: Colors.white,
+                    stroke: stroke,
+                    strokeWidth: 2.5,
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          agent != null
+                              ? 'ON IT NOW'
+                              : bot.lastActive == null
+                              ? 'LAST SAID'
+                              : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
+                          style: MangaType.stamp(const Color(0xFF4A4A50)),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          said,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: MangaType.line(const Color(0xFF0E0E10)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
+  }
+}
+
+/// The bot's still (the clip's first frame), filling the panel.
+class _Still extends StatelessWidget {
+  const _Still({required this.bot});
+
+  final HermesBot bot;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = HermezBotIcons.iconFor(bot.name);
+    return file == null
+        ? const SizedBox.expand()
+        : Image.file(file, fit: BoxFit.cover, gaplessPlayback: true);
   }
 }
 

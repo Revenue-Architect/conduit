@@ -20,6 +20,11 @@ import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../auth/providers/unified_auth_providers.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
+import '../../hermes/manga/manga_prefs.dart';
+import '../../hermes/manga/manga_theme.dart';
+import '../../hermes/manga/manga_widgets.dart';
+import '../../hermes/views/hermes_page_chrome.dart' show MangaPageHeader;
+import '../../hermes/widgets/hermes_tab_dock.dart' show hermesDockClearance;
 import '../../../core/services/api_service.dart';
 import '../../../core/models/user.dart' as models;
 import '../../../core/utils/user_display_name.dart';
@@ -44,6 +49,8 @@ class ProfilePage extends ConsumerWidget {
       orElse: () => authUser,
     );
     final isAuthLoading = ref.watch(isAuthLoadingProvider2);
+    // Watched here so every row below rebuilds when the layout flips.
+    ref.watch(mangaClassicLayoutProvider);
     final api = ref.watch(apiServiceProvider);
 
     Widget body;
@@ -63,6 +70,25 @@ class ProfilePage extends ConsumerWidget {
 
   Widget _buildScaffold(BuildContext context, {required Widget body}) {
     final l10n = AppLocalizations.of(context)!;
+    if (mangaLayoutOf(context)) {
+      // The manga page: its own title, plain paper, no app bar.
+      return Material(
+        color: MangaInk.of(context).ground,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: MangaPageHeader(title: l10n.you, subtitle: ''),
+              ),
+              Expanded(child: body),
+            ],
+          ),
+        ),
+      );
+    }
 
     return AdaptiveRouteShell(
       backgroundColor: context.conduitTheme.surfaceBackground,
@@ -101,15 +127,18 @@ class ProfilePage extends ConsumerWidget {
       directPrimary: directPrimary,
       hasOpenWebUiAccount: hasOpenWebUiAccount,
     );
+    final manga = mangaLayoutOf(context);
     return ListView(
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
       padding: EdgeInsets.fromLTRB(
-        Spacing.pagePadding,
-        topPadding,
-        Spacing.pagePadding,
-        Spacing.pagePadding + mediaQuery.padding.bottom,
+        manga ? 14 : Spacing.pagePadding,
+        manga ? 0 : topPadding,
+        manga ? 14 : Spacing.pagePadding,
+        Spacing.pagePadding +
+            mediaQuery.padding.bottom +
+            (manga ? hermesDockClearance(context) : 0),
       ),
       children: [
         if (hasOpenWebUiAccount) ...[
@@ -364,6 +393,20 @@ class ProfilePage extends ConsumerWidget {
           onTap: () => context.goNamed(RouteNames.serverConnection),
         ),
     ];
+    if (mangaLayoutOf(context)) {
+      return [
+        _MangaSection(
+          title: 'App',
+          children: [
+            ...appItems,
+            // The rollback, where the owner looks for it.
+            _MangaClassicRow(),
+          ],
+        ),
+        _MangaSection(title: 'Connections', children: connectionItems),
+        _MangaSection(title: 'About', children: [_buildAboutTile(context)]),
+      ];
+    }
     return [
       InsetGroupedList(children: appItems),
       const SizedBox(height: Spacing.lg),
@@ -407,6 +450,30 @@ class ProfilePage extends ConsumerWidget {
     );
     final theme = context.conduitTheme;
     final color = theme.buttonPrimary;
+    if (mangaLayoutOf(context)) {
+      return _MangaRow(
+        key: key,
+        onTap: onTap,
+        glyph: iconAsset != null
+            ? Image.asset(
+                iconAsset,
+                key: const Key('hermes-settings-logo'),
+                width: IconSize.medium + 2,
+                height: IconSize.medium + 2,
+                color: destructive ? theme.error : MangaInk.of(context).ink,
+                colorBlendMode: BlendMode.srcIn,
+              )
+            : Icon(
+                icon,
+                size: 22,
+                color: destructive ? theme.error : MangaInk.of(context).ink,
+              ),
+        title: title,
+        subtitle: subtitle,
+        showChevron: showChevron,
+        destructive: destructive,
+      );
+    }
     return UtilityRow(
       key: key,
       onTap: onTap,
@@ -497,5 +564,133 @@ class ProfilePage extends ConsumerWidget {
       if (!context.mounted) return;
       UiUtils.showMessage(context, AppLocalizations.of(context)!.errorMessage);
     }
+  }
+}
+
+/// A You section in the manga layout: the panel face over a thick ink rule,
+/// then plain rows on the paper.
+class _MangaSection extends StatelessWidget {
+  const _MangaSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = MangaInk.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Container(
+              padding: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: ink.ink, width: ink.border),
+                ),
+              ),
+              child: Text(title, style: MangaType.panel(ink.ink)),
+            ),
+          ),
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: ink.rule),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One You row in the manga layout: a square ink glyph tile, the title in
+/// the page face, one quiet line, a chevron.
+class _MangaRow extends StatelessWidget {
+  const _MangaRow({
+    super.key,
+    required this.onTap,
+    required this.glyph,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    this.showChevron = true,
+    this.destructive = false,
+  });
+
+  final VoidCallback? onTap;
+  final Widget glyph;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final bool showChevron;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = MangaInk.of(context);
+    final titleColour = destructive ? context.conduitTheme.error : ink.ink;
+    return MangaPress(
+      semanticLabel: '$title. $subtitle',
+      scale: .985,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border.all(color: ink.ink, width: ink.border),
+                ),
+                child: glyph,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: MangaType.title(titleColour)),
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: MangaType.meta(ink.ink2),
+                      ),
+                  ],
+                ),
+              ),
+              ?trailing,
+              if (trailing == null && showChevron)
+                Icon(Icons.chevron_right_rounded, color: ink.ink3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Classic layout": the switch back to the list screens.
+class _MangaClassicRow extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final classic = ref.watch(mangaClassicLayoutProvider);
+    final notifier = ref.read(mangaClassicLayoutProvider.notifier);
+    final ink = MangaInk.of(context);
+    return _MangaRow(
+      key: const Key('settings-classic-layout'),
+      onTap: () => notifier.set(!classic),
+      glyph: Icon(Icons.view_agenda_outlined, size: 22, color: ink.ink),
+      title: 'Classic layout',
+      subtitle: 'Pre-manga list screens',
+      trailing: Switch(value: classic, onChanged: notifier.set),
+    );
   }
 }
