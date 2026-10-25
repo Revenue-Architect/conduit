@@ -9,6 +9,7 @@ import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
 import '../manga/manga_pick_launch.dart' show openMangaPick;
+import '../models/hermes_bot.dart';
 import '../providers/hermes_providers.dart' show hermesBotsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
@@ -49,19 +50,35 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
     _lastHermesTab = _index;
     if (widget.openPick && !_launchPickShown) {
       _launchPickShown = true;
-      unawaited(_openPickWhenReady());
+      _openPickWhenReady();
     }
   }
 
-  /// Waits for the bot list (Pick needs it), then lands on Pick.
-  Future<void> _openPickWhenReady() async {
-    try {
-      await ref.read(hermesBotsProvider.future);
-    } catch (_) {
+  /// Waits for the bot list (Pick needs it), then lands on Pick. On a cold
+  /// start the first load can fail before the connection is ready, so this
+  /// listens until a list arrives instead of trying once; it gives up after
+  /// 20 s, or once the owner has moved off Home.
+  void _openPickWhenReady() {
+    if (ref.read(hermesBotsProvider).value?.isNotEmpty ?? false) {
+      _landOnPick();
       return;
     }
-    if (!mounted) return;
-    await openMangaPick(context, ref, instant: true);
+    late final ProviderSubscription<AsyncValue<List<HermesBot>>> sub;
+    final deadline = Timer(const Duration(seconds: 20), () => sub.close());
+    sub = ref.listenManual(hermesBotsProvider, (_, next) {
+      if (next.value?.isNotEmpty ?? false) {
+        deadline.cancel();
+        sub.close();
+        _landOnPick();
+      }
+    });
+  }
+
+  void _landOnPick() {
+    if (!mounted || _index != 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) openMangaPick(context, ref, instant: true);
+    });
   }
 
   void _select(int index) {
