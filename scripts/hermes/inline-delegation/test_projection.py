@@ -54,6 +54,39 @@ sys.stderr.write('diagnostic only')
             self.assertNotIn('hidden', receipt.path.read_text())
             proc.stdout.close(); proc.stderr.close()
 
+    def test_returned_tasks_anchor_on_the_chat_reply(self):
+        def row(i, role, content):
+            return {'id': i, 'message_uid': f'u{i}', 'role': role, 'content': content}
+        rows = [
+            row(1, 'user', '[Cronjob "initiative-engine" output — scheduled job, not the user.]\n\nDelegated to kai: t_63502ffe and t_fe3bf7f9.'),
+            row(2, 'assistant', ''),
+            row(3, 'assistant', 'Kai is drafting both.'),
+            row(4, 'user', 'what about t_aaaaaaaa?'),
+            row(5, 'assistant', 'Owner text is never an anchor.'),
+            row(6, 'user', '[kanban] Task t_63502ffe completed.\nTitle: NetSuite wording\nAssignee: @kai'),
+            row(7, 'user', '[kanban] Task t_fe3bf7f9 completed.\nTitle: Scope memo\nAssignee: @kai'),
+            row(8, 'assistant', 'Both drafts are ready.'),
+            row(9, 'user', '[kanban] Task t_0000beef blocked; needs attention.'),
+        ]
+        anchors = [(a['message_uid'], ids) for a, ids in projection.returned_tasks(rows)]
+        self.assertEqual(anchors, [
+            ('u3', ['t_63502ffe', 't_fe3bf7f9']),  # the reply, not the notification or an empty step
+            ('u8', ['t_63502ffe']),
+            ('u8', ['t_fe3bf7f9']),
+            ('u9', ['t_0000beef']),  # no reply yet: the notification itself
+        ])
+
+    def test_engine_output_adds_the_run_tasks_from_its_resolver(self):
+        rows = [
+            {'id': 1, 'message_uid': 'u1', 'role': 'user', 'content': '[Cronjob "initiative-engine" output — scheduled job]\n\nKai finished the memo.'},
+            {'id': 2, 'message_uid': 'u2', 'role': 'assistant', 'content': 'Kai finished the scope memo.'},
+            {'id': 3, 'message_uid': 'u3', 'role': 'user', 'content': '[Cronjob "initiative-engine" output — scheduled job]\n\nStill waiting on t_63502ffe.'},
+            {'id': 4, 'message_uid': 'u4', 'role': 'assistant', 'content': 'Still waiting.'},
+        ]
+        resolve = lambda row: {'u1': ['t_fe3bf7f9'], 'u3': ['t_63502ffe', 't_11111111']}.get(row['message_uid'], [])
+        anchors = [(a['message_uid'], ids) for a, ids in projection.returned_tasks(rows, resolve)]
+        self.assertEqual(anchors, [('u2', ['t_fe3bf7f9']), ('u4', ['t_63502ffe', 't_11111111'])])
+
     def test_existing_source_guard_is_intact(self):
         source = (Path(__file__).parent/'ask-specialist.py').read_text()
         for line in ['child_env["HERMES_SESSION_SOURCE"] = "oneshot"',

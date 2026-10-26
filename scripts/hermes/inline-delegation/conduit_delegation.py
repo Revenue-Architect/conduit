@@ -42,6 +42,45 @@ def messages(home, session_id):
             "WHERE session_id=? ORDER BY id DESC LIMIT 1000", (session_id,))][::-1]
 
 
+KANBAN_WAKE = re.compile(r"\[kanban\] Task (t_[0-9a-f]{6,16}) ")
+ENGINE_OUTPUT = '[Cronjob "initiative-engine" output'
+KANBAN_TASK_ID = re.compile(r"(?<![\w-])(t_[0-9a-f]{8})(?![\w-])")
+
+
+def returned_tasks(rows, resolve=None):
+    """Kanban work reported back into this chat by Hermes itself, never by the owner's text.
+
+    The native Kanban wake names exactly one task. For the initiative engine's delivered output,
+    ``resolve(row)`` returns the tasks that engine run itself created or collected (its own tool
+    results), plus any ids the output names. Each anchors on the chat's reply to that message, or the
+    message itself while no reply exists, as (anchor_row, [task ids])."""
+    found = []
+    for index, row in enumerate(rows):
+        text = row.get("content")
+        if row.get("role") != "user" or not isinstance(text, str):
+            continue
+        if text.startswith("[kanban] Task "):
+            match = KANBAN_WAKE.match(text)
+            ids = [match.group(1)] if match else []
+        elif text.startswith(ENGINE_OUTPUT):
+            ids = list(dict.fromkeys([*(resolve(row) if resolve else []), *KANBAN_TASK_ID.findall(text)]))
+        else:
+            continue
+        if not ids:
+            continue
+        reply = None
+        for later in rows[index + 1:]:
+            # Notifications queued back to back share one reply; the owner's own message ends the turn.
+            later_text = str(later.get("content") or "")
+            if later.get("role") == "user" and not later_text.startswith(("[kanban] Task ", ENGINE_OUTPUT)):
+                break
+            if later.get("role") == "assistant" and str(later.get("content") or "").strip():
+                reply = later
+                break
+        found.append((reply or row, ids[:8]))
+    return found
+
+
 def origin_for(task_file):
     """Match the unique task-file argument to its recorded, ID-bearing tool call.
 

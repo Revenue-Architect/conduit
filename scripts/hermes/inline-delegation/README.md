@@ -25,7 +25,14 @@ Enable `conduit-delegation` through Hermes's plugin CLI. Other profiles use syml
 
 The terminal hook carries Hermes's actual parent session, profile, turn, and tool-call IDs into the specialist wrapper. Lifecycle receipts sit beside existing specialist handoffs. The authenticated plugin router checks parent ownership before returning workers or artifacts.
 
-Native workers recover from recorded tool results and `async_delegations`. Kanban workers require both the task's stored parent session and an exact creation-tool result. No title or bot-name matching is used.
+Native workers recover from recorded tool results and `async_delegations`. Kanban workers created in the chat require both the task's stored parent session and an exact creation-tool result. No title or bot-name matching is used.
+
+Kanban work that Hermes itself reports back into a chat also gets a row (2026-10-26). This covers the initiative engine's Kai/Ops tasks, which have no parent session. Two cases:
+
+- **A native Kanban wake** (`[kanban] Task t_… completed.`) names its task.
+- **The initiative engine's delivered output** is matched exactly to its cron run. The chat admission carries `bot:<delivery id>`, cron derives that id from the job and execution id, and the run's own tool results name the tasks it created or collected.
+
+Only `initiative:` tasks count. The row anchors on the chat's reply to that message. When the run did not report the worker's session, the projection finds it in the worker profile's store: a `kanban` session that started with the run and names the task. Owner text is never an anchor.
 
 Conduit reads this projection every eight seconds while the parent is visible. Native events continue through the existing gateway stream. Transcript reads use the child's explicit profile and session; they never resume it or submit a prompt.
 
