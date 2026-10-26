@@ -44,6 +44,12 @@ bool hermesIsAutomationTurn(String text) =>
     text.startsWith('[kanban] Task t_') ||
     text.startsWith('[Umbrel incident ');
 
+/// The summary Hermes leaves when it compacts a long chat. It is reference
+/// for the model, stored as a user-role row; the chat shows it as a thin
+/// "earlier messages summarized" line.
+bool hermesIsCompactionHandoff(String text) =>
+    text.startsWith('[CONTEXT COMPACTION');
+
 /// Presentation only. Matching and server history keep the original wire text.
 String hermesInlineUiVisibleText(String text) {
   for (final suffix in const [_hermesInlineUiSuffix, _legacyInlineUiSuffix]) {

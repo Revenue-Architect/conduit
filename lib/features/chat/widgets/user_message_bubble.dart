@@ -806,6 +806,19 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
             hermesIsAutomationTurn(rawContent))) {
       return const SizedBox.shrink();
     }
+    if (widget.isHermesConversation && hermesIsCompactionHandoff(rawContent)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+        child: Center(
+          child: Text(
+            'Earlier messages summarized',
+            style: AppTypography.labelMediumStyle.copyWith(
+              color: theme.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
     final interactionLabel = widget.isHermesConversation
         ? hermesA2uiInteractionLabel(rawContent)
         : null;
