@@ -75,6 +75,8 @@ class HermesBot {
     final botMeta = meta is Map ? meta['hermes-bots'] : null;
     final session = json['preferred_session'] ?? json['last_session'];
     final sessionRow = session is Map ? session : const {};
+    final canonicalRow = json['canonical_session'];
+    final canonical = canonicalRow is Map ? canonicalRow : const {};
     final rawShape = validateHermesBoundedString(
       botMeta is Map ? botMeta['shape'] : null,
       maxCharacters: 96,
@@ -104,9 +106,15 @@ class HermesBot {
         sessionRow['preview'],
         maxCharacters: kMaxHermesBotPreviewCharacters,
       ),
-      chatSessionId: validateHermesOpaqueIdentifier(
-        botMeta is Map ? botMeta['chat'] : null,
-      ),
+      // Hermes 0.22 identifies the forever chat by title and reports it as
+      // canonical_session (resolved_id is its live compression tip); the old
+      // ui_meta pin is only read for older gateways.
+      chatSessionId:
+          validateHermesOpaqueIdentifier(canonical['resolved_id']) ??
+          validateHermesOpaqueIdentifier(canonical['id']) ??
+          validateHermesOpaqueIdentifier(
+            botMeta is Map ? botMeta['chat'] : null,
+          ),
       hasAvatar: json['has_avatar'] == true,
       avatarShape: _validHermesBotShape(rawShape) ?? 'squircle',
       avatarColor: _validHermesBotColor(rawColor) ?? '#8b5cf6',

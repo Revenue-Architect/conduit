@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/providers/chat_providers.dart' show sendMessageWithContainer;
 import '../models/hermes_bot.dart';
+import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart'
     show HermesDesktopApiService;
 import '../widgets/hermes_home_composer.dart' show startHermesBotConversation;
 import '../widgets/hermes_home_inbox.dart' show hermesChiefProfile;
+import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import 'manga_pick_page.dart';
 
 /// Opens Pick, the character selector, over the app's home: the landing
@@ -89,10 +91,14 @@ bool _instructions(String text) => RegExp(
   caseSensitive: false,
 ).hasMatch(text);
 
+/// What a bot last said, and the chat it said it in (null when the words
+/// came only from the roster preview).
+typedef MangaLastWords = ({String text, String? sessionId});
+
 /// What [profile] last said to the owner: the newest reply that reads as
 /// speech in its most recent chats a person started (scheduled runs talk to
 /// no one), else the newest message of its own chat.
-final mangaLastWordsProvider = FutureProvider.family<String?, String>((
+final mangaLastWordsProvider = FutureProvider.family<MangaLastWords?, String>((
   ref,
   profile,
 ) async {
@@ -110,7 +116,9 @@ final mangaLastWordsProvider = FutureProvider.family<String?, String>((
       try {
         for (final reply in await service.latestAssistantTexts(id)) {
           final text = mangaSpeech(reply);
-          if (text != null && !_instructions(text)) return text;
+          if (text != null && !_instructions(text)) {
+            return (text: text, sessionId: id);
+          }
         }
       } catch (_) {
         // One unreadable chat does not stop the next.
@@ -118,8 +126,27 @@ final mangaLastWordsProvider = FutureProvider.family<String?, String>((
     }
   }
   final text = mangaSpeech(bot?.preview);
-  return text != null && !_instructions(text) ? text : null;
+  return text != null && !_instructions(text)
+      ? (text: text, sessionId: bot?.chatSessionId)
+      : null;
 });
+
+/// Opens the chat a bot's speech bubble came from (its listed summary when
+/// there is one). Words with no known chat open nothing.
+Future<void> openMangaLastWords(
+  BuildContext context,
+  WidgetRef ref,
+  HermesBot bot,
+  MangaLastWords words,
+) async {
+  final id = words.sessionId;
+  if (id == null) return;
+  final sessions = ref.read(hermesSessionsProvider).value ?? const [];
+  final session =
+      sessions.where((s) => s.id == id).firstOrNull ??
+      HermesSessionSummary(id: id, title: bot.title, profile: bot.name);
+  await openHermesSession(context, ref, session, bot: bot);
+}
 
 /// The Chats tab: the character selector, always one tap away. Chief comes
 /// first; a task given here starts a new conversation with that bot.

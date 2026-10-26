@@ -39,6 +39,28 @@ void main() {
     check(bot.lastActive).isNotNull();
   });
 
+  test('the canonical Bot Chat comes from the roster, not a legacy pin', () {
+    // Hermes 0.22 names each bot's forever chat by title and reports it as
+    // canonical_session; ui_meta['hermes-bots'].chat pins were removed.
+    final bot = HermesBot.fromJson({
+      'name': 'default',
+      'ui_meta': {
+        'hermes-bots': {'imageKind': 'photo'},
+      },
+      'canonical_session': {
+        'id': 'local-74f799c6f9f1',
+        'resolved_id': 'local-74f799c6f9f2',
+      },
+      'last_session': {'id': 'webhook-session', 'preview': '[SILENT]'},
+    });
+    check(bot!.chatSessionId).equals('local-74f799c6f9f2'); // the live tip
+    final durable = HermesBot.fromJson({
+      'name': 'kai',
+      'canonical_session': {'id': 'local-kai-chat'},
+    });
+    check(durable!.chatSessionId).equals('local-kai-chat');
+  });
+
   test('falls back to the profile name and tolerates missing meta', () {
     final bot = HermesBot.fromJson({'name': 'default'});
 

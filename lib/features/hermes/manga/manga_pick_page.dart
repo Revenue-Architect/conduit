@@ -12,7 +12,7 @@ import '../widgets/hermes_home_working.dart'
 import '../widgets/hermes_tab_dock.dart' show hermesDockClearance;
 import '../widgets/hermez_bot_icons.dart';
 import 'manga_frame_probe.dart';
-import 'manga_pick_launch.dart' show mangaLastWordsProvider;
+import 'manga_pick_launch.dart' show mangaLastWordsProvider, openMangaLastWords;
 import 'manga_portrait.dart';
 import 'manga_theme.dart';
 import 'manga_widgets.dart';
@@ -583,7 +583,7 @@ class _Fighter extends ConsumerWidget {
             ),
           );
     final top = MediaQuery.paddingOf(context).top;
-    final said = words;
+    final said = words?.text;
 
     return LayoutBuilder(
       builder: (context, box) {
@@ -720,34 +720,42 @@ class _Fighter extends ConsumerWidget {
                   dy: bubbleTop - (top + 214),
                   scale: bubbleScale,
                   arrive(
-                    MangaBubble(
-                      fill: Colors.white,
-                      stroke: stroke,
-                      strokeWidth: 2.5,
-                      // An oval's text box is narrower than the oval: about
-                      // 70% of its width, so the margins are generous.
-                      padding: const EdgeInsets.fromLTRB(34, 20, 34, 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            agent != null
-                                ? 'ON IT NOW'
-                                : bot.lastActive == null
-                                ? 'LAST SAID'
-                                : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
-                            style: MangaType.stamp(const Color(0xFF4A4A50)),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            said,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: MangaType.line(const Color(0xFF0E0E10)),
-                          ),
-                        ],
+                    _TappableBubble(
+                      bubble: MangaBubble(
+                        fill: Colors.white,
+                        stroke: stroke,
+                        strokeWidth: 2.5,
+                        // An oval's text box is narrower than the oval: about
+                        // 70% of its width, so the margins are generous.
+                        padding: const EdgeInsets.fromLTRB(34, 20, 34, 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              agent != null
+                                  ? 'ON IT NOW'
+                                  : bot.lastActive == null
+                                  ? 'LAST SAID'
+                                  : 'LAST · ${mangaWhen(bot.lastActive!).toUpperCase()}',
+                              style: MangaType.stamp(const Color(0xFF4A4A50)),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              said,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: MangaType.line(const Color(0xFF0E0E10)),
+                            ),
+                          ],
+                        ),
                       ),
+                      // The bubble is what the bot said: tapping it opens the
+                      // chat it said it in.
+                      onTap: words?.sessionId == null
+                          ? null
+                          : () => openMangaLastWords(context, ref, bot, words!),
+                      label: '${bot.title}: open this conversation',
                     ),
                   ),
                 ),
@@ -755,6 +763,57 @@ class _Fighter extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// A speech bubble that opens its chat. It presses in a little (scale .97,
+/// 120 ms) so the tap reads as physical; with no chat it stays plain text.
+class _TappableBubble extends StatefulWidget {
+  const _TappableBubble({
+    required this.bubble,
+    required this.onTap,
+    required this.label,
+  });
+
+  final Widget bubble;
+  final VoidCallback? onTap;
+  final String label;
+
+  @override
+  State<_TappableBubble> createState() => _TappableBubbleState();
+}
+
+class _TappableBubbleState extends State<_TappableBubble> {
+  bool _down = false;
+
+  void _press(bool down) {
+    if (_down != down) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onTap = widget.onTap;
+    if (onTap == null) return widget.bubble;
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _press(true),
+        onTapCancel: () => _press(false),
+        onTapUp: (_) => _press(false),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedScale(
+          scale: _down && !context.reduceMotion ? .97 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: widget.bubble,
+        ),
+      ),
     );
   }
 }
