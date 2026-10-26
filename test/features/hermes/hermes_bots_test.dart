@@ -54,11 +54,23 @@ void main() {
       'last_session': {'id': 'webhook-session', 'preview': '[SILENT]'},
     });
     check(bot!.chatSessionId).equals('local-74f799c6f9f2'); // the live tip
+    // The pinned row describes the Bot Chat itself, not the newest chat.
+    check(bot.preview).isNull();
     final durable = HermesBot.fromJson({
       'name': 'kai',
-      'canonical_session': {'id': 'local-kai-chat'},
+      'canonical_session': {
+        'id': 'local-kai-chat',
+        'preview': 'Scope memo is ready.',
+        'last_active': 1793028341,
+      },
+      'last_session': {
+        'preview': 'Process email #3',
+        'last_active': 1793029000,
+      },
     });
     check(durable!.chatSessionId).equals('local-kai-chat');
+    check(durable.preview).equals('Scope memo is ready.');
+    check(durable.chatLastActive?.millisecondsSinceEpoch).equals(1793028341000);
   });
 
   test('falls back to the profile name and tolerates missing meta', () {

@@ -127,7 +127,7 @@ List<HermesInboxRow> buildHermesInbox({
               id: canonical,
               title: chiefName,
               preview: chief?.preview,
-              updatedAt: chief?.lastActive,
+              updatedAt: chief?.chatLastActive ?? chief?.lastActive,
               profile: chiefProfile,
             ),
             name: chiefName,

@@ -42,6 +42,7 @@ class HermesBot {
     this.avatarColor = '#8b5cf6',
     this.avatarImageKind,
     this.lastActive,
+    this.chatLastActive,
   });
 
   /// Profile name; also the RPC `profile` scope for this bot's session calls.
@@ -65,6 +66,9 @@ class HermesBot {
   final String? avatarImageKind;
 
   final DateTime? lastActive;
+
+  /// When the canonical chat itself last moved (null on older gateways).
+  final DateTime? chatLastActive;
 
   /// Parses one `profiles.list` row, or null when it is not a usable bot.
   static HermesBot? fromJson(Map<String, dynamic> json) {
@@ -102,10 +106,17 @@ class HermesBot {
         json['description'],
         maxCharacters: kMaxHermesBotTitleCharacters,
       ),
-      preview: validateHermesBoundedString(
-        sessionRow['preview'],
-        maxCharacters: kMaxHermesBotPreviewCharacters,
-      ),
+      // The canonical chat's own newest message when the gateway reports
+      // that chat; older gateways only send the newest conversation's.
+      preview: canonicalRow is Map
+          ? validateHermesBoundedString(
+              canonical['preview'],
+              maxCharacters: kMaxHermesBotPreviewCharacters,
+            )
+          : validateHermesBoundedString(
+              sessionRow['preview'],
+              maxCharacters: kMaxHermesBotPreviewCharacters,
+            ),
       // Hermes 0.22 identifies the forever chat by title and reports it as
       // canonical_session (resolved_id is its live compression tip); the old
       // ui_meta pin is only read for older gateways.
@@ -122,6 +133,7 @@ class HermesBot {
           ? rawImageKind
           : null,
       lastActive: parseHermesTimestamp(sessionRow['last_active']),
+      chatLastActive: parseHermesTimestamp(canonical['last_active']),
     );
   }
 }
