@@ -19,6 +19,20 @@ void main() {
     );
   });
 
+  test('a turn Hermes started itself is not shown as the owner speaking', () {
+    for (final text in [
+      '[Cronjob "initiative-engine" output — scheduled job, not the user. Review it…',
+      '[kanban] Task t_63502ffe completed.\nTitle: NetSuite wording',
+      '[Umbrel incident from the hourly selftest, not the user. Investigate…',
+    ]) {
+      expect(hermesIsAutomationTurn(text), isTrue, reason: text);
+    }
+    expect(hermesIsAutomationTurn('Why did the [Cronjob "x" output appear?'), isFalse);
+    expect(hermesIsAutomationTurn('[kanban] is my board name'), isFalse);
+    // A returned delegation continues its answer; it is a separate notice.
+    expect(hermesIsAutomationTurn('[ASYNC DELEGATION BATCH COMPLETE — d]'), isFalse);
+  });
+
   test('a profile-routed native worker takes its name from the projection', () {
     final store = HermesAgenticStateStore(clock: () => now);
     // Live events only know the parent's profile.

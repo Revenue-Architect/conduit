@@ -802,7 +802,8 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
     // The delegated worker's branch already shows it came back, and the
     // parent's follow-up reads as the rest of the same turn.
     if (widget.isHermesConversation &&
-        hermesIsDelegationResultNotice(rawContent)) {
+        (hermesIsDelegationResultNotice(rawContent) ||
+            hermesIsAutomationTurn(rawContent))) {
       return const SizedBox.shrink();
     }
     final interactionLabel = widget.isHermesConversation

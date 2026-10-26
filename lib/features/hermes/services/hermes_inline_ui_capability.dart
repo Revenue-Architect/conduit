@@ -35,6 +35,15 @@ String hermesInlineUiTurnText(String text) {
 bool hermesIsDelegationResultNotice(String text) =>
     text.startsWith('[ASYNC DELEGATION ');
 
+/// A turn Hermes admitted into the chat itself: a scheduled job's output, a
+/// Kanban task's status wake, or an Umbrel incident hand-off. It starts the
+/// turn but is not the owner speaking, so its text is not shown as a sent
+/// bubble; the bot's reply (and any worker row on it) says what happened.
+bool hermesIsAutomationTurn(String text) =>
+    text.startsWith('[Cronjob "') ||
+    text.startsWith('[kanban] Task t_') ||
+    text.startsWith('[Umbrel incident ');
+
 /// Presentation only. Matching and server history keep the original wire text.
 String hermesInlineUiVisibleText(String text) {
   for (final suffix in const [_hermesInlineUiSuffix, _legacyInlineUiSuffix]) {
