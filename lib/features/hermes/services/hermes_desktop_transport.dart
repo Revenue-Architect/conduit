@@ -236,6 +236,7 @@ final class HermesDesktopRpcClient {
     String method, {
     Map<String, dynamic> params = const {},
     Duration? timeout,
+    bool withDefaults = true,
   }) {
     final channel = _channel;
     if (!_ready || channel == null) {
@@ -261,7 +262,7 @@ final class HermesDesktopRpcClient {
           'jsonrpc': '2.0',
           'id': id,
           'method': method,
-          'params': {..._defaultParams, ...params},
+          'params': {if (withDefaults) ..._defaultParams, ...params},
         }),
       );
     } catch (error, stackTrace) {
@@ -283,6 +284,9 @@ final class HermesDesktopRpcClient {
         'client.capabilities',
         params: const {'server_requests': true},
         timeout: const Duration(seconds: 15),
+        // Hermes refuses unknown keys here (4000), and `profile` is one: the
+        // refusal left every approval unanswerable ("update the Hermes app").
+        withDefaults: false,
       );
     } on HermesDesktopRpcException catch (error) {
       if (error.code != -32601 && !error.disconnected) {

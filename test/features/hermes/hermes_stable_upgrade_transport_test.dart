@@ -68,6 +68,9 @@ void main() {
       () async {
         final gateway = _Gateway()..legacy = legacy;
         final client = await gateway.connect();
+        // Hermes refuses unknown keys on this method; the connection's
+        // profile must not ride along.
+        client.setDefaultParams({'profile': 'default'});
         await client.advertiseServerRequests();
         expect(client.isReady, isTrue);
         expect(gateway.sent.single['method'], 'client.capabilities');
