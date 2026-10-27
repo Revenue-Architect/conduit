@@ -61,5 +61,14 @@ void main() {
     expect(find.text('Steel player'), findsOneWidget);
     expect(loaded?.queryParameters['session'], 'abc');
     expect(loaded?.queryParameters['interactive'], 'false');
+
+    await tester.tap(find.text('Take over'));
+    await tester.pump();
+    expect(loaded?.queryParameters['interactive'], 'true');
+    expect(find.text('Hand back'), findsOneWidget);
+
+    await tester.tap(find.text('Hand back'));
+    await tester.pump();
+    expect(loaded?.queryParameters['interactive'], 'false');
   });
 }

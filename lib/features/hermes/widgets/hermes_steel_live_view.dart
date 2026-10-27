@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_steel_viewer.dart';
+import 'hermes_bot_screen_view.dart' show HermesTakeOverChip;
 import 'hermez_chat_palette.dart';
 import '../motion/hermez_motion.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -20,8 +21,20 @@ class HermesRunBrowserSection extends StatefulWidget {
     required this.sessionId,
     this.initiallyOpen = false,
     this.refreshToken = 0,
+    this.label = 'Watch the browser',
+    this.icon = Icons.language_rounded,
+    this.title = 'Live browser',
+    this.viewBuilder,
   });
   final String viewerUrl;
+  final String label;
+  final IconData icon;
+
+  /// The full-screen page's title.
+  final String title;
+
+  /// Another live view in place of Steel's player (the Bot Screen).
+  final WidgetBuilder? viewBuilder;
   final String sessionId;
 
   /// A change reloads the player. Steel's player connects once, when it
@@ -50,6 +63,8 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
       builder: (_) => HermesSteelFullScreenPage(
         viewerUrl: widget.viewerUrl,
         sessionId: widget.sessionId,
+        title: widget.title,
+        viewBuilder: widget.viewBuilder,
       ),
     ),
   );
@@ -68,9 +83,7 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
             Expanded(
               child: HermezMotionSurface(
                 key: const ValueKey('hermes-watch-browser'),
-                semanticLabel: _open
-                    ? 'Close the browser'
-                    : 'Watch the browser',
+                semanticLabel: _open ? 'Close: ${widget.label}' : widget.label,
                 semanticsExpanded: _open,
                 weight: HermezMotionWeight.light,
                 originRadius: 12,
@@ -79,15 +92,11 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
                   constraints: const BoxConstraints(minHeight: 40),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.language_rounded,
-                        size: 15,
-                        color: palette.accent,
-                      ),
+                      Icon(widget.icon, size: 15, color: palette.accent),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          'Watch the browser',
+                          widget.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -149,19 +158,14 @@ class _HermesRunBrowserSectionState extends State<HermesRunBrowserSection> {
                 height: 220,
                 child: _AfterArrival(
                   placeholder: const _BrowserAperture(),
-                  child: HermesSteelLiveView(
+                  child: KeyedSubtree(
                     key: ValueKey(
                       'steel-view-${widget.refreshToken}-$_reloads',
                     ),
-                    viewerUrl: widget.viewerUrl,
+                    child:
+                        widget.viewBuilder?.call(context) ??
+                        HermesSteelLiveView(viewerUrl: widget.viewerUrl),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(
-                  'Watch only · Hermes controls this browser.',
-                  style: TextStyle(fontSize: 12, color: palette.muted),
                 ),
               ),
             ],
@@ -190,6 +194,10 @@ class HermesSteelLiveView extends StatefulWidget {
 
 class _HermesSteelLiveViewState extends State<HermesSteelLiveView> {
   bool _loading = true;
+
+  // Steel's player takes input only when loaded interactive, so taking over
+  // or handing back reloads it in the other mode.
+  bool _control = false;
   String? _error;
   int _generation = 0;
 
@@ -251,7 +259,7 @@ class _HermesSteelLiveViewState extends State<HermesSteelLiveView> {
 
   @override
   Widget build(BuildContext context) {
-    final uri = steelViewerUri(widget.viewerUrl, interactive: false);
+    final uri = steelViewerUri(widget.viewerUrl, interactive: _control);
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
@@ -291,6 +299,18 @@ class _HermesSteelLiveViewState extends State<HermesSteelLiveView> {
             ),
             if (_loading && widget.viewerBuilder == null)
               const Center(child: CircularProgressIndicator.adaptive()),
+            if (_error == null)
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: HermesTakeOverChip(
+                  control: _control,
+                  onPressed: () => setState(() {
+                    _control = !_control;
+                    _loading = true;
+                  }),
+                ),
+              ),
             if (_error != null)
               Positioned.fill(
                 child: ColoredBox(
@@ -321,10 +341,14 @@ class HermesSteelFullScreenPage extends ConsumerWidget {
     super.key,
     required this.viewerUrl,
     required this.sessionId,
+    this.title = 'Live browser',
+    this.viewBuilder,
   });
 
   final String viewerUrl;
   final String sessionId;
+  final String title;
+  final WidgetBuilder? viewBuilder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -338,7 +362,7 @@ class HermesSteelFullScreenPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: palette.canvas,
       appBar: AppBar(
-        title: const Text('Live browser'),
+        title: Text(title),
         backgroundColor: palette.canvas,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
@@ -352,15 +376,14 @@ class HermesSteelFullScreenPage extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: _AfterArrival(
                         placeholder: const _BrowserAperture(),
-                        child: HermesSteelLiveView(viewerUrl: viewerUrl),
+                        child:
+                            viewBuilder?.call(context) ??
+                            HermesSteelLiveView(viewerUrl: viewerUrl),
                       ),
                     )
                   : const Center(child: Text('This run is no longer active.')),
             ),
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('Watch only · Hermes still controls this browser.'),
-            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

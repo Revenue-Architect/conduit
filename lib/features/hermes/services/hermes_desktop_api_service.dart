@@ -419,6 +419,39 @@ final class HermesDesktopApiService
   Stream<HermesAgenticSnapshot> agenticStateFor(String storedId) =>
       _agentic.watch(storedId);
 
+  /// A single-use (30 s) noVNC socket for the Bot Screen, and the viewer id
+  /// that names this connection when it takes control. Take-over and hand-back
+  /// must run on the same connection: Hermes only honours ids it minted there.
+  Future<({Uri socket, String viewerId})> observeBotScreen() async {
+    await _ensureConnected();
+    final result = _object(await _rpc.request<Object?>('display.observe'));
+    final ticket = result['ticket']?.toString() ?? '';
+    final viewerId = result['viewer_id']?.toString() ?? '';
+    if (ticket.isEmpty || viewerId.isEmpty) {
+      throw StateError('Hermes did not open the Bot Screen.');
+    }
+    final http = _uri(result['path']?.toString() ?? '/api/display/ws', {
+      'display_ticket': ticket,
+    });
+    return (
+      socket: http.replace(scheme: http.scheme == 'https' ? 'wss' : 'ws'),
+      viewerId: viewerId,
+    );
+  }
+
+  /// Hermes gates the screen's keyboard and mouse on this lease, so input
+  /// reaches the desktop only while it is held.
+  Future<void> takeBotScreen(String viewerId) async => _rpc.request<Object?>(
+    'display.lease.acquire',
+    params: {'viewer_id': viewerId, 'reason': 'Taken over in Conduit'},
+  );
+
+  Future<void> handBackBotScreen(String viewerId) async =>
+      _rpc.request<Object?>(
+        'display.lease.release',
+        params: {'viewer_id': viewerId},
+      );
+
   /// Looks for [storedId]'s plan in its stored transcript when Hermes has
   /// sent none; once per session, in the background.
   void restorePlanIfMissing(String storedId) =>

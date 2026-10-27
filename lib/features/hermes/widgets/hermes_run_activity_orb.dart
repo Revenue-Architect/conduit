@@ -18,6 +18,7 @@ import '../providers/hermes_providers.dart';
 import '../services/hermes_activity_presenter.dart';
 import '../services/hermes_agentic_state.dart';
 import '../services/hermes_desktop_api_service.dart';
+import 'hermes_bot_screen_view.dart';
 import '../services/hermes_identifier.dart';
 import '../services/hermes_inline_ui_capability.dart'
     show hermesIsDelegationResultNotice;
@@ -26,7 +27,11 @@ import '../services/hermes_run_transport.dart' show kHermesProviderWaitAction;
 import '../services/hermes_steel_viewer.dart';
 import '../sheets/hermes_tool_inspector_sheet.dart';
 import 'hermes_inline_run_surface.dart'
-    show hermesRunBrowserReady, hermesRunUsedBrowser, hermesThinkingOrbState;
+    show
+        hermesRunBrowserReady,
+        hermesRunUsedBrowser,
+        hermesRunUsedComputer,
+        hermesThinkingOrbState;
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/conduit_localizations.dart';
 import '../views/hermes_live_run_page.dart';
@@ -196,10 +201,10 @@ class HermesMessageActivity extends ConsumerWidget {
             },
           )
         : null;
-    // Watch-only Steel player, offered while a browsing run is under way.
+    // Steel's player, offered while a browsing run is under way.
     final viewerUrl = ref.watch(hermesSteelViewerUrlProvider);
     final browserRun = HermesRunSummary.latest(events, running: running);
-    final browser =
+    final steel =
         running &&
             parseSteelViewerUrl(viewerUrl) != null &&
             hermesRunUsedBrowser(browserRun)
@@ -211,6 +216,22 @@ class HermesMessageActivity extends ConsumerWidget {
             refreshToken: hermesRunBrowserReady(browserRun) ? 1 : 0,
           )
         : null;
+    // The Bot Screen, the same way, while the run uses the computer.
+    final screen = running && hermesRunUsedComputer(browserRun)
+        ? HermesRunBrowserSection(
+            key: ValueKey('bot-screen-section-$sessionId'),
+            viewerUrl: '',
+            sessionId: sessionId,
+            initiallyOpen: true,
+            label: 'Watch the screen',
+            icon: Icons.desktop_windows_outlined,
+            title: 'Bot Screen',
+            viewBuilder: (_) => HermesBotScreenView(service: service),
+          )
+        : null;
+    final browser = steel == null || screen == null
+        ? steel ?? screen
+        : Column(children: [steel, screen]);
     return HermezReveal(
       visible: !empty,
       revealKey: ValueKey('message-activity-$sessionId'),

@@ -40,6 +40,11 @@ bool hermesRunUsedBrowser(HermesRunSummary run) => run.tools.any(
   (tool) => RegExp('browser|steel', caseSensitive: false).hasMatch(tool.name),
 );
 
+/// Whether the run drove the Bot Desktop (Hermes' `computer_use` tool).
+bool hermesRunUsedComputer(HermesRunSummary run) => run.tools.any(
+  (tool) => RegExp('computer', caseSensitive: false).hasMatch(tool.name),
+);
+
 /// Whether a browser (Steel) tool has finished in the run: by then Hermes'
 /// browser session exists, so a player opened earlier can connect to it.
 bool hermesRunBrowserReady(HermesRunSummary run) => run.events.any(
