@@ -424,6 +424,11 @@ final class HermesDesktopApiService
   /// must run on the same connection: Hermes only honours ids it minted there.
   Future<({Uri socket, String viewerId})> observeBotScreen() async {
     await _ensureConnected();
+    // Idempotent: opening the screen starts the Bot Desktop if it is down.
+    await _rpc.request<Object?>(
+      'display.start',
+      timeout: const Duration(seconds: 30),
+    );
     final result = _object(await _rpc.request<Object?>('display.observe'));
     final ticket = result['ticket']?.toString() ?? '';
     final viewerId = result['viewer_id']?.toString() ?? '';

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../../shared/theme/theme_extensions.dart';
 import '../../push/providers/push_providers.dart' show approvalsPendingProvider;
 import '../kanban/hermes_kanban_summary_provider.dart';
 import '../motion/hermez_motion.dart';
 import '../providers/hermes_providers.dart';
+import '../widgets/hermes_bot_screen_view.dart' show HermesBotScreenPage;
 import '../widgets/hermes_home_needs_you.dart';
 import '../widgets/hermes_home_presence.dart' show HermesNotifyPrompt;
 import '../widgets/hermes_home_working.dart' show HermesWorkingStack;
@@ -177,6 +179,19 @@ class HermesWorkPage extends ConsumerWidget {
                 onOpen: (origin) => context.pushNamed(
                   RouteNames.hermesArtifacts,
                   extra: origin,
+                ),
+              ),
+              HermesWorkRow(
+                icon: Icons.desktop_windows_outlined,
+                title: 'Bot Screen',
+                meta: 'Watch Hermes’ computer, or take over',
+                onOpen: (origin) => Navigator.of(context).push(
+                  HermezRoute<void>(
+                    motion: HermezRouteMotion.expand,
+                    reducedMotion: context.reduceMotion,
+                    origin: origin,
+                    builder: (_) => const HermesBotScreenPage(),
+                  ),
                 ),
               ),
               const HermesWorkHeading('DECISIONS'),

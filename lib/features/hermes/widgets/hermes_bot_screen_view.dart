@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/hermes_providers.dart' show hermesApiServiceProvider;
 
 import '../services/hermes_desktop_api_service.dart';
 import 'hermez_chat_palette.dart';
@@ -178,6 +181,38 @@ class _HermesBotScreenViewState extends State<HermesBotScreenView> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The Bot Screen on its own page, opened from Work at any time.
+class HermesBotScreenPage extends ConsumerWidget {
+  const HermesBotScreenPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final service = ref.watch(hermesApiServiceProvider);
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Scaffold(
+      backgroundColor: palette.canvas,
+      appBar: AppBar(
+        title: const Text('Bot Screen'),
+        backgroundColor: palette.canvas,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: service is HermesDesktopApiService
+              ? HermesBotScreenView(service: service)
+              : const Center(
+                  child: Text('Connect to Hermes to see its screen.'),
+                ),
         ),
       ),
     );
