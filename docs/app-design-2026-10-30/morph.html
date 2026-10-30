@@ -334,6 +334,19 @@
   .att .attx svg { width: 14px; height: 14px; }
   .att.in { height: 30px; margin: 0 0 8px; background: var(--raised); padding: 0 12px 0 10px; }
   .crumb { padding: 0 22px 8px; font: 500 12px/1.3 "Geist"; color: var(--ink-2); }
+
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 16px 22px 0; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .kv span { display: block; font: 400 12px/1.3 "Geist"; color: var(--ink-2); }
+  .kv b { display: block; margin-top: 3px; font: 500 15px/1.3 "Geist"; }
+  .st { flex: none; height: 28px; padding: 0 11px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; }
+  .st.on { background: var(--soft); color: var(--ink); }
+  .st.need { background: var(--ink); color: var(--raised); }
+  .st.off { box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink-2); font-weight: 500; }
+  .st.live { color: var(--live-text); padding: 0 2px 0 11px; }
+  .st.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+  .seg { display: flex; margin: 0 16px; padding: 4px; border-radius: 999px; background: var(--soft); }
+  .seg span { flex: 1; height: 40px; border-radius: 999px; display: grid; place-items: center; font: 500 14px/1 "Geist"; color: var(--ink-2); }
+  .seg span.on { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(8,10,14,.12); }
 </style>
 </head>
 <body>
@@ -677,6 +690,150 @@
   <div class="fld tall"><label>Message</label><div class="ph">What should Chief do?</div></div>
   <div class="fld sel"><div class="grow"><label>Model</label><div>gpt-6.1-terra</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
   <div class="mbtns"><span class="mbtn icon"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="mbtn pri">Start chat</span></div>
+</div>
+</section>
+<!-- ============ m12-approve-with-scope ============ -->
+<section class="screen skyscreen" data-name="m12-approve-with-scope" data-time="7:42" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+  <div class="sky dawn tall" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>4° clear · sunrise 7:51</span></div>
+    <div class="display">11 done overnight.<br><span>3 need you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed live"><img src="assets/ops-cut.png" alt=""><div class="lt"><b>Push server</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="now"></i><i></i><i></i></span>4:12</span></div></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/architect-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/hermuse-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>ops</b> is restarting the push server. Tap to watch.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">3</span></h3>
+      <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go" style="visibility:hidden">Approve</span></div>
+      <div class="need"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>Export the relay diagram</b><span>architect · <span class="bad">failed 1:24</span>, out of memory</span></div><span class="go soft">Retry</span></div>
+      <div class="log" style="margin-top:56px">
+        <h3>Overnight</h3>
+        <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products to the catalogue</span></div>
+        <div class="row"><time>5:40</time><span><b>scout</b> read 14 Shopify changelog entries; 2 touch checkout</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard" data-float style="bottom:16px">
+  <div class="grab"></div><div class="mh"><img class="face" src="assets/kai-cut.png" alt=""><b>Publish the holiday theme?</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+  <p class="mp">kai will make the Holiday 2026 theme live on the Maple &amp; Pine storefront. Shoppers see it right away.</p>
+  <div class="kv"><div><span>Store</span><b>mapleandpine.ca</b></div><div><span>Replaces</span><b>Autumn 2026</b></div><div><span>Checked</span><b>3 phone sizes, 1 fix</b></div><div><span>Undo</span><b>Republish Autumn</b></div></div>
+  <div class="mbtns"><span class="mbtn">Deny</span><span class="mbtn pri">Approve once</span></div>
+</div>
+</section>
+<!-- ============ m13-scheduled-routines ============ -->
+<section class="screen skyscreen" data-name="m13-scheduled-routines" data-time="7:42" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+  <div class="sky dawn tall" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>4° clear · sunrise 7:51</span></div>
+    <div class="display">11 done overnight.<br><span>3 need you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed live"><img src="assets/ops-cut.png" alt=""><div class="lt"><b>Push server</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="now"></i><i></i><i></i></span>4:12</span></div></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/architect-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/hermuse-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>ops</b> is restarting the push server. Tap to watch.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">3</span></h3>
+      <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+      <div class="need"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>Export the relay diagram</b><span>architect · <span class="bad">failed 1:24</span>, out of memory</span></div><span class="go soft">Retry</span></div>
+      <div class="log" style="margin-top:56px">
+        <h3>Overnight</h3>
+        <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products to the catalogue</span></div>
+        <div class="row"><time>5:40</time><span><b>scout</b> read 14 Shopify changelog entries; 2 touch checkout</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard" data-float style="bottom:16px">
+  <div class="grab"></div><div class="mh"><b>Scheduled</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+  <div class="mlab">10 on · 1 needs you · 1 paused</div>
+  <div class="opt"><img class="face" src="assets/ops-cut.png" alt=""><div class="t"><b>Push relay health</b><span>Every 15 min · ops</span></div><span class="st live">Running</span></div>
+  <div class="opt"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Support reply drafts</b><span>On new email · Chief</span></div><span class="st need">Needs you</span></div>
+  <div class="opt"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Morning brief</b><span>Daily 7:30 · Chief, to Today</span></div><span class="st on">On</span></div>
+  <div class="opt"><img class="face" src="assets/scout-cut.png" alt=""><div class="t"><b>Shopify changelog</b><span>Daily 5:30 · scout</span></div><span class="st on">On</span></div>
+  <div class="opt"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Competitor price watch</b><span>Mondays 9:00 · kai</span></div><span class="st off">Paused</span></div>
+  <div class="sep"></div>
+  <div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><div class="t"><b>Schedule something</b><span>New routines start paused</span></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+</div>
+</section>
+<!-- ============ m14-new-routine-paused ============ -->
+<section class="screen skyscreen" data-name="m14-new-routine-paused" data-time="7:42" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+  <div class="sky dawn tall" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>4° clear · sunrise 7:51</span></div>
+    <div class="display">11 done overnight.<br><span>3 need you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed live"><img src="assets/ops-cut.png" alt=""><div class="lt"><b>Push server</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="now"></i><i></i><i></i></span>4:12</span></div></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/architect-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/hermuse-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>ops</b> is restarting the push server. Tap to watch.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">3</span></h3>
+      <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+      <div class="need"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>Export the relay diagram</b><span>architect · <span class="bad">failed 1:24</span>, out of memory</span></div><span class="go soft">Retry</span></div>
+      <div class="log" style="margin-top:56px">
+        <h3>Overnight</h3>
+        <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products to the catalogue</span></div>
+        <div class="row"><time>5:40</time><span><b>scout</b> read 14 Shopify changelog entries; 2 touch checkout</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard nest" data-float style="bottom:16px">
+  <div class="grab"></div><div class="mh nested"><span class="bk"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></span><b>New routine</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+  <div class="fld focus"><label>What</label><div>Check the storefront for broken images<span class="caret"></span></div></div>
+  <div class="fld sel"><div class="grow"><label>Who</label><div>kai</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="fld sel"><div class="grow"><label>When</label><div>Weekdays 8:00</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="mlab" style="padding-top:12px">What kai may do</div>
+  <div class="seg" data-system><span>Observe</span><span class="on">Propose</span><span>Act</span></div>
+  <div class="mnote">Propose: kai reports and drafts the fix; you approve before anything changes. It starts paused.</div>
+  <div class="mbtns"><span class="mbtn pri">Save, paused</span></div>
 </div>
 </section>
 <!-- ============ m08 storyboard: a pill becomes the card ============ -->

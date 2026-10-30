@@ -226,5 +226,104 @@
       ],
       "cards": 1
     }
+  },
+  {
+    "name": "m12-approve-with-scope",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"5:40\" (home indicator); \"scout read 14 Shopify ch\" (home indicator); \"scout\" (home indicator)",
+      "8 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 41
+      },
+      "sizes": [
+        40,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 8,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "m13-scheduled-routines",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"5:40\" (home indicator); \"scout read 14 Shopify ch\" (home indicator); \"scout\" (home indicator)",
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 49
+      },
+      "sizes": [
+        40,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "m14-new-routine-paused",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"5:40\" (home indicator); \"scout read 14 Shopify ch\" (home indicator); \"scout\" (home indicator)",
+      "8 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 40
+      },
+      "sizes": [
+        40,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 8,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 2
+    }
   }
 ]

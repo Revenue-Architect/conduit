@@ -10,6 +10,7 @@ The owner answered on 2026-10-30. This is a fresh redesign, unrelated to the Oct
 - **References:**
   - **KaizenOS v2 console** (`origin/main`, W4 visual system, 2026-10-29): neutral zinc grounds (`#f6f6f8` / `#09090b`), white and `#141416` surfaces, hairlines and no shadows, Hanken Grotesk 600 with tight negative tracking, mono figures, ink-solid KPI hero cards, a black dock rail with counts, 10–12 px radii, red only for "create" and "you are here", one-card spring morphs. Not the older navy / steel-ice v1 palette (owner's correction).
   - **Hark Pro** (Adcock, launched 2026-10-06): a full-screen homepage whose background imagery follows the local weather and time of day, chat in the centre, a proactive feed of suggested actions and "panels" (mini dashboards) below, and a small window that shows the agent working.
+  - **CoWork OS** (coworkosapp.com, added 2026-10-30): an open-source AI desktop app built on "every action is visible and approvable". Taken: runs as plan steps with results, approvals that state consequence, scope and undo and stay in the record, routines with a trigger, a bot and a status, new routines start paused with an Observe / Propose / Act scope (m12 to m14). Not taken: its warm off-white, gradient headline and coloured status pills.
 - **Fixed, kept as-is:** the bot faces and their idle/working video avatars; the inline run UI and its type scale (answer 17 > turn line 14/600 > rows 13.5/400 > meta 12, compact 13/600 pills); the A2UI/OpenUI surfaces.
 - **Dropped:** the orange `#FF5A26`. The new direction uses another hue family.
 - **Deliverable:** mockups first. No Flutter changes until a direction is approved.
@@ -243,7 +244,7 @@ Final screens: `mockup.html`, shot to `shots/r4/` (sheet `shots/r4/sheet.png`; s
 
 Content changes made during critique: Needs you now has 3 items (the third is architect's failed diagram export, with Retry), so Today says "3 need you" and Work and Chats show 3. The live timer advances with the clock (4:12 at 7:42, 5:12 at 7:43, 7:12 at 7:45, 8:12 at 7:46), and ops' run moves through its five steps across the screens.
 
-Round 4 also added the one-card system (`morph.html`: seven cards and four storyboards, including the nested chain m10 and card-to-screen m11; scan: no FAILs at both sizes). Built by `build_morph.py` then `build_morph_nested.py` from `mockup.html`.
+Round 4 also added the one-card system (`morph.html`: seven cards and four storyboards, including the nested chain m10 and card-to-screen m11; scan: no FAILs at both sizes). Built by `build_morph.py`, `build_morph_nested.py` and `build_morph_cowork.py` from `mockup.html`; m12 to m14 add the CoWork OS ideas (approval with scope, Scheduled routines, new routine paused). Implementation spec: `SPEC.md`.
 
 Round 4 (owner: "02 and 05 too terminal like"): the live window became the work in words and one picture, light, with the raw commands one tap away; Geist Mono is gone from the interface; the live tile and Work's running row show a step bar instead of tiny terminal lines; Chats gained search, new chat, the Open WebUI logo and more rows.
 
