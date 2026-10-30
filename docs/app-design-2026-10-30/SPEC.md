@@ -343,12 +343,34 @@ Each becomes a `MorphCard`: confirms become a confirm view, popup menus a menu v
 | Chats subtitle | "6 bots · 3 unread" | 0 unread: "6 bots" |
 | Search empty | "No chats match "regex"." | none |
 
+## Backend validation (2026-10-30, read from hermes-agent source)
+
+- **Ask/Do switch: not built.** Hermes has no per-message "answer only" mode. `prompt.submit` takes no toolsets or mode; `approvals.mode` (manual, smart, off) and `write_approval` are per bot; session `yolo` only loosens; `/plan` is a prompt, not enforced. An unenforced "Ask" would be false comfort. The You tab shows the real controls instead. Revisit if Hermes adds a per-turn tool restriction.
+- **Bot Screen: confirmed.**
+  - Each bot has its own headless Xfce desktop plus Chromium on Linux hosts (`display.start`, `display.observe` → `/api/display/ws`, `display.lease.acquire` and `.release`).
+  - The lease fences only the bot's screen and browser tools; its terminal keeps running. The Take over copy says so (m06).
+  - Conduit must call `display.status` (`supported`, `installed`, `running`) before offering the screen.
+  - noVNC is loaded from a CDN today. Bundle it so the screen works offline on the LAN.
+- **Routines: confirmed, with a different scope model.**
+  - Endpoints: `/api/cron/jobs` (create with `paused: true`), plus pause, resume, trigger and runs.
+  - Scope is an `enabled_toolsets` allowlist per job, plus `approvals.cron_mode` (deny by default), which blocks risky commands in routines. There is no Observe / Propose / Act, so m14 shows "Tools [bot] may use" instead.
+  - Statuses come from `enabled`, `state` and `last_status`: Running, On, Paused, Failed.
+  - Conduit must start sending `profile`, `paused` and `enabled_toolsets`.
+- **Kanban: card (owner).**
+  - Lanes are triage, todo, scheduled, ready, running, blocked, review, done. The card groups them: Needs you = review and blocked; Running; Up next = triage, todo, scheduled and ready; Done.
+  - There are no due dates. Rows show status and age.
+- **You tab (y01).** Every row maps to Hermes:
+  - the `USER.md` and `MEMORY.md` built-in memory (`/api/memory` returns sizes, so reading the text needs a file read);
+  - `/api/analytics/usage`;
+  - approvals settings;
+  - gateway channels;
+  - `/api/profiles` for the bots.
+
 ## Pending questions
 
 **Design (owner):**
-- An Ask/Do mode on the composer, like CoWork OS: "Ask" answers only, while "Do" may act. It changes how bots behave, so it needs a decision.
-- Kanban: a card (like Scheduled) or its own screen?
-- You and settings: still to be designed.
+- Settings beyond the You tab (y01) are not designed.
+- Reading `USER.md` text over the API: confirm which endpoint serves memory file content.
 
 **Engineering:**
 - Does Hermes emit an A2UI surface for run progress (the alert path), or is that new bot-side work? Until then, the window uses sources 2 and 3.

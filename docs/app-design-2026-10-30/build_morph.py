@@ -109,7 +109,7 @@ cards["model"] = f'''<div class="mcard" data-float style="bottom:16px">
 
 cards["take-over"] = f'''<div class="mcard" data-float style="bottom:16px">
   {head("Take over ops' screen?", face="ops")}
-  <p class="mp">ops stops where it is: it was sending a test alert to your S25. Your taps and typing go to its desktop until you hand it back.</p>
+  <p class="mp">While you have control, ops can't use its screen or browser. Commands it already started keep running. Leaving hands it back.</p>
   <div class="mbtns"><span class="mbtn">Keep watching</span><span class="mbtn pri">Take over</span></div>
 </div>'''
 

@@ -344,6 +344,13 @@
   .st.off { box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink-2); font-weight: 500; }
   .st.live { color: var(--live-text); padding: 0 2px 0 11px; }
   .st.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+  .st.fail { color: var(--neg); box-shadow: inset 0 0 0 1px var(--rule); }
+  .mlink { display: flex; align-items: center; justify-content: space-between; height: 44px; font: 500 13px/1 "Geist"; color: var(--ink-2); }
+  .mlink .sc svg { width: 18px; height: 18px; }
+  .tchips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 22px 4px; }
+  .tchips span { height: 36px; padding: 0 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 500 14px/1 "Geist"; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+  .tchips span.on { background: var(--ink); color: var(--raised); box-shadow: none; font-weight: 600; }
+  .tchips span svg { width: 15px; height: 15px; stroke-width: 2.4; }
   .seg { display: flex; margin: 0 16px; padding: 4px; border-radius: 999px; background: var(--soft); }
   .seg span { flex: 1; height: 40px; border-radius: 999px; display: grid; place-items: center; font: 500 14px/1 "Geist"; color: var(--ink-2); }
   .seg span.on { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(8,10,14,.12); }
@@ -646,7 +653,7 @@
   <div class="scrim" data-float></div>
   <div class="mcard" data-float style="bottom:16px">
   <div class="grab"></div><div class="mh"><img class="face" src="assets/ops-cut.png" alt=""><b>Take over ops' screen?</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
-  <p class="mp">ops stops where it is: it was sending a test alert to your S25. Your taps and typing go to its desktop until you hand it back.</p>
+  <p class="mp">While you have control, ops can't use its screen or browser. Commands it already started keep running. Leaving hands it back.</p>
   <div class="mbtns"><span class="mbtn">Keep watching</span><span class="mbtn pri">Take over</span></div>
 </div>
 </section>
@@ -732,8 +739,9 @@
   <div class="scrim" data-float></div>
   <div class="mcard" data-float style="bottom:16px">
   <div class="grab"></div><div class="mh"><img class="face" src="assets/kai-cut.png" alt=""><b>Publish the holiday theme?</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
-  <p class="mp">kai will make the Holiday 2026 theme live on the Maple &amp; Pine storefront. Shoppers see it right away.</p>
-  <div class="kv"><div><span>Store</span><b>mapleandpine.ca</b></div><div><span>Replaces</span><b>Autumn 2026</b></div><div><span>Checked</span><b>3 phone sizes, 1 fix</b></div><div><span>Undo</span><b>Republish Autumn</b></div></div>
+  <p class="mp">kai asked at 7:38 before making the Holiday 2026 theme live on mapleandpine.ca. It checked the theme on 3 phone sizes first.</p>
+  <div class="kv"><div><span>Asks to run</span><b>Shopify theme publish</b></div><div><span>Bot</span><b>kai, on your Umbrel</b></div></div>
+  <div class="mlink" style="margin:6px 22px 0">Show the exact command<span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
   <div class="mbtns"><span class="mbtn">Deny</span><span class="mbtn pri">Approve once</span></div>
 </div>
 </section>
@@ -777,9 +785,9 @@
   <div class="scrim" data-float></div>
   <div class="mcard" data-float style="bottom:16px">
   <div class="grab"></div><div class="mh"><b>Scheduled</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
-  <div class="mlab">10 on · 1 needs you · 1 paused</div>
+  <div class="mlab">10 on · 1 failed · 1 paused</div>
   <div class="opt"><img class="face" src="assets/ops-cut.png" alt=""><div class="t"><b>Push relay health</b><span>Every 15 min · ops</span></div><span class="st live">Running</span></div>
-  <div class="opt"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Support reply drafts</b><span>On new email · Chief</span></div><span class="st need">Needs you</span></div>
+  <div class="opt"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Support reply drafts</b><span>Every 30 min · Chief · failed 6:40</span></div><span class="st fail">Failed</span></div>
   <div class="opt"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Morning brief</b><span>Daily 7:30 · Chief, to Today</span></div><span class="st on">On</span></div>
   <div class="opt"><img class="face" src="assets/scout-cut.png" alt=""><div class="t"><b>Shopify changelog</b><span>Daily 5:30 · scout</span></div><span class="st on">On</span></div>
   <div class="opt"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Competitor price watch</b><span>Mondays 9:00 · kai</span></div><span class="st off">Paused</span></div>
@@ -830,9 +838,9 @@
   <div class="fld focus"><label>What</label><div>Check the storefront for broken images<span class="caret"></span></div></div>
   <div class="fld sel"><div class="grow"><label>Who</label><div>kai</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
   <div class="fld sel"><div class="grow"><label>When</label><div>Weekdays 8:00</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
-  <div class="mlab" style="padding-top:12px">What kai may do</div>
-  <div class="seg" data-system><span>Observe</span><span class="on">Propose</span><span>Act</span></div>
-  <div class="mnote">Propose: kai reports and drafts the fix; you approve before anything changes. It starts paused.</div>
+  <div class="mlab" style="padding-top:12px">Tools kai may use</div>
+  <div class="tchips"><span class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Web</span><span class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Browser</span><span>Files</span><span>Terminal</span></div>
+  <div class="mnote">Risky commands never run in routines; Hermes blocks them. It starts paused until you turn it on.</div>
   <div class="mbtns"><span class="mbtn pri">Save, paused</span></div>
 </div>
 </section>
