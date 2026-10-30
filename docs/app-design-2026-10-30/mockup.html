@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conduit, Today: mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.css">
+<link rel="stylesheet" href="../app-design-2026-10-24/android.css">
+<style>
+  :root {
+    --ground: #F7F7F7; --raised: #FFFFFF; --soft: #F1F2F4; --ink: #0E1116; --ink-2: #5A606B; --ink-3: #6B717B; --rule: #E6E7EA;
+    --live: #FFB020; --live-text: #8A5A00; --neg: #C2362B;
+    --dock: #0E1116; --on-dock: #FFFFFF; --on-dock-2: rgba(255,255,255,.66); --ind: rgba(255,255,255,.16);
+    --m: 20px;
+  }
+  .screen { container-type: size; font-family: "Geist", sans-serif; color: var(--ink); background: var(--ground); }
+  .screen[data-theme="dark"] {
+    --ground: #0B0C0E; --raised: #16181C; --soft: #22252B; --ink: #F2F3F5; --ink-2: #A3A8B2; --ink-3: #8F95A0; --rule: #272A30;
+    --live-text: #FFB020; --neg: #FF7A6E;
+    --dock: #F2F3F5; --on-dock: #0E1116; --on-dock-2: #50555E; --ind: rgba(14,17,22,.1);
+    color: var(--ink);
+  }
+  svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .face { display: block; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: #fff; flex: none; }
+  .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+
+  /* Android status bar (replaces the kit's iOS bar) */
+  .ac-status { display: flex !important; justify-content: space-between; align-items: center; padding: 4px 22px 0 26px !important; font: 500 14px/1 "Geist" !important; }
+  .ac-status .sb { display: flex; align-items: center; gap: 7px; }
+  .ac-status .sb svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ac-status .sb svg.f { fill: currentColor; stroke: none; }
+  .ac-status .pct { font: 500 13px/1 "Geist"; }
+
+  /* ---------- sky ---------- */
+  .screen.skyscreen { background: #0F1E33; }
+  .screen.skyscreen.dusk-g { background: #0A1220; }
+  .screen.skyscreen.night-g { background: #070B14; }
+  .sky { position: absolute; inset: 0 0 auto 0; overflow: hidden; }
+  .sky.dawn { background: linear-gradient(#0D2141 0%, #2C4F80 34%, #7E9DC2 64%, #D9D3BE 88%, #EFDDB2 100%); }
+  .sky.dusk { background: linear-gradient(#081224 0%, #14284A 38%, #3B5A82 66%, #B89474 100%); }
+  .sky.night { background: linear-gradient(#05080F 0%, #0B1424 60%, #15253D 100%); }
+  .sky .city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; }
+  .sky .stars circle { fill: #fff; }
+  .sky .rain { position: absolute; inset: 0; background: repeating-linear-gradient(104deg, transparent 0 22px, rgba(255,255,255,.07) 22px 23px); }
+  .top { display: flex; justify-content: space-between; align-items: baseline; padding: 14px var(--m) 0; font: 500 13px/1 "Geist"; color: rgba(255,255,255,.86); }
+  .top b { color: #fff; font-weight: 600; }
+  .display { padding: 30px var(--m) 0; font: 600 40px/1.04 "Geist"; letter-spacing: -.045em; color: #fff; }
+  .display span { color: rgba(255,255,255,.62); }
+
+  /* feeds */
+  .feeds { display: flex; gap: 8px; padding: 22px 0 0 var(--m); overflow: hidden; }
+  .feed { position: relative; width: 52px; height: 52px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.18); flex: none; }
+  .feed > img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block; }
+  .feed.quiet > img { opacity: .5; filter: grayscale(.7); }
+  /* a working bot's tile: its task in words and its steps as a bar, never a tiny terminal */
+  .feed.live { width: 140px; background: var(--raised); box-shadow: inset 0 0 0 2px var(--live); }
+  .feed.live > img { position: absolute; left: 8px; top: 12px; width: 28px; height: 28px; border-radius: 50%; background: #fff; }
+  .feed.live .lt { position: absolute; left: 44px; right: 10px; top: 11px; display: flex; flex-direction: column; gap: 8px; }
+  .feed.live .lt b { font: 600 12px/1.1 "Geist"; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed.live .lt > span { display: flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--live-text); }
+  .prog { display: flex; gap: 3px; flex: 1; }
+  .prog i { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); }
+  .prog i.d { background: var(--ink); }
+  .prog i.now { background: var(--live); }
+  .prog.sm { flex: none; width: 46px; }
+  .tally { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; }
+  .tally::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+  .feedcap { padding: 10px var(--m) 0; color: rgba(255,255,255,.84); font: 400 13px/1.3 "Geist"; }
+  .feedcap b { color: #fff; font-weight: 600; }
+
+  /* composer on the sky */
+  .ask { margin: auto 16px 0; height: 56px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 6px; color: #5A606B; font: 400 16px/1 "Geist"; flex: none; }
+  .screen[data-theme="dark"] .ask { background: #16181C; color: #A3A8B2; border: 1px solid #272A30; }
+  .ask .grow { flex: 1; padding-left: 2px; }
+  .ask .plus { width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .to { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 4px; border-radius: 999px; background: var(--soft); color: var(--ink); font: 600 13px/1 "Geist"; flex: none; }
+  .to .face { width: 24px; height: 24px; }
+  .to svg { width: 14px; height: 14px; color: var(--ink-2); }
+  .mic { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; flex: none; }
+  .mic svg { width: 20px; height: 20px; }
+
+  /* sheet */
+  .sheet { margin-top: 14px; height: 332px; background: var(--raised); border-radius: 28px 28px 0 0; padding: 22px var(--m) 0; flex: none; overflow: hidden; }
+  h3 { margin: 0 0 4px; font: 600 15px/1.2 "Geist"; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
+  .n { font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--soft); border-radius: 999px; padding: 4px 7px; }
+  .need { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .need .face { width: 38px; height: 38px; }
+  .t { flex: 1; min-width: 0; }
+  .t b { display: block; font: 600 15px/1.25 "Geist"; letter-spacing: -.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t span { display: block; font: 400 13px/1.3 "Geist"; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t span .bad { display: inline; color: var(--neg); font-weight: 600; }
+  .go { flex: none; height: 36px; padding: 0 16px; border-radius: 999px; background: var(--ink); color: var(--raised); font: 600 13px/36px "Geist"; }
+  .go.soft { background: var(--soft); color: var(--ink); }
+  .log { margin-top: 18px; }
+  .log .row { display: grid; grid-template-columns: 42px 1fr; padding: 5px 0; font: 400 14px/1.35 "Geist"; }
+  .log time { font: 500 12px/1.6 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .log b { font-weight: 600; }
+  .sheetfade { position: absolute; left: 0; right: 0; bottom: 0; height: 112px; background: linear-gradient(color-mix(in srgb, var(--raised) 0%, transparent), var(--raised) 24px); pointer-events: none; }
+  .say { margin-top: 14px; font: 400 13px/1.4 "Geist"; color: var(--ink-2); }
+  .say b { color: var(--ink); font-weight: 600; }
+
+  /* dock with the Material 3 active indicator */
+  .dock { position: absolute; left: 16px; right: 16px; bottom: 20px; height: 68px; border-radius: 999px; background: var(--dock); display: flex; align-items: center; justify-content: space-around; padding: 0 6px; }
+  .dock a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--on-dock-2); font: 500 12px/1 "Geist"; width: 80px; }
+  .dock a .ind { position: relative; width: 64px; height: 32px; border-radius: 16px; display: grid; place-items: center; }
+  .dock a.on { color: var(--on-dock); font-weight: 600; }
+  .dock a.on .ind { background: var(--ind); }
+  .dock a.on svg { stroke-width: 2.1; }
+  .dock .ind em { position: absolute; top: 0; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--on-dock); color: var(--dock); font: 700 11px/16px "Geist"; font-style: normal; text-align: center; }
+
+  /* Material back button */
+  .back { width: 48px; height: 48px; display: grid; place-items: center; flex: none; }
+  .back svg { width: 24px; height: 24px; }
+
+  /* sky band for the other screens */
+  .band { position: absolute; inset: 0 0 auto 0; height: 152px; overflow: hidden; }
+  .band .city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 64px; }
+  .over { position: relative; }
+  .sheetpage { margin-top: 18px; flex: 1; min-height: 0; background: var(--ground); border-radius: 28px 28px 0 0; overflow: hidden; }
+
+
+  /* sky band carried by the header itself */
+  .bandwrap { position: relative; flex: none; margin-top: calc(-1 * var(--safe-top)); padding-top: var(--safe-top); overflow: hidden;
+              background: linear-gradient(#0D2141 0%, #2C4F80 40%, #7E9DC2 78%, #CFC9B6 100%); }
+  .bandwrap .city { position: absolute; left: 0; right: 0; bottom: 18px; width: 100%; height: 44px; }
+  .bandwrap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: var(--ground); border-radius: 28px 28px 0 0; }
+  .bandwrap .city.base { bottom: 0; height: 18px; }
+
+  /* ---------- live window: the work, in words and one picture; the commands are a tap away ---------- */
+  .lw .head .go { background: #FFFFFF; color: #0E1116; }
+  .lw .head .who .tally { color: #fff; font-weight: 500; }
+  .lw .head .who .tally::before { box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
+  .lw .lede { padding: 2px var(--m) 0; }
+  .lw .lede h1 { margin: 0; font: 600 30px/1.1 "Geist"; letter-spacing: -.04em; }
+  .lw .lede p { margin: 8px 0 0; font: 400 15px/1.4 "Geist"; color: var(--ink-2); }
+  .win { margin: 20px 12px 0; border-radius: 24px; background: var(--raised); box-shadow: inset 0 0 0 2px var(--live); padding: 18px 14px; }
+  .win .wl { display: flex; justify-content: space-between; padding: 0 4px; font: 500 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .win .wl b { font-weight: 600; color: var(--ink); }
+  .path { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 18px; }
+  .path .wire { position: absolute; top: 23px; left: 12.5%; right: 12.5%; height: 2px; display: flex; }
+  .path .wire i { flex: 1; background: var(--ink); }
+  .path .wire i.dash { background: repeating-linear-gradient(90deg, var(--live) 0 6px, transparent 6px 11px); }
+  .path .pkt { position: absolute; top: 18px; left: calc(73% - 6px); width: 12px; height: 12px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 3px var(--raised); }
+  .path .node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .path .ic { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--soft); color: var(--ink); display: grid; place-items: center; }
+  .path .ic svg { width: 22px; height: 22px; }
+  .path .ic .ok { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; box-shadow: 0 0 0 2px var(--raised); }
+  .path .ic .ok svg { width: 11px; height: 11px; stroke-width: 3; }
+  .path .node.now .ic { background: #FFF3DA; box-shadow: inset 0 0 0 2px var(--live); }
+  .path .node b { display: block; font: 600 13px/1.2 "Geist"; letter-spacing: -.01em; }
+  .path .node span { display: block; margin-top: 2px; font: 400 12px/1.3 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .path .node.now span { color: var(--live-text); font-weight: 600; }
+  .win .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 4px 0; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .win .stats span { display: block; font: 400 12px/1.3 "Geist"; color: var(--ink-2); }
+  .win .stats b { display: block; margin-top: 4px; font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .win .stats b s { font-weight: 400; color: var(--ink-3); }
+  .lw .run { padding: 22px var(--m) 0; }
+  .cmds { display: flex; align-items: center; gap: 4px; height: 48px; margin-top: 4px; font: 600 13px/1 "Geist"; color: var(--ink); }
+  .cmds svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .cfade { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(color-mix(in srgb, var(--ground) 0%, transparent), var(--ground) 40px); pointer-events: none; }
+  .turn { display: flex; align-items: center; gap: 8px; font: 600 14px/1.3 "Geist"; letter-spacing: -.01em; }
+  .turn .meta { font-weight: 400; color: var(--ink-2); }
+  .turn svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .pulse { width: 9px; height: 9px; margin: 0 2px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 4px rgba(255,176,32,.22); flex: none; }
+  .steps { margin: 8px 0 0 5px; padding-left: 15px; border-left: 1.5px solid var(--rule); }
+  .step { display: flex; align-items: center; gap: 9px; padding: 5px 0; font: 400 13.5px/1.35 "Geist"; color: var(--ink-2); }
+  .step svg { width: 14px; height: 14px; stroke-width: 2.2; color: var(--ink-3); flex: none; }
+  .step.now { font-weight: 600; color: var(--ink); }
+  .step.now .dot { width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; background: var(--live); flex: none; }
+  .step .ring { width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; border: 1.5px solid var(--ink-3); flex: none; }
+  .meta12 { margin-top: 14px; font: 400 12px/1.4 "Geist"; color: var(--ink-3); }
+  .composer { position: absolute; left: 16px; right: 16px; bottom: 26px; height: 56px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; padding: 0 8px; font: 400 16px/1 "Geist"; color: var(--ink-3); }
+  .composer .grow { flex: 1; }
+  .composer .ic { width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink-2); }
+  .composer .voice { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; }
+
+  /* ---------- chat ---------- */
+  .head { display: flex; align-items: center; gap: 6px; padding: 6px 12px 0 4px; color: #fff; }
+  .head .face { width: 40px; height: 40px; }
+  .head .who { flex: 1; }
+  .head .who b { display: block; font: 600 17px/1.1 "Geist"; letter-spacing: -.02em; }
+  .head .who span { font: 400 12px/1.3 "Geist"; color: rgba(255,255,255,.84); }
+  .head .who .tally { margin-top: 5px; }
+  .chat .scroll { padding: 22px var(--m) 0; }
+  .you { margin-left: 48px; background: var(--soft); border-radius: 20px 20px 6px 20px; padding: 12px 15px; font: 400 15px/1.4 "Geist"; }
+  .chat .turn { margin-top: 22px; }
+  .answer { margin-top: 10px; font: 400 17px/1.45 "Geist"; letter-spacing: -.005em; }
+  /* A2UI DraftReview, kept: its own labels and structure, on the new neutral tokens */
+  .draft { position: relative; margin-top: 16px; background: #FDFDFD; border: 1px solid var(--rule); border-radius: 18px; padding: 18px 18px 26px; }
+  .draft .dt { font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; }
+  .draft .lab { margin-top: 12px; font: 600 11px/1 "Geist"; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .draft .lab.first { margin-top: 8px; }
+  .draft .val { margin-top: 5px; font: 400 15px/1.4 "Geist"; }
+  .draft hr { border: 0; border-top: 1px solid var(--rule); margin: 14px 0 0; }
+  .draft .more { position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--raised); border: 1px solid var(--rule); display: grid; place-items: center; color: var(--ink-2); }
+  .chat .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 170px; background: linear-gradient(rgba(247,247,247,0), #F7F7F7 46%); }
+  .chip { position: absolute; left: 16px; bottom: 92px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); display: flex; align-items: center; gap: 6px; font: 600 13px/1 "Geist"; }
+  .chip span { color: var(--ink-2); font-weight: 400; }
+  .chip svg { width: 14px; height: 14px; color: var(--ink-2); }
+
+  /* ---------- work / chats ---------- */
+  .pagehead { padding: 14px var(--m) 0; color: #fff; display: flex; flex-direction: column; gap: 4px; }
+  .pagehead b { font: 600 30px/1.1 "Geist"; letter-spacing: -.04em; }
+  .pagehead span { font: 400 15px/1.3 "Geist"; color: rgba(255,255,255,.9); }
+  .grp { padding: 22px var(--m) 0; }
+  .grp:first-child { padding-top: 6px; }
+  .runrow { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .runrow .face { width: 42px; height: 42px; }
+  .lring { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--live); }
+  .runrow .tally, .r .tally { color: var(--live-text); }
+  .r { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .r .face { width: 42px; height: 42px; }
+  .r .t b { font-weight: 500; }
+  .r.unread .t b { font-weight: 650; }
+  .side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex: none; }
+  .r time { font: 500 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .r.unread time { color: var(--ink); }
+  .r .ud { min-width: 18px; height: 18px; border-radius: 9px; background: var(--ink); color: var(--raised); font: 700 11px/18px "Geist"; text-align: center; padding: 0 5px; }
+  .r .ud.dot { min-width: 8px; width: 8px; height: 8px; padding: 0; }
+  .r .ud.off { background: transparent; }
+  .r .glyph { width: 42px; height: 42px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .r .glyph svg { width: 20px; height: 20px; }
+  .r .glyph img { width: 24px; height: 24px; border-radius: 50%; display: block; }
+  .search { display: flex; align-items: center; gap: 10px; height: 48px; margin: 6px var(--m) 0; padding: 0 16px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); font: 400 15px/1 "Geist"; color: var(--ink-3); }
+  .search svg { width: 20px; height: 20px; color: var(--ink-2); }
+  .pagehead .act { position: absolute; right: 8px; top: 2px; width: 48px; height: 48px; display: grid; place-items: center; color: #fff; }
+  .pagehead .act svg { width: 22px; height: 22px; }
+  .dockfade { position: absolute; left: 0; right: 0; bottom: 0; height: 112px; background: linear-gradient(color-mix(in srgb, var(--ground) 0%, transparent), var(--ground) 24px); pointer-events: none; }
+  .links { display: flex; gap: 8px; padding: 16px var(--m) 0; }
+  .links a { height: 36px; padding: 0 14px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); font: 500 13px/34px "Geist"; color: var(--ink-2); }
+  .links a b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- storyboard ---------- */
+  .story { background: #E4E5E8; }
+  .story .grid { position: absolute; inset: 24px 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; align-content: start; }
+  .story figure { margin: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .story figcaption { font: 500 12px/1.3 "Geist"; color: #3F444C; text-align: center; }
+  .story figcaption b { font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: #0E1116; display: block; margin-bottom: 3px; }
+  .mini { --mini: .42; }
+  .mini-screen { font-family: "Geist", sans-serif; }
+  .ms-veil { position: absolute; inset: 0; background: var(--ground); }
+  .ms-win { position: absolute; margin: 0; }
+
+  /* ---------- icon ---------- */
+  .app-icon.conduit { background: linear-gradient(#173560 0%, #3E6497 44%, #A9B9C8 74%, #EFDCAF 100%); }
+  .app-icon.conduit svg, .app-icon.mono svg { position: absolute; left: -37%; width: 142%; bottom: 7%; height: 50%; }
+  .app-icon.conduit::after, .app-icon.mono::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8%; background: #0F1E33; }
+  .app-icon.mono::after { background: #31445F; }
+  .app-icon.mono { background: #DCE3EE; }
+
+  @container (max-height: 760px) {
+    .screen .feedcap, .screen .log, .screen .say, .screen .meta12 { display: none; }
+    .screen .display { padding-top: 16px; }
+    .screen .sky.tall { height: 380px !important; }
+    .screen .sky.tall .city { height: 120px !important; }
+    .screen .sheet { height: 230px; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="city" viewBox="0 280 412 280" preserveAspectRatio="none">
+    <path d="M0 560V512h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V454h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18H412V560z"/>
+  </symbol>
+  <symbol id="lights" viewBox="0 280 412 280" preserveAspectRatio="none">
+    <g fill="#F3E6C8" opacity=".7"><rect x="40" y="520" width="2" height="3"/><rect x="88" y="490" width="2" height="3"/><rect x="92" y="510" width="2" height="3"/><rect x="146" y="470" width="2" height="3"/><rect x="150" y="492" width="2" height="3"/><rect x="214" y="470" width="2" height="3"/><rect x="232" y="500" width="2" height="3"/><rect x="290" y="520" width="2" height="3"/><rect x="320" y="482" width="2" height="3"/><rect x="356" y="506" width="2" height="3"/><rect x="263" y="440" width="2" height="2"/></g>
+  </symbol>
+</svg>
+
+<!-- ============ 1. Today, morning ============ -->
+<section class="screen skyscreen" data-name="01-today-morning" data-time="7:42" data-chrome="light" data-home="dark">
+  <div class="sky dawn tall" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>4° clear · sunrise 7:51</span></div>
+    <div class="display">11 done overnight.<br><span>3 need you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed live"><img src="assets/ops-cut.png" alt=""><div class="lt"><b>Push server</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="now"></i><i></i><i></i></span>4:12</span></div></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/architect-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/hermuse-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>ops</b> is restarting the push server. Tap to watch.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">3</span></h3>
+      <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+      <div class="need"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>Export the relay diagram</b><span>architect · <span class="bad">failed 1:24</span>, out of memory</span></div><span class="go soft">Retry</span></div>
+      <div class="log" style="margin-top:56px">
+        <h3>Overnight</h3>
+        <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products to the catalogue</span></div>
+        <div class="row"><time>5:40</time><span><b>scout</b> read 14 Shopify changelog entries; 2 touch checkout</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+</section>
+
+<!-- ============ 2. Live window ============ -->
+<section class="screen lw" data-name="02-live-window" data-time="7:43" data-chrome="light" data-home="dark">
+  <div class="body">
+    <div class="bandwrap" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg>
+    <div class="head over">
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span>
+      <img class="face" src="assets/ops-cut.png" alt="">
+      <div class="who"><b>ops</b><span class="tally">Working · 5:12</span></div>
+      <span class="go">Take over</span>
+    </div></div>
+    <div data-scrolls style="flex:1; min-height:0; overflow:hidden">
+      <div class="lede">
+        <h1>A test alert is on its way to your S25.</h1>
+        <p>Alerts stopped reaching your phone at 7:31. ops restarted the push relay at 7:42 and is checking that they arrive.</p>
+      </div>
+      <div class="win">
+        <div class="wl"><b>Alert path</b><span>7:43</span></div>
+        <div class="path">
+          <div class="wire"><i></i><i></i><i class="dash"></i></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Umbrel</b><span>ok</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Push relay</b><span>restarted</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Firebase</b><span>0.4 s</span></div></div>
+          <div class="node now"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Your S25</b><span>arriving</span></div></div>
+          <span class="pkt"></span>
+        </div>
+        <div class="stats">
+          <div><span>Alert delay</span><b><s>31.2 s</s> 0.4 s</b></div>
+          <div><span>Missed while down</span><b>3 alerts</b></div>
+        </div>
+      </div>
+      <div class="run">
+        <div class="turn"><span class="pulse"></span>Fixing the push server <span class="meta">· 5m</span></div>
+        <div class="steps">
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Found Firebase timing out after 31.2 s</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Read the last 40 log lines</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Restarted the push relay</div>
+          <div class="step now"><span class="dot"></span>Sending a test alert to your S25</div>
+          <div class="step"><span class="ring"></span>Watch alerts for 5 minutes, then resend the 3 missed</div>
+        </div>
+        <div class="cmds">Show the 6 commands ops ran<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="meta12" style="margin-top:2px">Started 7:38 after 2 failed checks. ops pauses while you take over.</div>
+      </div>
+    </div>
+  </div>
+  <div class="cfade" data-float></div>
+  <div class="composer" data-float><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Message ops</span><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+</section>
+
+<!-- ============ 3. Chat: Chief ============ -->
+<section class="screen chat" data-name="03-chat-chief" data-time="7:44" data-chrome="light" data-home="dark">
+  <div class="body">
+    <div class="bandwrap" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg>
+    <div class="head over">
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span>
+      <img class="face" src="assets/chief-cut.png" alt="">
+      <div class="who"><b>Chief</b><span>gpt-6.1-terra</span></div>
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>
+    </div></div>
+    <div>
+      <div class="scroll" data-scrolls style="padding-top:4px">
+        <div class="you">Draft a short note to Jordan confirming Tuesday's kickoff at 10 on Teams. Don't send it.</div>
+        <div class="turn"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>Read 4 emails and your calendar <span class="meta">· 12s</span></div>
+        <div class="answer">Here's the draft. Tuesday at 10:00 is clear, and Jordan's last email asked for the Teams link, so I put it in.</div>
+        <div class="draft">
+          <div class="dt">Kickoff confirmation</div>
+          <div class="lab first">Draft / not sent</div>
+          <div class="lab">To</div><div class="val">jordan@mapleandpine.ca</div>
+          <div class="lab">Subject</div><div class="val">Tuesday kickoff</div>
+          <hr>
+          <div class="lab">Message</div><div class="val">Hi Jordan, confirming our kickoff Tuesday at 10:00 on Teams. The link is below.</div>
+          <span class="more"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="fade" data-float></div>
+  <div class="chip" data-float>gpt-6.1-terra <span>High</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+  <div class="composer" data-float><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Message Chief</span><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span><span class="voice"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></span></div>
+</section>
+
+<!-- ============ 4. Work ============ -->
+<section class="screen work" data-name="04-work" data-time="7:45" data-chrome="light" data-home="dark">
+  <div class="body">
+    <div class="bandwrap" style="height:164px"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead over"><b>Work</b><span>3 need you · 1 running</span></div></div>
+    <div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden">
+      <section class="grp">
+        <h3>Needs you</h3>
+        <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+        <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+        <div class="need"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>Export the relay diagram</b><span>architect · <span class="bad">failed 1:24</span>, out of memory</span></div><span class="go soft">Retry</span></div>
+      </section>
+      <section class="grp">
+        <h3>Running</h3>
+        <div class="runrow"><img class="face lring" src="assets/ops-cut.png" alt=""><div class="t"><b>Fixing the push server</b><span>ops · test alert arrived, watching</span></div><div class="side"><span class="tally">7:12</span><span class="prog sm"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="now"></i></span></div></div>
+      </section>
+      <section class="grp">
+        <h3>Recent</h3>
+        <div class="r unread"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Plan for Thursday</b><span>3 meetings and a call at 2:30</span></div><div class="side"><time>6:58</time><span class="ud dot"></span></div></div>
+        <div class="r unread"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Holiday theme QA</b><span>Checked on 3 phone sizes; fixed 1 overlap</span></div><div class="side"><time>6:12</time><span class="ud dot"></span></div></div>
+        <div class="r"><img class="face" src="assets/scout-cut.png" alt=""><div class="t"><b>Shopify changelog, 29 Oct</b><span>2 entries touch checkout extensions</span></div><div class="side"><time>5:40</time><span class="ud dot off"></span></div></div>
+      </section>
+      <div class="links"><a><b>Scheduled</b> · 10 active</a><a><b>Kanban</b> · 15 tasks</a></div>
+    </div>
+  </div>
+  <nav class="dock" data-float>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+</section>
+
+<!-- ============ 5. Chats ============ -->
+<section class="screen" data-name="05-chats" data-time="7:46" data-chrome="light" data-home="dark">
+  <div class="body">
+    <div class="bandwrap" style="height:164px"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead over"><b>Chats</b><span>6 bots · 3 unread</span><span class="act"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span></div></div>
+    <div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden">
+      <div class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>Search chats</div>
+      <section class="grp">
+        <h3>Your team</h3>
+        <div class="r unread"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Chief</b><span>Plan for Thursday: 3 meetings</span></div><div class="side"><time>6:58</time><span class="ud">2</span></div></div>
+        <div class="r unread"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>kai</b><span>Theme QA: fixed 1 overlap</span></div><div class="side"><time>6:12</time><span class="ud">1</span></div></div>
+        <div class="r"><img class="face lring" src="assets/ops-cut.png" alt=""><div class="t"><b>ops</b><span>Test alert arrived. Watching for 5 min</span></div><div class="side"><span class="tally">8:12</span><span class="ud dot off"></span></div></div>
+        <div class="r"><img class="face" src="assets/scout-cut.png" alt=""><div class="t"><b>scout</b><span>Changelog digest for 29 Oct</span></div><div class="side"><time>5:40</time><span class="ud dot off"></span></div></div>
+        <div class="r"><img class="face" src="assets/architect-cut.png" alt=""><div class="t"><b>architect</b><span>Push relay split, 3 pages</span></div><div class="side"><time>1:20</time><span class="ud dot off"></span></div></div>
+        <div class="r"><img class="face" src="assets/hermuse-cut.png" alt=""><div class="t"><b>hermuse</b><span>Newsletter draft, issue 14</span></div><div class="side"><time>Tue</time><span class="ud dot off"></span></div></div>
+      </section>
+      <section class="grp">
+        <h3>Open WebUI and direct</h3>
+        <div class="r"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Scaling a bread recipe</b><span>Llama 3.3 70B · Open WebUI</span></div><div class="side"><time>Mon</time><span class="ud dot off"></span></div></div>
+        <div class="r"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Winter tires in Ontario</b><span>Llama 3.3 70B · Open WebUI</span></div><div class="side"><time>Sun</time><span class="ud dot off"></span></div></div>
+        <div class="r"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>Regex for SKU codes</b><span>gpt-6.1-terra · direct</span></div><div class="side"><time>22 Oct</time><span class="ud dot off"></span></div></div>
+      </section>
+    </div>
+  </div>
+  <div class="dockfade" data-float></div>
+  <nav class="dock" data-float>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></span>Today</a>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><em>3</em></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>3</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+</section>
+
+<!-- ============ 6. Signature storyboard ============ -->
+<section class="screen story" data-name="06-signature-window-opens" data-chrome="none">
+  <div class="grid">
+    <figure>
+      <div class="mini"><div class="mini-screen" data-chrome="light" data-time="7:42" style="background:#0F1E33">
+        <div class="sky dawn" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+        <div class="body">
+          <div class="display" style="padding-top:60px">11 done overnight.<br><span>3 need you.</span></div>
+          <div class="feeds"><div class="feed live" style="transform:scale(.94); box-shadow: inset 0 0 0 3px var(--live)"><img src="assets/ops-cut.png" alt=""><div class="lt"><b>Push server</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="now"></i><i></i><i></i></span>4:12</span></div></div><div class="feed" style="opacity:.6"><img src="assets/chief-cut.png" alt=""></div><div class="feed" style="opacity:.6"><img src="assets/kai-cut.png" alt=""></div><div class="feed" style="opacity:.6"><img src="assets/architect-cut.png" alt=""></div></div>
+          <div class="ask" style="margin-top:190px"><span class="grow" style="padding-left:16px">Ask the team</span><span class="mic"></span></div>
+          <div class="sheet"><h3>Needs you <span class="n">3</span></h3>
+            <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+            <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div></div>
+        </div>
+      </div></div>
+      <figcaption><b>0 ms</b>Press: tile to 0.94, haptic</figcaption>
+    </figure>
+    <figure>
+      <div class="mini"><div class="mini-screen" data-chrome="light" data-time="7:42" style="background:#0F1E33">
+        <div class="sky dawn" style="height:512px"><svg class="city" style="height:172px; fill:#0F1E33"><use href="#city"/></svg></div>
+        <div class="ms-veil" style="opacity:.55"></div>
+        <div class="win ms-win" style="left:16px; top:196px; width:300px">
+          <div class="wl"><b>Alert path</b><span>7:42</span></div>
+          <div class="path">
+          <div class="wire"><i></i><i></i><i class="dash"></i></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Umbrel</b><span>ok</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Push relay</b><span>restarted</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Firebase</b><span>0.4 s</span></div></div>
+          <div class="node now"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Your S25</b><span>arriving</span></div></div>
+          <span class="pkt"></span>
+        </div>
+        </div>
+        <img class="face" src="assets/ops-cut.png" alt="" style="position:absolute; left:24px; top:146px; width:36px; height:36px">
+      </div></div>
+      <figcaption><b>180 ms</b>The frame springs out</figcaption>
+    </figure>
+    <figure>
+      <div class="mini"><div class="mini-screen lw" data-chrome="light" data-time="7:43" style="background:var(--ground)">
+  <div class="body">
+    <div class="bandwrap" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg>
+    <div class="head over">
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span>
+      <img class="face" src="assets/ops-cut.png" alt="">
+      <div class="who"><b>ops</b><span class="tally">Working · 5:12</span></div>
+      <span class="go">Take over</span>
+    </div></div>
+    <div data-scrolls style="flex:1; min-height:0; overflow:hidden">
+      <div class="lede" style="opacity:.55; transform:translateY(10px)">
+        <h1>A test alert is on its way to your S25.</h1>
+        <p>Alerts stopped reaching your phone at 7:31. ops restarted the push relay at 7:42 and is checking that they arrive.</p>
+      </div>
+      <div class="win">
+        <div class="wl"><b>Alert path</b><span>7:43</span></div>
+        <div class="path">
+          <div class="wire"><i></i><i></i><i class="dash"></i></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Umbrel</b><span>ok</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Push relay</b><span>restarted</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Firebase</b><span>0.4 s</span></div></div>
+          <div class="node now"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Your S25</b><span>arriving</span></div></div>
+          <span class="pkt"></span>
+        </div>
+        <div class="stats">
+          <div><span>Alert delay</span><b><s>31.2 s</s> 0.4 s</b></div>
+          <div><span>Missed while down</span><b>3 alerts</b></div>
+        </div>
+      </div>
+      <div class="run" style="opacity:0">
+        <div class="turn"><span class="pulse"></span>Fixing the push server <span class="meta">· 5m</span></div>
+        <div class="steps">
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Found Firebase timing out after 31.2 s</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Read the last 40 log lines</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Restarted the push relay</div>
+          <div class="step now"><span class="dot"></span>Sending a test alert to your S25</div>
+          <div class="step"><span class="ring"></span>Watch alerts for 5 minutes, then resend the 3 missed</div>
+        </div>
+        <div class="cmds">Show the 6 commands ops ran<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="meta12" style="margin-top:2px">Started 7:38 after 2 failed checks. ops pauses while you take over.</div>
+      </div>
+    </div>
+  </div>
+  <div class="cfade" data-float></div>
+  <div class="composer" data-float style="opacity:.35"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Message ops</span><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+      </div></div>
+      <figcaption><b>360 ms</b>Sky folds into the header</figcaption>
+    </figure>
+    <figure>
+      <div class="mini"><div class="mini-screen lw" data-chrome="light" data-time="7:43" style="background:var(--ground)">
+  <div class="body">
+    <div class="bandwrap" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg>
+    <div class="head over">
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span>
+      <img class="face" src="assets/ops-cut.png" alt="">
+      <div class="who"><b>ops</b><span class="tally">Working · 5:12</span></div>
+      <span class="go">Take over</span>
+    </div></div>
+    <div data-scrolls style="flex:1; min-height:0; overflow:hidden">
+      <div class="lede">
+        <h1>A test alert is on its way to your S25.</h1>
+        <p>Alerts stopped reaching your phone at 7:31. ops restarted the push relay at 7:42 and is checking that they arrive.</p>
+      </div>
+      <div class="win">
+        <div class="wl"><b>Alert path</b><span>7:43</span></div>
+        <div class="path">
+          <div class="wire"><i></i><i></i><i class="dash"></i></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Umbrel</b><span>ok</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Push relay</b><span>restarted</span></div></div>
+          <div class="node"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg><span class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span><div><b>Firebase</b><span>0.4 s</span></div></div>
+          <div class="node now"><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div><b>Your S25</b><span>arriving</span></div></div>
+          <span class="pkt"></span>
+        </div>
+        <div class="stats">
+          <div><span>Alert delay</span><b><s>31.2 s</s> 0.4 s</b></div>
+          <div><span>Missed while down</span><b>3 alerts</b></div>
+        </div>
+      </div>
+      <div class="run">
+        <div class="turn"><span class="pulse"></span>Fixing the push server <span class="meta">· 5m</span></div>
+        <div class="steps">
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Found Firebase timing out after 31.2 s</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Read the last 40 log lines</div>
+          <div class="step"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Restarted the push relay</div>
+          <div class="step now"><span class="dot"></span>Sending a test alert to your S25</div>
+          <div class="step"><span class="ring"></span>Watch alerts for 5 minutes, then resend the 3 missed</div>
+        </div>
+        <div class="cmds">Show the 6 commands ops ran<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="meta12" style="margin-top:2px">Started 7:38 after 2 failed checks. ops pauses while you take over.</div>
+      </div>
+    </div>
+  </div>
+  <div class="cfade" data-float></div>
+  <div class="composer" data-float><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Message ops</span><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+      </div></div>
+      <figcaption><b>520 ms</b>Steps settle, haptic</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ 7. Today, evening (dark) ============ -->
+<section class="screen skyscreen dusk-g" data-name="07-today-evening-dark" data-time="18:52" data-theme="dark" data-chrome="light" data-home="light">
+  <div class="sky dusk tall" style="height:512px">
+    <div class="rain"></div>
+    <svg class="city" style="height:172px; fill:#0A1220"><use href="#city"/></svg>
+    <svg class="city" style="height:172px"><use href="#lights"/></svg>
+  </div>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>6° light rain · dark since 6:31</span></div>
+    <div class="display">23 done today.<br><span>1 still needs you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed live"><img src="assets/hermuse-cut.png" alt=""><div class="lt"><b>Issue 14</b><span><span class="prog"><i class="d"></i><i class="d"></i><i class="d"></i><i class="now"></i><i></i></span>2:31</span></div></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/ops-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/architect-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>hermuse</b> is drafting newsletter issue 14. Tap to watch.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">1</span></h3>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai checked it on 3 phone sizes</span></div><span class="go">Approve</span></div>
+      <div class="log">
+        <h3>Tomorrow</h3>
+        <div class="row"><time>10:00</time><span><b>Kickoff with Jordan</b> · Chief prepared notes from 4 emails</span></div>
+      </div>
+      <div class="say">Umbrel has <b>14 apps up</b>. The catalogue is at <b>1,284</b>, 38 added today.</div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>1</em></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+</section>
+
+<!-- ============ 8. Today, quiet night ============ -->
+<section class="screen skyscreen night-g" data-name="08-today-quiet-night" data-time="2:14" data-chrome="light" data-home="dark">
+  <div class="sky night tall" style="height:512px">
+    <svg class="stars" viewBox="0 0 412 512" style="position:absolute; inset:0; width:100%; height:512px" aria-hidden="true">
+      <circle cx="40" cy="340" r="1.1"/><circle cx="130" cy="362" r=".9"/><circle cx="214" cy="336" r="1.2"/><circle cx="296" cy="372" r=".8"/><circle cx="352" cy="344" r="1"/><circle cx="392" cy="300" r=".9"/><circle cx="84" cy="398" r=".7"/><circle cx="388" cy="230" r=".8"/>
+    </svg>
+    <svg class="city" style="height:172px; fill:#070B14"><use href="#city"/></svg>
+    <svg class="city" style="height:172px"><use href="#lights"/></svg>
+  </div>
+  <div class="body">
+    <div class="top"><span><b>Fri 31 Oct</b> &nbsp;Toronto</span><span>1° clear · sunrise 7:52</span></div>
+    <div class="display">Quiet night.<br><span>Nothing needs you.</span></div>
+    <div class="feeds" data-scrolls>
+      <div class="feed quiet"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/ops-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/architect-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/hermuse-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>scout</b> reads the changelog at 5:30.</div>
+    <div class="ask"><span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Ask the team</span><span class="to"><img class="face" src="assets/chief-cut.png" alt="">Chief<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <div class="log" style="margin-top:0">
+        <h3>Earlier</h3>
+        <div class="row"><time>1:20</time><span><b>architect</b> drafted the push relay split, 3 pages</span></div>
+        <div class="row"><time>0:48</time><span><b>Chief</b> planned Friday: 2 meetings, nothing before 11</span></div>
+      </div>
+      <div class="log">
+        <h3>Tomorrow</h3>
+        <div class="row"><time>11:00</time><span><b>Weekly ops review</b> · Chief has the agenda ready</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheetfade" data-float></div>
+  <nav class="dock" data-float>
+    <a class="on"><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></span>Today</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span>Chats</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></span>Work</a>
+    <a><span class="ind"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>You</a>
+  </nav>
+</section>
+
+<!-- ============ 9. Icon: adaptive, full-bleed sky with the skyline inside the safe zone, plus its themed mono layer ============ -->
+<section class="app-icon conduit" data-name="icon">
+  <svg style="fill:#0F1E33"><use href="#city"/></svg>
+</section>
+<section class="app-icon mono" data-name="icon-themed">
+  <svg style="fill:#31445F"><use href="#city"/></svg>
+</section>
+
+<script src="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.js"></script>
+<script>
+  // One UI status bar: time and two notification icons left; wifi, signal, battery % right.
+  document.querySelectorAll('.ac-status').forEach(el => {
+    const host = el.closest('[data-time]'); const t = host ? host.dataset.time : '9:41';
+    el.innerHTML = `<span class="sb">${t}<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span>
+      <span class="sb"><svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M6 12.5a9 9 0 0 1 12 0M9.5 16a4 4 0 0 1 5 0"/></svg><svg class="f" viewBox="0 0 24 24"><path d="M3 20h3v-4H3zM8 20h3v-8H8zM13 20h3V8h-3zM18 20h3V4h-3z"/></svg><span class="pct">84%</span><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="17" rx="2"/><path d="M10 2h4"/><rect x="9" y="8" width="6" height="11" rx="1" style="fill:currentColor;stroke:none"/></svg></span>`;
+  });
+</script>
+</body>
+</html>

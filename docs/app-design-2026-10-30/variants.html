@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conduit variants, A and B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Geist+Mono:wght@400..600&family=Big+Shoulders+Display:wght@700..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.css">
+<link rel="stylesheet" href="../app-design-2026-10-24/android.css">
+<style>
+  :root { --live: #FFB020; --live-ink: #8A5A00; }
+  svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .face { display: block; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: #fff; }
+  .screen { font-family: "Geist", sans-serif; }
+  .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+  .art { position: absolute; inset: 0 0 auto 0; }
+
+  /* shared: reversed dock */
+  .dock { position: absolute; left: 16px; right: 16px; bottom: 24px; height: 64px; border-radius: 999px; background: #0E1116; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; }
+  .dock a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: rgba(255,255,255,.62); font: 500 11px/1 "Geist"; width: 76px; }
+  .dock a.on { color: #fff; }
+  .dock .badge { position: relative; }
+  .dock .badge em { position: absolute; top: -5px; right: -9px; min-width: 16px; height: 16px; border-radius: 8px; background: #fff; color: #0E1116; font: 700 11px/16px "Geist"; font-style: normal; text-align: center; }
+  .dock.light { background: #F2F3F5; }
+  .dock.light a { color: #5A606B; } .dock.light a.on { color: #0E1116; }
+  .dock.light .badge em { background: #0E1116; color: #fff; }
+
+  /* shared: sheet rows */
+  .sheet { background: #fff; color: #0E1116; border-radius: 28px 28px 0 0; padding: 20px 20px 112px; }
+  h3 { margin: 0 0 4px; font: 600 15px/1.2 "Geist"; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
+  h3 .n { font: 600 12px/1 "Geist Mono"; color: #5A606B; background: #F1F2F4; border-radius: 999px; padding: 4px 7px; }
+  .need { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
+  .need .face { width: 38px; height: 38px; flex: none; }
+  .need .t { flex: 1; min-width: 0; }
+  .need .t b { display: block; font: 600 15px/1.25 "Geist"; letter-spacing: -.015em; }
+  .need .t span { font: 400 13px/1.3 "Geist"; color: #5A606B; }
+  .go { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; background: #0E1116; color: #fff; font: 600 13px/34px "Geist"; }
+  .log { margin-top: 16px; }
+  .log .row { display: grid; grid-template-columns: 44px 1fr; gap: 6px; padding: 6px 0; font: 400 14px/1.3 "Geist"; }
+  .log time { font: 500 12px/1.5 "Geist Mono"; color: #6B717B; }
+  .log b { font-weight: 600; }
+
+  /* tally pill: live */
+  .tally { display: inline-flex; align-items: center; gap: 6px; font: 600 11px/1 "Geist Mono"; letter-spacing: .02em; }
+  .tally::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+
+  /* ================= A1: sky + feeds ================= */
+  .a1 { background: #0F1E33; }
+  .a1 .top { display: flex; justify-content: space-between; padding: 14px 22px 0; color: rgba(255,255,255,.86); font: 500 13px/1 "Geist"; }
+  .a1 .top b { color: #fff; font-weight: 600; }
+  .a1 .hero { padding: 34px 22px 0; color: #fff; font: 600 40px/1.04 "Geist"; letter-spacing: -.045em; }
+  .a1 .hero span { color: rgba(255,255,255,.62); }
+  .a1 .feeds { display: flex; gap: 8px; padding: 22px 22px 0; }
+  .a1 .feed { position: relative; width: 52px; height: 52px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.18); }
+  .a1 .feed img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
+  .a1 .feed.quiet img { opacity: .55; filter: grayscale(.6); }
+  .a1 .feed.live { width: 128px; box-shadow: inset 0 0 0 2px var(--live); background: #0B0D10; }
+  .a1 .feed.live img { position: absolute; left: 6px; bottom: 6px; width: 26px; height: 26px; border-radius: 50%; background: #fff; }
+  .a1 .feed.live .scr { position: absolute; inset: 8px 8px 0 40px; display: flex; flex-direction: column; gap: 4px; }
+  .a1 .feed.live .scr i { display: block; height: 3px; border-radius: 2px; background: #C9CED6; }
+  .a1 .feed.live .scr i:first-child { background: #6FE3A4; width: 80%; }
+  .a1 .feed.live .scr i:nth-child(3) { width: 55%; }
+  .a1 .feed.live .tally { position: absolute; left: 40px; bottom: 7px; color: #fff; }
+  .a1 .feedcap { padding: 8px 22px 0; color: rgba(255,255,255,.8); font: 400 13px/1.3 "Geist"; }
+  .a1 .feedcap b { color: #fff; font-weight: 600; }
+  .a1 .ask { margin: auto 16px 0; height: 54px; border-radius: 999px; background: rgba(255,255,255,.95); display: flex; align-items: center; gap: 12px; padding: 0 8px 0 20px; color: #5A606B; font: 400 16px/1 "Geist"; }
+  .a1 .ask .grow { flex: 1; }
+  .mic { width: 40px; height: 40px; border-radius: 50%; background: #0E1116; color: #fff; display: grid; place-items: center; }
+  .mic svg { width: 20px; height: 20px; }
+  .a1 .sheet { margin-top: 14px; }
+
+  /* ================= A2: dusk + panels ================= */
+  .a2 { background: #0B1424; color: #fff; }
+  .a2 .top { display: flex; justify-content: space-between; padding: 14px 22px 0; color: rgba(255,255,255,.8); font: 500 13px/1 "Geist"; }
+  .a2 .top b { color: #fff; font-weight: 600; }
+  .a2 .hero { padding: 30px 22px 0; font: 600 36px/1.06 "Geist"; letter-spacing: -.045em; }
+  .a2 .hero span { color: rgba(255,255,255,.6); }
+  .a2 .ask { margin: 22px 16px 0; height: 54px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2); backdrop-filter: blur(20px); display: flex; align-items: center; gap: 12px; padding: 0 8px 0 20px; color: rgba(255,255,255,.78); font: 400 16px/1 "Geist"; }
+  .a2 .ask .grow { flex: 1; }
+  .a2 .ask .mic { background: #fff; color: #0E1116; }
+  .a2 .lower { margin-top: auto; padding: 0 16px 108px; display: flex; flex-direction: column; gap: 10px; }
+  .a2 .glass { background: rgba(14,20,32,.55); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(24px); border-radius: 22px; }
+  .a2 .sug { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; }
+  .a2 .sug .face { width: 36px; height: 36px; flex: none; }
+  .a2 .sug .t { flex: 1; min-width: 0; }
+  .a2 .sug b { display: block; font: 600 15px/1.25 "Geist"; letter-spacing: -.015em; }
+  .a2 .sug span { font: 400 13px/1.3 "Geist"; color: rgba(255,255,255,.72); }
+  .a2 .sug .go { background: #fff; color: #0E1116; font: 600 13px/34px "Geist"; }
+  .a2 .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .a2 .panel { padding: 14px; }
+  .a2 .panel .k { font: 500 12px/1 "Geist"; color: rgba(255,255,255,.72); }
+  .a2 .panel .v { margin-top: 10px; font: 600 28px/1 "Geist"; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .a2 .panel .v small { font: 500 13px/1 "Geist"; letter-spacing: 0; color: rgba(255,255,255,.72); margin-left: 4px; }
+  .a2 .panel .s { margin-top: 8px; font: 400 13px/1.3 "Geist"; color: rgba(255,255,255,.8); }
+  .a2 .spark { margin-top: 10px; height: 22px; }
+
+  /* ================= B1: control room, calmer ================= */
+  .b1 { --g: #0B0C0E; --tile: #17191D; --ink: #F2F3F5; --ink-2: #A3A8B2; --ink-3: #7E8490; --rule: #23262C; background: var(--g); color: var(--ink); }
+  .b1 .body { padding: 0 16px; }
+  .b1 .top { display: flex; justify-content: space-between; padding: 14px 4px 14px; font: 500 13px/1 "Geist"; color: var(--ink-2); }
+  .b1 .top b { color: var(--ink); font-weight: 600; }
+  .b1 .wall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .b1 .mon { position: relative; aspect-ratio: 1 / 1; border-radius: 14px; overflow: hidden; background: var(--tile); }
+  .b1 .mon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
+  .b1 .mon.quiet img { filter: grayscale(.9) brightness(.5); }
+  .b1 .mon .lt { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 9px 8px; background: linear-gradient(transparent, rgba(0,0,0,.85)); font: 600 13px/1 "Geist"; color: #fff; display: flex; justify-content: space-between; align-items: baseline; }
+  .b1 .mon .lt span { font: 500 11px/1 "Geist Mono"; color: var(--ink-2); }
+  .b1 .mon.live { box-shadow: inset 0 0 0 2px var(--live); }
+  .b1 .mon.live .lt span { color: var(--live); }
+  .b1 .mon .cnt { position: absolute; top: 0; right: 0; padding: 7px 9px 6px 10px; border-radius: 0 0 0 12px; background: #0B0C0E; color: #fff; font: 700 12px/1 "Geist"; }
+  .b1 .hero { margin: 26px 4px 0; font: 600 34px/1.06 "Geist"; letter-spacing: -.045em; }
+  .b1 .hero span { color: var(--ink-2); }
+  .b1 .need { padding: 12px 4px; }
+  .b1 .need:first-of-type { margin-top: 12px; }
+  .b1 .need .t span { color: var(--ink-2); }
+  .b1 .go { background: var(--ink); color: var(--g); }
+  .b1 .log { padding: 0 4px; margin-top: 10px; }
+  .b1 .log .row { color: var(--ink-2); font-size: 13px; padding: 4px 0; }
+  .b1 .log time { color: var(--ink-3); }
+  .b1 .log b { color: var(--ink); }
+  .b1 .ask { position: absolute; left: 16px; right: 16px; bottom: 28px; height: 58px; border-radius: 999px; background: #F2F3F5; color: #5A606B; display: flex; align-items: center; gap: 12px; padding: 0 9px 0 22px; font: 400 16px/1 "Geist"; }
+  .b1 .ask .grow { flex: 1; }
+  .b1 .ask .hold { font: 500 12px/1 "Geist"; color: #50555E; }
+
+  /* ================= B2: program monitor, light ================= */
+  .b2 { --g: #F7F7F7; --ink: #0E1116; --ink-2: #5A606B; --ink-3: #6B717B; background: var(--g); color: var(--ink); }
+  .b2 .body { padding: 0 16px; }
+  .b2 .top { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 4px 0; }
+  .b2 .top b { font: 700 34px/1 "Geist"; letter-spacing: -.045em; }
+  .b2 .top span { font: 500 13px/1 "Geist"; color: var(--ink-2); }
+  .b2 .pgm { position: relative; margin-top: 16px; border-radius: 20px; overflow: hidden; background: #0B0D10; aspect-ratio: 16 / 11; box-shadow: inset 0 0 0 3px var(--live); }
+  .b2 .pgm .bar { display: flex; gap: 6px; align-items: center; padding: 12px 14px; border-bottom: 1px solid #1E2127; }
+  .b2 .pgm .bar i { width: 7px; height: 7px; border-radius: 50%; background: #2A2E35; }
+  .b2 .pgm .bar span { margin-left: 8px; font: 500 11px/1 "Geist Mono"; color: #8A909A; }
+  .b2 .pgm pre { margin: 0; padding: 12px 14px; font: 400 11.5px/1.65 "Geist Mono"; color: #C9CED6; white-space: pre-wrap; }
+  .b2 .pgm pre em { font-style: normal; color: #6FE3A4; }
+  .b2 .pgm pre u { text-decoration: none; color: #FFB020; }
+  .b2 .pgm .lower3 { position: absolute; left: 0; right: 0; bottom: 0; padding: 32px 14px 14px; background: linear-gradient(transparent, rgba(5,6,8,.92) 45%); display: flex; align-items: flex-end; gap: 10px; }
+  .b2 .pgm .lower3 .face { width: 40px; height: 40px; box-shadow: 0 0 0 2px #0B0D10; }
+  .b2 .pgm .lower3 .t { flex: 1; color: #fff; }
+  .b2 .pgm .lower3 .t b { display: block; font: 600 15px/1.2 "Geist"; letter-spacing: -.015em; }
+  .b2 .pgm .lower3 .tally { color: var(--live); margin-bottom: 5px; }
+  .b2 .pgm .lower3 .take { height: 34px; padding: 0 14px; border-radius: 999px; background: #fff; color: #0E1116; font: 600 13px/34px "Geist"; }
+  .b2 .pvw { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px; }
+  .b2 .pv { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0 9px; border-radius: 16px; background: #fff; font: 500 12px/1 "Geist"; color: var(--ink-2); }
+  .b2 .pv .face { width: 40px; height: 40px; }
+  .b2 .pv b { font: 600 12px/1 "Geist"; color: var(--ink); }
+  .b2 .pv .cnt { color: var(--ink); background: #EDEEF0; border-radius: 999px; padding: 3px 6px; font: 600 11px/1 "Geist Mono"; }
+  .b2 h3 { margin-top: 22px; padding: 0 4px; }
+  .b2 .need { padding: 9px 4px; }
+</style>
+</head>
+<body>
+
+<!-- ============ A1: sky + feeds ============ -->
+<section class="screen a1" data-name="a1-sky-feeds" data-time="7:42" data-chrome="light" data-home="dark">
+  <svg class="art" style="height:452px" viewBox="0 0 412 560" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="dawn1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0D2141"/><stop offset=".38" stop-color="#2C4F80"/><stop offset=".66" stop-color="#7E9DC2"/><stop offset=".86" stop-color="#D9D3BE"/><stop offset="1" stop-color="#EFDDB2"/></linearGradient>
+    </defs>
+    <rect width="412" height="560" fill="url(#dawn1)"/>
+    <path fill="#0F1E33" d="M0 560V512h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V454h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18h14v56z"/>
+  </svg>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>4° clear · sunrise 7:51</span></div>
+    <div class="hero">11 done overnight.<br><span>2 need you.</span></div>
+    <div class="feeds">
+      <div class="feed live"><img src="assets/ops-cut.png" alt=""><div class="scr"><i></i><i></i><i></i></div><span class="tally">4:12</span></div>
+      <div class="feed"><img src="assets/chief-cut.png" alt=""></div>
+      <div class="feed"><img src="assets/kai-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/scout-cut.png" alt=""></div>
+      <div class="feed quiet"><img src="assets/architect-cut.png" alt=""></div>
+    </div>
+    <div class="feedcap"><b>ops</b> is checking the push server. Tap to watch.</div>
+    <div class="ask"><span class="grow">Ask the team</span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="sheet" data-scrolls>
+      <h3>Needs you <span class="n">2</span></h3>
+      <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+      <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+      <div class="log">
+        <h3>Overnight</h3>
+        <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products to the catalogue</span></div>
+        <div class="row"><time>5:40</time><span><b>scout</b> read 14 Shopify changelog entries; 2 touch checkout</span></div>
+      </div>
+    </div>
+  </div>
+  <nav class="dock" data-float>
+    <a class="on"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>Today</a>
+    <a><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chats</a>
+    <a><span class="badge"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>2</em></span>Work</a>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</a>
+  </nav>
+</section>
+
+<!-- ============ A2: dusk + panels ============ -->
+<section class="screen a2" data-name="a2-sky-dusk-panels" data-time="18:52" data-chrome="light" data-theme="dark">
+  <svg class="art" style="height:892px" viewBox="0 0 412 892" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#081224"/><stop offset=".28" stop-color="#14284A"/><stop offset=".4" stop-color="#3B5A82"/><stop offset=".48" stop-color="#B89474"/><stop offset=".58" stop-color="#2A2A2C"/></linearGradient>
+    </defs>
+    <rect width="412" height="892" fill="url(#dusk)"/>
+    <g transform="translate(0 -150) scale(1 1.3)">
+      <path fill="#0A1220" d="M0 682V512h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V454h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18h14v178z"/>
+      <g fill="#F4D58A" opacity=".85"><rect x="40" y="520" width="2" height="3"/><rect x="88" y="490" width="2" height="3"/><rect x="92" y="510" width="2" height="3"/><rect x="146" y="470" width="2" height="3"/><rect x="150" y="492" width="2" height="3"/><rect x="214" y="470" width="2" height="3"/><rect x="232" y="500" width="2" height="3"/><rect x="290" y="520" width="2" height="3"/><rect x="320" y="482" width="2" height="3"/><rect x="356" y="506" width="2" height="3"/><rect x="200" y="300" width="2" height="2"/></g>
+    </g>
+  </svg>
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> &nbsp;Toronto</span><span>6° light rain · dark at 6:31</span></div>
+    <div class="hero">23 done today.<br><span>1 still needs you.</span></div>
+    <div class="ask"><span class="grow">Ask the team</span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+    <div class="lower">
+      <div class="glass sug"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme?</b><span>kai checked it on 3 phone sizes</span></div><span class="go">Approve</span></div>
+      <div class="glass sug"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Tomorrow, 10:00 kickoff</b><span>Chief prepared notes from 4 emails</span></div><span class="go">Open</span></div>
+      <div class="panels">
+        <div class="glass panel"><div class="k">Umbrel</div><div class="v">14<small>apps up</small></div><div class="s">CPU 31% · ops restarted 1 at 3:12</div></div>
+        <div class="glass panel"><div class="k">Kaizen catalogue</div><div class="v">1,284<small>+38</small></div>
+          <svg class="spark" viewBox="0 0 140 22" preserveAspectRatio="none"><path d="M0 18 L20 16 L40 17 L60 13 L80 14 L100 9 L120 10 L140 4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+      </div>
+    </div>
+  </div>
+  <nav class="dock light" data-float>
+    <a class="on"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Today</a>
+    <a><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chats</a>
+    <a><span class="badge"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>1</em></span>Work</a>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</a>
+  </nav>
+</section>
+
+<!-- ============ B1: control room, calmer ============ -->
+<section class="screen b1" data-name="b1-control-room-calm" data-time="7:42" data-theme="dark" data-chrome="light">
+  <div class="body">
+    <div class="top"><span><b>Thu 30 Oct</b> · 7:42</span><span>Toronto 4°</span></div>
+    <div class="wall">
+      <div class="mon"><img src="assets/chief-cut.png" alt=""><span class="cnt">1</span><div class="lt">Chief<span>6:58</span></div></div>
+      <div class="mon live"><img src="assets/ops-cut.png" alt=""><div class="lt">ops<span>live 4:12</span></div></div>
+      <div class="mon"><img src="assets/kai-cut.png" alt=""><span class="cnt">1</span><div class="lt">kai<span>6:05</span></div></div>
+      <div class="mon quiet"><img src="assets/scout-cut.png" alt=""><div class="lt">scout<span>5:40</span></div></div>
+      <div class="mon quiet"><img src="assets/architect-cut.png" alt=""><div class="lt">architect<span>1:20</span></div></div>
+      <div class="mon quiet"><img src="assets/hermuse-cut.png" alt=""><div class="lt">hermuse<span>idle</span></div></div>
+    </div>
+    <div class="hero">2 need you.<br><span>11 done overnight.</span></div>
+    <div class="need"><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+    <div class="need"><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+    <div class="log">
+      <div class="row"><time>6:05</time><span><b>kai</b> synced 38 products</span></div>
+      <div class="row"><time>3:12</time><span><b>ops</b> restarted umbrel-serve</span></div>
+    </div>
+  </div>
+  <div class="ask" data-float><span class="grow">Ask the team</span><span class="hold">hold to talk</span><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span></div>
+</section>
+
+<!-- ============ B2: program monitor, light ============ -->
+<section class="screen b2" data-name="b2-program-monitor" data-time="7:42" data-home="dark">
+  <div class="body">
+    <div class="top"><b>Today</b><span>Thu 30 Oct · 7:42</span></div>
+    <div class="pgm">
+      <div class="bar"><i></i><i></i><i></i><span>umbrel · push-relay</span></div>
+<pre><em>$</em> curl -s localhost:7731/health
+{"status":"degraded","fcm":"timeout"}
+<em>$</em> journalctl -u push-relay -n 40
+<u>warn</u> FCM token refresh took 31.2s
+<em>$</em> systemctl restart push-relay</pre>
+      <div class="lower3"><img class="face" src="assets/ops-cut.png" alt=""><div class="t"><span class="tally">LIVE 4:12</span><b>ops is fixing the push server</b></div><span class="take">Take over</span></div>
+    </div>
+    <div class="pvw">
+      <div class="pv"><img class="face" src="assets/chief-cut.png" alt=""><span class="cnt">1</span></div>
+      <div class="pv"><img class="face" src="assets/kai-cut.png" alt=""><span class="cnt">1</span></div>
+      <div class="pv"><img class="face" src="assets/scout-cut.png" alt="">5:40</div>
+      <div class="pv"><img class="face" src="assets/architect-cut.png" alt="">1:20</div>
+      <div class="pv"><img class="face" src="assets/hermuse-cut.png" alt="">idle</div>
+    </div>
+    <h3>Needs you <span class="n">2</span></h3>
+    <div class="need"><img class="face" src="assets/chief-cut.png" alt=""><div class="t"><b>Reply to Jordan about Tuesday</b><span>Chief · draft ready, not sent</span></div><span class="go">Review</span></div>
+    <div class="need"><img class="face" src="assets/kai-cut.png" alt=""><div class="t"><b>Publish the holiday theme</b><span>kai · Maple &amp; Pine storefront</span></div><span class="go">Approve</span></div>
+  </div>
+  <nav class="dock" data-float>
+    <a class="on"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>Today</a>
+    <a><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chats</a>
+    <a><span class="badge"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><em>2</em></span>Work</a>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>You</a>
+  </nav>
+</section>
+
+<script src="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.js"></script>
+</body>
+</html>
