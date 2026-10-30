@@ -4690,7 +4690,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   child: ConduitChromeGradientFade.top(
                     contentHeight:
                         MediaQuery.viewPaddingOf(context).top +
-                        _chatToolbarHeight(context),
+                        (hermesBot == null
+                            ? _chatToolbarHeight(context)
+                            // With the fade below, ends at the middle of the
+                            // folded bot name (face and name are centred).
+                            : _chatToolbarHeight(context) / 2 +
+                                  (kHermesBotHeaderAvatarFolded + 4) / 2 -
+                                  20),
                     backgroundColor: hermezVisuals
                         ? hermezPalette.canvas
                         : null,

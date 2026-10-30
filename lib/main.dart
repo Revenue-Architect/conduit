@@ -62,6 +62,7 @@ import 'core/services/quick_actions_service.dart';
 import 'core/providers/app_startup_providers.dart';
 import 'features/notifications/providers/notification_center.dart';
 import 'features/push/providers/push_runtime.dart';
+import 'features/hermes/providers/hermes_unread_providers.dart';
 import 'features/notifications/services/local_notification_service.dart';
 import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
@@ -954,6 +955,9 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     // Native push (UnifiedPush): foreground banners, health updates and
     // registration. The receiver itself runs natively, with or without this.
     ref.read(pushRuntimeProvider);
+    // Unread Hermes chats: follows Hermes' read watermark and marks the chat
+    // on screen read.
+    ref.read(hermesUnreadSyncProvider);
     unawaited(_drainLaunchTap());
   }
 

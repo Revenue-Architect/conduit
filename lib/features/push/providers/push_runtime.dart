@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../../core/providers/app_providers.dart' show activeConversationProvider;
+import '../../../core/providers/app_providers.dart'
+    show activeConversationProvider;
 import '../../hermes/providers/hermes_providers.dart';
+import '../../hermes/providers/hermes_unread_providers.dart';
 import '../../hermes/services/hermes_desktop_api_service.dart';
 import '../../notifications/providers/notification_center.dart';
 import '../platform/conduit_push_api.g.dart';
@@ -36,6 +38,7 @@ final pushRuntimeProvider = Provider<PushDispatcher>((ref) {
     route: (notification) async {
       await ref.read(notificationRouterProvider).route(notification);
       refreshOpenHermesChat();
+      refreshHermesUnread(ref);
     },
     onStatusChange: () {
       unawaited(ref.read(pushStatusProvider.notifier).refreshLocal());

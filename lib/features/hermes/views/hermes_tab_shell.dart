@@ -7,6 +7,8 @@ import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
 import '../manga/manga_pick_launch.dart' show MangaPickTab;
+import '../providers/hermes_unread_providers.dart'
+    show hermesUnreadSessionIdsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
 import 'hermes_home_page.dart';
@@ -50,6 +52,10 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
   Widget build(BuildContext context) {
     // The same list Work's Needs you shows, so the dot and the section agree.
     final needsYou = watchHermesNeedsYou(ref).any((item) => item.actionable);
+    // Work's inbox holds Chief's Bot Chat and the other conversations.
+    final unread = ref.watch(
+      hermesUnreadSessionIdsProvider.select((ids) => ids.length),
+    );
     final pages = const <Widget>[
       // Home is the hub; Work is what needs the owner and what is running.
       HermesWorkPage(),
@@ -114,6 +120,7 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
                       icon: Icons.layers_outlined,
                       selectedIcon: Icons.layers_rounded,
                       badge: needsYou && _index != 2,
+                      unread: unread,
                     ),
                     const HermesDockDestination(
                       label: 'You',

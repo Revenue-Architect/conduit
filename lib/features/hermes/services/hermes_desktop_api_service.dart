@@ -20,6 +20,7 @@ import '../models/hermes_config.dart';
 import '../models/hermes_mcp.dart';
 import '../models/hermes_model.dart';
 import '../models/hermes_run_event.dart';
+import '../models/hermes_session.dart' show HermesSessionReadState;
 import '../models/hermes_subagent.dart';
 import '../models/hermes_team.dart';
 import '../models/hermes_todo.dart';
@@ -731,6 +732,66 @@ final class HermesDesktopApiService
     origin: _origin,
     storedSessionId: storedId,
   );
+
+  /// Hermes' read watermark for one session. Bot Chat is a hidden row, so the
+  /// session list never reports its `unread`; this reads the row itself.
+  Future<HermesSessionReadState> sessionReadState(String storedId) async =>
+      HermesSessionReadState.fromJson(await _sessionRow(storedId));
+
+  Future<Map<String, dynamic>> _sessionRow(String storedId) async {
+    final id = validateHermesOpaqueIdentifier(storedId);
+    if (id == null) throw ArgumentError.value(storedId, 'storedId');
+    return _object(
+      await _requestJson(
+        'GET',
+        '/api/sessions/${Uri.encodeComponent(id)}',
+        query: _sessionScope(id),
+      ),
+    );
+  }
+
+  /// Marks a session read up to now on Hermes, the same sidebar flag Hermes
+  /// Desktop sets. Hermes stamps the whole compression lineage. Session edits
+  /// are fenced: each names the row revision it read and a fresh request id,
+  /// so one lost to a concurrent edit is read again and retried once.
+  Future<void> markSessionRead(String storedId) async {
+    final id = validateHermesOpaqueIdentifier(storedId);
+    if (id == null) throw ArgumentError.value(storedId, 'storedId');
+    final scope = _sessionScope(id);
+    for (var attempt = 0; ; attempt++) {
+      final revision = (await _sessionRow(id))['runtime_revision'];
+      try {
+        await _requestJson(
+          'PATCH',
+          '/api/sessions/${Uri.encodeComponent(id)}',
+          query: scope,
+          body: {
+            'unread': false,
+            'request_id': 'conduit-read-${_readRequestNonce()}',
+            'expected_revision': revision is int ? revision : 0,
+            ...scope,
+          },
+        );
+        return;
+      } on DioException catch (error) {
+        if (attempt > 0 || error.response?.statusCode != 409) rethrow;
+      }
+    }
+  }
+
+  static String _readRequestNonce() {
+    final random = Random.secure();
+    return [
+      for (var i = 0; i < 12; i++)
+        random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ].join();
+  }
+
+  /// Hermes' "the session store moved" broadcast (a message landed, a chat
+  /// was read). Only arrives while the gateway socket is connected.
+  Stream<void> get sessionStoreChanges =>
+      _rpc.events.where((event) => event.type == 'sessions.changed');
+
   @override
   Future<void> renameSession(String id, String title) =>
       _runtimeRenameSession(id, title);

@@ -46,6 +46,13 @@ class NavigationService {
 
   static final Set<void Function()> _routeWaiters = {};
 
+  /// Calls [listener] whenever the location (or the attached router) changes.
+  static void addRouteListener(void Function() listener) =>
+      _routeWaiters.add(listener);
+
+  static void removeRouteListener(void Function() listener) =>
+      _routeWaiters.remove(listener);
+
   static void attachRouter(GoRouter router) {
     _router?.routeInformationProvider.removeListener(_handleRouteChanged);
     _router = router;

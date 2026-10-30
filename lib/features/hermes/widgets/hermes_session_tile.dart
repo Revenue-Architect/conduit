@@ -27,6 +27,8 @@ import '../models/hermes_bot.dart';
 import '../providers/hermes_agentic_providers.dart'
     show hermesActiveWorkProvider;
 import '../providers/hermes_providers.dart';
+import '../providers/hermes_unread_providers.dart'
+    show hermesUnreadSessionIdsProvider;
 import '../services/hermes_backend_service.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_desktop_transport.dart';
@@ -263,6 +265,16 @@ class HermesSessionTile extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ],
+                  HermesUnreadDot(
+                    visible:
+                        !working &&
+                        ref.watch(
+                          hermesUnreadSessionIdsProvider.select(
+                            (ids) => ids.contains(session.id),
+                          ),
+                        ),
+                    color: palette.accent,
+                  ),
                 ],
               ),
             ),
@@ -348,6 +360,9 @@ class HermesSessionTile extends ConsumerWidget {
     final when = session.updatedAt == null
         ? null
         : hermesInboxTimeLabel(session.updatedAt!);
+    final unread = ref.watch(
+      hermesUnreadSessionIdsProvider.select((ids) => ids.contains(session.id)),
+    );
     final profile = session.profile;
     // What sits under the name: the live line while an agent works, a plain
     // flag while Hermes waits on the owner, else the last words.
@@ -373,7 +388,7 @@ class HermesSessionTile extends ConsumerWidget {
         : quiet;
     final row = HermezMotionSurface(
       weight: HermezMotionWeight.medium,
-      semanticLabel: [title, ?subtitle, ?when].join('. '),
+      semanticLabel: [title, if (unread) 'unread', ?subtitle, ?when].join('. '),
       onTap: () => openHermesSession(context, ref, session),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 56),
@@ -409,22 +424,42 @@ class HermesSessionTile extends ConsumerWidget {
                           Text(
                             when,
                             maxLines: 1,
-                            style: HermezType.meta(palette)
-                                .copyWith(fontSize: 11.5),
+                            style: HermezType.meta(palette).copyWith(
+                              fontSize: 11.5,
+                              color: unread ? palette.accent : null,
+                              fontWeight: unread ? FontWeight.w700 : null,
+                            ),
                           ),
                         ],
                       ],
                     ),
-                    if (subtitle != null)
-                      HermezLiveText(
-                        subtitle,
-                        live: live != null,
-                        style: live != null || needsYou
-                            ? HermezType.meta(palette).copyWith(
-                                color: palette.accent,
-                                fontWeight: FontWeight.w600,
-                              )
-                            : HermezType.meta(palette),
+                    if (subtitle != null || unread)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: subtitle == null
+                                ? const SizedBox.shrink()
+                                : HermezLiveText(
+                                    subtitle,
+                                    live: live != null,
+                                    style: live != null || needsYou
+                                        ? HermezType.meta(palette).copyWith(
+                                            color: palette.accent,
+                                            fontWeight: FontWeight.w600,
+                                          )
+                                        : unread
+                                        ? HermezType.meta(palette).copyWith(
+                                            color: palette.ink,
+                                            fontWeight: FontWeight.w600,
+                                          )
+                                        : HermezType.meta(palette),
+                                  ),
+                          ),
+                          HermesUnreadDot(
+                            visible: unread,
+                            color: palette.accent,
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -910,4 +945,49 @@ TextSpan hermezHighlightedText(
   }
   if (from < text.length) spans.add(TextSpan(text: text.substring(from)));
   return TextSpan(style: base, children: spans);
+}
+
+/// The unread mark on a conversation row: one accent dot that grows in when
+/// something new lands and shrinks away once it is read.
+class HermesUnreadDot extends StatelessWidget {
+  const HermesUnreadDot({
+    super.key,
+    required this.visible,
+    required this.color,
+  });
+
+  final bool visible;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = context.reduceMotion;
+    return AnimatedSize(
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: visible
+          ? Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: reduceMotion ? 1 : 0, end: 1),
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutBack,
+                builder: (context, t, child) =>
+                    Transform.scale(scale: t, child: child),
+                child: Container(
+                  key: const ValueKey('hermes-unread-dot'),
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
 }

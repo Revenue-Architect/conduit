@@ -16,6 +16,7 @@ class HermesDockDestination {
     required this.icon,
     required this.selectedIcon,
     this.badge = false,
+    this.unread = 0,
   });
 
   final String label;
@@ -24,6 +25,10 @@ class HermesDockDestination {
 
   /// A small accent dot: something here needs the owner.
   final bool badge;
+
+  /// Conversations here with something the owner has not seen. Shown as a
+  /// count, which takes the dot's place.
+  final int unread;
 }
 
 /// Height of the dock itself, without the system inset under it.
@@ -188,6 +193,7 @@ class _HermesTabDockState extends State<HermesTabDock>
                                   reduceMotion: reduceMotion,
                                   ink: reversed.ink,
                                   muted: reversed.muted,
+                                  cutout: reversed.canvas,
                                   accent: app.accent,
                                   onTap: () => _select(i),
                                 ),
@@ -216,6 +222,7 @@ class _DockItem extends StatefulWidget {
     required this.reduceMotion,
     required this.ink,
     required this.muted,
+    required this.cutout,
     required this.accent,
     required this.onTap,
   });
@@ -225,7 +232,7 @@ class _DockItem extends StatefulWidget {
   final Animation<double> arrival;
   final int order;
   final bool reduceMotion;
-  final Color ink, muted, accent;
+  final Color ink, muted, cutout, accent;
   final VoidCallback onTap;
 
   @override
@@ -242,7 +249,11 @@ class _DockItemState extends State<_DockItem> {
     final item = Semantics(
       button: true,
       selected: widget.selected,
-      label: d.badge ? '${d.label}, needs you' : d.label,
+      label: [
+        d.label,
+        if (d.unread > 0) '${d.unread} unread',
+        if (d.badge) 'needs you',
+      ].join(', '),
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -271,7 +282,18 @@ class _DockItemState extends State<_DockItem> {
                       color: color,
                     ),
                   ),
-                  if (d.badge)
+                  if (d.unread > 0)
+                    Positioned(
+                      left: 13,
+                      top: -7,
+                      child: _UnreadCount(
+                        count: d.unread,
+                        fill: widget.accent,
+                        cutout: widget.cutout,
+                        reduceMotion: widget.reduceMotion,
+                      ),
+                    )
+                  else if (d.badge)
                     Positioned(
                       right: -3,
                       top: -1,
@@ -332,6 +354,62 @@ class _DockItemState extends State<_DockItem> {
           child: child,
         );
       },
+    );
+  }
+}
+
+/// The unread count on a destination: an accent pill cut out of the dock, so
+/// it reads on the icon it overlaps. It springs in when it first appears and
+/// pops when the number changes.
+class _UnreadCount extends StatelessWidget {
+  const _UnreadCount({
+    required this.count,
+    required this.fill,
+    required this.cutout,
+    required this.reduceMotion,
+  });
+
+  final int count;
+  final Color fill, cutout;
+  final bool reduceMotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 9 ? '9+' : '$count';
+    final ink = fill.computeLuminance() > 0.5
+        ? const Color(0xFF111111)
+        : const Color(0xFFFFFFFF);
+    final pill = Container(
+      constraints: const BoxConstraints(minWidth: 19),
+      height: 19,
+      padding: const EdgeInsets.symmetric(horizontal: 4.5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cutout, width: 2),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          color: ink,
+          fontSize: 10,
+          height: 1,
+          fontWeight: FontWeight.w800,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+    if (reduceMotion) return pill;
+    return TweenAnimationBuilder<double>(
+      // A new number starts the pop again.
+      key: ValueKey(label),
+      tween: Tween(begin: 0.4, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutBack,
+      builder: (context, t, child) => Transform.scale(scale: t, child: child),
+      child: pill,
     );
   }
 }

@@ -16,6 +16,7 @@ class HermesSessionSummary {
     this.updatedAt,
     this.profile,
     this.messageCount,
+    this.unread,
   });
 
   final String id;
@@ -34,6 +35,10 @@ class HermesSessionSummary {
   /// Owning Hermes profile on the unified Desktop session endpoint.
   final String? profile;
   final int? messageCount;
+
+  /// Hermes' own read state (`sessions.last_read_at`): true when activity
+  /// postdates the watermark. Null when the server does not report it.
+  final bool? unread;
 
   /// API transport alone does not distinguish a person from an automation.
   bool get isAutomated => const {
@@ -87,6 +92,42 @@ class HermesSessionSummary {
         final int value when value >= 0 => value,
         _ => null,
       },
+      unread: switch (json['unread']) {
+        final bool value => value,
+        _ => null,
+      },
+    );
+  }
+}
+
+/// A session's read watermark as Hermes keeps it, in server epoch seconds.
+/// Hermes stamps `last_read_at` across the whole compression lineage, so a
+/// rotated Bot Chat tip reads the same as its root.
+class HermesSessionReadState {
+  const HermesSessionReadState({this.lastReadAt, this.lastActive});
+
+  /// Null: Hermes has never tracked this session, which it counts as read.
+  final double? lastReadAt;
+
+  final double? lastActive;
+
+  /// Hermes' own rule: activity after the watermark.
+  bool get unread => lastReadAt != null && (lastActive ?? 0) > lastReadAt!;
+
+  /// Reads one `GET /api/sessions/{id}` row.
+  static HermesSessionReadState fromJson(Map<String, dynamic> json) {
+    double? seconds(Object? value) =>
+        value is num && value.isFinite && value >= 0 ? value.toDouble() : null;
+    final activity = [
+      seconds(json['last_active']),
+      seconds(json['last_activity_at']),
+      seconds(json['started_at']),
+    ].whereType<double>();
+    return HermesSessionReadState(
+      lastReadAt: seconds(json['last_read_at']),
+      lastActive: activity.isEmpty
+          ? null
+          : activity.reduce((a, b) => a > b ? a : b),
     );
   }
 }
