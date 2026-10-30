@@ -259,8 +259,8 @@ Round 4 (owner: "02 and 05 too terminal like"): the live window became the work 
 - [x] Open WebUI and direct chats (Chats)
 - [ ] Settings in You: not designed in this pass
 
-**Decisions for the owner:**
-1. Four tabs (Today, Chats, Work, You), or fold Work into Today now that Today carries Needs you and Running.
-2. The amber "live" accent replaces the orange entirely, including the app icon.
-3. Geist as the app font (bundled; OFL).
-4. Weather and sunrise data for the sky: needs a source (Hermes already knows Toronto; a weather tool call or Open-Meteo).
+**Decisions (owner, 2026-10-30):**
+1. **Three tabs: Today, Chats, You.** Work folds into Today. Today's sheet carries Needs you, Running, then quiet links to Scheduled and Kanban; recent bot results live in Chats (by bot) and in Today's Overnight/Earlier log. The Work tab, its dock item and its badge go away; the mockups' four-item dock becomes three.
+2. **Amber everywhere**, including the app icon (the sky icon, no orange).
+3. **Geist bundled** as the app font (OFL), tabular figures for numbers.
+4. **Sky data from Open-Meteo**, no key: called from the app for Toronto, cached for an hour, sunrise/sunset from the same call; offline, the sky follows the clock only.
