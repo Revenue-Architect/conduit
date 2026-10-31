@@ -53,7 +53,7 @@ class HermezCardStackState extends State<HermezCardStack>
   late final AnimationController _swap =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 280),
         value: 1,
       )..addStatusListener((status) {
         if (status == AnimationStatus.completed && _leaving != null) {
@@ -190,7 +190,7 @@ class HermezCardStackState extends State<HermezCardStack>
             // The same card reshapes with the reference's springy settle.
             duration: reduce
                 ? Duration.zero
-                : const Duration(milliseconds: 260),
+                : const Duration(milliseconds: 330),
             curve: const Cubic(0.34, 1.28, 0.64, 1),
             alignment: Alignment.topCenter,
             child: AnimatedBuilder(

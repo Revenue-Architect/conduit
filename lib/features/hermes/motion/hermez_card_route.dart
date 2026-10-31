@@ -139,10 +139,10 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
   // its card in about a third of a second with a small springy overshoot,
   // and folds back quicker and flat.
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 340);
+  Duration get transitionDuration => const Duration(milliseconds: 440);
 
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 240);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 320);
 
   /// A gentle overshoot (about 4%) that settles: the frame lands with give.
   static const Curve _land = Cubic(0.34, 1.28, 0.64, 1);
