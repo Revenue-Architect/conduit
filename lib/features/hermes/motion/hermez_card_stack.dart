@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
@@ -39,20 +41,75 @@ class HermezCardStack extends StatefulWidget {
   State<HermezCardStack> createState() => HermezCardStackState();
 }
 
-class HermezCardStackState extends State<HermezCardStack> {
+class HermezCardStackState extends State<HermezCardStack>
+    with SingleTickerProviderStateMixin {
   late final List<HermezCardView> _views = [widget.root];
+
+  /// The step leaving the card while the next one arrives: the one pushed
+  /// over, or the one popped.
+  HermezCardView? _leaving;
+
+  /// 0 to 1 as one step cross-blurs into the next (the reference's ~200 ms).
+  late final AnimationController _swap =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+        value: 1,
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && _leaving != null) {
+          setState(() => _leaving = null);
+        }
+      });
 
   int get depth => _views.length - 1;
 
-  void push(HermezCardView view) => setState(() => _views.add(view));
+  void push(HermezCardView view) {
+    setState(() {
+      _leaving = _views.last;
+      _views.add(view);
+    });
+    _start();
+  }
 
   void pop() {
-    if (_views.length > 1) setState(_views.removeLast);
+    if (_views.length < 2) return;
+    setState(() => _leaving = _views.removeLast());
+    _start();
+  }
+
+  void _start() {
+    if (MediaQuery.of(context).disableAnimations) {
+      _swap.value = 1;
+      _leaving = null;
+    } else {
+      _swap.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _swap.dispose();
+    super.dispose();
   }
 
   void _close() => widget.onClose != null
       ? widget.onClose!()
       : Navigator.of(context).maybePop();
+
+  static Widget _blurred(double sigma, double opacity, Widget child) {
+    final faded = Opacity(opacity: opacity.clamp(0.0, 1.0), child: child);
+    return sigma < 0.3
+        ? faded
+        : ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: faded,
+          );
+  }
+
+  Widget _step(HermezCardView view) => KeyedSubtree(
+    key: view.key,
+    child: Builder(builder: view.builder),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +118,7 @@ class HermezCardStackState extends State<HermezCardStack> {
     );
     final top = _views.last;
     final reduce = MediaQuery.of(context).disableAnimations;
+    final leaving = _leaving;
     return PopScope(
       // System Back pops a step before it closes the card.
       canPop: _views.length == 1,
@@ -82,16 +140,36 @@ class HermezCardStackState extends State<HermezCardStack> {
                     icon: Icon(Icons.chevron_left_rounded, color: palette.ink),
                   ),
                 Expanded(
-                  child: Text(
-                    top.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: AppTypography.fontFamily,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
-                      color: palette.ink,
+                  // The title cross-blurs with its step, as in the reference.
+                  child: AnimatedSwitcher(
+                    duration: reduce
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [...previous, ?current],
+                    ),
+                    transitionBuilder: (child, animation) => AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, c) => _blurred(
+                        (1 - animation.value) * 6,
+                        animation.value,
+                        c!,
+                      ),
+                      child: child,
+                    ),
+                    child: Text(
+                      top.title,
+                      key: ValueKey(top.key),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        color: palette.ink,
+                      ),
                     ),
                   ),
                 ),
@@ -109,29 +187,42 @@ class HermezCardStackState extends State<HermezCardStack> {
             ),
           ),
           AnimatedSize(
+            // The same card reshapes with the reference's springy settle.
             duration: reduce
                 ? Duration.zero
-                : const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
+                : const Duration(milliseconds: 260),
+            curve: const Cubic(0.34, 1.28, 0.64, 1),
             alignment: Alignment.topCenter,
-            child: Stack(
-              children: [
-                for (var i = 0; i < _views.length; i++)
-                  Offstage(
-                    offstage: i != _views.length - 1,
-                    child: TickerMode(
-                      enabled: i == _views.length - 1,
-                      child: _SlideIn(
-                        active: i == _views.length - 1,
-                        reduce: reduce,
-                        child: KeyedSubtree(
-                          key: _views[i].key,
-                          child: Builder(builder: _views[i].builder),
+            child: AnimatedBuilder(
+              animation: _swap,
+              builder: (context, _) {
+                final v = Curves.easeOut.transform(_swap.value);
+                return Stack(
+                  clipBehavior: Clip.hardEdge,
+                  children: [
+                    // Lower steps stay mounted (and keep their input) unseen.
+                    for (final view in _views)
+                      if (view != top && view != leaving)
+                        Offstage(
+                          child: TickerMode(enabled: false, child: _step(view)),
+                        ),
+                    _blurred(
+                      leaving == null ? 0 : (1 - v) * 8,
+                      leaving == null ? 1 : v,
+                      _step(top),
+                    ),
+                    if (leaving != null)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          child: _blurred(v * 8, 1 - v, _step(leaving)),
                         ),
                       ),
-                    ),
-                  ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -140,69 +231,20 @@ class HermezCardStackState extends State<HermezCardStack> {
   }
 }
 
-/// Slides a step 8 dp into place and fades it in each time it becomes the
-/// one on top. Its structure never changes, so the step keeps its state.
-class _SlideIn extends StatefulWidget {
-  const _SlideIn({
-    required this.active,
-    required this.reduce,
-    required this.child,
-  });
-
-  final bool active;
-  final bool reduce;
-  final Widget child;
-
-  @override
-  State<_SlideIn> createState() => _SlideInState();
-}
-
-class _SlideInState extends State<_SlideIn>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _t = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 220),
-    value: 1,
-  );
-
-  @override
-  void didUpdateWidget(_SlideIn old) {
-    super.didUpdateWidget(old);
-    if (widget.active && !old.active && !widget.reduce) _t.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _t.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _t,
-    builder: (context, child) {
-      final v = Curves.easeOutCubic.transform(_t.value);
-      return Opacity(
-        opacity: v,
-        child: Transform.translate(
-          offset: Offset(8 * (1 - v), 0),
-          child: child,
-        ),
-      );
-    },
-    child: widget.child,
-  );
-}
-
 /// A yes/no question as a one card: it grows out of the control in [from]
-/// (the button that asked) and folds back into it. Returns true only when
-/// the owner picks [confirmLabel]; closing the card never confirms.
+/// (the button that asked) and folds back into it. With [fromIsControl]
+/// false, [from] is only where to push and the card grows out of the last
+/// pressed control instead. Returns true only when the owner picks
+/// [confirmLabel]; closing the card never confirms. [destructive] paints the
+/// confirm in the failure red.
 Future<bool> confirmHermezCard(
   BuildContext from, {
   required String title,
   required String body,
   required String confirmLabel,
   String cancelLabel = 'Cancel',
+  bool destructive = false,
+  bool fromIsControl = true,
 }) async {
   final palette = HermezChatPalette.forBrightness(Theme.of(from).brightness);
   Widget content(BuildContext panelContext) => Padding(
@@ -238,8 +280,12 @@ Future<bool> confirmHermezCard(
                   Expanded(
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: palette.onAccent,
+                        backgroundColor: destructive
+                            ? palette.failed
+                            : palette.accent,
+                        foregroundColor: destructive
+                            ? palette.raised
+                            : palette.onAccent,
                       ),
                       onPressed: () => Navigator.pop(panelContext, true),
                       child: Text(confirmLabel),
@@ -255,9 +301,145 @@ Future<bool> confirmHermezCard(
   );
   final answer = await pushHermezCard<bool>(
     from,
-    from: from,
+    from: fromIsControl ? from : null,
     builder: content,
     semanticLabel: title,
   );
   return answer ?? false;
+}
+
+/// Asks for one line of text as a one card (rename, create). Returns the
+/// trimmed text, or null when closed, empty or unchanged.
+Future<String?> promptHermezCard(
+  BuildContext context, {
+  required String title,
+  required String hintText,
+  String? initialValue,
+  required String confirmLabel,
+  String cancelLabel = 'Cancel',
+  TextInputType? keyboardType,
+  TextCapitalization textCapitalization = TextCapitalization.sentences,
+  int? maxLength,
+}) async {
+  final value = await pushHermezCard<String>(
+    context,
+    semanticLabel: title,
+    builder: (cardContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 14),
+      child: HermezCardStack(
+        root: HermezCardView(
+          title: title,
+          builder: (_) => _PromptField(
+            hintText: hintText,
+            initialValue: initialValue,
+            confirmLabel: confirmLabel,
+            cancelLabel: cancelLabel,
+            keyboardType: keyboardType,
+            textCapitalization: textCapitalization,
+            maxLength: maxLength,
+            onDone: (text) => Navigator.pop(cardContext, text),
+          ),
+        ),
+      ),
+    ),
+  );
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  if (initialValue != null && trimmed == initialValue.trim()) return null;
+  return trimmed;
+}
+
+class _PromptField extends StatefulWidget {
+  const _PromptField({
+    required this.hintText,
+    required this.initialValue,
+    required this.confirmLabel,
+    required this.cancelLabel,
+    required this.keyboardType,
+    required this.textCapitalization,
+    required this.maxLength,
+    required this.onDone,
+  });
+
+  final String hintText;
+  final String? initialValue;
+  final String confirmLabel;
+  final String cancelLabel;
+  final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+  final int? maxLength;
+  final ValueChanged<String?> onDone;
+
+  @override
+  State<_PromptField> createState() => _PromptFieldState();
+}
+
+class _PromptFieldState extends State<_PromptField> {
+  late final _controller = TextEditingController(text: widget.initialValue);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: widget.keyboardType,
+            textCapitalization: widget.textCapitalization,
+            maxLength: widget.maxLength,
+            onSubmitted: widget.onDone,
+            style: TextStyle(
+              fontFamily: AppTypography.fontFamily,
+              fontSize: 15,
+              color: palette.ink,
+            ),
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.ink, width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: () => widget.onDone(null),
+                  child: Text(widget.cancelLabel),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.onAccent,
+                  ),
+                  onPressed: () => widget.onDone(_controller.text),
+                  child: Text(widget.confirmLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

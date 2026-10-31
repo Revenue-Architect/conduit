@@ -1,9 +1,10 @@
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart' as mui;
 
 import '../widgets/hermez_chat_palette.dart';
 
@@ -134,13 +135,17 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
   @override
   String? get barrierLabel => 'Close';
 
-  // Opening keeps a touch of give; closing is quicker and settles flat
-  // (HermezMotion.springCardOpen / springCardClose, as durations).
+  // Timed to the owner's Morphlet reference recording: a control becomes
+  // its card in about a third of a second with a small springy overshoot,
+  // and folds back quicker and flat.
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 420);
+  Duration get transitionDuration => const Duration(milliseconds: 340);
 
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 300);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 240);
+
+  /// A gentle overshoot (about 4%) that settles: the frame lands with give.
+  static const Curve _land = Cubic(0.34, 1.28, 0.64, 1);
 
   @override
   Widget buildPage(
@@ -153,7 +158,7 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
     final reduce = media.disableAnimations;
     final curved = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
+      curve: _land,
       reverseCurve: Curves.easeInCubic,
     );
     final page = capturedThemes.wrap(
@@ -162,32 +167,83 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
         namesRoute: true,
         label: semanticLabel,
         explicitChildNodes: true,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, media.padding.top + 12, 16, bottom),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 480,
-                maxHeight: media.size.height * maxHeightFactor,
-              ),
-              child: AnimatedBuilder(
-                animation: curved,
-                builder: (context, child) => _CardReveal(
-                  t: reduce ? 1 : curved.value,
-                  originRect: originRect,
-                  originRadius: originRadius,
-                  originColor: originColor,
-                  cardColor: cardColor,
-                  child: child!,
-                ),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: _Grabbed(child: Builder(builder: builder)),
+        child: Stack(
+          children: [
+            // The page behind blurs as well as dims, as in the reference.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, _) {
+                    final sigma = (reduce ? 1.0 : animation.value) * 14;
+                    return sigma < 0.5
+                        ? const SizedBox.expand()
+                        : BackdropFilter(
+                            filter: ImageFilter.blur(
+                              sigmaX: sigma,
+                              sigmaY: sigma,
+                            ),
+                            child: const SizedBox.expand(),
+                          );
+                  },
                 ),
               ),
             ),
-          ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                media.padding.top + 12,
+                16,
+                bottom,
+              ),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 480,
+                    maxHeight: media.size.height * maxHeightFactor,
+                  ),
+                  child: AnimatedBuilder(
+                    animation: curved,
+                    builder: (context, child) {
+                      final t = reduce ? 1.0 : curved.value;
+                      // The content is there from the first frame, blurred and
+                      // faint, and sharpens as the card lands.
+                      final clear = t.clamp(0.0, 1.0);
+                      final blur = (1 - clear) * 10;
+                      return _CardReveal(
+                        t: t,
+                        originRect: originRect,
+                        originRadius: originRadius,
+                        originColor: originColor,
+                        cardColor: cardColor,
+                        child: Opacity(
+                          opacity: Curves.easeOut.transform(clear),
+                          child: blur < 0.3
+                              ? child
+                              : ImageFiltered(
+                                  imageFilter: ImageFilter.blur(
+                                    sigmaX: blur,
+                                    sigmaY: blur,
+                                  ),
+                                  child: child,
+                                ),
+                        ),
+                      );
+                    },
+                    child: Material(
+                      type: MaterialType.transparency,
+                      // The material_ui fork's ink needs its own Material.
+                      child: mui.Material(
+                        type: mui.MaterialType.transparency,
+                        child: _Grabbed(child: Builder(builder: builder)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -310,8 +366,10 @@ class _RenderCardReveal extends RenderProxyBox {
     );
     canvas.drawRRect(rrect, Paint()..color = color);
     // The content arrives after the shape has left the control.
-    final reveal = ((_t - 0.35) / 0.65).clamp(0.0, 1.0);
-    if (reveal > 0) {
+    // The widget above fades and sharpens the content; here it only rides
+    // inside the growing shape.
+    const reveal = 1.0;
+    if (_t > 0) {
       context.pushClipRRect(needsCompositing, Offset.zero, rect, rrect, (
         context,
         _,

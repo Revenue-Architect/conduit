@@ -431,9 +431,7 @@ void main() {
     );
   });
 
-  testWidgets('all themed sheets use the shared edge-to-edge rounded route', (
-    tester,
-  ) async {
+  testWidgets('Android surfaces land as the inset one card', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(402, 874);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -461,15 +459,20 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final bottomSheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
-    final surface = find.byType(ConduitModalSheetSurface);
-    expect(
-      bottomSheet.shape,
-      ThemedSheets.roundedShapeFor(tester.element(surface)),
+    // docs/app-design-2026-10-30, "One card": a floating card inset 16 from
+    // the sides (plus the content's own 16), never an edge-to-edge sheet.
+    expect(find.byType(BottomSheet), findsNothing);
+    final content = find.byKey(
+      const ValueKey<String>('standard-sheet-content'),
     );
-    expect(bottomSheet.clipBehavior, Clip.antiAlias);
-    expect(tester.getSize(surface).width, 402);
-    expect(tester.getTopLeft(surface).dx, 0);
+    expect(content, findsOneWidget);
+    expect(tester.getTopLeft(content).dx, 32);
+    expect(tester.getSize(content).width, 402 - 64);
+
+    // Close it so the shared sheet tracker is clear for the next test.
+    Navigator.of(tester.element(content)).pop();
+    await tester.pumpAndSettle();
+    expect(ThemedSheets.hasActiveSheet, isFalse);
   });
 
   testWidgets('draggable custom sheets remain edge-to-edge', (tester) async {

@@ -6,6 +6,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/services/haptic_service.dart';
 import 'platform_ui_capabilities.dart';
+import '../../../../features/hermes/motion/hermez_card_route.dart';
+import '../../../../features/hermes/widgets/hermez_chat_palette.dart';
 
 /// Native SF Symbol extent for 44-point iOS toolbar and composer controls.
 const double kCupertinoNativeControlSymbolExtent = 20;
@@ -659,32 +661,34 @@ class AdaptivePopupMenuButton<T> {
         ),
       );
     }
-    return PopupMenuButton<int>(
+    // Android: the button becomes its menu card (one card, never a popup).
+    return Builder(
       key: key,
-      tooltip: label,
-      onSelected: (index) => _dispatch<T>(items, index, onSelected),
-      itemBuilder: (context) => [
-        for (var index = 0; index < items.length; index++)
-          if (items[index] is AdaptivePopupMenuDivider)
-            const PopupMenuDivider()
-          else
-            PopupMenuItem<int>(
-              key: (items[index] as AdaptivePopupMenuItem<T>).key,
-              value: index,
-              enabled: (items[index] as AdaptivePopupMenuItem<T>).enabled,
-              child: _menuItemContent(
-                items[index] as AdaptivePopupMenuItem<T>,
-                material: true,
-              ),
+      builder: (context) => Tooltip(
+        message: label ?? '',
+        // Its own transparent Material: menus sit in places without one.
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkResponse(
+            radius: height / 2 + 4,
+            onTap: () => _showCardMenu<T>(context, items, onSelected),
+            child: SizedBox(
+              height: height,
+              width: icon == null ? null : height,
+              child: icon == null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(label ?? '', style: TextStyle(color: tint)),
+                      ),
+                    )
+                  : Icon(
+                      icon is IconData ? icon : Icons.more_vert,
+                      color: tint,
+                    ),
             ),
-      ],
-      child: SizedBox(
-        height: height,
-        child: icon == null
-            ? Center(
-                child: Text(label ?? '', style: TextStyle(color: tint)),
-              )
-            : Icon(icon is IconData ? icon : Icons.more_vert, color: tint),
+          ),
+        ),
       ),
     );
   }
@@ -762,38 +766,80 @@ class AdaptivePopupMenuButton<T> {
     BuildContext context,
     List<AdaptivePopupMenuEntry> items,
     void Function(int index, AdaptivePopupMenuItem<T> entry) onSelected,
+  ) => _showCardMenu<T>(context, items, onSelected);
+
+  /// A menu as one card that grows out of [context]'s control
+  /// (docs/app-design-2026-10-30, "One card") and folds back on a choice.
+  static Future<void> _showCardMenu<T>(
+    BuildContext context,
+    List<AdaptivePopupMenuEntry> items,
+    void Function(int index, AdaptivePopupMenuItem<T> entry) onSelected,
   ) async {
-    final button = context.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (button == null || overlay == null || !button.attached) return;
-    final topLeft = button.localToGlobal(Offset.zero, ancestor: overlay);
-    final bottomRight = button.localToGlobal(
-      button.size.bottomRight(Offset.zero),
-      ancestor: overlay,
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
     );
-    final selected = await showMenu<int>(
-      context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromPoints(topLeft, bottomRight),
-        Offset.zero & overlay.size,
+    final selected = await pushHermezCard<int>(
+      context,
+      from: context,
+      builder: (cardContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < items.length; index++)
+              if (items[index] is AdaptivePopupMenuDivider)
+                Divider(
+                  height: 13,
+                  indent: 14,
+                  endIndent: 14,
+                  color: palette.border,
+                )
+              else
+                _cardMenuRow<T>(
+                  cardContext,
+                  index,
+                  items[index] as AdaptivePopupMenuItem<T>,
+                  palette,
+                ),
+          ],
+        ),
       ),
-      items: [
-        for (var index = 0; index < items.length; index++)
-          if (items[index] is AdaptivePopupMenuDivider)
-            const PopupMenuDivider()
-          else
-            PopupMenuItem<int>(
-              value: index,
-              enabled: (items[index] as AdaptivePopupMenuItem<T>).enabled,
-              child: _menuItemContent(
-                items[index] as AdaptivePopupMenuItem<T>,
-                material: true,
-              ),
-            ),
-      ],
     );
     if (selected != null) _dispatch<T>(items, selected, onSelected);
+  }
+
+  static Widget _cardMenuRow<T>(
+    BuildContext cardContext,
+    int index,
+    AdaptivePopupMenuItem<T> item,
+    HermezChatPalette palette,
+  ) {
+    final color = item.isDestructive ? palette.failed : palette.ink;
+    return Opacity(
+      opacity: item.enabled ? 1 : 0.4,
+      child: InkWell(
+        key: item.key,
+        borderRadius: BorderRadius.circular(20),
+        onTap: item.enabled ? () => Navigator.of(cardContext).pop(index) : null,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: IconTheme.merge(
+              data: IconThemeData(color: color),
+              child: DefaultTextStyle.merge(
+                style: TextStyle(color: color, fontSize: 15),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _menuItemContent(item, material: true),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   static Widget _menuItemContent<T>(

@@ -10,6 +10,8 @@ import '../theme/conduit_input_styles.dart';
 import '../theme/theme_extensions.dart';
 import 'conduit_components.dart';
 import 'conduit_dialog_route.dart';
+import '../../features/hermes/motion/hermez_card_route.dart';
+import '../../features/hermes/motion/hermez_card_stack.dart';
 
 /// Centralized helper for building themed dialogs consistently.
 ///
@@ -134,10 +136,23 @@ class ThemedDialogs {
       return completer.future;
     }
 
-    // Android — fully themed Material dialog.
+    // Android: one card grown out of the control that asked
+    // (docs/app-design-2026-10-30, "One card"). Closing never confirms.
+    // barrierDismissible false (must answer) keeps the shared dialog route.
+    if (barrierDismissible) {
+      return confirmHermezCard(
+        context,
+        title: title,
+        body: message,
+        confirmLabel: effectiveConfirmText,
+        cancelLabel: effectiveCancelText,
+        destructive: isDestructive,
+        fromIsControl: false,
+      );
+    }
     final result = await showConduitDialog<bool>(
       context: context,
-      barrierDismissible: barrierDismissible,
+      barrierDismissible: false,
       builder: (ctx) {
         final theme = ctx.conduitTheme;
         return buildBase(
@@ -175,6 +190,39 @@ class ThemedDialogs {
     List<Widget>? actions,
     bool barrierDismissible = true,
   }) {
+    // Android: the same title, content and actions as one card.
+    if (!PlatformUiCapabilities.isIOS && barrierDismissible) {
+      return pushHermezCard<T>(
+        context,
+        semanticLabel: title,
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 14),
+          child: HermezCardStack(
+            root: HermezCardView(
+              title: title,
+              builder: (_) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content,
+                    if (actions != null && actions.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        children: actions,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return showCustom<T>(
       context: context,
       barrierDismissible: barrierDismissible,
@@ -283,12 +331,23 @@ class ThemedDialogs {
       return trimmed;
     }
 
-    // Android — fully themed Material dialog with TextField.
-    // The controller is owned by _TextInputDialogContent so its lifecycle
-    // is tied to the dialog widget tree (survives dismiss animation).
+    // Android: a one-card prompt (it trims and drops unchanged text itself).
+    if (barrierDismissible) {
+      return promptHermezCard(
+        context,
+        title: title,
+        hintText: hintText,
+        initialValue: initialValue,
+        confirmLabel: effectiveConfirmText,
+        cancelLabel: effectiveCancelText,
+        keyboardType: keyboardType,
+        textCapitalization: textCapitalization,
+        maxLength: maxLength,
+      );
+    }
     final result = await showConduitDialog<String>(
       context: context,
-      barrierDismissible: barrierDismissible,
+      barrierDismissible: false,
       builder: (ctx) => _TextInputDialogContent(
         title: title,
         hintText: hintText,

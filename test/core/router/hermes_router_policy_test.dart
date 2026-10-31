@@ -356,7 +356,7 @@ void main() {
         container.read(hermesSecretsLoadingProvider.notifier).set(false);
 
         check(notifier.redirect(_MockBuildContext(), state))
-            .equals('${Routes.hermesHome}?pick=1');
+            .equals(Routes.hermesHome);
       },
     );
 
@@ -575,7 +575,7 @@ void main() {
       final notifier = container.read(routerNotifierProvider);
       when(() => state.uri).thenReturn(Uri.parse(Routes.splash));
       check(notifier.redirect(_MockBuildContext(), state))
-          .equals('${Routes.hermesHome}?pick=1');
+          .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
       check(notifier.redirect(_MockBuildContext(), state))
@@ -614,7 +614,7 @@ void main() {
       final notifier = container.read(routerNotifierProvider);
       when(() => state.uri).thenReturn(Uri.parse(Routes.splash));
       check(notifier.redirect(_MockBuildContext(), state))
-          .equals('${Routes.hermesHome}?pick=1');
+          .equals(Routes.hermesHome);
 
       when(() => state.uri).thenReturn(Uri.parse(Routes.notes));
       check(notifier.redirect(_MockBuildContext(), state))

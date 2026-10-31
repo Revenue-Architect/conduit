@@ -23,7 +23,7 @@ const _allowed = <String, int>{
   'lib/features/spaces/views/space_page_editor.dart': 1,
   'lib/shared/widgets/conduit_dialog_route.dart': 3,
   'lib/shared/widgets/markdown/citation_badge.dart': 1,
-  'lib/shared/widgets/platform_ui/src/adaptive_controls.dart': 2,
+  'lib/shared/widgets/platform_ui/src/adaptive_controls.dart': 1,
   'lib/shared/widgets/platform_ui/src/adaptive_feedback.dart': 4,
   'lib/shared/widgets/themed_dialogs.dart': 6,
   'lib/shared/widgets/themed_sheets.dart': 3,

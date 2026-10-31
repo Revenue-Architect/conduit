@@ -10,6 +10,7 @@ import '../theme/theme_extensions.dart';
 import '../utils/adaptive_glass.dart';
 import 'modal_safe_area.dart';
 import 'sheet_handle.dart';
+import '../../features/hermes/motion/hermez_card_route.dart';
 
 /// Default size fractions for [DraggableScrollableSheet] inside modal sheets.
 ///
@@ -351,6 +352,27 @@ class ThemedSheets {
     bool showHandle = true,
     bool useViewInsets = true,
   }) {
+    // Android: one card grown out of the control that was pressed
+    // (docs/app-design-2026-10-30, "One card"); it rides above the keyboard
+    // and scrolls its content itself. A sheet that must be answered keeps
+    // the bottom sheet.
+    if (!PlatformUiCapabilities.isIOS &&
+        Theme.of(context).platform != TargetPlatform.iOS &&
+        isDismissible) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      return _showTracked<T>(
+        context: context,
+        present: (_) => pushHermezCard<T>(
+          context,
+          // The tracker closes when the card's future completes
+          // (_showTracked), never mid-unmount.
+          builder: (cardContext) => Padding(
+            padding: padding ?? const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: _CardContent(child: builder(cardContext)),
+          ),
+        ),
+      );
+    }
     return showCustom<T>(
       context: context,
       isScrollControlled: isScrollControlled,
@@ -621,6 +643,37 @@ class ConduitAdaptiveSheetSurface extends StatelessWidget {
       padding: padding,
       bottom: bottomSafeArea,
       child: child,
+    );
+  }
+}
+
+/// Sheet content inside the one card. A draggable sheet needs a bounded
+/// height, so the card shows its scrolling content at its starting size.
+class _CardContent extends StatefulWidget {
+  const _CardContent({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_CardContent> createState() => _CardContentState();
+}
+
+class _CardContentState extends State<_CardContent> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    if (child is! DraggableScrollableSheet) return child;
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * child.initialChildSize,
+      child: child.builder(context, _scroll),
     );
   }
 }
