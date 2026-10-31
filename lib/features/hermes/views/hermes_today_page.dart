@@ -209,15 +209,16 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
                 ],
               ),
             ),
-            // A magnetic sheet: it snaps between resting and raised with a
-            // spring instead of the whole page scrolling.
+            // A magnetic sheet: it snaps between resting and raised instead
+            // of the whole page scrolling. No fixed snap duration: the snap
+            // carries the finger's release speed (at least 1600 dp/s), so a
+            // flick lands at once and a slow release still clicks home fast.
             DraggableScrollableSheet(
               initialChildSize: resting,
               minChildSize: resting,
               maxChildSize: raised,
               snap: true,
               snapSizes: [resting, raised],
-              snapAnimationDuration: const Duration(milliseconds: 340),
               builder: (context, controller) => RefreshIndicator(
                 onRefresh: _refresh,
                 child: ListView(
@@ -362,14 +363,16 @@ Future<void> _showDone(
                         style: _geist(13, FontWeight.w400, palette.muted),
                       ),
                       onTap: () async {
-                        // m11: the card becomes the conversation.
-                        await growHermezCardToScreen(rowContext);
-                        if (!context.mounted) return;
-                        await openHermesSession(
-                          context,
-                          ref,
-                          session,
-                          bot: bot,
+                        // m11: the card becomes the conversation, which
+                        // loads while the card grows.
+                        await openFromHermesCard(
+                          rowContext,
+                          () => openHermesSession(
+                            context,
+                            ref,
+                            session,
+                            bot: bot,
+                          ),
                         );
                       },
                     );
