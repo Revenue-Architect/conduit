@@ -134,6 +134,12 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
     // The sky fills the top of the screen down to Ask the team; the sheet
     // starts right under it.
     final skyHeight = (media.size.height * 0.58).clamp(420.0, 560.0);
+    // The sheet rests with "Ask the team" where the sky meets the city, and
+    // springs up to cover the sky; the sky and its sentence stay put.
+    final screen = media.size.height;
+    final askTop = media.padding.top + skyHeight - 70;
+    final resting = ((screen - askTop) / screen).clamp(0.3, 0.7);
+    const raised = 0.94;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
@@ -141,110 +147,117 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
       ),
       child: Material(
         color: hermezSkyGround(sky.phase),
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            children: [
-              SizedBox(
-                height: skyHeight + media.padding.top,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(painter: HermezSkyPainter(sky)),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: skyHeight + media.padding.top,
+              child: CustomPaint(painter: HermezSkyPainter(sky)),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, media.padding.top + 14, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _TopLine(now: now, weather: weather, phase: sky.phase),
+                  const SizedBox(height: 30),
+                  _Headline(done: headline.done, needs: headline.needs),
+                  const SizedBox(height: 22),
+                  _TeamStrip(
+                    bots: bots,
+                    working: working,
+                    onOpenBot: (bot) =>
+                        startHermesBotConversation(context, ref, bot),
+                    onOpenWorking: (agent) => context.pushNamed(
+                      RouteNames.hermesLiveRun,
+                      pathParameters: {'sessionId': agent.storedId},
+                      queryParameters: {'profile': agent.profile},
                     ),
+                  ),
+                  if (working.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _Caption(
+                      agent: working.first,
+                      bot: _botNamed(bots, working.first.profile),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // A magnetic sheet: it snaps between resting and raised with a
+            // spring instead of the whole page scrolling.
+            DraggableScrollableSheet(
+              initialChildSize: resting,
+              minChildSize: resting,
+              maxChildSize: raised,
+              snap: true,
+              snapSizes: [resting, raised],
+              snapAnimationDuration: const Duration(milliseconds: 340),
+              builder: (context, controller) => RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView(
+                  controller: controller,
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: ClampingScrollPhysics(),
+                  ),
+                  padding: EdgeInsets.zero,
+                  children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        media.padding.top + 14,
-                        20,
-                        0,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: _AskTheTeam(
+                        recipient: recipient,
+                        palette: palette,
+                        onAsk: recipient == null
+                            ? null
+                            : () => startHermesBotConversation(
+                                context,
+                                ref,
+                                recipient,
+                              ),
+                        onChooseRecipient: (chipContext) async {
+                          final picked = await _chooseRecipient(
+                            chipContext,
+                            bots,
+                          );
+                          if (picked != null && mounted) {
+                            setState(() => _recipient = picked.name);
+                          }
+                        },
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _TopLine(
-                            now: now,
-                            weather: weather,
-                            phase: sky.phase,
-                          ),
-                          const SizedBox(height: 30),
-                          _Headline(done: headline.done, needs: headline.needs),
-                          const SizedBox(height: 22),
-                          _TeamStrip(
-                            bots: bots,
+                    ),
+                    _Sheet(
+                      palette: palette,
+                      clearance: hermesDockClearance(context) + 16,
+                      minHeight: screen * raised - 70,
+                      children: [
+                        HermesHomeOfflineLine(visible: stale),
+                        const HermesNeedsYouSection(),
+                        if (working.isNotEmpty)
+                          _Running(
                             working: working,
-                            onOpenBot: (bot) =>
-                                startHermesBotConversation(context, ref, bot),
-                            onOpenWorking: (agent) => context.pushNamed(
-                              RouteNames.hermesLiveRun,
-                              pathParameters: {'sessionId': agent.storedId},
-                              queryParameters: {'profile': agent.profile},
-                            ),
-                          ),
-                          if (working.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            _Caption(
-                              agent: working.first,
-                              bot: _botNamed(bots, working.first.profile),
-                            ),
-                          ],
-                          const Spacer(),
-                          _AskTheTeam(
-                            recipient: recipient,
+                            bots: bots,
+                            sessions: sessions,
                             palette: palette,
-                            onAsk: recipient == null
-                                ? null
-                                : () => startHermesBotConversation(
-                                    context,
-                                    ref,
-                                    recipient,
-                                  ),
-                            onChooseRecipient: (chipContext) async {
-                              final picked = await _chooseRecipient(
-                                chipContext,
-                                bots,
-                              );
-                              if (picked != null && mounted) {
-                                setState(() => _recipient = picked.name);
-                              }
-                            },
                           ),
-                          const SizedBox(height: 14),
-                        ],
-                      ),
+                        const HermesHomeInbox(),
+                        HermesHomeLaterToday(
+                          routines: hermesRoutinesLaterToday(
+                            jobs ?? const [],
+                            now,
+                          ).length,
+                        ),
+                        HermesAwayDigest(jobs: jobs),
+                        const SizedBox(height: 8),
+                        _QuietLinks(palette: palette, routines: jobs?.length),
+                      ],
                     ),
                   ],
                 ),
               ),
-              _Sheet(
-                palette: palette,
-                clearance: hermesDockClearance(context) + 16,
-                children: [
-                  HermesHomeOfflineLine(visible: stale),
-                  const HermesNeedsYouSection(),
-                  if (working.isNotEmpty)
-                    _Running(
-                      working: working,
-                      bots: bots,
-                      sessions: sessions,
-                      palette: palette,
-                    ),
-                  const HermesHomeInbox(),
-                  HermesHomeLaterToday(
-                    routines: hermesRoutinesLaterToday(
-                      jobs ?? const [],
-                      now,
-                    ).length,
-                  ),
-                  HermesAwayDigest(jobs: jobs),
-                  const SizedBox(height: 8),
-                  _QuietLinks(palette: palette, routines: jobs?.length),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -721,26 +734,50 @@ class _Sheet extends StatelessWidget {
   const _Sheet({
     required this.palette,
     required this.clearance,
+    required this.minHeight,
     required this.children,
   });
 
   final HermezChatPalette palette;
   final double clearance;
+  final double minHeight;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      constraints: BoxConstraints(minHeight: height * 0.5),
+      constraints: BoxConstraints(minHeight: minHeight),
       decoration: BoxDecoration(
         color: palette.raised,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        // On the evening sky the sheet needs an edge to read as a card.
+        border: dark ? Border(top: BorderSide(color: palette.border)) : null,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 24,
+            offset: Offset(0, -4),
+          ),
+        ],
       ),
-      padding: EdgeInsets.fromLTRB(20, 22, 20, clearance),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, clearance),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          ...children,
+        ],
       ),
     );
   }

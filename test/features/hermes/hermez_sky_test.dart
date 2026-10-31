@@ -21,4 +21,28 @@ void main() {
       );
     }
   });
+
+  // The owner's rule: the evening is the A2 dusk sky until 11 pm, not night.
+  test('the evening shows the dusk sky until 11 pm', () {
+    final day = DateTime(2026, 10, 30);
+    final sunset = day.add(const Duration(hours: 18, minutes: 9));
+    for (final t in [
+      const Duration(hours: 19),
+      const Duration(hours: 20, minutes: 44),
+      const Duration(hours: 22, minutes: 50),
+    ]) {
+      expect(
+        hermezSkyPhaseAt(day.add(t), sunset: sunset, dark: false),
+        HermezSkyPhase.dusk,
+      );
+    }
+    expect(
+      hermezSkyPhaseAt(
+        day.add(const Duration(hours: 23, minutes: 30)),
+        sunset: sunset,
+        dark: false,
+      ),
+      HermezSkyPhase.night,
+    );
+  });
 }

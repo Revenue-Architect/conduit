@@ -31,8 +31,8 @@ class HermezSkyState {
   int get hashCode => Object.hash(phase, weather);
 }
 
-/// The phase at [now]. Dawn and dusk are an hour either side of sunrise and
-/// sunset; with no sun times, Toronto's late-October hours stand in. In dark
+/// The phase at [now]. Dawn is an hour either side of sunrise; dusk runs
+/// from an hour before sunset until 11 pm (the evening); with no sun times, Toronto's late-October hours stand in. In dark
 /// mode the sky is never daytime: dusk or night, whichever is nearer.
 HermezSkyPhase hermezSkyPhaseAt(
   DateTime now, {
@@ -47,7 +47,9 @@ HermezSkyPhase hermezSkyPhaseAt(
   final HermezSkyPhase phase;
   if (now.isAfter(rise.subtract(hour)) && now.isBefore(rise.add(hour))) {
     phase = HermezSkyPhase.dawn;
-  } else if (now.isAfter(set.subtract(hour)) && now.isBefore(set.add(hour))) {
+  } else if (now.isAfter(set.subtract(hour)) &&
+      now.isBefore(day.add(const Duration(hours: 23)))) {
+    // The evening is the owner's dusk sky (variant A2) until 11 pm.
     phase = HermezSkyPhase.dusk;
   } else if (now.isAfter(rise) && now.isBefore(set)) {
     phase = HermezSkyPhase.day;
