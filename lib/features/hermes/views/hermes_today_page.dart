@@ -20,6 +20,9 @@ import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../widgets/hermes_tab_dock.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_visual_theme.dart';
+import '../motion/hermez_card_stack.dart';
+import '../motion/hermez_motion.dart';
 import 'hermes_today_copy.dart';
 import 'hermes_work_page.dart';
 
@@ -199,9 +202,9 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
                                     ref,
                                     recipient,
                                   ),
-                            onChooseRecipient: () async {
+                            onChooseRecipient: (chipContext) async {
                               final picked = await _chooseRecipient(
-                                context,
+                                chipContext,
                                 bots,
                               );
                               if (picked != null && mounted) {
@@ -256,39 +259,73 @@ HermesBot? _botNamed(List<HermesBot> bots, String name) {
   return null;
 }
 
-/// The recipient chip's card: the existing bot menu that grows out of what
-/// was pressed. Returns the chosen bot without starting a conversation.
+/// The recipient chip becomes its card (docs/app-design-2026-10-30, m01):
+/// the chip's own surface grows into "Send to" and folds back into the chip,
+/// which then shows the bot chosen. Choosing never starts a conversation.
 Future<HermesBot?> _chooseRecipient(
-  BuildContext context,
+  BuildContext chipContext,
   List<HermesBot> bots,
 ) {
   if (bots.isEmpty) return Future.value();
-  return showModalBottomSheet<HermesBot>(
-    context: context,
-    showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        children: [
-          for (final bot in bots)
-            ListTile(
-              leading: HermezBotMark(
-                identity: hermezIdentityForBot(bot),
-                botName: bot.name,
-                size: 36,
-                label: bot.title,
-              ),
-              title: Text(bot.title),
-              subtitle: bot.description == null
-                  ? null
-                  : Text(
-                      bot.description!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+  final palette = HermezChatPalette.forBrightness(
+    Theme.of(chipContext).brightness,
+  );
+  final origin = HermezMorphOrigin.of(
+    chipContext,
+    radius: 16,
+    color: palette.surface,
+  );
+  // No laid-out chip to grow from: nothing opens.
+  if (origin == null) return Future.value();
+  return pushHermezPanel<HermesBot>(
+    chipContext,
+    origin: origin,
+    surfaceColor: palette.raised,
+    maxWidth: 400,
+    semanticLabel: 'Send to',
+    theme: hermezVisualTheme(Theme.of(chipContext)),
+    faceBuilder: (_, _) => const SizedBox.expand(),
+    builder: (panelContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+      child: HermezCardStack(
+        root: HermezCardView(
+          title: 'Send to',
+          builder: (context) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final bot in bots)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  leading: ClipOval(
+                    child: SizedBox.square(
+                      dimension: 36,
+                      child: HermezBotMark(
+                        identity: hermezIdentityForBot(bot),
+                        botName: bot.name,
+                        size: 36,
+                        label: bot.title,
+                      ),
                     ),
-              onTap: () => Navigator.pop(sheetContext, bot),
-            ),
-        ],
+                  ),
+                  title: Text(
+                    bot.title,
+                    style: _geist(15, FontWeight.w500, palette.ink),
+                  ),
+                  subtitle: bot.description == null
+                      ? null
+                      : Text(
+                          bot.description!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _geist(13, FontWeight.w400, palette.muted),
+                        ),
+                  onTap: () => Navigator.pop(panelContext, bot),
+                ),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -585,7 +622,7 @@ class _AskTheTeam extends StatelessWidget {
   final HermesBot? recipient;
   final HermezChatPalette palette;
   final VoidCallback? onAsk;
-  final VoidCallback onChooseRecipient;
+  final ValueChanged<BuildContext> onChooseRecipient;
 
   @override
   Widget build(BuildContext context) {
@@ -624,39 +661,41 @@ class _AskTheTeam extends StatelessWidget {
             Semantics(
               button: true,
               label: 'Send to ${bot.title}. Change',
-              child: GestureDetector(
-                onTap: onChooseRecipient,
-                child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
-                  decoration: BoxDecoration(
-                    color: palette.surface,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipOval(
-                        child: SizedBox.square(
-                          dimension: 24,
-                          child: HermezBotMark(
-                            identity: hermezIdentityForBot(bot),
-                            botName: bot.name,
-                            size: 24,
-                            label: bot.title,
+              child: Builder(
+                builder: (chipContext) => GestureDetector(
+                  onTap: () => onChooseRecipient(chipContext),
+                  child: Container(
+                    height: 32,
+                    padding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
+                    decoration: BoxDecoration(
+                      color: palette.surface,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipOval(
+                          child: SizedBox.square(
+                            dimension: 24,
+                            child: HermezBotMark(
+                              identity: hermezIdentityForBot(bot),
+                              botName: bot.name,
+                              size: 24,
+                              label: bot.title,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        bot.title,
-                        style: _geist(13, FontWeight.w600, palette.ink),
-                      ),
-                      Icon(
-                        Icons.expand_more_rounded,
-                        size: 16,
-                        color: palette.muted,
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          bot.title,
+                          style: _geist(13, FontWeight.w600, palette.ink),
+                        ),
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 16,
+                          color: palette.muted,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

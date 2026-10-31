@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/hermes_providers.dart' show hermesApiServiceProvider;
 
 import '../services/hermes_desktop_api_service.dart';
+import '../../../shared/theme/theme_extensions.dart';
 import 'hermez_chat_palette.dart';
+import '../motion/hermez_motion.dart';
+import '../motion/hermez_card_stack.dart';
 
 /// Hermes' Bot Desktop through its own noVNC stream (`/api/display/ws`).
 /// Watching is the default; "Take over" holds Hermes' control lease, which is
@@ -66,10 +69,14 @@ class _HermesBotScreenViewState extends State<HermesBotScreenView> {
     }
   }
 
-  Future<void> _toggleControl() async {
+  Future<void> _toggleControl(BuildContext chipContext) async {
     final screen = _screen;
     if (screen == null || _busy) return;
     final take = !_control;
+    // Taking over asks first (docs/app-design-2026-10-30, m06): the chip
+    // becomes the confirm card. Handing back needs no question.
+    if (take && !await _confirmTakeOver(chipContext)) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       take
@@ -174,10 +181,12 @@ class _HermesBotScreenViewState extends State<HermesBotScreenView> {
               Positioned(
                 right: 8,
                 bottom: 8,
-                child: HermesTakeOverChip(
-                  control: _control,
-                  busy: _busy,
-                  onPressed: _toggleControl,
+                child: Builder(
+                  builder: (chipContext) => HermesTakeOverChip(
+                    control: _control,
+                    busy: _busy,
+                    onPressed: () => _toggleControl(chipContext),
+                  ),
                 ),
               ),
           ],
@@ -217,6 +226,80 @@ class HermesBotScreenPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The Take over chip turned into its confirm card. The lease only fences
+/// the bot's screen and browser (Hermes' display lease), so the card says
+/// that commands it already started keep running.
+Future<bool> _confirmTakeOver(BuildContext chipContext) async {
+  final palette = HermezChatPalette.forBrightness(
+    Theme.of(chipContext).brightness,
+  );
+  final origin = HermezMorphOrigin.of(
+    chipContext,
+    radius: 999,
+    color: palette.accent,
+  );
+  if (origin == null) return false;
+  final confirmed = await pushHermezPanel<bool>(
+    chipContext,
+    origin: origin,
+    surfaceColor: palette.raised,
+    maxWidth: 400,
+    semanticLabel: 'Take over the screen?',
+    faceBuilder: (_, _) => const SizedBox.expand(),
+    builder: (panelContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 14),
+      child: HermezCardStack(
+        root: HermezCardView(
+          title: 'Take over the screen?',
+          builder: (context) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'While you have control, the bot can’t use its screen or '
+                  'browser. Commands it already started keep running. '
+                  'Leaving hands it back.',
+                  style: TextStyle(
+                    fontFamily: AppTypography.fontFamily,
+                    fontSize: 15,
+                    height: 1.45,
+                    color: palette.muted,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: () => Navigator.pop(panelContext, false),
+                        child: const Text('Keep watching'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: palette.accent,
+                          foregroundColor: palette.onAccent,
+                        ),
+                        onPressed: () => Navigator.pop(panelContext, true),
+                        child: const Text('Take over'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  return confirmed ?? false;
 }
 
 /// "Take over" while watching, "Hand back" while in control.
