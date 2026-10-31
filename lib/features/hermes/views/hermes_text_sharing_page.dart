@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../motion/hermez_card_stack.dart';
+
 /// Sharing is opt-in. Permission and pairing actions are always initiated here.
 class HermesTextSharingPage extends StatefulWidget {
   const HermesTextSharingPage({super.key});
@@ -69,27 +71,15 @@ class _HermesTextSharingPageState extends State<HermesTextSharingPage> {
     await _action('setEnabled', {'enabled': enabled});
   }
 
-  Future<void> _forget() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Forget this device?'),
-        content: const Text(
-          'Sharing stops and this phone’s pairing is revoked. Your messages and chats stay on the phone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Forget device'),
-          ),
-        ],
-      ),
+  Future<void> _forget(BuildContext button) async {
+    // The button becomes its confirm card (one card, never a dialog).
+    final confirmed = await confirmHermezCard(
+      button,
+      title: 'Forget this device?',
+      body: 'Sharing stops and this phone’s pairing is revoked. Your messages and chats stay on the phone.',
+      confirmLabel: 'Forget device',
     );
-    if (confirmed == true) await _action('forget');
+    if (confirmed) await _action('forget');
   }
 
   @override
@@ -175,9 +165,11 @@ class _HermesTextSharingPageState extends State<HermesTextSharingPage> {
                 child: const Text('Pause 24 h'),
               ),
             ],
-            TextButton(
-              onPressed: _busy ? null : _forget,
-              child: const Text('Forget device'),
+            Builder(
+              builder: (button) => TextButton(
+                onPressed: _busy ? null : () => _forget(button),
+                child: const Text('Forget device'),
+              ),
             ),
           ],
           if (_busy)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../widgets/hermez_chat_palette.dart';
+import 'hermez_motion.dart';
 
 /// One step inside a card: its title and its content.
 @immutable
@@ -191,4 +192,82 @@ class _SlideInState extends State<_SlideIn>
     },
     child: widget.child,
   );
+}
+
+/// A yes/no question as a one card: it grows out of the control in [from]
+/// (the button that asked) and folds back into it. Returns true only when
+/// the owner picks [confirmLabel]; closing the card never confirms.
+Future<bool> confirmHermezCard(
+  BuildContext from, {
+  required String title,
+  required String body,
+  required String confirmLabel,
+  String cancelLabel = 'Cancel',
+}) async {
+  final palette = HermezChatPalette.forBrightness(Theme.of(from).brightness);
+  Widget content(BuildContext panelContext) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 10, 4, 14),
+    child: HermezCardStack(
+      root: HermezCardView(
+        title: title,
+        builder: (context) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                body,
+                style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontSize: 15,
+                  height: 1.45,
+                  color: palette.muted,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: () => Navigator.pop(panelContext, false),
+                      child: Text(cancelLabel),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.onAccent,
+                      ),
+                      onPressed: () => Navigator.pop(panelContext, true),
+                      child: Text(confirmLabel),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  final origin = HermezMorphOrigin.of(
+    from,
+    radius: 999,
+    color: palette.surface,
+  );
+  final bool? answer = origin == null
+      ? await pushHermezSheet<bool>(from, builder: content, heightFactor: 0.4)
+      : await pushHermezPanel<bool>(
+          from,
+          origin: origin,
+          surfaceColor: palette.raised,
+          maxWidth: 400,
+          semanticLabel: title,
+          faceBuilder: (_, _) => const SizedBox.expand(),
+          builder: content,
+        );
+  return answer ?? false;
 }

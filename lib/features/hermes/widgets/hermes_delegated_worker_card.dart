@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/chat_message.dart';
-import '../../../shared/widgets/conduit_dialog_route.dart';
 import '../feedback/hermez_feedback.dart';
 import '../models/hermes_subagent.dart';
 import '../motion/hermez_motion.dart';
@@ -17,6 +16,7 @@ import 'hermez_live.dart';
 import 'hermez_segments.dart';
 import 'hermez_surfaces.dart';
 import 'hermes_turn_delegation.dart';
+import '../motion/hermez_card_stack.dart';
 
 HermezLiveState hermesWorkerLiveState(HermesSubagentStatus status) =>
     switch (status) {
@@ -274,27 +274,16 @@ class _HermesDelegatedWorkerCardState
     return wasAccepted;
   }
 
-  Future<void> _confirmStop() async {
-    final accepted = await showConduitDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Stop this delegate?'),
-        content: const Text(
-          'Hermes will receive a stop request. The delegate may finish before it is handled.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Request stop'),
-          ),
-        ],
-      ),
+  Future<void> _confirmStop(BuildContext button) async {
+    // The delegate's card grows into its confirm card (one card, never a
+    // dialog).
+    final accepted = await confirmHermezCard(
+      button,
+      title: 'Stop this delegate?',
+      body: 'Hermes will receive a stop request. The delegate may finish before it is handled.',
+      confirmLabel: 'Request stop',
     );
-    if (accepted != true || !mounted) return;
+    if (!accepted || !mounted) return;
     final worker = widget.worker;
     final steerableId = worker.steerableId;
     if (!worker.supportsNativeControl ||
@@ -730,7 +719,9 @@ class _HermesDelegatedWorkerCardState
                     label: 'Stop',
                     icon: Icons.stop_circle_outlined,
                     busy: _busy,
-                    onTap: _busy ? null : () => unawaited(_confirmStop()),
+                    onTap: _busy
+                        ? null
+                        : () => unawaited(_confirmStop(context)),
                   ),
                 ],
               ),
