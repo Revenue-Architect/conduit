@@ -847,18 +847,20 @@ class _QuietLinks extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: palette.border),
           ),
-          alignment: Alignment.center,
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: label,
-                  style: _geist(13, FontWeight.w600, palette.ink),
-                ),
-                if (detail != null) TextSpan(text: ' · $detail'),
-              ],
+          child: Center(
+            widthFactor: 1,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: label,
+                    style: _geist(13, FontWeight.w600, palette.ink),
+                  ),
+                  if (detail != null) TextSpan(text: ' · $detail'),
+                ],
+              ),
+              style: _geist(13, FontWeight.w500, palette.muted),
             ),
-            style: _geist(13, FontWeight.w500, palette.muted),
           ),
         ),
       ),
