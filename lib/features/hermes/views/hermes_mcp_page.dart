@@ -85,6 +85,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     final accepted = await pushHermezSheetRoute<bool>(
       context,
       origin: origin,
+      fit: true,
       builder: (context) => HermezModalSheet(
         eyebrow: 'MCP',
         title: 'Add MCP server',
@@ -236,7 +237,7 @@ final class _HermesMcpPageState extends ConsumerState<HermesMcpPage> {
     final accepted = await pushHermezSheetRoute<bool>(
       context,
       origin: origin,
-      heightFactor: 0.6,
+      fit: true,
       builder: (context) => HermezModalSheet(
         eyebrow: 'Set API key',
         title: name,

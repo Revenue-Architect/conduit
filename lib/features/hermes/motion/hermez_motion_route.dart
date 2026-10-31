@@ -8,6 +8,7 @@ import '../feedback/hermez_feedback.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermez_morph_origin.dart';
 import 'hermez_motion_tokens.dart';
+import 'hermez_card_route.dart';
 
 /// What a Hermez route becomes when it has finished growing.
 enum HermezExpandShape {
@@ -77,17 +78,15 @@ Future<T?> pushHermezSheet<T>(
   double heightFactor = 0.91,
   bool reducedMotion = false,
 }) async {
-  final route = HermezRoute<T>(
-    builder: builder,
-    motion: HermezRouteMotion.expand,
-    shape: HermezExpandShape.sheet,
+  // One card (docs/app-design-2026-10-30; POPUPS-PLAN.md step 1): every
+  // Hermes sheet is the floating full-height card, grown out of the control
+  // that was pressed, resting at 62% and springing up to [heightFactor].
+  return pushHermezFullCard<T>(
+    context,
     origin: origin,
-    heightFactor: heightFactor,
-    reducedMotion: reducedMotion,
+    builder: builder,
+    raisedFactor: heightFactor,
   );
-  final result = await Navigator.of(context).push<T>(route);
-  await route.completed;
-  return result;
 }
 
 /// A Hermez route for imperative navigation.

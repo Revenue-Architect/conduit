@@ -53,6 +53,7 @@ Future<void> startHermesTeam(
 ]) async {
   final team = await showHermezSheet<HermesTeam>(
     context,
+    fit: true,
     origin: origin,
     title: 'New team',
     subtitle: Text(

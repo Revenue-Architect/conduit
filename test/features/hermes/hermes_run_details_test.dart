@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
-import 'package:conduit/features/hermes/motion/hermez_panel_morph.dart';
+import 'package:conduit/features/hermes/motion/hermez_card_route.dart';
 import 'package:conduit/features/hermes/providers/hermes_agentic_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/services/hermes_agentic_state.dart';
@@ -88,11 +88,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(HermesLiveRunPage), findsOneWidget);
           expect(
-            tester
-                .renderObject<RenderHermezPanelMorph>(
-                  find.byType(HermezPanelMorph),
-                )
-                .originRect,
+            hermezCardOriginOf(
+              tester.element(find.byType(HermesLiveRunPage)),
+            ),
             triggerRect,
           );
           expect(adapter.reads, ['session-1']);

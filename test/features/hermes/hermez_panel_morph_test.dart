@@ -47,7 +47,7 @@ class _HarnessState extends State<_Harness> {
       color: const Color(0xFFE3192B),
     );
     if (origin == null) return;
-    final result = await pushHermezPanel<bool>(
+    final result = await pushHermezPanelMorph<bool>(
       context,
       origin: origin,
       originElevation: 2,

@@ -31,6 +31,7 @@ Future<String?> showPageMoveSheet(
   ];
   return pushHermezSheetRoute<String>(
     context,
+    fit: true,
     heightFactor: 0.7,
     builder: (sheetContext) {
       final palette = HermezChatPalette.forBrightness(
@@ -40,6 +41,8 @@ Future<String?> showPageMoveSheet(
         eyebrow: 'Move page',
         title: page.title,
         body: ListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           children: [
             if (page.parentId != null)
@@ -109,6 +112,8 @@ Future<void> showPageVersionSheet(
       eyebrow: 'Latest version · revision ${page.revision}',
       title: page.title,
       body: ListView(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
         children: [
           SelectableText(

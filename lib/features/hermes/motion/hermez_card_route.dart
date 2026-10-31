@@ -3,10 +3,12 @@ import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart' as mui;
 
 import '../widgets/hermez_chat_palette.dart';
+import 'hermez_morph_origin.dart';
 
 /// Where the last press landed, recorded at press time (KaizenOS'
 /// morphOrigin pattern): the control a card grows out of, without every
@@ -66,16 +68,20 @@ class HermezPressOrigin {
 /// 34% scrim, and folds back into it on close. Shape, corners and colour
 /// travel; the content is revealed by the growing clip, never stretched.
 ///
-/// [from] names the control explicitly; otherwise the last fresh press is
-/// used, and without either the card rises from the bottom edge.
+/// [from] (a context) or [origin] (a measured control) names the control
+/// explicitly; otherwise the last fresh press is used, and without any the
+/// card rises from the bottom edge.
 Future<T?> pushHermezCard<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   BuildContext? from,
+  HermezMorphOrigin? origin,
   Color? originColor,
   double maxHeightFactor = 0.86,
   String? semanticLabel,
-}) {
+  double? restingFactor,
+  bool scrollsContent = true,
+}) async {
   final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
   Rect? rect;
   double radius = 16;
@@ -84,25 +90,35 @@ Future<T?> pushHermezCard<T>(
     rect = box.localToGlobal(Offset.zero) & box.size;
     radius = math.min(box.size.shortestSide / 2, 20);
   }
+  if (rect == null && origin != null) {
+    rect = origin.resolve();
+    radius = origin.radius;
+    originColor ??= origin.color;
+  }
   if (rect == null) {
     final pressed = HermezPressOrigin.take();
     if (pressed != null) (rect, radius) = pressed;
   }
-  return Navigator.of(context).push<T>(
-    _HermezCardRoute<T>(
-      builder: builder,
-      originRect: rect,
-      originRadius: radius,
-      originColor: originColor ?? palette.surface,
-      cardColor: palette.raised,
-      maxHeightFactor: maxHeightFactor,
-      semanticLabel: semanticLabel,
-      capturedThemes: InheritedTheme.capture(
-        from: context,
-        to: Navigator.of(context).context,
-      ),
+  final route = _HermezCardRoute<T>(
+    builder: builder,
+    originRect: rect,
+    originRadius: radius,
+    originColor: originColor ?? palette.surface,
+    cardColor: palette.raised,
+    maxHeightFactor: maxHeightFactor,
+    restingFactor: restingFactor,
+    scrollsContent: scrollsContent,
+    semanticLabel: semanticLabel,
+    capturedThemes: InheritedTheme.capture(
+      from: context,
+      to: Navigator.of(context).context,
     ),
   );
+  final result = await Navigator.of(context).push<T>(route);
+  // Answer once the card has finished closing: callers dispose controllers
+  // the card's fields still show while it folds back into the control.
+  await route.completed;
+  return result;
 }
 
 class _HermezCardRoute<T> extends PopupRoute<T> {
@@ -115,7 +131,17 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
     required this.maxHeightFactor,
     required this.capturedThemes,
     this.semanticLabel,
+    this.restingFactor,
+    this.scrollsContent = true,
   });
+
+  /// False when the content scrolls itself between a fixed header and
+  /// footer: it then gets the card's bounded height instead of a scroll view.
+  final bool scrollsContent;
+
+  /// Set for a full-height card: it rests at this fraction of the screen
+  /// and springs up to [maxHeightFactor] (magnetic, like Today's sheet).
+  final double? restingFactor;
 
   final WidgetBuilder builder;
   final Rect? originRect;
@@ -236,7 +262,18 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                       // The material_ui fork's ink needs its own Material.
                       child: mui.Material(
                         type: mui.MaterialType.transparency,
-                        child: _Grabbed(child: Builder(builder: builder)),
+                        child: restingFactor == null
+                            ? _Grabbed(
+                                scrolls: scrollsContent,
+                                child: _Unpadded(builder: builder),
+                              )
+                            : _MagneticCard(
+                                resting: media.size.height * restingFactor!,
+                                raised: media.size.height * maxHeightFactor,
+                                onDismiss: () =>
+                                    Navigator.of(context).maybePop(),
+                                child: _Unpadded(builder: builder),
+                              ),
                       ),
                     ),
                   ),
@@ -253,10 +290,30 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
 }
 
 /// The card's grabber and its own scrolling when content outgrows it.
+/// The card already floats clear of the status bar, the gesture area and
+/// the screen edges, so its content gets none of that padding again (a
+/// SafeArea inside would open a status-bar gap at the card's top).
+class _Unpadded extends StatelessWidget {
+  const _Unpadded({required this.builder});
+
+  final WidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) => MediaQuery.removePadding(
+    context: context,
+    removeTop: true,
+    removeBottom: true,
+    removeLeft: true,
+    removeRight: true,
+    child: Builder(builder: builder),
+  );
+}
+
 class _Grabbed extends StatelessWidget {
-  const _Grabbed({required this.child});
+  const _Grabbed({required this.child, this.scrolls = true});
 
   final Widget child;
+  final bool scrolls;
 
   @override
   Widget build(BuildContext context) {
@@ -279,10 +336,15 @@ class _Grabbed extends StatelessWidget {
           ),
         ),
         Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: child,
-          ),
+          child: scrolls
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: child,
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: child,
+                ),
         ),
       ],
     );
@@ -380,4 +442,129 @@ class _RenderCardReveal extends RenderProxyBox {
       });
     }
   }
+}
+
+/// The rect the card around [context] grew out of, or null outside a card.
+@visibleForTesting
+Rect? hermezCardOriginOf(BuildContext context) {
+  final route = ModalRoute.of(context);
+  return route is _HermezCardRoute ? route.originRect : null;
+}
+
+/// Pushes a full-height card: content that fills a sheet and scrolls inside
+/// it (the Hermes sheets). It rests at [restingFactor] of the screen and
+/// springs up to [raisedFactor]; dragging below resting closes it.
+Future<T?> pushHermezFullCard<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+  BuildContext? from,
+  HermezMorphOrigin? origin,
+  double restingFactor = 0.62,
+  double raisedFactor = 0.91,
+  String? semanticLabel,
+}) => pushHermezCard<T>(
+  context,
+  builder: builder,
+  from: from,
+  origin: origin,
+  maxHeightFactor: raisedFactor,
+  restingFactor: math.min(restingFactor, raisedFactor),
+  semanticLabel: semanticLabel,
+);
+
+/// A card with two magnetic detents. The top band (grabber and title)
+/// drags it; release springs to the detent the velocity or position points
+/// at, and dragging well below resting closes the card. The content gets a
+/// definite height and keeps its own scrolling.
+class _MagneticCard extends StatefulWidget {
+  const _MagneticCard({
+    required this.resting,
+    required this.raised,
+    required this.onDismiss,
+    required this.child,
+  });
+
+  final double resting;
+  final double raised;
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  @override
+  State<_MagneticCard> createState() => _MagneticCardState();
+}
+
+class _MagneticCardState extends State<_MagneticCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _height = AnimationController.unbounded(
+    vsync: this,
+    value: widget.resting,
+  );
+
+  // The reference's settle: a little give, then still.
+  static const _spring = SpringDescription(
+    mass: 1,
+    stiffness: 260,
+    damping: 26,
+  );
+
+  @override
+  void dispose() {
+    _height.dispose();
+    super.dispose();
+  }
+
+  // Where the drag began: a fling down closes the card only from resting.
+  double _start = 0;
+
+  void _drag(DragUpdateDetails details) {
+    _height.value = (_height.value - details.delta.dy).clamp(
+      widget.resting * 0.6,
+      widget.raised,
+    );
+  }
+
+  void _release(DragEndDetails details) {
+    final v = -(details.primaryVelocity ?? 0); // positive: upward
+    final h = _height.value;
+    final fromResting = _start <= widget.resting + 4;
+    if (h < widget.resting * 0.8 || (v < -900 && fromResting)) {
+      widget.onDismiss();
+      return;
+    }
+    final target = v > 500
+        ? widget.raised
+        : v < -500
+        ? widget.resting
+        : (h - widget.resting).abs() < (h - widget.raised).abs()
+        ? widget.resting
+        : widget.raised;
+    _height.animateWith(SpringSimulation(_spring, h, target, v));
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _height,
+    builder: (context, child) =>
+        SizedBox(height: _height.value.clamp(0.0, widget.raised), child: child),
+    child: Stack(
+      children: [
+        Positioned.fill(child: widget.child),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 44,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) {
+              _height.stop();
+              _start = _height.value;
+            },
+            onVerticalDragUpdate: _drag,
+            onVerticalDragEnd: _release,
+          ),
+        ),
+      ],
+    ),
+  );
 }

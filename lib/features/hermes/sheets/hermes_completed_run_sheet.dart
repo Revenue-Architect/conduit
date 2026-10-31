@@ -19,6 +19,7 @@ Future<HermesCompletedRunAction?> showHermesCompletedRunSheet(
   HermezMorphOrigin? origin,
 }) => pushHermezSheetRoute<HermesCompletedRunAction>(
   context,
+  fit: true,
   origin: origin,
   builder: (sheetContext) => _CompletedRunSheet(snapshot: snapshot),
 );

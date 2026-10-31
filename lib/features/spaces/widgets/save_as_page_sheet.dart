@@ -52,6 +52,7 @@ Future<void> showSaveAsPageSheet(
   final messenger = ScaffoldMessenger.maybeOf(context);
   final saved = await pushHermezSheetRoute<(HermesPage, HermesSpace)>(
     context,
+    fit: true,
     heightFactor: 0.62,
     builder: (sheetContext) => _SaveAsPageSheet(
       client: client,
@@ -151,6 +152,8 @@ class _SaveAsPageSheetState extends State<_SaveAsPageSheet> {
           eyebrow: 'Save as Page',
           title: 'Keep this reply',
           body: ListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(22, 4, 22, 16),
             children: [
               Text('SPACE', style: HermezType.technical(palette.muted)),

@@ -19,6 +19,7 @@ Future<void> showHermesDelegatesSheet(
   HermezMorphOrigin? origin,
 }) => pushHermezSheetRoute<void>(
   context,
+  fit: true,
   origin: origin,
   heightFactor: .88,
   builder: (_) => Consumer(

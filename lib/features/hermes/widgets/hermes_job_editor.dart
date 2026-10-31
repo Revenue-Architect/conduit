@@ -130,6 +130,7 @@ Future<({String name, String prompt, String schedule})?> showHermesJobEditor(
 }) {
   return pushHermezSheetRoute<({String name, String prompt, String schedule})>(
     context,
+    fit: true,
     origin: origin,
     builder: (context) => _HermesJobEditorDialog(
       initialName: initialName,

@@ -197,6 +197,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     // Linked items live in physical compartments that open in place.
     expect(find.text('Plan.pdf'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.textContaining('FILES /'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.ensureVisible(find.textContaining('FILES /'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('FILES /'));
@@ -215,6 +220,11 @@ void main() {
     await tester.tap(find.text('Linked task'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.scrollUntilVisible(
+      find.textContaining('DEPENDENCIES /'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.ensureVisible(find.textContaining('DEPENDENCIES /'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('DEPENDENCIES /'));
@@ -331,12 +341,16 @@ void main() {
           250,
           scrollable: find.byType(Scrollable).last,
         );
+        await tester.ensureVisible(find.text('No private data.'));
+        await tester.pumpAndSettle();
         expect(find.text('No private data.'), findsOneWidget);
         await tester.scrollUntilVisible(
           find.text('Live activity'),
           250,
           scrollable: find.byType(Scrollable).last,
         );
+        await tester.ensureVisible(find.text('Live activity'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Live activity'));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
@@ -344,6 +358,8 @@ void main() {
           250,
           scrollable: find.byType(Scrollable).last,
         );
+        await tester.ensureVisible(find.text('Check the route'));
+        await tester.pumpAndSettle();
         expect(find.text('Check the route'), findsOneWidget);
       });
     }
@@ -481,10 +497,17 @@ void main() {
     // Status, bot and priority live in the OPTIONS compartment.
     await tester.tap(find.text('OPTIONS'));
     await tester.pumpAndSettle();
+    // With the options open the form outgrows the card and scrolls.
+    await tester.ensureVisible(find.text('Ready').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ready').last);
+    await tester.ensureVisible(find.text('Assign a bot (optional)'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Assign a bot (optional)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('kai'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Create task'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create task'));
     await tester.pumpAndSettle();
@@ -506,6 +529,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.ensureVisible(find.text('Add comment'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add comment'));
     await tester.pumpAndSettle();
     // The comment field opens in place under its button.
@@ -520,6 +545,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.ensureVisible(find.text('Live activity'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Live activity'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -527,6 +554,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.ensureVisible(find.text('Reviewed in QA'));
+    await tester.pumpAndSettle();
     expect(find.text('Reviewed in QA'), findsOneWidget);
 
     // Status is a chip; its menu holds the stages.
@@ -535,6 +564,10 @@ void main() {
       -180,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('kanban-task-status')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('kanban-task-status')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.widgetWithText(ActionChip, 'Todo'));
@@ -554,8 +587,20 @@ void main() {
     expect(writes.length, 3);
     // Running is never offered as a manual move.
     expect(find.widgetWithText(ActionChip, 'Running'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.widgetWithText(ActionChip, 'Todo'),
+      -180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.ensureVisible(find.widgetWithText(ActionChip, 'Todo'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ActionChip, 'Todo'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Move'),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.ensureVisible(find.text('Move'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move'));

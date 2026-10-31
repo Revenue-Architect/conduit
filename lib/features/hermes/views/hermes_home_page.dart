@@ -156,6 +156,7 @@ Future<void> chooseHermesNewChat(
   if (origin == null) {
     bot = await pushHermezSheetRoute<HermesBot>(
       context,
+      fit: true,
       heightFactor: 0.8,
       builder: (sheetContext) => HermezModalSheet(
         eyebrow: 'New conversation',

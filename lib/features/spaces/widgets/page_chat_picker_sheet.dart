@@ -21,6 +21,7 @@ Future<HermesBot?> showPageChatPicker(
   final existing = {for (final chat in chats) chat.profile};
   return pushHermezSheetRoute<HermesBot>(
     context,
+    fit: true,
     heightFactor: 0.72,
     builder: (sheetContext) {
       final palette = HermezChatPalette.forBrightness(

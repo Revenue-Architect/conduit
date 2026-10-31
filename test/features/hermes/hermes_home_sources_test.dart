@@ -1,7 +1,7 @@
 import 'package:conduit/core/services/navigation_service.dart';
 import 'package:conduit/features/hermes/models/hermes_bot.dart';
 import 'package:conduit/features/hermes/models/hermes_session.dart';
-import 'package:conduit/features/hermes/motion/hermez_panel_morph.dart';
+import 'package:conduit/features/hermes/motion/hermez_card_route.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_session_totals_provider.dart';
 import 'package:conduit/features/hermes/sheets/hermez_modal_sheet.dart';
@@ -85,8 +85,11 @@ void main() {
     await _pumpHome(tester);
     await tester.tap(find.byTooltip('New Hermes chat'));
     await tester.pumpAndSettle();
-    // The plus-to-menu morph, not a sheet from the bottom edge.
-    expect(find.byType(HermezPanelMorph), findsOneWidget);
+    // The + grows into the one card, not a sheet from the bottom edge.
+    expect(
+      hermezCardOriginOf(tester.element(find.text('NEW CONVERSATION'))),
+      isNotNull,
+    );
     expect(find.byType(HermezModalSheet), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('NEW CONVERSATION'), findsOneWidget);
@@ -103,7 +106,7 @@ void main() {
       find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(HermezPanelMorph), findsNothing);
+    expect(find.text('NEW CONVERSATION'), findsNothing);
     expect(tester.takeException(), isNull);
     handle.dispose();
   });

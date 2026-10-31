@@ -5,7 +5,6 @@ import '../views/hermes_live_run_page.dart';
 import '../sheets/hermez_modal_sheet.dart' show pushHermezSheetRoute;
 import 'hermes_run_actions.dart';
 import 'hermez_chat_palette.dart';
-import 'hermez_visual_theme.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/conduit_localizations.dart';
@@ -96,9 +95,6 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
             currentAnswer: currentAnswer,
           ),
     );
-    final palette = HermezChatPalette.forBrightness(
-      Theme.of(context).brightness,
-    );
     final fixed = HermezMorphOrigin.rect(
       origin.resolve(),
       radius: origin.radius,
@@ -107,26 +103,13 @@ class _HermesRunDetailsButtonState extends State<HermesRunDetailsButton> {
     );
     setState(() => _open = true);
     try {
-      if (widget.faceBuilder != null) {
-        await pushHermezSheetRoute<void>(
-          context,
-          origin: origin,
-          heightFactor: 0.88,
-          builder: details,
-        );
-        return;
-      }
-      await pushHermezPanel<void>(
+      // Run details is long content: the full-height card, grown out of
+      // this button.
+      await pushHermezSheetRoute<void>(
         context,
-        origin: fixed,
-        semanticLabel: 'Run details',
-        surfaceColor: palette.surface,
-        theme: hermezVisualTheme(Theme.of(context)),
-        faceBuilder: (context, frame) => _face(context, (_) {}),
-        builder: (context) => SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.82,
-          child: details(context),
-        ),
+        origin: widget.faceBuilder != null ? origin : fixed,
+        heightFactor: 0.88,
+        builder: details,
       );
     } finally {
       if (mounted) setState(() => _open = false);

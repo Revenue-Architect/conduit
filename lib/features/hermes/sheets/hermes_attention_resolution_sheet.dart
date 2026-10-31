@@ -24,6 +24,7 @@ Future<bool?> showHermesAttentionResolutionSheet(
   HermezMorphOrigin? origin,
 }) => pushHermezSheetRoute<bool>(
   context,
+  fit: true,
   origin: origin,
   builder: (_) => _ResolutionSheet(decision: decision),
 );

@@ -51,7 +51,9 @@ Future<void> openHermesDelegatedKanbanTask(
       context,
       origin: origin,
       heightFactor: .88,
-      builder: (_) => Material(
+      builder: (context) => Material(
+        color: HermezChatPalette.forBrightness(Theme.of(context).brightness)
+            .raised,
         child: _KanbanTaskSheet(
           board: board,
           task: detail.task,
@@ -1133,7 +1135,7 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
       heightFactor: 0.86,
       builder: (context) => Material(
         color: HermezChatPalette.forBrightness(Theme.of(context).brightness)
-            .surface,
+            .raised,
         clipBehavior: Clip.antiAlias,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(30)),

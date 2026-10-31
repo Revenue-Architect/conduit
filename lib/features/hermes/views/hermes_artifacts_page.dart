@@ -364,6 +364,7 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
                               final selected =
                                   await showHermezSheet<HermesSessionSummary>(
                                     context,
+                                    fit: true,
                                     origin: origin,
                                     title: file.name,
                                     titleMorphId: hermezMorphPart(

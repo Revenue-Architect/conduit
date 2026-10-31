@@ -455,7 +455,7 @@ void main() {
             alignment: const Alignment(0, 0.6),
             child: Builder(
               builder: (context) => HermezMotionSurface(
-                onOpen: (origin) => pushHermezSheet<void>(
+                onOpen: (origin) => _pushRouteSheet(
                   context,
                   origin: origin,
                   builder: (_) => const Material(
@@ -517,7 +517,7 @@ void main() {
             alignment: const Alignment(0, 0.6),
             child: Builder(
               builder: (context) => HermezMotionSurface(
-                onOpen: (origin) => pushHermezSheet<void>(
+                onOpen: (origin) => _pushRouteSheet(
                   context,
                   origin: origin,
                   builder: (_) => const Material(
@@ -596,7 +596,7 @@ void main() {
                 const Spacer(),
                 const Text('Above the card'),
                 HermezMotionSurface(
-                  onOpen: (origin) => pushHermezSheet<void>(
+                  onOpen: (origin) => _pushRouteSheet(
                     context,
                     origin: origin,
                     builder: (_) => const Material(child: Text('Sheet body')),
@@ -697,7 +697,7 @@ void main() {
       MaterialApp(navigatorKey: navigator, home: const Scaffold()),
     );
     var closed = false;
-    pushHermezSheet<void>(
+    _pushRouteSheet(
       navigator.currentContext!,
       builder: (_) => const ColoredBox(
         color: Colors.white,
@@ -723,7 +723,7 @@ void main() {
       ),
     );
     var closed = false;
-    pushHermezSheet<void>(
+    _pushRouteSheet(
       navigator.currentContext!,
       builder: (_) => ColoredBox(
         color: Colors.white,
@@ -760,7 +760,7 @@ void main() {
       MaterialApp(navigatorKey: navigator, home: const Scaffold()),
     );
     var closed = false;
-    pushHermezSheet<void>(
+    _pushRouteSheet(
       navigator.currentContext!,
       builder: (_) => ColoredBox(
         color: Colors.white,
@@ -841,3 +841,18 @@ void main() {
     await tester.pumpAndSettle();
   });
 }
+
+// The Hermez sheet route itself (pushHermezSheet now opens the one card,
+// covered by hermez_full_card_test).
+Future<void> _pushRouteSheet(
+  BuildContext context, {
+  required WidgetBuilder builder,
+  HermezMorphOrigin? origin,
+}) => Navigator.of(context).push<void>(
+  HermezRoute<void>(
+    builder: builder,
+    motion: HermezRouteMotion.expand,
+    shape: HermezExpandShape.sheet,
+    origin: origin,
+  ),
+);

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../feedback/hermez_feedback.dart';
+import 'hermez_card_route.dart';
 import 'hermez_morph_origin.dart';
 
 /// Builds the face of the button a panel grew out of. [turn] runs 0 to 1 as
@@ -137,6 +138,31 @@ class HermezMorphFrame {
 /// panel lands on the button, which is also the frame the panel goes, so
 /// there is never a frame with neither.
 Future<T?> pushHermezPanel<T>(
+  BuildContext context, {
+  required HermezMorphOrigin origin,
+  required HermezPanelFaceBuilder faceBuilder,
+  required WidgetBuilder builder,
+  ThemeData? theme,
+  Color? surfaceColor,
+  double maxWidth = 440,
+  double originElevation = 0,
+  String? semanticLabel,
+}) async {
+  // One card (docs/app-design-2026-10-30/POPUPS-PLAN.md): the pressed
+  // control grows into the content-sized card and folds back into it.
+  return pushHermezCard<T>(
+    context,
+    origin: origin,
+    originColor: origin.color ?? surfaceColor,
+    semanticLabel: semanticLabel,
+    builder: (cardContext) => theme == null
+        ? builder(cardContext)
+        : Theme(data: theme, child: builder(cardContext)),
+  );
+}
+
+/// The previous button-to-panel morph, kept for reference and its tests.
+Future<T?> pushHermezPanelMorph<T>(
   BuildContext context, {
   required HermezMorphOrigin origin,
   required HermezPanelFaceBuilder faceBuilder,

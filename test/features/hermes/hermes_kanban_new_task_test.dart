@@ -5,7 +5,7 @@ import 'package:conduit/features/hermes/feedback/hermez_feedback.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_client.dart';
 import 'package:conduit/features/hermes/kanban/hermes_kanban_page.dart';
 import 'package:conduit/features/hermes/motion/hermez_motion_surface.dart';
-import 'package:conduit/features/hermes/motion/hermez_panel_morph.dart';
+import 'package:conduit/features/hermes/motion/hermez_card_route.dart';
 import 'package:conduit/features/hermes/models/hermes_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -114,6 +114,13 @@ Future<void> _openNewTask(WidgetTester tester) async {
 
 double _y(WidgetTester tester, Finder finder) => tester.getTopLeft(finder).dy;
 
+// With the options open the form can outgrow the card, which then scrolls.
+Future<void> _tapInView(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+}
+
 void main() {
   late _Sound sound;
   late HermezFeedback previous;
@@ -150,19 +157,12 @@ void main() {
 
     await tester.tap(find.text('New task'));
     await tester.pump();
-    final morph = tester.renderObject<RenderHermezPanelMorph>(
-      find.byType(HermezPanelMorph),
-    );
-    // It grows out of exactly where the button is, and the real button is
-    // held back (still in its place) while the panel stands in for it.
-    expect(morph.originRect, button);
+    // The card grows out of exactly where the button is, and the real
+    // button is held back (still in its place) while the card stands in.
+    expect(hermezCardOriginOf(tester.element(find.text('Title *'))), button);
     expect(triggerVisible(tester, fabSurface()), isFalse);
-    await tester.pump(const Duration(milliseconds: 80));
-    expect(morph.apertureRect.height, greaterThan(button.height));
-    expect(morph.apertureRect.height, lessThan(morph.panelRect.height));
 
     await tester.pumpAndSettle();
-    expect(morph.apertureRect, morph.panelRect);
     expect(find.text('Title *'), findsOneWidget);
     expect(triggerVisible(tester, fabSurface()), isFalse);
 
@@ -173,7 +173,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(triggerVisible(tester, fabSurface()), isFalse);
     await tester.pumpAndSettle();
-    expect(find.byType(HermezPanelMorph), findsNothing);
+    expect(find.text('Title *'), findsNothing);
     expect(triggerVisible(tester, fabSurface()), isTrue);
     expect(tester.getRect(fabSurface()), button);
     expect(tester.takeException(), isNull);
@@ -201,10 +201,7 @@ void main() {
 
     await tester.tap(plus);
     await tester.pump();
-    final morph = tester.renderObject<RenderHermezPanelMorph>(
-      find.byType(HermezPanelMorph),
-    );
-    expect(morph.originRect, plusRect);
+    expect(hermezCardOriginOf(tester.element(find.text('Title *'))), plusRect);
     // Only the tapped plus is held back; the floating button stays.
     expect(triggerVisible(tester, fabSurface()), isTrue);
 
@@ -212,7 +209,7 @@ void main() {
     expect(find.text('Ready · No bot · Priority 0'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(find.byType(HermezPanelMorph), findsNothing);
+    expect(find.text('Title *'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -223,9 +220,10 @@ void main() {
     await _pumpBoard(tester, board);
     await _openNewTask(tester);
     await tester.enterText(find.byType(TextField).first, 'Draft');
-    await tester.tapAt(const Offset(200, 880));
+    // The scrim above the card.
+    await tester.tapAt(const Offset(200, 40));
     await tester.pumpAndSettle();
-    expect(find.byType(HermezPanelMorph), findsNothing);
+    expect(find.text('Title *'), findsNothing);
     expect(board.created, isEmpty);
     expect(triggerVisible(tester, fabSurface()), isTrue);
   });
@@ -297,14 +295,14 @@ void main() {
     // Ready with no bot: no warning yet.
     expect(find.text(_notice), findsNothing);
 
-    await tester.tap(find.text('Assign a bot (optional)'));
+    await _tapInView(tester, find.text('Assign a bot (optional)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('kai'));
     await tester.pumpAndSettle();
     expect(find.text('Ready · kai · Priority 0'), findsOneWidget);
     expect(find.text(_notice), findsOneWidget);
 
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await _tapInView(tester, find.byType(DropdownButtonFormField<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Priority 2').last);
     await tester.pumpAndSettle();
@@ -317,7 +315,7 @@ void main() {
     expect(find.text('Ready · kai · Priority 2'), findsOneWidget);
     expect(find.text(_notice), findsOneWidget);
 
-    await tester.tap(find.text('Create task'));
+    await _tapInView(tester, find.text('Create task'));
     await tester.pumpAndSettle();
     expect(board.created, hasLength(1));
     expect(board.created.single['title'], 'Ship the route');
@@ -335,7 +333,7 @@ void main() {
     await _pumpBoard(tester, board);
     await _openNewTask(tester);
 
-    await tester.tap(find.text('Create task'));
+    await _tapInView(tester, find.text('Create task'));
     await tester.pumpAndSettle();
     expect(find.text('Enter a task title.'), findsOneWidget);
     expect(find.byType(SegmentedButton<bool>), findsNothing);
@@ -425,7 +423,7 @@ void main() {
     await tester.tap(find.text('OPTIONS'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Create task'));
+    await _tapInView(tester, find.text('Create task'));
     await tester.pump();
     expect(
       tester
