@@ -5,6 +5,7 @@ import 'package:conduit/l10n/app_localizations.dart';
 
 import '../../shared/theme/theme_extensions.dart';
 import '../../shared/widgets/themed_dialogs.dart';
+import '../../features/hermes/motion/hermez_dialog_card.dart';
 import 'navigation_service.dart';
 import '../utils/debug_logger.dart';
 
@@ -559,7 +560,7 @@ class ErrorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return HermezDialogBody(
       title: Row(
         children: [
           Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),

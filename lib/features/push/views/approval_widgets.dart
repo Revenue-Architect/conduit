@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../hermes/widgets/hermez_chat_palette.dart';
+import '../../hermes/motion/hermez_dialog_card.dart';
 import '../models/approval.dart';
 import 'approval_formatting.dart';
 import 'hold_to_confirm_button.dart';
@@ -129,9 +130,9 @@ class ApprovalDecisionBar extends StatelessWidget {
   final Future<void> Function(ApprovalDecision decision) onDecision;
 
   Future<void> _confirmDeny(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHermezDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => HermezDialogBody(
         title: const Text('Deny this request?'),
         content: Text(
           '${approval.actionType}\n\n${approval.description}',

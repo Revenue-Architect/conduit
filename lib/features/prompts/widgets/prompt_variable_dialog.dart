@@ -8,6 +8,7 @@ import 'package:conduit/shared/theme/conduit_input_styles.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/widgets/adaptive_dropdown_field.dart';
 import 'package:conduit/shared/widgets/themed_dialogs.dart';
+import 'package:conduit/features/hermes/motion/hermez_dialog_card.dart';
 
 /// A dialog that collects user input for prompt variables.
 ///
@@ -102,7 +103,7 @@ class _PromptVariableDialogState extends State<PromptVariableDialog> {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context)!;
 
-    return AlertDialog(
+    return HermezDialogBody(
       backgroundColor: theme.surfaceBackground,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppBorderRadius.dialog),

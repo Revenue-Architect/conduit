@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/adaptive_selection_sheet.dart';
+import '../../../shared/widgets/themed_sheets.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../chat/providers/chat_providers.dart' show restoreDefaultModel;
@@ -485,8 +486,11 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
       return;
     }
 
-    final result = await showAdaptiveSelectionSheet<String?>(
+    // A searchable model list that sizes itself: a content sheet, not the
+    // select card.
+    final result = await ThemedSheets.showCustom<String?>(
       context: context,
+      isScrollControlled: true,
       builder: (sheetContext) => DefaultModelBottomSheet(
         models: models,
         currentDefaultModelId: currentDefaultModelId,

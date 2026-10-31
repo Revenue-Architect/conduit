@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../hermes/views/hermes_page_chrome.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
@@ -169,28 +170,32 @@ class _SpaceLibraryPageState extends ConsumerState<SpaceLibraryPage> {
           onPressed: _createPage,
           icon: const Icon(Icons.note_add_outlined),
         ),
-        PopupMenuButton<_SpaceAction>(
+        // The ⋯ grows into its menu card (one card, never a popup).
+        AdaptivePopupMenuButton.icon<_SpaceAction>(
+          icon: Icons.more_vert_rounded,
           tooltip: 'Space options',
-          onSelected: (action) => _onAction(action, space),
-          itemBuilder: (context) => [
-            CheckedPopupMenuItem(
+          buttonStyle: PopupButtonStyle.plain,
+          onSelected: (_, entry) => _onAction(entry.value!, space),
+          items: [
+            AdaptivePopupMenuItem(
               value: _SpaceAction.sortRecent,
               checked: !_byName,
-              child: const Text('Recently updated'),
+              label: 'Recently updated',
             ),
-            CheckedPopupMenuItem(
+            AdaptivePopupMenuItem(
               value: _SpaceAction.sortName,
               checked: _byName,
-              child: const Text('Name'),
+              label: 'Name',
             ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
+            const AdaptivePopupMenuDivider(),
+            const AdaptivePopupMenuItem(
               value: _SpaceAction.rename,
-              child: Text('Rename Space'),
+              label: 'Rename Space',
             ),
-            const PopupMenuItem(
+            const AdaptivePopupMenuItem(
               value: _SpaceAction.delete,
-              child: Text('Delete Space'),
+              label: 'Delete Space',
+              isDestructive: true,
             ),
           ],
         ),

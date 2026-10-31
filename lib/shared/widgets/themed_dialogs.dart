@@ -9,9 +9,9 @@ import 'package:conduit/l10n/app_localizations.dart';
 import '../theme/conduit_input_styles.dart';
 import '../theme/theme_extensions.dart';
 import 'conduit_components.dart';
-import 'conduit_dialog_route.dart';
 import '../../features/hermes/motion/hermez_card_route.dart';
 import '../../features/hermes/motion/hermez_card_stack.dart';
+import '../../features/hermes/motion/hermez_dialog_card.dart';
 
 /// Centralized helper for building themed dialogs consistently.
 ///
@@ -22,8 +22,9 @@ import '../../features/hermes/motion/hermez_card_stack.dart';
 class ThemedDialogs {
   ThemedDialogs._();
 
-  /// Build a base themed [AlertDialog] widget.
-  static AlertDialog buildBase({
+  /// Build a base themed dialog body: the one card's content on Android
+  /// (shown by [showCustom]), an [AlertDialog] elsewhere.
+  static Widget buildBase({
     required BuildContext context,
     required String title,
     Widget? content,
@@ -31,26 +32,20 @@ class ThemedDialogs {
     bool scrollable = false,
   }) {
     final theme = context.conduitTheme;
-    return AlertDialog(
+    return HermezDialogBody(
       backgroundColor: theme.surfaces.popover,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppBorderRadius.dialog),
       ),
-      title: Text(
-        title,
-        style: AppTypography.titleMediumStyle.copyWith(
-          color: theme.textPrimary,
-        ),
+      titleTextStyle: AppTypography.titleMediumStyle.copyWith(
+        color: theme.textPrimary,
       ),
-      content: content != null
-          ? DefaultTextStyle(
-              style: AppTypography.bodyMediumStyle.copyWith(
-                color: theme.textSecondary,
-              ),
-              child: content,
-            )
-          : null,
+      contentTextStyle: AppTypography.bodyMediumStyle.copyWith(
+        color: theme.textSecondary,
+      ),
+      title: Text(title),
+      content: content,
       actions: actions,
       scrollable: scrollable,
     );
@@ -138,7 +133,7 @@ class ThemedDialogs {
 
     // Android: one card grown out of the control that asked
     // (docs/app-design-2026-10-30, "One card"). Closing never confirms.
-    // barrierDismissible false (must answer) keeps the shared dialog route.
+    // barrierDismissible false is the must-answer card, through showCustom.
     if (barrierDismissible) {
       return confirmHermezCard(
         context,
@@ -150,7 +145,7 @@ class ThemedDialogs {
         fromIsControl: false,
       );
     }
-    final result = await showConduitDialog<bool>(
+    final result = await showCustom<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -241,7 +236,7 @@ class ThemedDialogs {
     required WidgetBuilder builder,
     bool barrierDismissible = true,
   }) {
-    return showConduitDialog<T>(
+    return showHermezDialog<T>(
       context: context,
       barrierDismissible: barrierDismissible,
       builder: builder,
@@ -345,7 +340,7 @@ class ThemedDialogs {
         maxLength: maxLength,
       );
     }
-    final result = await showConduitDialog<String>(
+    final result = await showCustom<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => _TextInputDialogContent(

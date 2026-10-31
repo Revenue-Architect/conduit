@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:conduit/core/models/chat_message.dart';
+import 'package:conduit/features/hermes/motion/hermez_card_route.dart';
 import 'package:conduit/core/services/secure_credential_storage.dart';
 import 'package:conduit/features/direct_connections/models/direct_completion.dart';
 import 'package:conduit/features/direct_connections/models/direct_mcp_server.dart';
@@ -17,7 +18,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart' as material_ui;
 
 void main() {
   const key = (
@@ -754,7 +754,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(material_ui.AlertDialog),
+        // The confirmation is the one card on Android.
+        of: find.byType(HermezCardScope),
         matching: find.text('Always allow'),
       ),
     );

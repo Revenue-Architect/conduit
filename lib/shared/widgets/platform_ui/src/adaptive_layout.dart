@@ -751,31 +751,22 @@ Future<void> showAdaptiveContextMenu({
   required List<AdaptiveContextMenuAction> actions,
   required Rect globalAnchor,
 }) async {
-  final overlayObject = Overlay.of(context).context.findRenderObject();
-  if (overlayObject is! RenderBox || !overlayObject.attached) return;
-
-  final anchor = Rect.fromPoints(
-    overlayObject.globalToLocal(globalAnchor.topLeft),
-    overlayObject.globalToLocal(globalAnchor.bottomRight),
-  );
-  final selected = await showMenu<int>(
+  // The menu card grows out of the pressed spot and folds back on a choice.
+  await AdaptivePopupMenuButton.showCardMenuAt<int>(
     context: context,
-    position: RelativeRect.fromRect(anchor, Offset.zero & overlayObject.size),
+    anchor: globalAnchor,
     items: [
       for (var index = 0; index < actions.length; index++)
-        PopupMenuItem<int>(
+        AdaptivePopupMenuItem<int>(
           value: index,
+          label: actions[index].title,
+          icon: actions[index].icon is IconData ? actions[index].icon : null,
           enabled: !actions[index].isDisabled,
-          child: Text(
-            actions[index].title,
-            style: actions[index].isDestructive
-                ? const TextStyle(color: Colors.red)
-                : null,
-          ),
+          isDestructive: actions[index].isDestructive,
         ),
     ],
+    onSelected: (_, entry) => actions[entry.value!].onPressed(),
   );
-  if (selected != null) actions[selected].onPressed();
 }
 
 class AdaptiveContextMenu extends StatelessWidget {

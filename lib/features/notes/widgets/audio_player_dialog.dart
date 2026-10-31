@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/services/api_service.dart';
 import '../../../core/utils/debug_logger.dart';
+import '../../hermes/motion/hermez_card_route.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/conduit_components.dart';
@@ -345,6 +346,18 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
     super.dispose();
   }
 
+  /// In the one card the player is the card's content; elsewhere a dialog.
+  Widget _framed(BuildContext context, Widget child) {
+    if (HermezCardScope.within(context)) return child;
+    return Dialog(
+      backgroundColor: context.conduitTheme.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+      ),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
@@ -354,12 +367,9 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
-    return Dialog(
-      backgroundColor: theme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-      ),
-      child: Padding(
+    return _framed(
+      context,
+      Padding(
         padding: const EdgeInsets.all(Spacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,

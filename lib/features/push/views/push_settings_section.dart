@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../../hermes/motion/hermez_select_card.dart';
+import '../../hermes/motion/hermez_dialog_card.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../models/push_envelope.dart';
@@ -32,7 +34,8 @@ class PushSettingsSection extends ConsumerStatefulWidget {
   const PushSettingsSection({super.key});
 
   @override
-  ConsumerState<PushSettingsSection> createState() => _PushSettingsSectionState();
+  ConsumerState<PushSettingsSection> createState() =>
+      _PushSettingsSectionState();
 }
 
 class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
@@ -113,7 +116,8 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
       PushEnableResult.notPaired => 'Pair this phone first.',
       PushEnableResult.failed => 'Android did not register push.',
     };
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(text)));
     await _check();
   }
 
@@ -121,30 +125,17 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
     final service = ref.read(pushRegistrationServiceProvider);
     final options = await service.distributors();
     if (!mounted || options.isEmpty) return;
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Which app delivers push?',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-            ),
-            for (final option in options)
-              ListTile(
-                title: Text(option),
-                subtitle: option == 'io.heckel.ntfy'
-                    ? const Text('ntfy (recommended)')
-                    : null,
-                onTap: () => Navigator.of(context).pop(option),
-              ),
-          ],
-        ),
-      ),
+    final picked = await showHermezSelectCard<String>(
+      context,
+      title: 'Which app delivers push?',
+      options: [
+        for (final option in options)
+          HermezSelectOption(
+            option,
+            option,
+            subtitle: option == 'io.heckel.ntfy' ? 'ntfy (recommended)' : null,
+          ),
+      ],
     );
     if (picked == null) return;
     await service.chooseDistributor(picked);
@@ -152,38 +143,29 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
   }
 
   Future<void> _channelSheet() async {
-    final picked = await showModalBottomSheet<PushCategory>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Sound and vibration per category',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-            ),
-            for (final category in PushCategory.values)
-              ListTile(
-                title: Text(category.label),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).pop(category),
-              ),
-          ],
-        ),
-      ),
+    final picked = await showHermezSelectCard<PushCategory>(
+      context,
+      title: 'Sound and vibration per category',
+      options: [
+        for (final category in PushCategory.values)
+          HermezSelectOption(
+            category,
+            category.label,
+            // Each opens Android's own channel settings.
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+      ],
     );
     if (picked == null) return;
-    await ref.read(pushRegistrationServiceProvider).openChannelSettings(picked.name);
+    await ref
+        .read(pushRegistrationServiceProvider)
+        .openChannelSettings(picked.name);
   }
 
   Future<void> _unpair() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showHermezDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => HermezDialogBody(
         title: const Text('Unpair this phone?'),
         content: const Text(
           'Hermez stops receiving push and cannot decide approvals until it '
@@ -258,7 +240,9 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
           onTap: () => context.push(Routes.hermesApprovals),
         ),
       UtilityRow(
-        title: native != null && native.paired ? 'Pair again' : 'Pair this phone',
+        title: native != null && native.paired
+            ? 'Pair again'
+            : 'Pair this phone',
         subtitle: 'Enter a one-time code from the Umbrel',
         showChevron: true,
         onTap: () => context.push(Routes.hermesPushPairing),
@@ -376,14 +360,18 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
         if (_packageName.isNotEmpty) {
           actionLabel = 'Battery settings';
           action = () => unawaited(
-            ref.read(pushRegistrationServiceProvider).openBatterySettings(_packageName),
+            ref
+                .read(pushRegistrationServiceProvider)
+                .openBatterySettings(_packageName),
           );
         }
       case PushIssue.distributorBatteryRestricted:
         if (distributor != null) {
           actionLabel = 'Battery settings';
           action = () => unawaited(
-            ref.read(pushRegistrationServiceProvider).openBatterySettings(distributor),
+            ref
+                .read(pushRegistrationServiceProvider)
+                .openBatterySettings(distributor),
           );
         }
       case PushIssue.noDistributor:

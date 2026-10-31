@@ -10,6 +10,7 @@ import 'package:flutter/semantics.dart';
 import '../../shared/theme/tweakcn_themes.dart';
 import '../../shared/theme/theme_extensions.dart';
 import '../../shared/widgets/themed_dialogs.dart';
+import '../../features/hermes/motion/hermez_dialog_card.dart';
 import 'navigation_service.dart';
 
 /// Enhanced accessibility service for WCAG 2.2 AA compliance
@@ -371,7 +372,7 @@ class EnhancedAccessibilityService {
           scopesRoute: true,
           explicitChildNodes: true,
           label: dialogL10n?.dialogSemanticLabel(title) ?? 'Dialog: $title',
-          child: AlertDialog(
+          child: HermezDialogBody(
             title: Semantics(headingLevel: 1, child: Text(title)),
             content: child,
           ),

@@ -81,6 +81,8 @@ Future<T?> pushHermezCard<T>(
   String? semanticLabel,
   double? restingFactor,
   bool scrollsContent = true,
+  bool dismissible = true,
+  bool waitForClose = false,
 }) async {
   final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
   Rect? rect;
@@ -108,6 +110,7 @@ Future<T?> pushHermezCard<T>(
     maxHeightFactor: maxHeightFactor,
     restingFactor: restingFactor,
     scrollsContent: scrollsContent,
+    dismissible: dismissible,
     semanticLabel: semanticLabel,
     capturedThemes: InheritedTheme.capture(
       from: context,
@@ -115,9 +118,10 @@ Future<T?> pushHermezCard<T>(
     ),
   );
   final result = await Navigator.of(context).push<T>(route);
-  // Answer once the card has finished closing: callers dispose controllers
-  // the card's fields still show while it folds back into the control.
-  await route.completed;
+  // With [waitForClose], answer once the card has finished folding back:
+  // sheet callers dispose controllers its fields still show until then.
+  // Dialogs and menus answer on the tap, as they always have.
+  if (waitForClose) await route.completed;
   return result;
 }
 
@@ -133,7 +137,12 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
     this.semanticLabel,
     this.restingFactor,
     this.scrollsContent = true,
+    this.dismissible = true,
   });
+
+  /// False for a question that must be answered: the scrim doesn't close
+  /// it and it shows no grabber, only its answers.
+  final bool dismissible;
 
   /// False when the content scrolls itself between a fixed header and
   /// footer: it then gets the card's bounded height instead of a scroll view.
@@ -156,7 +165,7 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
   Color? get barrierColor => const Color(0x570A0C10); // 34% ink
 
   @override
-  bool get barrierDismissible => true;
+  bool get barrierDismissible => dismissible;
 
   @override
   String? get barrierLabel => 'Close';
@@ -245,15 +254,16 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                         cardColor: cardColor,
                         child: Opacity(
                           opacity: Curves.easeOut.transform(clear),
-                          child: blur < 0.3
-                              ? child
-                              : ImageFiltered(
-                                  imageFilter: ImageFilter.blur(
-                                    sigmaX: blur,
-                                    sigmaY: blur,
-                                  ),
-                                  child: child,
-                                ),
+                          // Always the same widget, only switched off, so
+                          // the content keeps its state as the blur clears.
+                          child: ImageFiltered(
+                            enabled: blur >= 0.3,
+                            imageFilter: ImageFilter.blur(
+                              sigmaX: blur,
+                              sigmaY: blur,
+                            ),
+                            child: child,
+                          ),
                         ),
                       );
                     },
@@ -265,6 +275,7 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                         child: restingFactor == null
                             ? _Grabbed(
                                 scrolls: scrollsContent,
+                                grabber: dismissible,
                                 child: _Unpadded(builder: builder),
                               )
                             : _MagneticCard(
@@ -305,15 +316,32 @@ class _Unpadded extends StatelessWidget {
     removeBottom: true,
     removeLeft: true,
     removeRight: true,
-    child: Builder(builder: builder),
+    child: HermezCardScope(child: Builder(builder: builder)),
   );
 }
 
+/// Marks content shown in the one card, so a dialog body inside it can drop
+/// its own chrome and take the card's layout.
+class HermezCardScope extends InheritedWidget {
+  const HermezCardScope({super.key, required super.child});
+
+  static bool within(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<HermezCardScope>() != null;
+
+  @override
+  bool updateShouldNotify(HermezCardScope oldWidget) => false;
+}
+
 class _Grabbed extends StatelessWidget {
-  const _Grabbed({required this.child, this.scrolls = true});
+  const _Grabbed({
+    required this.child,
+    this.scrolls = true,
+    this.grabber = true,
+  });
 
   final Widget child;
   final bool scrolls;
+  final bool grabber;
 
   @override
   Widget build(BuildContext context) {
@@ -324,17 +352,19 @@ class _Grabbed extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 2),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: palette.border,
-              borderRadius: BorderRadius.circular(2),
+        if (!grabber) const SizedBox(height: 14),
+        if (grabber)
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 2),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-        ),
         Flexible(
           child: scrolls
               ? SingleChildScrollView(
@@ -469,6 +499,7 @@ Future<T?> pushHermezFullCard<T>(
   origin: origin,
   maxHeightFactor: raisedFactor,
   restingFactor: math.min(restingFactor, raisedFactor),
+  waitForClose: true,
   semanticLabel: semanticLabel,
 );
 

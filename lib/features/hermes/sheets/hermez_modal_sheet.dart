@@ -59,6 +59,7 @@ Future<T?> pushHermezSheetRoute<T>(
       origin: origin,
       builder: themed,
       scrollsContent: false,
+      waitForClose: true,
     );
   }
   return pushHermezSheet<T>(

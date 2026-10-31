@@ -5,7 +5,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'platform_ui_capabilities.dart';
-import '../../conduit_dialog_route.dart';
+import '../../../../features/hermes/motion/hermez_dialog_card.dart';
 
 enum AdaptiveSnackBarType { info, success, warning, error }
 
@@ -282,9 +282,9 @@ class AdaptiveAlertDialog {
       );
       return;
     }
-    await showConduitDialog<void>(
+    await showHermezDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => HermezDialogBody(
         title: Text(title),
         content: message == null ? null : Text(message),
         actions: [
@@ -363,9 +363,9 @@ class AdaptiveAlertDialog {
           ),
         );
       }
-      return await showConduitDialog<String?>(
+      return await showHermezDialog<String?>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => HermezDialogBody(
           title: Text(title),
           content: TextField(
             controller: controller,

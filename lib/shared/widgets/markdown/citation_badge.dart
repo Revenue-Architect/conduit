@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/models/chat_message.dart';
-import '../../../core/services/haptic_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../theme/theme_extensions.dart';
+import '../platform_ui/platform_ui.dart';
 import '../../utils/external_link_launcher.dart';
 import 'source_reference_helper.dart';
 
@@ -177,34 +177,24 @@ class CitationBadgeGroup extends ConsumerWidget {
 
     return Material(
       type: MaterialType.transparency,
-      child: PopupMenuButton<int>(
-        itemBuilder: (context) => [
+      // The badge grows into its menu card of sources.
+      child: AdaptivePopupMenuButton.widget<int>(
+        items: [
           for (final index in validIndices)
-            PopupMenuItem<int>(
+            AdaptivePopupMenuItem<int>(
               value: index,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.link_rounded, size: 16),
-                  const SizedBox(width: Spacing.xs),
-                  Flexible(
-                    child: Text(
-                      SourceReferenceHelper.formatDisplayTitle(
-                        SourceReferenceHelper.getInlineSourceLabel(
-                          sources[index],
-                          index,
-                          preferTitle: showTitles,
-                        ),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+              icon: Icons.link_rounded,
+              label: SourceReferenceHelper.formatDisplayTitle(
+                SourceReferenceHelper.getInlineSourceLabel(
+                  sources[index],
+                  index,
+                  preferTitle: showTitles,
+                ),
               ),
             ),
         ],
-        onSelected: (index) {
-          ConduitHaptics.selectionClick();
+        onSelected: (_, entry) {
+          final index = entry.value!;
           if (onSourceTap != null) {
             onSourceTap!(index);
             return;
@@ -217,8 +207,6 @@ class CitationBadgeGroup extends ConsumerWidget {
             }
           }
         },
-        padding: EdgeInsets.zero,
-        tooltip: '',
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           margin: const EdgeInsets.symmetric(horizontal: 1),

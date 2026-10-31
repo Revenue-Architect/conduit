@@ -7,6 +7,8 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../motion/hermez_card_route.dart';
+
 /// Which of a bot's two looping clips plays: calm, or while it works.
 enum HermezBotClip { idle, working }
 
@@ -297,78 +299,74 @@ class HermezBotIcons {
     }
   }
 
-  /// Bottom sheet: pick a library icon, import more, or reset.
+  /// The card: pick a library icon, import more, or reset.
   static Future<void> showPicker(BuildContext context, String botName) async {
     final files = await library();
     if (!context.mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      // Tall enough for the icons and both video rows; scrolls when not.
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Icon for $botName',
-                style: Theme.of(sheetContext).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 240),
-                child: GridView.count(
-                  shrinkWrap: true,
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: [
-                    for (final f in files)
-                      InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () async {
-                          await assign(botName, f);
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext);
-                          }
-                        },
-                        child: Image.file(f, cacheWidth: 160),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              // A looping clip per state; the chosen image stays the poster.
-              for (final clip in HermezBotClip.values)
-                _VideoRow(botName: botName, clip: clip),
-              _ColorRow(botName: botName),
-              const SizedBox(height: 4),
-              Row(
+    // The card scrolls when the icons and the video rows don't fit.
+    await pushHermezCard<void>(
+      context,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Icon for $botName',
+              style: Theme.of(sheetContext).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: 4,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
                 children: [
-                  TextButton.icon(
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    label: const Text('Import images'),
-                    onPressed: () async {
-                      Navigator.pop(sheetContext);
-                      await importFromGallery();
-                      if (context.mounted) await showPicker(context, botName);
-                    },
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    child: const Text('Default'),
-                    onPressed: () async {
-                      await assign(botName, null);
-                      if (sheetContext.mounted) Navigator.pop(sheetContext);
-                    },
-                  ),
+                  for (final f in files)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () async {
+                        await assign(botName, f);
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                      child: Image.file(f, cacheWidth: 160),
+                    ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            // A looping clip per state; the chosen image stays the poster.
+            for (final clip in HermezBotClip.values)
+              _VideoRow(botName: botName, clip: clip),
+            _ColorRow(botName: botName),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text('Import images'),
+                  onPressed: () async {
+                    Navigator.pop(sheetContext);
+                    await importFromGallery();
+                    if (context.mounted) await showPicker(context, botName);
+                  },
+                ),
+                const Spacer(),
+                TextButton(
+                  child: const Text('Default'),
+                  onPressed: () async {
+                    await assign(botName, null);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

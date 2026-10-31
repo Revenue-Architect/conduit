@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../../core/services/haptic_service.dart';
 import 'platform_ui_capabilities.dart';
 import '../../../../features/hermes/motion/hermez_card_route.dart';
+import '../../../../features/hermes/motion/hermez_morph_origin.dart';
 import '../../../../features/hermes/widgets/hermez_chat_palette.dart';
 
 /// Native SF Symbol extent for 44-point iOS toolbar and composer controls.
@@ -492,6 +493,7 @@ class AdaptivePopupMenuButton<T> {
   static Widget icon<T>({
     Key? key,
     required dynamic icon,
+    String? tooltip,
     required List<AdaptivePopupMenuEntry> items,
     required void Function(int index, AdaptivePopupMenuItem<T> entry)
     onSelected,
@@ -524,6 +526,7 @@ class AdaptivePopupMenuButton<T> {
     } else {
       button = _flutterMenu<T>(
         key: key,
+        label: tooltip,
         icon: icon,
         items: items,
         onSelected: (index, entry) {
@@ -768,19 +771,31 @@ class AdaptivePopupMenuButton<T> {
     void Function(int index, AdaptivePopupMenuItem<T> entry) onSelected,
   ) => _showCardMenu<T>(context, items, onSelected);
 
+  /// The menu card grown out of [anchor] (global), for menus with no
+  /// control of their own, such as a long-press context menu.
+  static Future<void> showCardMenuAt<T>({
+    required BuildContext context,
+    required Rect anchor,
+    required List<AdaptivePopupMenuEntry> items,
+    required void Function(int index, AdaptivePopupMenuItem<T> entry)
+    onSelected,
+  }) => _showCardMenu<T>(context, items, onSelected, anchor: anchor);
+
   /// A menu as one card that grows out of [context]'s control
   /// (docs/app-design-2026-10-30, "One card") and folds back on a choice.
   static Future<void> _showCardMenu<T>(
     BuildContext context,
     List<AdaptivePopupMenuEntry> items,
-    void Function(int index, AdaptivePopupMenuItem<T> entry) onSelected,
-  ) async {
+    void Function(int index, AdaptivePopupMenuItem<T> entry) onSelected, {
+    Rect? anchor,
+  }) async {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
     final selected = await pushHermezCard<int>(
       context,
-      from: context,
+      from: anchor == null ? context : null,
+      origin: anchor == null ? null : HermezMorphOrigin.rect(anchor),
       builder: (cardContext) => Padding(
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
         child: Column(

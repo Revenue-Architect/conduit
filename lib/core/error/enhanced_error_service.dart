@@ -8,6 +8,7 @@ import 'api_error_handler.dart';
 import 'api_error_interceptor.dart';
 import '../../shared/theme/theme_extensions.dart';
 import '../../shared/widgets/themed_dialogs.dart';
+import '../../features/hermes/motion/hermez_dialog_card.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
@@ -141,7 +142,7 @@ class EnhancedErrorService {
       barrierDismissible: true,
       builder: (BuildContext context) {
         final theme = context.conduitTheme;
-        return AlertDialog(
+        return HermezDialogBody(
           title: Row(
             children: [
               Icon(_getErrorIcon(error), color: _getErrorColor(context, error)),

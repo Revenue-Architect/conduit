@@ -1,18 +1,31 @@
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../features/hermes/motion/hermez_card_route.dart';
+import '../../features/hermes/motion/hermez_card_stack.dart';
+import '../../features/hermes/motion/hermez_select_card.dart';
 import '../theme/theme_extensions.dart';
 import 'modal_safe_area.dart';
 import 'sheet_handle.dart';
 import 'themed_sheets.dart';
 import 'utility_components.dart';
 
-/// Presents the canonical adaptive selector surface.
+/// Presents the canonical adaptive selector surface. On Android it is the
+/// select card (docs/app-design-2026-10-30/POPUPS-PLAN.md, pattern C): the
+/// pressed field grows into its options and folds back once one is picked.
 Future<T?> showAdaptiveSelectionSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool isScrollControlled = true,
   bool useSafeArea = false,
 }) {
+  if (!PlatformUiCapabilities.isIOS &&
+      Theme.of(context).platform != TargetPlatform.iOS) {
+    return pushHermezCard<T>(
+      context,
+      builder: (cardContext) => _InSelectCard(child: Builder(builder: builder)),
+    );
+  }
   return ThemedSheets.showCustom<T>(
     context: context,
     isScrollControlled: isScrollControlled,
@@ -45,6 +58,35 @@ class AdaptiveSelectionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_InSelectCard.within(context)) {
+      // The card sizes to the options and scrolls when they outgrow it.
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+        child: HermezCardStack(
+          root: HermezCardView(
+            title: title,
+            builder: (context) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (description != null && description!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                    child: Text(
+                      description!,
+                      style: context.conduitTheme.bodySmall?.copyWith(
+                        color: context.conduitTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                for (var index = 0; index < itemCount; index++)
+                  itemBuilder(context, index),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Stack(
       children: [
         Positioned.fill(
@@ -131,6 +173,16 @@ class AdaptiveSelectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_InSelectCard.within(context)) {
+      return HermezSelectRow(
+        label: title,
+        subtitle: subtitle,
+        leading: leading,
+        trailing: trailing,
+        selected: selected,
+        onTap: onTap,
+      );
+    }
     final theme = context.conduitTheme;
     return UtilityRow(
       title: title,
@@ -185,4 +237,16 @@ class _SelectionSheetHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Marks content shown in the select card, so the sheet and its rows take
+/// the card's layout.
+class _InSelectCard extends InheritedWidget {
+  const _InSelectCard({required super.child});
+
+  static bool within(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_InSelectCard>() != null;
+
+  @override
+  bool updateShouldNotify(_InSelectCard oldWidget) => false;
 }

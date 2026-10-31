@@ -154,6 +154,8 @@ Future<T?> pushHermezPanel<T>(
     context,
     origin: origin,
     originColor: origin.color ?? surfaceColor,
+    // Callers show their button again and dispose fields once it's home.
+    waitForClose: true,
     semanticLabel: semanticLabel,
     builder: (cardContext) => theme == null
         ? builder(cardContext)
