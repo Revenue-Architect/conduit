@@ -11,7 +11,7 @@ import '../providers/hermes_unread_providers.dart'
     show hermesUnreadSessionIdsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
-import 'hermes_home_page.dart';
+import 'hermes_today_page.dart';
 
 /// Phone home of the Hermes app: Today, Chats and You behind one floating
 /// bottom dock (docs/app-design-2026-10-30: Work folds into Today). Each tab keeps its own state and scroll position; switching
@@ -34,7 +34,8 @@ class HermesTabShell extends ConsumerStatefulWidget {
 }
 
 class _HermesTabShellState extends ConsumerState<HermesTabShell> {
-  // A cold start lands on Chats, the character selector.
+  // A cold start lands on Today: see what happened first (the redesign's
+  // core action). A ?pick link still opens Chats.
   late int _index = widget.openPick ? 1 : widget.initialIndex ?? _lastHermesTab;
   int _previous = 0;
 
@@ -63,7 +64,7 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
     );
     final pages = const <Widget>[
       // Today: what happened and what needs the owner, then what is running.
-      HermesHomePage(),
+      HermesTodayPage(),
       // Chats is the character selector: pick a bot, give it a task.
       MangaPickTab(),
       ProfilePage(),

@@ -209,14 +209,14 @@ class RouterNotifier extends ChangeNotifier {
         !ref.read(hermesSecretsLoadingProvider)) {
       _pendingHermesDestination = null;
     }
-    // A cold start opens on Pick, the character selector, over Home,
-    // instead of a fresh chat. Only the launch hand-off from the splash
-    // changes; every other route to chat stands.
+    // A cold start opens on Today (see what happened first) instead of a
+    // fresh chat. Only the launch hand-off from the splash changes; every
+    // other route to chat stands.
     if (destination == Routes.chat &&
         path == Routes.splash &&
         ref.read(preferredBackendProvider) == PreferredBackend.hermes &&
         ref.read(hermesConfigProvider).isUsable) {
-      return '${Routes.hermesHome}?pick=1';
+      return Routes.hermesHome;
     }
     return destination;
   }
