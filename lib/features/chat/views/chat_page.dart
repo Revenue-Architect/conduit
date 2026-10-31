@@ -4679,19 +4679,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   // it, so the transcript sheet's rounded top sits on it.
                   // The skyline stands on the sheet's top edge; behind its
                   // rounded corners is the skyline's own ground colour.
+                  // The sky runs on behind the sheet's rounded corners, so
+                  // they show the city, not a flat wedge; the towers rise
+                  // in their own strip under the title row.
                   Positioned(
                     left: 0,
                     right: 0,
                     top: 0,
-                    height: _skySheetTop(context),
-                    child: const HermezSkyBand(),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: _skySheetTop(context),
-                    height: kHermesSkySheetRadius,
-                    child: const HermezSkyGround(),
+                    height: _skySheetTop(context) + kHermesSkySheetRadius,
+                    child: const HermezSkyBand(
+                      skylineHeight: _skylineStrip + kHermesSkySheetRadius,
+                    ),
                   ),
                   Positioned(
                     left: 0,
@@ -4704,10 +4702,41 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ),
                       child: ColoredBox(
                         color: hermezPalette.canvas,
-                        child: Consumer(
-                          builder: (context, listRef, _) => RepaintBoundary(
-                            child: _buildMessagesList(theme, listRef),
-                          ),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Consumer(
+                                builder: (context, listRef, _) =>
+                                    RepaintBoundary(
+                                      child: _buildMessagesList(theme, listRef),
+                                    ),
+                              ),
+                            ),
+                            // Messages pass under the sheet's edge softly
+                            // instead of being cut by it.
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              height: 20,
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        hermezPalette.canvas,
+                                        hermezPalette.canvas.withValues(
+                                          alpha: 0,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -4925,7 +4954,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   /// Where the transcript's sheet starts: under the sky header.
   double _skySheetTop(BuildContext context) =>
-      MediaQuery.paddingOf(context).top + _chatToolbarHeight(context);
+      MediaQuery.paddingOf(context).top +
+      _chatToolbarHeight(context) +
+      _skylineStrip;
+
+  /// The band under the title row where Montreal's towers stand, clear of
+  /// the avatar and the model name.
+  static const _skylineStrip = 34.0;
 
   /// The transcript's top padding. Under the sky header the list already
   /// starts below it; otherwise it runs under the floating toolbar.
