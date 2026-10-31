@@ -139,7 +139,11 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
     final screen = media.size.height;
     final askTop = media.padding.top + skyHeight - 70;
     final resting = ((screen - askTop) / screen).clamp(0.3, 0.7);
-    const raised = 0.94;
+    // Raised, Ask the team stops just under the status bar.
+    final raised = ((screen - media.padding.top - 8) / screen).clamp(
+      resting,
+      1.0,
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
