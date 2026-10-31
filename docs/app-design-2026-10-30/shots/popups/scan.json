@@ -1,0 +1,211 @@
+[
+  {
+    "name": "pf1-hermes-sheet-resting",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 20
+      },
+      "sizes": [
+        17,
+        15,
+        14,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "600"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        48
+      ],
+      "cards": 3
+    }
+  },
+  {
+    "name": "pf2-hermes-sheet-raised",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)",
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 25
+      },
+      "sizes": [
+        17,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "600"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        48
+      ],
+      "cards": 3
+    }
+  },
+  {
+    "name": "pc-select-card",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 42
+      },
+      "sizes": [
+        30,
+        17,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "650",
+        "700"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        48
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "pb-form-card",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)",
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 22
+      },
+      "sizes": [
+        17,
+        15,
+        14,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 6,
+      "accentHues": [],
+      "cards": 3
+    }
+  },
+  {
+    "name": "pa1-must-answer",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 39
+      },
+      "sizes": [
+        30,
+        17,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "650",
+        "700"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "pa2-error-card",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)",
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 22
+      },
+      "sizes": [
+        17,
+        15,
+        14,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 6,
+      "accentHues": [],
+      "cards": 3
+    }
+  },
+  {
+    "name": "pd-row-menu",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 38
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "650",
+        "700"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 1
+    }
+  }
+]
