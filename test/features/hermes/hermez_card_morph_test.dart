@@ -1,7 +1,6 @@
 import 'package:conduit/features/hermes/motion/hermez_card_morph.dart';
 import 'package:conduit/features/hermes/motion/hermez_card_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Steps extends StatefulWidget {
@@ -27,24 +26,21 @@ class _StepsState extends State<_Steps> {
         : Align(
             key: const ValueKey('list'),
             alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: 56,
-              child: TextButton(
-                onPressed: () => setState(() => _open = true),
-                child: const Text('Routine'),
-              ),
+            child: TextButton(
+              onPressed: () => setState(() => _open = true),
+              child: const Text('Routine'),
             ),
           ),
   );
 }
 
 void main() {
-  // The owner's rule: a step opened inside a card is the pressed row
-  // growing into the same card, which reshapes to it, never a fade.
-  testWidgets('a nested step grows from its row and reshapes the card', (
+  // The owner's rule, from the Morphlet reference: a step opened inside a
+  // card changes in place in the same card, which reshapes to it. One card,
+  // a short overlap, never a second surface or a wait.
+  testWidgets('a nested step changes in place and the card reshapes', (
     tester,
   ) async {
-    HermezPressOrigin.install();
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -64,21 +60,14 @@ void main() {
     await tester.pumpAndSettle();
     final card = find.byType(_Steps);
     final resting = tester.getSize(card).height;
-    final row = tester.getRect(find.text('Routine'));
 
     await tester.tap(find.text('Routine'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 8));
-    // Early on, the step is still about the size of the row it came from.
-    final clip = tester.renderObject<RenderClipRRect>(
-      find.descendant(of: card, matching: find.byType(ClipRRect)).first,
-    );
-    final early = clip.clipper!.getClip(clip.size).outerRect;
-    expect(early.height, lessThan(resting / 2));
-    expect(
-      (tester.getTopLeft(card) + early.center).dy,
-      closeTo(row.center.dy, resting / 3),
-    );
+    await tester.pump(const Duration(milliseconds: 80));
+    // Mid-change both steps are there, in the one card.
+    expect(find.text('Routine'), findsOneWidget);
+    expect(find.text('Back'), findsOneWidget);
+    expect(card, findsOneWidget);
 
     await tester.pumpAndSettle();
     expect(find.text('Routine'), findsNothing);

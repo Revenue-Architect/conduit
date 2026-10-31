@@ -586,10 +586,12 @@ class _MagneticCardState extends State<_MagneticCard>
     damping: 26,
   );
 
+  // About a quarter second, critically damped: it lands with the step
+  // changing inside it (the reference's reshape), never after it.
   static const _settle = SpringDescription(
     mass: 1,
-    stiffness: 380,
-    damping: 39,
+    stiffness: 600,
+    damping: 49,
   );
 
   @override
