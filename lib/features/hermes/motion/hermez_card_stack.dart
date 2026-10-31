@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
@@ -49,7 +47,7 @@ class HermezCardStackState extends State<HermezCardStack>
   /// over, or the one popped.
   HermezCardView? _leaving;
 
-  /// 0 to 1 as one step cross-blurs into the next (the reference's ~200 ms).
+  /// 0 to 1 as one step cross-fades into the next (the reference's ~200 ms).
   late final AnimationController _swap =
       AnimationController(
         vsync: this,
@@ -96,15 +94,10 @@ class HermezCardStackState extends State<HermezCardStack>
       ? widget.onClose!()
       : Navigator.of(context).maybePop();
 
-  static Widget _blurred(double sigma, double opacity, Widget child) {
-    final faded = Opacity(opacity: opacity.clamp(0.0, 1.0), child: child);
-    return sigma < 0.3
-        ? faded
-        : ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-            child: faded,
-          );
-  }
+  // Opacity only: a blur per frame on a whole step dropped frames on the
+  // phone.
+  static Widget _fade(double opacity, Widget child) =>
+      Opacity(opacity: opacity.clamp(0.0, 1.0), child: child);
 
   Widget _step(HermezCardView view) => KeyedSubtree(
     key: view.key,
@@ -140,7 +133,7 @@ class HermezCardStackState extends State<HermezCardStack>
                     icon: Icon(Icons.chevron_left_rounded, color: palette.ink),
                   ),
                 Expanded(
-                  // The title cross-blurs with its step, as in the reference.
+                  // The title cross-fades with its step.
                   child: AnimatedSwitcher(
                     duration: reduce
                         ? Duration.zero
@@ -151,11 +144,7 @@ class HermezCardStackState extends State<HermezCardStack>
                     ),
                     transitionBuilder: (child, animation) => AnimatedBuilder(
                       animation: animation,
-                      builder: (context, c) => _blurred(
-                        (1 - animation.value) * 6,
-                        animation.value,
-                        c!,
-                      ),
+                      builder: (context, c) => _fade(animation.value, c!),
                       child: child,
                     ),
                     child: Text(
@@ -206,18 +195,14 @@ class HermezCardStackState extends State<HermezCardStack>
                         Offstage(
                           child: TickerMode(enabled: false, child: _step(view)),
                         ),
-                    _blurred(
-                      leaving == null ? 0 : (1 - v) * 8,
-                      leaving == null ? 1 : v,
-                      _step(top),
-                    ),
+                    _fade(leaving == null ? 1 : v, _step(top)),
                     if (leaving != null)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
                         child: IgnorePointer(
-                          child: _blurred(v * 8, 1 - v, _step(leaving)),
+                          child: _fade(1 - v, _step(leaving)),
                         ),
                       ),
                   ],

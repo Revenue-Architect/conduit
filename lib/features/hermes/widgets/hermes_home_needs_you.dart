@@ -530,9 +530,10 @@ Future<void> _showDraftCard(
             ),
             onPressed: () async {
               // m11: the card becomes the chat the draft lives in.
-              await growHermezCardToScreen(cardContext);
-              if (!context.mounted) return;
-              await openHermesSession(context, ref, known, bot: bot);
+              await openFromHermesCard(
+                cardContext,
+                () => openHermesSession(context, ref, known, bot: bot),
+              );
             },
             child: const Text('Open the draft'),
           ),

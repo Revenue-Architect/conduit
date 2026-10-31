@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter, lerpDouble;
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -183,7 +183,8 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
   }
 
   @override
-  Color? get barrierColor => const Color(0x570A0C10); // 34% ink
+  // 42% ink: a touch deeper than before, now that nothing blurs behind.
+  Color? get barrierColor => const Color(0x6B0A0C10);
 
   @override
   bool get barrierDismissible => dismissible;
@@ -225,26 +226,6 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
         explicitChildNodes: true,
         child: Stack(
           children: [
-            // The page behind blurs as well as dims, as in the reference.
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: animation,
-                  builder: (context, _) {
-                    final sigma = (reduce ? 1.0 : animation.value) * 14;
-                    return sigma < 0.5
-                        ? const SizedBox.expand()
-                        : BackdropFilter(
-                            filter: ImageFilter.blur(
-                              sigmaX: sigma,
-                              sigmaY: sigma,
-                            ),
-                            child: const SizedBox.expand(),
-                          );
-                  },
-                ),
-              ),
-            ),
             AnimatedBuilder(
               animation: _grow,
               builder: (context, card) {
@@ -279,10 +260,18 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                 builder: (context, child) {
                   final t = reduce ? 1.0 : curved.value;
                   final g = _grow.value;
-                  // The content is there from the first frame, blurred and
-                  // faint, and sharpens as the card lands.
-                  final clear = t.clamp(0.0, 1.0);
-                  final blur = (1 - clear) * 10;
+                  // The content rides in the growing shape and clears as it
+                  // lands. No blur, here or behind the card: a live
+                  // full-screen blur re-ran on every frame the card moved
+                  // and was what made the cards stutter on the phone.
+                  final clear = Curves.easeOut.transform(
+                    (t * 1.4).clamp(0.0, 1.0),
+                  );
+                  // Growing into a screen, the content leaves early, so the
+                  // card arrives as the screen's canvas, not a fading list.
+                  final leave = Curves.easeOut.transform(
+                    (g * 2.5).clamp(0.0, 1.0),
+                  );
                   return _CardReveal(
                     t: t,
                     grow: g,
@@ -291,17 +280,8 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                     originColor: originColor,
                     cardColor: Color.lerp(cardColor, screenColor, g)!,
                     child: Opacity(
-                      opacity: Curves.easeOut.transform(clear) * (1 - g),
-                      // Always the same widget, only switched off, so
-                      // the content keeps its state as the blur clears.
-                      child: ImageFiltered(
-                        enabled: blur >= 0.3,
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: blur,
-                          sigmaY: blur,
-                        ),
-                        child: child,
-                      ),
+                      opacity: clear * (1 - leave),
+                      child: RepaintBoundary(child: child),
                     ),
                   );
                 },
@@ -525,6 +505,21 @@ Future<void> growHermezCardToScreen(BuildContext context) {
 Future<void> shrinkHermezCardToCard(BuildContext context) {
   final route = ModalRoute.of(context);
   return route is _HermezCardRoute ? route._shrinkToCard() : Future.value();
+}
+
+/// The card around [cardContext] becomes the screen [open] goes to (m11),
+/// with [open] loading while the card grows rather than after it, so no
+/// blank screen waits between them. Opening replaces the card; when [open]
+/// stays (it failed and said so), the card returns to its shape.
+Future<void> openFromHermesCard(
+  BuildContext cardContext,
+  Future<void> Function() open,
+) async {
+  final route = ModalRoute.of(cardContext);
+  await Future.wait([growHermezCardToScreen(cardContext), open()]);
+  if (route is _HermezCardRoute && route.isCurrent) {
+    await route._shrinkToCard();
+  }
 }
 
 /// The rect the card around [context] grew out of, or null outside a card.
