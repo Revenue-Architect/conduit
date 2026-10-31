@@ -13,7 +13,6 @@ import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_sheet_parts.dart';
-import '../widgets/hermez_technical_background.dart';
 import 'hermes_page_chrome.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import '../widgets/hermez_expandable_section.dart';
@@ -126,7 +125,6 @@ class _HermesArtifactsPageState extends ConsumerState<HermesArtifactsPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
       child: HermesPanel(
-        backgroundVariant: HermezBackgroundVariant.editorial,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

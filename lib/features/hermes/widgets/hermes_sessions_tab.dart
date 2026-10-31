@@ -27,7 +27,6 @@ import '../providers/hermes_session_totals_provider.dart';
 import 'hermes_bot_tile.dart';
 import 'hermes_bot_avatar.dart';
 import 'hermez_bot_mark.dart';
-import 'hermez_technical_background.dart';
 import 'hermes_session_tile.dart';
 import 'hermez_skeleton.dart';
 
@@ -195,17 +194,14 @@ class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
                   ),
             child: Column(
               children: [
-                HermezTechnicalBackground(
-                  variant: HermezBackgroundVariant.editorial,
-                  child: _SectionHeader(
-                    title: AppLocalizations.of(context)!.hermesBotsTitle,
-                    count: bots.length,
-                    expanded: expanded,
-                    onToggle: () {
-                      ConduitHaptics.selectionClick();
-                      ref.read(hermesShowBotsProvider.notifier).toggle();
-                    },
-                  ),
+                _SectionHeader(
+                  title: AppLocalizations.of(context)!.hermesBotsTitle,
+                  count: bots.length,
+                  expanded: expanded,
+                  onToggle: () {
+                    ConduitHaptics.selectionClick();
+                    ref.read(hermesShowBotsProvider.notifier).toggle();
+                  },
                 ),
                 if (expanded)
                   for (var index = 0; index < bots.length; index++) ...[

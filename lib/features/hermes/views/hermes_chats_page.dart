@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../sky/hermez_sky_band.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart' show conversationsProvider;
 import '../../../core/services/navigation_service.dart';
@@ -271,56 +272,47 @@ class _Band extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = HermezChatPalette.forBrightness(
-      Theme.of(context).brightness,
-    );
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, top + 14, 8, 34),
-      decoration: BoxDecoration(
-        // Dark mode always shows the evening sky (DIRECTION.md, "The sky").
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: Theme.of(context).brightness == Brightness.dark
-              ? const [Color(0xFF081224), Color(0xFF14284A), Color(0xFF3B5A82)]
-              : const [Color(0xFF0D2141), Color(0xFF2C4F80), Color(0xFF7E9DC2)],
+    return Stack(
+      children: [
+        const Positioned.fill(child: HermezSkyBand(skylineHeight: 34)),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, top + 14, 8, 34),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: _geist(
+                        30,
+                        FontWeight.w600,
+                        Colors.white,
+                      ).copyWith(letterSpacing: -1.2),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: _geist(
+                        15,
+                        FontWeight.w400,
+                        Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'New chat',
+                onPressed: onNewChat,
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+              ),
+            ],
+          ),
         ),
-        border: Border(bottom: BorderSide(color: palette.canvas, width: 0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: _geist(
-                    30,
-                    FontWeight.w600,
-                    Colors.white,
-                  ).copyWith(letterSpacing: -1.2),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: _geist(
-                    15,
-                    FontWeight.w400,
-                    Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'New chat',
-            onPressed: onNewChat,
-            icon: const Icon(Icons.edit_outlined, color: Colors.white),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

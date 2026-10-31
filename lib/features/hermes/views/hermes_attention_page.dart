@@ -11,7 +11,6 @@ import '../services/hermes_pending_decision_store.dart';
 import '../sheets/hermes_attention_resolution_sheet.dart';
 import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../widgets/hermez_chat_palette.dart';
-import '../widgets/hermez_technical_background.dart';
 import '../motion/hermez_morph_origin.dart';
 import 'hermes_page_chrome.dart';
 
@@ -36,7 +35,8 @@ final hermesAttentionPreparedProvider =
           .whereType<HermesSessionSummary>()
           .where(
             (session) =>
-                session.source?.trim().toLowerCase() == 'initiative_objective' &&
+                session.source?.trim().toLowerCase() ==
+                    'initiative_objective' &&
                 _objectiveChat.hasMatch(session.id),
           )
           .toList(growable: false);
@@ -123,7 +123,6 @@ class HermesAttentionPage extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
           children: [
             HermesPanel(
-              backgroundVariant: HermezBackgroundVariant.mechanical,
               child: Row(
                 children: [
                   CircleAvatar(backgroundColor: palette.accent, radius: 11),

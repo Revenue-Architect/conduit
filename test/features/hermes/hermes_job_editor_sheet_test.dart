@@ -251,9 +251,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     // This profile's one job plus the two others, as Home counts them.
-    expect(find.text('2 active · 3 total'), findsOneWidget);
+    expect(find.text('2 on · 3 in all'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('OTHER BOTS  2'),
+      find.text('Other bots · 2'),
       300,
       scrollable: find.byType(Scrollable).first,
     );

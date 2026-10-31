@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../sky/hermez_sky_band.dart';
 import '../sky/hermez_weather.dart' show kHermezCity;
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -153,47 +154,35 @@ class HermesYouPage extends ConsumerWidget {
       child: ListView(
         padding: EdgeInsets.only(bottom: hermesDockClearance(context) + 24),
         children: [
-          Container(
-            padding: EdgeInsets.fromLTRB(20, top + 14, 20, 34),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: dark
-                    ? const [
-                        Color(0xFF081224),
-                        Color(0xFF14284A),
-                        Color(0xFF3B5A82),
-                      ]
-                    : const [
-                        Color(0xFF0D2141),
-                        Color(0xFF2C4F80),
-                        Color(0xFF7E9DC2),
-                      ],
+          Stack(
+            children: [
+              const Positioned.fill(child: HermezSkyBand(skylineHeight: 34)),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, top + 14, 20, 34),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'You',
+                      style: _geist(
+                        30,
+                        FontWeight.w600,
+                        Colors.white,
+                      ).copyWith(letterSpacing: -1.2),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$kHermezCity · ${bots.length} bots',
+                      style: _geist(
+                        15,
+                        FontWeight.w400,
+                        Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'You',
-                  style: _geist(
-                    30,
-                    FontWeight.w600,
-                    Colors.white,
-                  ).copyWith(letterSpacing: -1.2),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$kHermezCity · ${bots.length} bots',
-                  style: _geist(
-                    15,
-                    FontWeight.w400,
-                    Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
           row(
             icon: Icons.dns_outlined,

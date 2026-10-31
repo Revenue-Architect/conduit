@@ -19,7 +19,6 @@ import '../feedback/hermez_feedback.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../widgets/hermez_expandable_section.dart';
 import '../widgets/hermez_surfaces.dart';
-import '../widgets/hermez_technical_background.dart';
 import '../motion/hermez_motion.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import 'hermes_kanban_client.dart';
@@ -1217,38 +1216,33 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                 ),
           body: Column(
             children: [
-              HermezTechnicalBackground(
-                variant: HermezBackgroundVariant.editorial,
-                morphId: hermezMorphPart(hermezBoardMorphId, 'motif'),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        HermezMorphText(
-                          'Kanban',
-                          id: hermezMorphPart(hermezBoardMorphId, 'title'),
-                          style:
-                              (Theme.of(context).textTheme.displaySmall ??
-                                      const TextStyle())
-                                  .copyWith(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -1.8,
-                                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      HermezMorphText(
+                        'Kanban',
+                        id: hermezMorphPart(hermezBoardMorphId, 'title'),
+                        style:
+                            (Theme.of(context).textTheme.displaySmall ??
+                                    const TextStyle())
+                                .copyWith(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.8,
+                                ),
+                      ),
+                      Text(
+                        'TURN IDEAS INTO ACTION',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          letterSpacing: 3.0,
+                          fontWeight: FontWeight.w700,
                         ),
-                        Text(
-                          'TURN IDEAS INTO ACTION',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                letterSpacing: 3.0,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),

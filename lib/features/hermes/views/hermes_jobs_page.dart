@@ -1,7 +1,9 @@
+import 'package:flutter/services.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../sky/hermez_sky_band.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../l10n/app_localizations_en.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -94,25 +96,50 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
       color: palette.canvas,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // The sky header every inner screen wears (mockup r4 03).
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
+          toolbarHeight: 64,
+          foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+            statusBarColor: Colors.transparent,
+          ),
+          flexibleSpace: const HermezSkyBand(skylineHeight: 22),
+          titleSpacing: 0,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HermezMorphText(
+                l10n.hermesScheduledAgentsTitle,
+                id: hermezMorphPart(hermezScheduleMorphId, 'title'),
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                jobs == null
+                    ? 'Routines your bots run'
+                    : '$active on · ${jobs.length} in all',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
         body: SafeArea(
           top: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              HermezPageHeader(
-                title: l10n.hermesScheduledAgentsTitle,
-                titleMorphId: hermezMorphPart(hermezScheduleMorphId, 'title'),
-                motifMorphId: hermezMorphPart(hermezScheduleMorphId, 'motif'),
-                subtitle: jobs == null
-                    ? 'Cron-driven Hermes agents'
-                    : '$active active · ${jobs.length} total',
-                palette: palette,
-              ),
+              const SizedBox(height: 12),
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: () async {
@@ -147,8 +174,6 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     return [
       HermezEntrance(
         order: 0,
-        // The page header already carries the technical marks; a second,
-        // padded background here read as a decoration cut off mid-screen.
         child: Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 16),
           // Its own layer, so the editor can carry the button's face.
@@ -289,8 +314,12 @@ class _OtherBotsSchedules extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'OTHER BOTS  ${entries.length}',
-            style: HermezType.technical(palette.muted),
+            'Other bots · ${entries.length}',
+            style: TextStyle(
+              color: palette.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: Spacing.sm),
           for (final (profile, job) in entries)

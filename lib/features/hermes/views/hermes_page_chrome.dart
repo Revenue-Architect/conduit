@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nib_motion/nib_motion.dart';
 
+import '../sky/hermez_sky_band.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../feedback/hermez_feedback.dart';
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
-import '../widgets/hermez_technical_background.dart';
 import '../widgets/hermez_visual_theme.dart';
 
 /// Shared native chrome for Hermes-owned destinations. Content is always real
@@ -134,10 +134,7 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
                 actions: widget.actions,
                 // The marks run behind the status bar and the actions, from
                 // the top-right corner, as they did behind the large title.
-                flexibleSpace: const HermezTechnicalBackground(
-                  variant: HermezBackgroundVariant.editorial,
-                  child: SizedBox.expand(),
-                ),
+                flexibleSpace: SizedBox.expand(),
                 title: HermezMorphText(
                   widget.title,
                   id: widget.titleMorphId,
@@ -175,18 +172,7 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
               actions: widget.actions,
               centerTitle: true,
               flexibleSpace: widget.skyBand
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors:
-                              Theme.of(context).brightness == Brightness.dark
-                              ? const [Color(0xFF081224), Color(0xFF3B5A82)]
-                              : const [Color(0xFF0D2141), Color(0xFF7E9DC2)],
-                        ),
-                      ),
-                    )
+                  ? const HermezSkyBand(skylineHeight: 22)
                   : widget.showHeader
                   ? ValueListenableBuilder<double>(
                       valueListenable: _collapsed,
@@ -267,44 +253,38 @@ class HermezPageHeader extends StatelessWidget {
     required this.subtitle,
     required this.palette,
     this.titleMorphId,
-    this.motifMorphId,
   });
 
   final String title;
   final String subtitle;
   final HermezChatPalette palette;
   final String? titleMorphId;
-  final String? motifMorphId;
 
   @override
   // Full width: the construction marks run to the edge of the section, not
   // to the end of the title.
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    child: HermezTechnicalBackground(
-      variant: HermezBackgroundVariant.editorial,
-      morphId: motifMorphId,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            HermezMorphText(
-              title,
-              id: titleMorphId,
-              maxLines: 2,
-              style: HermesPageChrome.titleStyle(palette),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(22, 2, 22, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HermezMorphText(
+            title,
+            id: titleMorphId,
+            maxLines: 2,
+            style: HermesPageChrome.titleStyle(palette),
+          ),
+          const SizedBox(height: 4),
+          HermezEntrance(
+            order: 0,
+            child: Text(
+              subtitle,
+              style: TextStyle(color: palette.muted, fontSize: 13),
             ),
-            const SizedBox(height: 4),
-            HermezEntrance(
-              order: 0,
-              child: Text(
-                subtitle,
-                style: TextStyle(color: palette.muted, fontSize: 13),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -362,12 +342,10 @@ class HermesPanel extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
-    this.backgroundVariant,
   });
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
-  final HermezBackgroundVariant? backgroundVariant;
 
   @override
   Widget build(BuildContext context) {
@@ -381,12 +359,7 @@ class HermesPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(19),
         side: BorderSide(color: palette.border),
       ),
-      child: backgroundVariant == null
-          ? _content()
-          : HermezTechnicalBackground(
-              variant: backgroundVariant!,
-              child: _content(),
-            ),
+      child: _content(),
     );
   }
 
