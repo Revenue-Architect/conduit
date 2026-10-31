@@ -148,9 +148,10 @@ void main() {
 
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('direct-mcp-resource-file:///notes.txt')),
-      );
+      // The full card rests at 62%: bring the resource into view first.
+      await tester.ensureVisible(_notesResource);
+      await tester.pumpAndSettle();
+      await tester.tap(_notesResource);
       await tester.pumpAndSettle();
       expect(find.textContaining('file:///notes.txt'), findsWidgets);
       expect(find.textContaining('Exact local text.'), findsOneWidget);
@@ -212,10 +213,10 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
+    // Both rows fit once the full card is raised.
+    await _raiseCard(tester);
     await tester.tap(find.byKey(const Key('direct-mcp-prompt-explain')));
-    await tester.tap(
-      find.byKey(const Key('direct-mcp-resource-file:///notes.txt')),
-    );
+    await tester.tap(_notesResource);
     await tester.pump();
 
     await firstAborted.future.timeout(const Duration(seconds: 2));
@@ -239,9 +240,9 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const Key('direct-mcp-resource-file:///notes.txt')),
-    );
+    // Both rows fit once the full card is raised.
+    await _raiseCard(tester);
+    await tester.tap(_notesResource);
     await tester.tap(find.byKey(const Key('direct-mcp-prompt-explain')));
     await tester.pump();
 
@@ -250,6 +251,20 @@ void main() {
     expect(find.text('Continue'), findsOneWidget);
     expect(find.text('Loading MCP content…'), findsNothing);
   });
+}
+
+final _notesResource = find.byKey(
+  const Key('direct-mcp-resource-file:///notes.txt'),
+);
+
+// Drags the full card's top band up to its raised height.
+Future<void> _raiseCard(WidgetTester tester) async {
+  await tester.dragFrom(
+    tester.getTopLeft(find.byType(DirectMcpContentSheet)) +
+        const Offset(60, 12),
+    const Offset(0, -300),
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<ProviderContainer> _container({

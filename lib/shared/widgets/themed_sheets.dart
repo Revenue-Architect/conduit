@@ -104,7 +104,13 @@ class ThemedSheets {
   static Future<T?> showAdaptive<T>({
     required BuildContext context,
     required WidgetBuilder builder,
+    // Android: content that sets its own height gets the card sized to it
+    // instead of the full-height card.
+    bool fit = false,
   }) {
+    if (_opensCard(context, dismissible: true)) {
+      return _showCard<T>(context, builder, fit: fit);
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final theme = context.conduitTheme;
     final backgroundColor = theme.surfaceBackground;
@@ -201,7 +207,14 @@ class ThemedSheets {
     ShapeBorder? shape,
     double? elevation,
     Clip? clipBehavior,
+    // Android: short content (a few rows), or a widget that sizes itself
+    // with its own DraggableScrollableSheet, gets the card sized to it
+    // instead of the full-height card.
+    bool fit = false,
   }) {
+    if (_opensCard(context, dismissible: isDismissible && enableDrag)) {
+      return _showCard<T>(context, builder, fit: fit);
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final resolvedShape = shape ?? roundedShapeFor(context);
     return _showTracked<T>(
@@ -259,6 +272,9 @@ class ThemedSheets {
     Color? barrierColor,
     RouteSettings? routeSettings,
   }) {
+    if (_opensCard(context, dismissible: isDismissible)) {
+      return _showCard<T>(context, builder);
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     return _showTracked<T>(
       context: context,
@@ -337,6 +353,48 @@ class ThemedSheets {
     }
   }
 
+  /// Android shows sheets as one card grown out of the control that was
+  /// pressed (docs/app-design-2026-10-30, "One card"). iOS, and a sheet
+  /// that must be answered, keep their routes.
+  static bool _opensCard(BuildContext context, {required bool dismissible}) =>
+      !PlatformUiCapabilities.isIOS &&
+      Theme.of(context).platform != TargetPlatform.iOS &&
+      dismissible;
+
+  /// A content sheet as the full-height card: it rests at 62% and springs
+  /// up, and lists, browsers and previews keep their own scrolling in its
+  /// definite height. With [fit] it is the card sized to its content. The
+  /// card rides above the keyboard, so the content gets no keyboard inset.
+  static Future<T?> _showCard<T>(
+    BuildContext context,
+    WidgetBuilder builder, {
+    bool fit = false,
+  }) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    return _showTracked<T>(
+      context: context,
+      // The tracker closes when the card's future completes
+      // (_showTracked), never mid-unmount.
+      present: (_) {
+        Widget content(BuildContext cardContext) => MediaQuery.removeViewInsets(
+          context: cardContext,
+          removeBottom: true,
+          child: Builder(
+            builder: (context) =>
+                _CardContent(fill: !fit, child: builder(context)),
+          ),
+        );
+        return fit
+            ? pushHermezCard<T>(
+                context,
+                builder: content,
+                scrollsContent: false,
+              )
+            : pushHermezFullCard<T>(context, builder: content);
+      },
+    );
+  }
+
   static Future<T?> showSurface<T>({
     required BuildContext context,
     required WidgetBuilder builder,
@@ -356,9 +414,7 @@ class ThemedSheets {
     // (docs/app-design-2026-10-30, "One card"); it rides above the keyboard
     // and scrolls its content itself. A sheet that must be answered keeps
     // the bottom sheet.
-    if (!PlatformUiCapabilities.isIOS &&
-        Theme.of(context).platform != TargetPlatform.iOS &&
-        isDismissible) {
+    if (_opensCard(context, dismissible: isDismissible)) {
       FocusManager.instance.primaryFocus?.unfocus();
       return _showTracked<T>(
         context: context,
@@ -648,11 +704,13 @@ class ConduitAdaptiveSheetSurface extends StatelessWidget {
 }
 
 /// Sheet content inside the one card. A draggable sheet needs a bounded
-/// height, so the card shows its scrolling content at its starting size.
+/// height, so the card shows its scrolling content at its starting size,
+/// or with [fill] at the full-height card's own height.
 class _CardContent extends StatefulWidget {
-  const _CardContent({required this.child});
+  const _CardContent({required this.child, this.fill = false});
 
   final Widget child;
+  final bool fill;
 
   @override
   State<_CardContent> createState() => _CardContentState();
@@ -671,6 +729,7 @@ class _CardContentState extends State<_CardContent> {
   Widget build(BuildContext context) {
     final child = widget.child;
     if (child is! DraggableScrollableSheet) return child;
+    if (widget.fill) return child.builder(context, _scroll);
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * child.initialChildSize,
       child: child.builder(context, _scroll),

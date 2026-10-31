@@ -1019,7 +1019,9 @@ void main() {
                     TextButton(
                       onPressed: () => ThemedSheets.showRoundedPage<void>(
                         context: nestedContext,
-                        builder: (_) => const SizedBox.expand(),
+                        builder: (_) => const SizedBox.expand(
+                          key: ValueKey<String>('rounded-page-content'),
+                        ),
                       ),
                       child: const Text('Open sheet'),
                     ),
@@ -1038,10 +1040,13 @@ void main() {
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
+    // Android: the preview opens as the one card, not a bottom sheet.
+    final content = find.byKey(const ValueKey<String>('rounded-page-content'));
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(content, findsOneWidget);
     expect(composerSurfaceShadow(), findsNothing);
 
-    Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+    Navigator.of(tester.element(content)).pop();
     await tester.pumpAndSettle();
     expect(ThemedSheets.hasActiveSheet, isFalse);
   });

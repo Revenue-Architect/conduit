@@ -367,6 +367,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       await ThemedSheets.showCustom<void>(
         context: context,
         isScrollControlled: true,
+        fit: true,
         builder: (sheetContext) => ModelSelectorSheet(models: models),
       );
     } catch (_) {
@@ -701,6 +702,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         ThemedSheets.showCustom<void>(
           context: context,
           isScrollControlled: true,
+          fit: true,
           builder: (_) => ServerFilePickerSheet(
             onSelected: (file) {
               ref.read(attachedFilesProvider.notifier).addRemoteFile(file);
@@ -714,6 +716,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
     ThemedSheets.showCustom<void>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (_) => ServerFilePickerSheet(
         onSelected: (file) {
           ref.read(attachedFilesProvider.notifier).addRemoteFile(file);
@@ -1118,6 +1121,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
     final updatedFolder = await ThemedSheets.showCustom<Folder>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (sheetContext) => _FolderEditSheet(folder: folder),
     );
 
@@ -1209,6 +1213,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
     final updatedFolder = await ThemedSheets.showCustom<Folder>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (sheetContext) => _FolderSystemPromptSheet(folder: folder),
     );
 

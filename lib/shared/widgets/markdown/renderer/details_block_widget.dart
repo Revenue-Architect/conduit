@@ -256,6 +256,7 @@ class _MarkdownDetailsBlockState extends State<MarkdownDetailsBlock> {
       context: context,
       isScrollControlled: true,
       constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width),
+      fit: true,
       builder: _buildDetailsBottomSheet,
     ).whenComplete(() {
       _isSheetOpen = false;

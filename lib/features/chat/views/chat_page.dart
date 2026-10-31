@@ -1739,6 +1739,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ThemedSheets.showCustom<void>(
           context: context,
           isScrollControlled: true,
+          fit: true,
           builder: (_) => ServerFilePickerSheet(
             onSelected: (file) {
               ref.read(attachedFilesProvider.notifier).addRemoteFile(file);
@@ -1752,6 +1753,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     ThemedSheets.showCustom<void>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (_) => ServerFilePickerSheet(
         onSelected: (file) {
           ref.read(attachedFilesProvider.notifier).addRemoteFile(file);
@@ -5295,6 +5297,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     await ThemedSheets.showCustom<void>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (context) => ModelSelectorSheet(models: models),
     );
     await restoreFocusIfNeeded();

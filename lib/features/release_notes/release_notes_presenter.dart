@@ -39,6 +39,8 @@ Future<void> showReleaseNotesSheet({
 }) async {
   await ThemedSheets.showAdaptive<void>(
     context: context,
+    // The sheet sets its own height (84% of the screen).
+    fit: true,
     builder: (sheetContext) {
       void closeSheet() {
         Navigator.of(sheetContext).maybePop();

@@ -37,6 +37,7 @@ Future<void> showChatShareSheet({
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
+    fit: true,
     builder: (_) => ChatShareSheet(conversation: conversation),
   );
 }

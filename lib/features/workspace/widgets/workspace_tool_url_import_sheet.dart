@@ -31,6 +31,7 @@ class WorkspaceToolUrlImportSheet extends StatefulWidget {
   }) {
     return ThemedSheets.showCustom<Map<String, dynamic>>(
       context: context,
+      fit: true,
       builder: (_) => WorkspaceToolUrlImportSheet(loader: loader),
     );
   }

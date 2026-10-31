@@ -1178,16 +1178,13 @@ graph TD
     expect(find.byType(MermaidDiagram), findsOneWidget);
     expect(find.byType(WebContentEmbed), findsNothing);
     expect(find.byType(InteractiveViewer), findsOneWidget);
-    expect(find.byType(BottomSheet), findsOneWidget);
+    // Android: the preview opens as the full-height one card.
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(ConduitModalSheetHeader), findsOneWidget);
-    final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
     expect(
-      sheet.shape,
-      ThemedSheets.roundedShapeFor(
-        tester.element(find.byType(ConduitModalSheetHeader)),
-      ),
+      ModalRoute.of(tester.element(find.byType(ConduitModalSheetHeader))),
+      isNot(isA<ModalBottomSheetRoute<void>>()),
     );
-    expect(sheet.clipBehavior, Clip.antiAlias);
     expect(find.bySemanticsLabel('Pan up'), findsOneWidget);
     expect(find.bySemanticsLabel('Zoom in'), findsOneWidget);
     expect(find.bySemanticsLabel('Reset diagram position'), findsOneWidget);
@@ -4388,15 +4385,13 @@ Tail keeps growing
         find.text('Embedded content preview is unavailable in widget tests.'),
         findsOneWidget,
       );
+      // Android: the preview opens as the full-height one card.
       expect(find.byType(ConduitModalSheetHeader), findsOneWidget);
-      final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+      expect(find.byType(BottomSheet), findsNothing);
       expect(
-        sheet.shape,
-        ThemedSheets.roundedShapeFor(
-          tester.element(find.byType(ConduitModalSheetHeader)),
-        ),
+        ModalRoute.of(tester.element(find.byType(ConduitModalSheetHeader))),
+        isNot(isA<ModalBottomSheetRoute<void>>()),
       );
-      expect(sheet.clipBehavior, Clip.antiAlias);
     },
   );
 
