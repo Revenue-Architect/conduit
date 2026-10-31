@@ -277,10 +277,13 @@ class _Band extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(20, top + 14, 8, 34),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        // Dark mode always shows the evening sky (DIRECTION.md, "The sky").
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF0D2141), Color(0xFF2C4F80), Color(0xFF7E9DC2)],
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? const [Color(0xFF081224), Color(0xFF14284A), Color(0xFF3B5A82)]
+              : const [Color(0xFF0D2141), Color(0xFF2C4F80), Color(0xFF7E9DC2)],
         ),
         border: Border(bottom: BorderSide(color: palette.canvas, width: 0)),
       ),
