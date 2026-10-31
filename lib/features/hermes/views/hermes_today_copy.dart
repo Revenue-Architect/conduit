@@ -1,3 +1,4 @@
+import '../models/hermes_session.dart';
 import '../sky/hermez_sky.dart';
 
 /// Today's two sentences (docs/app-design-2026-10-30/SPEC.md, copy matrix):
@@ -36,3 +37,25 @@ DateTime hermesTodayDoneSince(DateTime now) {
   final midnight = DateTime(now.year, now.month, now.day);
   return now.hour < 12 ? midnight.subtract(const Duration(hours: 4)) : midnight;
 }
+
+/// What Today counts as done: conversations that moved since [since] and
+/// are not still working, newest first. A routine's runs (cron, webhook,
+/// subagent) and empty sessions are left out: an hourly run is the
+/// routine's history, not something finished for the owner, and opening
+/// one showed an empty chat.
+List<HermesSessionSummary> hermesTodayDoneSessions(
+  Iterable<HermesSessionSummary> sessions, {
+  required DateTime since,
+  Set<String> working = const {},
+}) =>
+    sessions
+        .where(
+          (s) =>
+              s.updatedAt != null &&
+              s.updatedAt!.isAfter(since) &&
+              !working.contains(s.id) &&
+              !s.isAutomated &&
+              s.messageCount != 0,
+        )
+        .toList()
+      ..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!));

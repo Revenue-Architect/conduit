@@ -625,10 +625,19 @@ class _MagneticCardState extends State<_MagneticCard>
         : (h - widget.resting).abs() < (h - widget.raised).abs()
         ? widget.resting
         : widget.raised;
+    _layout = target;
     _height.animateWith(SpringSimulation(_spring, h, target, v));
   }
 
+  /// The height the content is laid out at while the card springs: the one
+  /// it is going to, so the content is laid out once and the card's edge
+  /// moves over it. Null while a finger drags the card: the content follows.
+  double? _layout;
+
   void _springTo(double target) {
+    // Read by the next animation frame's rebuild: a step calls this while
+    // it builds, when the card can't be marked to rebuild.
+    _layout = target;
     if (MediaQuery.of(context).disableAnimations) {
       _height.value = target;
       return;
@@ -641,14 +650,20 @@ class _MagneticCardState extends State<_MagneticCard>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _height,
-    builder: (context, child) =>
-        SizedBox(height: _height.value.clamp(0.0, widget.raised), child: child),
+    builder: (context, child) {
+      final height = _height.value.clamp(0.0, widget.raised);
+      return _DetentBox(
+        height: height,
+        layoutHeight: _layout ?? height,
+        child: child!,
+      );
+    },
     child: HermezCardDetents._(
       raise: () => _springTo(widget.raised),
       rest: () => _springTo(widget.resting),
       child: Stack(
         children: [
-          Positioned.fill(child: widget.child),
+          Positioned.fill(child: RepaintBoundary(child: widget.child)),
           Positioned(
             left: 0,
             right: 0,
@@ -659,6 +674,7 @@ class _MagneticCardState extends State<_MagneticCard>
               onVerticalDragStart: (_) {
                 _height.stop();
                 _start = _height.value;
+                _layout = null;
               },
               onVerticalDragUpdate: _drag,
               onVerticalDragEnd: _release,
@@ -668,6 +684,92 @@ class _MagneticCardState extends State<_MagneticCard>
       ),
     ),
   );
+}
+
+/// Shows [child] [height] tall while laying it out [layoutHeight] tall. As
+/// the card springs between its heights only the edge moves: the content
+/// keeps its layout and its drawn layer, instead of being laid out and
+/// redrawn every frame (on the S25 that redraw was 45 ms a frame).
+class _DetentBox extends SingleChildRenderObjectWidget {
+  const _DetentBox({
+    required this.height,
+    required this.layoutHeight,
+    required Widget super.child,
+  });
+
+  final double height;
+  final double layoutHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderDetentBox(height, layoutHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderDetentBox render) =>
+      render
+        ..height = height
+        ..layoutHeight = layoutHeight;
+}
+
+class _RenderDetentBox extends RenderProxyBox {
+  _RenderDetentBox(this._height, this._layoutHeight);
+
+  double _height;
+  set height(double value) {
+    if (value == _height) return;
+    _height = value;
+    markNeedsLayout();
+  }
+
+  double _layoutHeight;
+  set layoutHeight(double value) {
+    if (value == _layoutHeight) return;
+    _layoutHeight = value;
+    markNeedsLayout();
+  }
+
+  final _clip = LayerHandle<ClipRectLayer>();
+
+  @override
+  bool get isRepaintBoundary => false;
+
+  @override
+  void performLayout() {
+    final child = this.child!;
+    child.layout(
+      BoxConstraints(
+        minWidth: constraints.minWidth,
+        maxWidth: constraints.maxWidth,
+        minHeight: _layoutHeight,
+        maxHeight: _layoutHeight,
+      ),
+      parentUsesSize: true,
+    );
+    size = constraints.constrain(Size(child.size.width, _height));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child!;
+    if (child.size.height <= size.height) {
+      _clip.layer = null;
+      context.paintChild(child, offset);
+      return;
+    }
+    _clip.layer = context.pushClipRect(
+      needsCompositing,
+      offset,
+      Offset.zero & size,
+      (context, offset) => context.paintChild(child, offset),
+      oldLayer: _clip.layer,
+    );
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
+  }
 }
 
 /// A full-height card's two heights, for a step inside it (a detail, a

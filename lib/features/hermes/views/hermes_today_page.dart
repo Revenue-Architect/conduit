@@ -117,16 +117,11 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
     final stale = watchHermesHomeStale(ref);
     final since = hermesTodayDoneSince(now);
     final workingIds = {for (final w in working) w.storedId};
-    final doneSessions =
-        sessions
-            .where(
-              (s) =>
-                  s.updatedAt != null &&
-                  s.updatedAt!.isAfter(since) &&
-                  !workingIds.contains(s.id),
-            )
-            .toList()
-          ..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!));
+    final doneSessions = hermesTodayDoneSessions(
+      sessions,
+      since: since,
+      working: workingIds,
+    );
     final done = doneSessions.length;
     final headline = hermesTodayHeadline(
       done: done,

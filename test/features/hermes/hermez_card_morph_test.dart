@@ -69,9 +69,15 @@ void main() {
     expect(find.text('Back'), findsOneWidget);
     expect(card, findsOneWidget);
 
+    // The step is laid out once at the height the card is going to; only
+    // the card's edge moves (on the S25, relaying it out every frame cost
+    // 45 ms a frame).
+    final midway = tester.getSize(card).height;
+
     await tester.pumpAndSettle();
     expect(find.text('Routine'), findsNothing);
     expect(tester.getSize(card).height, greaterThan(resting + 50));
+    expect(tester.getSize(card).height, midway);
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
