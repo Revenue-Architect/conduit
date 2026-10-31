@@ -297,7 +297,9 @@ void main() {
       check(store.snapshotFor('s').todo!.items.single.id).equals('a');
     });
 
-    test('a new turn drops finished delegates and keeps live ones', () {
+    // Delegates belong to the turn that started them and stay visible inline
+    // after a new turn starts (6d83464d); the per-session cap evicts them.
+    test('a new turn keeps finished delegates beside live ones', () {
       final store = HermesAgenticStateStore();
       addTearDown(store.close);
       store.applySubagentEvent('s', 'subagent.start', {
@@ -311,7 +313,7 @@ void main() {
       });
       store.pruneFinishedSubagents('s');
       check(store.snapshotFor('s').subagents.map((worker) => worker.id))
-          .deepEquals(['live']);
+          .deepEquals(['live', 'done']);
     });
   });
 

@@ -1,5 +1,7 @@
 import 'package:conduit/features/hermes/models/hermes_config.dart';
+import 'package:conduit/features/hermes/providers/hermes_agentic_providers.dart';
 import 'package:conduit/features/hermes/providers/hermes_live_run_providers.dart';
+import 'package:conduit/features/hermes/services/hermes_agentic_state.dart';
 import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/hermes/services/hermes_desktop_api_service.dart';
 import 'package:conduit/features/hermes/services/hermes_pending_decision_store.dart';
@@ -55,6 +57,11 @@ void main() {
       ProviderScope(
         overrides: [
           hermesApiServiceProvider.overrideWithValue(service),
+          // No delegation polling against the fake server: its request would
+          // still be pending when a short test ends.
+          hermesAgenticStateProvider.overrideWith(
+            (ref, id) => Stream.value(HermesAgenticSnapshot.empty),
+          ),
           hermesPendingSessionDecisionsProvider('session-1')
               .overrideWith((ref) async => decisions),
           hermesSteelViewerUrlProvider.overrideWith(
