@@ -110,7 +110,7 @@ List<Color> _gradient(HermezSkyState state) {
 }
 
 /// Paints the sky: gradient, stars on a clear night, rain or snow, the
-/// Toronto skyline, and lit windows at dusk and night.
+/// Montreal skyline, and lit windows at dusk and night.
 class HermezSkyPainter extends CustomPainter {
   const HermezSkyPainter(this.state, {this.skylineHeight = 172});
 
@@ -179,27 +179,31 @@ class HermezSkyPainter extends CustomPainter {
       old.state != state || old.skylineHeight != skylineHeight;
 }
 
-/// Toronto, flat: the same silhouette as the mockups' skyline (CN Tower at
-/// x 264). Coordinates in a 412 × 280 box, origin top-left.
-final Path _skyline = () {
-  const ops = [
-    'M0 280V232h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V174h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18H412V280z',
-  ];
-  return _parse(ops.first);
-}();
+/// Montreal, flat: Mount Royal and its cross, downtown (Place Ville Marie,
+/// 1000 de La Gauchetière's copper peak, 1250 René-Lévesque's stepped
+/// crown) and the Olympic Stadium's leaning tower. Coordinates in a
+/// 412 × 280 box, origin top-left.
+final Path _skyline = _parse(
+  'M0 280V236l10-6l12-10l14-14l12-12h6h2v-20h-5v-4h5v-10h4v10h5v4h-5v20h8'
+  'l14 10l14 12l12 10h4v-50h16v20h6v-68h30v68h4v-82l8-22l8 22v40h6v-44h4v-8'
+  'h12v8h4v50h8v-20h18v40h10v-24h14v52h12v14h6l10-8h30l10 8l-24-70h14l22 70'
+  'h10v-14h16v10h14v-8h12v18H412V280z',
+);
 
+/// Lit at dusk and night: windows, and the cross on Mount Royal.
 const _windows = <Rect>[
-  Rect.fromLTWH(40, 240, 2, 3),
-  Rect.fromLTWH(88, 210, 2, 3),
-  Rect.fromLTWH(92, 230, 2, 3),
-  Rect.fromLTWH(146, 190, 2, 3),
-  Rect.fromLTWH(150, 212, 2, 3),
-  Rect.fromLTWH(214, 190, 2, 3),
-  Rect.fromLTWH(232, 220, 2, 3),
-  Rect.fromLTWH(290, 240, 2, 3),
-  Rect.fromLTWH(320, 202, 2, 3),
-  Rect.fromLTWH(356, 226, 2, 3),
-  Rect.fromLTWH(263, 160, 2, 2),
+  Rect.fromLTWH(56, 160, 4, 34),
+  Rect.fromLTWH(51, 170, 14, 4),
+  Rect.fromLTWH(118, 196, 2, 3),
+  Rect.fromLTWH(140, 150, 2, 3),
+  Rect.fromLTWH(152, 172, 2, 3),
+  Rect.fromLTWH(172, 138, 2, 3),
+  Rect.fromLTWH(198, 128, 2, 3),
+  Rect.fromLTWH(202, 150, 2, 3),
+  Rect.fromLTWH(226, 166, 2, 3),
+  Rect.fromLTWH(250, 172, 2, 3),
+  Rect.fromLTWH(356, 206, 2, 3),
+  Rect.fromLTWH(384, 212, 2, 3),
 ];
 
 const _stars = <(double, double, double)>[
