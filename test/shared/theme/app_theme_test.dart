@@ -48,15 +48,15 @@ void main() {
     );
     expect(
       palette.variantFor(Brightness.light).primary,
-      const Color(0xFFFF5A26),
+      const Color(0xFF0E1116),
     );
     expect(
       palette.variantFor(Brightness.dark).background,
-      const Color(0xFF111215),
+      const Color(0xFF0B0C0E),
     );
     expect(
       palette.variantFor(Brightness.dark).primary,
-      const Color(0xFFFF6A36),
+      const Color(0xFFF2F3F5),
     );
     expect(TweakcnThemes.byId('conduit').id, palette.id);
     final light = AppTheme.light(palette);
@@ -64,14 +64,14 @@ void main() {
     expect(light.scaffoldBackgroundColor, TweakcnThemes.lightCanvas);
     expect(
       palette.variantFor(Brightness.light).accent,
-      const Color(0xFFEDEDED),
+      const Color(0xFFF1F2F4),
     );
-    expect(light.colorScheme.primary, const Color(0xFFFF5A26));
-    // Cards are a faint grey on the white canvas.
-    expect(light.cardTheme.color, TweakcnThemes.lightSurface);
-    expect(dark.scaffoldBackgroundColor, const Color(0xFF111215));
-    expect(dark.colorScheme.primary, const Color(0xFFFF6A36));
-    expect(dark.cardTheme.color, const Color(0xFF24252A));
+    // 2026-10-30 redesign: ink primary, white raised cards on a grey ground.
+    expect(light.colorScheme.primary, const Color(0xFF0E1116));
+    expect(light.cardTheme.color, const Color(0xFFFFFFFF));
+    expect(dark.scaffoldBackgroundColor, const Color(0xFF0B0C0E));
+    expect(dark.colorScheme.primary, const Color(0xFFF2F3F5));
+    expect(dark.cardTheme.color, const Color(0xFF16181C));
   });
 
   test('iOS text selection uses the themed Android accent colors', () {
