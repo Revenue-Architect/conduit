@@ -44,7 +44,7 @@ void main() {
     expect(find.text('Transport mode'), findsNothing);
   });
 
-  testWidgets('Open WebUI Chat opens quick actions without ListTile error', (
+  testWidgets('Open WebUI Chat shows its quick actions in place', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -53,15 +53,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Quick actions in chat'), findsOneWidget);
-    await tester.tap(find.text('Quick actions in chat'));
-    await tester.pumpAndSettle();
-
+    expect(find.text('0 selected'), findsOneWidget);
     expect(find.text('Web'), findsOneWidget);
     expect(find.text('Image Gen'), findsOneWidget);
+
+    await tester.tap(find.text('Web'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('Clear all'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Open WebUI Chat exposes advanced prompt settings', (
+  testWidgets('Open WebUI Chat keeps model system prompts under Advanced', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -69,11 +72,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('Advanced prompt overrides'),
-      300,
-    );
-    expect(find.text('Advanced prompt overrides'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Model system prompts'), 300);
+    expect(find.text('Advanced'), findsOneWidget);
+    expect(find.text('Advanced prompt overrides'), findsNothing);
   });
 
   testWidgets('Data and Connection owns transport and streaming diagnostics', (
@@ -98,7 +99,7 @@ Widget _sectionHarness(
 }) {
   return ProviderScope(
     overrides: [
-      appSettingsProvider.overrideWithValue(const AppSettings()),
+      appSettingsProvider.overrideWith(_TestSettings.new),
       openWebUiAccountAvailableProvider.overrideWithValue(hasOpenWebUiAccount),
       apiServiceProvider.overrideWithValue(null),
       modelsProvider.overrideWith(_TestModels.new),
@@ -115,6 +116,17 @@ Widget _sectionHarness(
       home: AppCustomizationPage(section: section),
     ),
   );
+}
+
+class _TestSettings extends AppSettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings();
+
+  // The real one persists to disk; the test only needs the new state.
+  @override
+  Future<void> setQuickPills(List<String> ids) async {
+    state = state.copyWith(quickPills: ids);
+  }
 }
 
 class _TestModels extends Models {

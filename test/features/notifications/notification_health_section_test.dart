@@ -46,7 +46,7 @@ void main() {
       tester,
       const AndroidNotificationHealth(allowed: true, channelExists: true),
     );
-    expect(find.text('ALLOWED'), findsOneWidget);
+    expect(find.text('Allowed'), findsOneWidget);
     expect(find.text(_fix), findsNothing);
   });
 
@@ -57,7 +57,7 @@ void main() {
       tester,
       const AndroidNotificationHealth(allowed: false, channelExists: true),
     );
-    expect(find.text('NOT ALLOWED'), findsOneWidget);
+    expect(find.text('Not allowed'), findsOneWidget);
     expect(find.text(_fix), findsOneWidget);
   });
 }

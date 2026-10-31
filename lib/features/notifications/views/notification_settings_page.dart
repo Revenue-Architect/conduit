@@ -1,16 +1,14 @@
 import 'dart:async';
 
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
-import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/theme/theme_extensions.dart';
-import '../../profile/widgets/settings_page_scaffold.dart';
-import '../../../shared/widgets/utility_components.dart';
+import '../../profile/widgets/settings_sky_page.dart';
 import '../../push/views/push_settings_section.dart';
 import '../services/local_notification_service.dart';
 
@@ -35,95 +33,99 @@ class NotificationSettingsPage extends ConsumerWidget {
       bool dependantOnMaster = true,
     }) {
       final interactive = !dependantOnMaster || enabled;
-      return UtilityRow(
-        enabled: interactive,
+      return SettingsSwitchRow(
         title: title,
-        subtitle: subtitle,
+        sub: subtitle,
         semanticLabel:
             '$title. ${value ? l10n.enabled : l10n.disabled}. $subtitle',
-        trailing: AdaptiveSwitch(
-          value: value,
-          onChanged: interactive ? onChanged : null,
-        ),
-        onTap: interactive ? () => onChanged(!value) : null,
+        value: value,
+        onChanged: interactive ? onChanged : null,
       );
     }
 
-    return UtilityPageScaffold.settings(
+    final hasServer = ref.watch(apiServiceProvider) != null;
+    // The plain switches come first; what Android reports and Push from
+    // Hermes (health, pairing, categories) sit below them.
+    return SettingsSkyPage(
       title: l10n.notificationsTitle,
+      lede: 'Banners, alerts and push',
       children: [
-        InsetGroupedList(
+        SettingsGroup(
           children: [
             tile(
               title: l10n.notificationsEnabledTitle,
-              subtitle: l10n.notificationsEnabledDescription,
+              subtitle: 'Allow banners and system alerts.',
               value: enabled,
               dependantOnMaster: false,
               onChanged: (value) => _setMaster(context, ref, value),
             ),
-            UtilityRow(
-              title: l10n.notificationSystemSettingsTitle,
-              subtitle: l10n.notificationSystemSettingsDescription,
-              showChevron: true,
+            SettingsRow(
+              leading: const SettingsGlyph(icon: Icons.smartphone_outlined),
+              title: 'Android notification settings',
+              sub: 'Permission, sound and banners for Conduit',
               onTap: () => _openSystemSettings(context, ref),
             ),
           ],
         ),
-        settingsSectionGap,
-        // What Android actually reports, and a direct test, so a missing
-        // notification can be traced to the device or to the event.
-        const NotificationHealthSection(),
-        settingsSectionGap,
-        // Push from the Umbrel (UnifiedPush): health, pairing, categories.
-        const PushSettingsSection(),
-        settingsSectionGap,
-        InsetGroupedList(
+        SettingsGroup(
+          title: 'While you use Conduit',
           children: [
             tile(
               title: l10n.notificationInAppBannerTitle,
-              subtitle: l10n.notificationInAppBannerDescription,
+              subtitle: 'Show a banner while the app is open.',
               value: settings.notificationInAppBanner,
               onChanged: notifier.setNotificationInAppBanner,
             ),
             tile(
               title: l10n.notificationSystemTitle,
-              subtitle: l10n.notificationSystemDescription,
+              subtitle: 'Show an alert when Conduit is in the background.',
               value: settings.notificationSystem,
               onChanged: notifier.setNotificationSystem,
             ),
             tile(
               title: l10n.notificationSoundTitle,
-              subtitle: l10n.notificationSoundDescription,
+              subtitle: 'Play a cue when a notification arrives.',
               value: settings.notificationSound,
               onChanged: (value) => _setSound(ref, value),
             ),
             tile(
               title: l10n.notificationSoundAlwaysTitle,
-              subtitle: l10n.notificationSoundAlwaysDescription,
+              subtitle: 'Play it even when the app is open and focused.',
               value: settings.notificationSoundAlways,
               onChanged: (value) => _setSoundAlways(ref, value),
             ),
           ],
         ),
-        const SizedBox(height: Spacing.lg),
-        InsetGroupedList(
+        SettingsGroup(
+          title: 'What you hear about',
+          note: hasServer
+              ? 'Channel messages come from Open WebUI and only show with a '
+                    'server account.'
+              : null,
           children: [
             tile(
               title: l10n.notificationChatTitle,
-              subtitle: l10n.notificationChatDescription,
+              subtitle:
+                  'When an answer finishes in a chat you are not viewing.',
               value: settings.notificationChatEnabled,
               onChanged: notifier.setNotificationChatEnabled,
             ),
             // Channels are Open WebUI only.
-            if (ref.watch(apiServiceProvider) != null)
+            if (hasServer)
               tile(
                 title: l10n.notificationChannelTitle,
-                subtitle: l10n.notificationChannelDescription,
+                subtitle:
+                    'When someone writes in a channel or a direct message.',
                 value: settings.notificationChannelEnabled,
                 onChanged: notifier.setNotificationChannelEnabled,
               ),
           ],
         ),
+        // What Android actually reports, and a direct test, so a missing
+        // notification can be traced to the device or to the event.
+        const NotificationHealthSection(),
+        // Push from the Umbrel (UnifiedPush): health, pairing, categories.
+        const PushSettingsSection(),
       ],
     );
   }
@@ -209,7 +211,7 @@ class NotificationSettingsPage extends ConsumerWidget {
   }
 }
 
-/// NOTIFICATION HEALTH: actual state from settings and from Android, a test
+/// Check this phone: actual state from settings and from Android, a test
 /// notification, and how the foreground / background split works.
 class NotificationHealthSection extends ConsumerStatefulWidget {
   const NotificationHealthSection({super.key});
@@ -294,51 +296,50 @@ class _NotificationHealthSectionState
     final settings = ref.watch(appSettingsProvider);
     final health = _health;
 
-    Widget status(String title, String value, {String? subtitle}) => UtilityRow(
-      title: title,
-      subtitle: subtitle,
-      semanticLabel: '$title: $value',
-      trailing: Text(value),
-    );
+    Widget status(String title, String value, {String? subtitle}) =>
+        SettingsStatRow(title: title, value: value, sub: subtitle);
 
-    String onOff(bool value) => value ? 'ON' : 'OFF';
+    String onOff(bool value) => value ? 'On' : 'Off';
     final permission = !_loaded
-        ? 'CHECKING'
+        ? 'Checking'
         : health == null
-        ? 'NOT ANDROID'
+        ? 'Not Android'
         : switch (health.allowed) {
-            true => 'ALLOWED',
-            false => 'NOT ALLOWED',
-            null => 'UNKNOWN',
+            true => 'Allowed',
+            false => 'Not allowed',
+            null => 'Unknown',
           };
     final channel = !_loaded
-        ? 'CHECKING'
+        ? 'Checking'
         : health == null
-        ? 'NOT ANDROID'
+        ? 'Not Android'
         : !health.channelExists
-        ? 'NOT CREATED'
+        ? 'Not created'
         : health.channelEnabled
-        ? 'ENABLED'
-        : 'TURNED OFF';
+        ? 'Enabled'
+        : 'Turned off';
 
-    return InsetGroupedList(
-      title: 'NOTIFICATION HEALTH',
+    return SettingsGroup(
+      title: 'Check this phone',
+      note:
+          'Alerts show inside the app while it is open, and as Android '
+          'notifications while it is in the background. A fully closed app '
+          'cannot receive them.',
       children: [
         status('Conduit notifications', onOff(settings.notificationsEnabled)),
         status(
           'System notifications',
           onOff(settings.notificationSystem),
-          subtitle: 'Android notifications while Hermez is in the background.',
+          subtitle: 'Android alerts while Conduit is in the background',
         ),
         status('Android permission', permission),
         status('Android channel', channel),
-        UtilityRow(
+        SettingsRow(
           title: 'Send test notification',
-          subtitle:
-              'Posts straight to Android, skipping Hermes, to check this '
-              'device.',
+          sub:
+              'Goes straight to Android, skipping Hermes, to check this '
+              'phone.',
           enabled: !_sending,
-          showChevron: true,
           onTap: _sending ? null : () => unawaited(_sendTest()),
         ),
         // The page's first group already links to Android settings; here
@@ -347,10 +348,9 @@ class _NotificationHealthSectionState
             (health.allowed == false ||
                 !health.channelExists ||
                 !health.channelEnabled))
-          UtilityRow(
+          SettingsRow(
             title: l10n.notificationSystemSettingsTitle,
-            subtitle: 'Open Android settings to turn notifications back on',
-            showChevron: true,
+            sub: 'Open Android settings to turn notifications back on',
             onTap: () async {
               final opened = await ref
                   .read(localNotificationServiceProvider)
@@ -364,15 +364,6 @@ class _NotificationHealthSectionState
               }
             },
           ),
-        const UtilityRow(
-          title: 'Where notifications appear',
-          subtitle:
-              'System notifications are shown while Hermez is in the '
-              'background. While the app is open, notifications appear '
-              'inside the app. Hermez must be running (in the background is '
-              'fine): a fully closed app cannot receive them.',
-          subtitleMaxLines: 6,
-        ),
       ],
     );
   }

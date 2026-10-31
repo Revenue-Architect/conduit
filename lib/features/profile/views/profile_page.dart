@@ -1,34 +1,39 @@
-import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
-
 import 'package:material_ui/material_ui.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 
 import '../../../shared/widgets/conduit_loading.dart';
-import '../../../shared/widgets/adaptive_route_shell.dart';
 
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/sign_out_options_dialog.dart';
+import '../../../core/models/model.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/services/navigation_service.dart';
+import '../../../core/services/settings_service.dart';
 import '../../auth/providers/unified_auth_providers.dart';
+import '../../direct_connections/providers/direct_connection_providers.dart';
+import '../../hermes/models/hermes_bot.dart';
+import '../../hermes/providers/hermes_providers.dart';
+import '../../hermes/sky/hermez_weather.dart' show kHermezCity;
+import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/models/user.dart' as models;
 import '../../../core/utils/user_display_name.dart';
 import '../../../core/utils/user_avatar_utils.dart';
 import '../../../shared/widgets/user_avatar.dart';
-import '../../../shared/widgets/utility_components.dart';
+import '../widgets/settings_sky_page.dart';
+import 'personalization_page.dart' show hasOpenRouterImageModel;
 
-/// Profile page (You tab) showing user info and main actions
-/// Enhanced with production-grade design tokens for better cohesion
+/// All settings (docs/app-design-2026-10-30, s01): every setting in one
+/// page, grouped by what you are doing (your team, chatting, this app,
+/// servers, about) rather than by who built it.
 class ProfilePage extends ConsumerWidget {
   static const _githubSponsorsUrl = 'https://github.com/sponsors/cogwheel0';
   static const _buyMeACoffeeUrl = 'https://www.buymeacoffee.com/cogwheel0';
@@ -45,151 +50,70 @@ class ProfilePage extends ConsumerWidget {
     );
     final isAuthLoading = ref.watch(isAuthLoadingProvider2);
     final api = ref.watch(apiServiceProvider);
-
-    Widget body;
-    if (isAuthLoading && user == null) {
-      body = _buildCenteredState(
-        context,
-        ImprovedLoadingState(
-          message: AppLocalizations.of(context)!.loadingProfile,
-        ),
-      );
-    } else {
-      body = _buildProfileBody(context, ref, user, api);
-    }
-
-    return _buildScaffold(context, body: body);
-  }
-
-  Widget _buildScaffold(BuildContext context, {required Widget body}) {
     final l10n = AppLocalizations.of(context)!;
 
-    return AdaptiveRouteShell(
-      backgroundColor: context.conduitTheme.surfaceBackground,
-      appBar: AdaptiveAppBar(title: l10n.you),
-      body: body,
-    );
-  }
-
-  Widget _buildCenteredState(BuildContext context, Widget child) {
-    final topPadding = _topContentPadding(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        Spacing.pagePadding,
-        topPadding,
-        Spacing.pagePadding,
-        Spacing.pagePadding + MediaQuery.of(context).padding.bottom,
-      ),
-      child: Center(child: child),
-    );
-  }
-
-  Widget _buildProfileBody(
-    BuildContext context,
-    WidgetRef ref,
-    dynamic userData,
-    ApiService? api,
-  ) {
-    final mediaQuery = MediaQuery.of(context);
-    final topPadding = _topContentPadding(context);
+    if (isAuthLoading && user == null) {
+      return SettingsSkyPage(
+        title: 'All settings',
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(Spacing.xl),
+            child: Center(
+              child: ImprovedLoadingState(message: l10n.loadingProfile),
+            ),
+          ),
+        ],
+      );
+    }
     final directPrimary =
         ref.watch(preferredBackendProvider) == PreferredBackend.direct;
-    final hasOpenWebUiAccount = userData != null && api != null;
-    final items = _buildSettingsItems(
-      context,
-      ref,
-      directPrimary: directPrimary,
-      hasOpenWebUiAccount: hasOpenWebUiAccount,
-    );
-    return ListView(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        Spacing.pagePadding,
-        topPadding,
-        Spacing.pagePadding,
-        Spacing.pagePadding + mediaQuery.padding.bottom,
-      ),
+    final hasOpenWebUiAccount = user != null && api != null;
+    final name = hasOpenWebUiAccount
+        ? deriveUserDisplayName(user, fallback: l10n.userFallbackName)
+        : null;
+    return SettingsSkyPage(
+      title: 'All settings',
+      lede: name == null ? kHermezCity : '$name · $kHermezCity',
       children: [
-        if (hasOpenWebUiAccount) ...[
-          InsetGroupedList(
-            children: [_buildProfileHeader(context, userData, api)],
-          ),
-          const SizedBox(height: Spacing.sm),
-        ],
-        ...items,
-        const SizedBox(height: Spacing.xl),
-        _buildDonationSection(context),
-        if (hasOpenWebUiAccount) const SizedBox(height: Spacing.xl),
         if (hasOpenWebUiAccount)
-          InsetGroupedList(children: [_buildSignOutOption(context, ref)]),
+          SettingsGroup(
+            first: true,
+            children: [_buildProfileHeader(context, user, api)],
+          ),
+        ..._buildSettingsItems(
+          context,
+          ref,
+          directPrimary: directPrimary,
+          hasOpenWebUiAccount: hasOpenWebUiAccount,
+        ),
+        _buildDonationSection(context),
+        if (hasOpenWebUiAccount)
+          SettingsGroup(children: [_buildSignOutOption(context, ref)]),
       ],
     );
   }
 
-  double _topContentPadding(BuildContext context) {
-    return Spacing.lg;
-  }
-
   Widget _buildDonationSection(BuildContext context) {
-    final theme = context.conduitTheme;
-    final l10n = AppLocalizations.of(context)!;
-    final donationOptions = [
-      _buildSupportOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.gift,
-          android: Icons.coffee,
-        ),
-        title: l10n.buyMeACoffeeTitle,
-        subtitle: l10n.buyMeACoffeeSubtitle,
-        url: _buyMeACoffeeUrl,
-        color: theme.warning,
-      ),
-      _buildSupportOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.heart,
-          android: Icons.favorite_border,
-        ),
-        title: l10n.githubSponsorsTitle,
-        subtitle: l10n.githubSponsorsSubtitle,
-        url: _githubSponsorsUrl,
-        color: theme.success,
-      ),
-    ];
-
-    return InsetGroupedList(
+    return SettingsGroup(
       key: const Key('settings-donations'),
-      title: l10n.supportConduit,
-      description: l10n.supportConduitSubtitle,
-      children: donationOptions,
-    );
-  }
-
-  Widget _buildSupportOption(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String url,
-    required Color color,
-  }) {
-    final theme = context.conduitTheme;
-    return UtilityRow(
-      onTap: () => _openExternalLink(context, url),
-      leading: _buildIconBadge(context, icon, color: color),
-      title: title,
-      subtitle: subtitle,
-      trailing: Icon(
-        UiUtils.platformIcon(
-          ios: CupertinoIcons.arrow_up_right,
-          android: Icons.open_in_new,
+      title: 'Support Conduit',
+      note: 'Conduit stays independent when its users fund it.',
+      children: [
+        SettingsRow(
+          leading: const SettingsGlyph(icon: Icons.card_giftcard_outlined),
+          title: 'Buy me a coffee',
+          sub: 'A one-time thank you',
+          chevron: Icons.north_east_rounded,
+          onTap: () => _openExternalLink(context, _buyMeACoffeeUrl),
         ),
-        color: theme.iconSecondary,
-        size: IconSize.small,
-      ),
+        SettingsRow(
+          leading: const SettingsGlyph(icon: Icons.favorite_border),
+          title: 'GitHub Sponsors',
+          sub: 'Recurring support for the roadmap',
+          chevron: Icons.north_east_rounded,
+          onTap: () => _openExternalLink(context, _githubSponsorsUrl),
+        ),
+      ],
     );
   }
 
@@ -237,13 +161,12 @@ class ProfilePage extends ConsumerWidget {
     }
 
     final email = extractEmail(user) ?? l10n.noEmailLabel;
-    return UtilityRow(
+    return SettingsRow(
       onTap: () => context.pushNamed(RouteNames.accountSettings),
-      leading: UserAvatar(size: 56, imageUrl: avatarUrl, fallbackText: initial),
+      leading: UserAvatar(size: 52, imageUrl: avatarUrl, fallbackText: initial),
       title: displayName,
-      subtitle: email,
-      showChevron: true,
-      padding: const EdgeInsets.all(Spacing.md),
+      sub: email,
+      minHeight: 64,
     );
   }
 
@@ -255,233 +178,154 @@ class ProfilePage extends ConsumerWidget {
   }) {
     final l10n = AppLocalizations.of(context)!;
     final canManageWorkspace = canManageAnyWorkspaceSection(ref);
+    final defaultModelId = ref.watch(
+      appSettingsProvider.select((s) => s.defaultModel),
+    );
+    final allModels = ref.watch(modelsProvider).value ?? const <Model>[];
+    final bots = ref.watch(hermesBotsProvider).value ?? const <HermesBot>[];
+    final directCount =
+        ref.watch(directConnectionProfilesProvider).value?.length ?? 0;
+    final buildNumber = ref.watch(packageInfoProvider).value?.buildNumber ?? '';
+    final themeMode = ref.watch(appThemeModeProvider);
+    // The default model's name, so the row shows what a new chat starts on.
+    final defaultModel = defaultModelId == null
+        ? null
+        : allModels
+                  .where((m) => m.id == defaultModelId)
+                  .map((m) => m.name)
+                  .firstOrNull ??
+              defaultModelId;
+    // Personalization holds the image model, your prompt and memories; with
+    // only direct connections it has something only for an image model.
+    final showPersonalization =
+        hasOpenWebUiAccount ||
+        (directPrimary && hasOpenRouterImageModel(allModels));
 
-    final appItems = <Widget>[
-      _buildAccountOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.paintbrush,
-          android: Icons.palette_outlined,
-        ),
-        title: l10n.settingsAppearance,
-        subtitle: l10n.settingsAppearanceSubtitle,
-        onTap: () => context.pushNamed(RouteNames.appearanceSettings),
-      ),
-      _buildAccountOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.bubble_left_bubble_right,
-          android: Icons.chat_bubble_outline,
-        ),
-        title: l10n.chatSettings,
-        subtitle: l10n.settingsChatSubtitle,
-        onTap: () => context.pushNamed(RouteNames.chatSettings),
-      ),
-      _buildAccountOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.waveform,
-          android: Icons.graphic_eq,
-        ),
-        title: l10n.audioSettingsTitle,
-        subtitle: l10n.audioSettingsSubtitle,
-        onTap: () => context.pushNamed(RouteNames.audioSettings),
-      ),
-      // Hermes runs notify too, so this is not an Open WebUI-only setting.
-      _buildAccountOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.bell,
-          android: Icons.notifications_outlined,
-        ),
-        title: l10n.notificationsTitle,
-        subtitle: l10n.notificationsSubtitle,
-        onTap: () => context.pushNamed(RouteNames.notificationSettings),
-      ),
-      if (hasOpenWebUiAccount || directPrimary)
-        _buildAccountOption(
-          context,
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.person_crop_circle_badge_checkmark,
-            android: Icons.auto_awesome,
-          ),
-          title: l10n.personalization,
-          subtitle: l10n.personalizationSubtitle,
-          onTap: () => context.pushNamed(RouteNames.personalization),
-        ),
-    ];
-    final connectionItems = <Widget>[
-      _buildAccountOption(
-        context,
-        iconAsset: 'assets/icons/hermes_agent.png',
-        title: l10n.hermesAgentSettingsTitle,
-        subtitle: l10n.hermesAgentSettingsSubtitle,
-        onTap: () => context.pushNamed(RouteNames.hermesSettings),
-      ),
-      if (canManageWorkspace)
-        _buildAccountOption(
-          context,
-          key: const Key('workspace-entry'),
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.square_grid_2x2,
-            android: Icons.dashboard_customize_outlined,
-          ),
-          title: l10n.workspaceTitle,
-          subtitle: l10n.workspaceSubtitle,
-          onTap: () => context.pushNamed(RouteNames.workspace),
-        ),
-      if (hasOpenWebUiAccount)
-        _buildAccountOption(
-          context,
-          key: const Key('data-connection-entry'),
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.antenna_radiowaves_left_right,
-            android: Icons.hub_outlined,
-          ),
-          title: l10n.settingsDataAndConnection,
-          subtitle: l10n.connectionHealth,
-          onTap: () => context.pushNamed(RouteNames.dataConnectionSettings),
-        ),
-      _buildAccountOption(
-        context,
-        icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.link,
-          android: Icons.hub_outlined,
-        ),
-        title: l10n.directConnectionsTitle,
-        subtitle: l10n.directConnectionsSubtitle,
-        onTap: () => context.pushNamed(RouteNames.directConnections),
-      ),
-      if (!hasOpenWebUiAccount)
-        _buildAccountOption(
-          context,
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.add_circled,
-            android: Icons.add_circle_outline,
-          ),
-          title: l10n.connectOpenWebUITitle,
-          subtitle: l10n.connectOpenWebUISubtitle,
-          onTap: () => context.goNamed(RouteNames.serverConnection),
-        ),
-    ];
     return [
-      InsetGroupedList(children: appItems),
-      const SizedBox(height: Spacing.lg),
-      InsetGroupedList(children: connectionItems),
-      const SizedBox(height: Spacing.lg),
-      InsetGroupedList(children: [_buildAboutTile(context)]),
+      SettingsGroup(
+        title: 'Your team',
+        children: [
+          SettingsRow(
+            leading: const SettingsGlyphShell(child: _HermesLogo()),
+            title: 'Hermes Agent',
+            sub: bots.isEmpty
+                ? 'Self-hosted agent'
+                : 'Connected to your Umbrel · ${bots.length} bots',
+            onTap: () => context.pushNamed(RouteNames.hermesSettings),
+          ),
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.notifications_none),
+            title: l10n.notificationsTitle,
+            sub: 'Banners, alerts and push from your team',
+            onTap: () => context.pushNamed(RouteNames.notificationSettings),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        title: 'Chatting',
+        children: [
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.chat_bubble_outline),
+            title: l10n.chatSettings,
+            sub: 'Model, quick actions, sending',
+            value: defaultModel,
+            onTap: () => context.pushNamed(RouteNames.chatSettings),
+          ),
+          if (showPersonalization)
+            SettingsRow(
+              leading: const SettingsGlyph(icon: Icons.menu_book_outlined),
+              title: l10n.personalization,
+              sub: 'Your prompt and server memory',
+              onTap: () => context.pushNamed(RouteNames.personalization),
+            ),
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.graphic_eq),
+            title: l10n.audioSettingsTitle,
+            sub: 'Dictation and spoken answers',
+            onTap: () => context.pushNamed(RouteNames.audioSettings),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        title: 'This app',
+        children: [
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.contrast),
+            title: l10n.settingsAppearance,
+            sub: 'Theme, accent and language',
+            value: switch (themeMode) {
+              ThemeMode.system => l10n.system,
+              ThemeMode.light => l10n.themeLight,
+              ThemeMode.dark => l10n.themeDark,
+            },
+            onTap: () => context.pushNamed(RouteNames.appearanceSettings),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        title: 'Servers',
+        children: [
+          if (!hasOpenWebUiAccount)
+            SettingsRow(
+              leading: const SettingsGlyph(icon: Icons.add_circle_outline),
+              title: 'Connect to Open WebUI',
+              sub: 'Add a self-hosted Open WebUI server',
+              onTap: () => context.goNamed(RouteNames.serverConnection),
+            ),
+          if (hasOpenWebUiAccount)
+            SettingsRow(
+              key: const Key('data-connection-entry'),
+              leading: const SettingsGlyph(icon: Icons.sensors),
+              title: 'Open WebUI connection',
+              sub: l10n.connectionHealth,
+              onTap: () => context.pushNamed(RouteNames.dataConnectionSettings),
+            ),
+          if (canManageWorkspace)
+            SettingsRow(
+              key: const Key('workspace-entry'),
+              leading: const SettingsGlyph(icon: Icons.grid_view_outlined),
+              title: l10n.workspaceTitle,
+              sub: 'Models, tools and access on the server',
+              onTap: () => context.pushNamed(RouteNames.workspace),
+            ),
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.power_outlined),
+            title: 'Direct connections',
+            sub: l10n.directConnectionsSubtitle,
+            value: directCount > 0 ? '$directCount' : null,
+            onTap: () => context.pushNamed(RouteNames.directConnections),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        title: 'About Conduit',
+        children: [
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.info_outline),
+            title: l10n.aboutApp,
+            sub: buildNumber.isEmpty
+                ? l10n.aboutAppSubtitle
+                : 'Build $buildNumber · what’s new and licences',
+            onTap: () => context.pushNamed(RouteNames.about),
+          ),
+        ],
+      ),
     ];
   }
 
   Widget _buildSignOutOption(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
-    return _buildAccountOption(
-      context,
+    return SettingsRow(
       key: const Key('settings-sign-out'),
-      icon: UiUtils.platformIcon(
-        ios: CupertinoIcons.square_arrow_left,
-        android: Icons.logout,
+      leading: SettingsGlyph(
+        icon: Icons.logout,
+        color: HermezChatPalette.forBrightness(Theme.of(context).brightness)
+            .failed,
       ),
-      title: l10n.signOut,
-      subtitle: l10n.endYourSession,
-      onTap: () => _signOut(context, ref),
-      showChevron: false,
+      title: AppLocalizations.of(context)!.signOut,
+      sub: 'End your Open WebUI session',
+      chevron: null,
       destructive: true,
-    );
-  }
-
-  Widget _buildAccountOption(
-    BuildContext context, {
-    Key? key,
-    IconData? icon,
-    String? iconAsset,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    bool showChevron = true,
-    bool destructive = false,
-  }) {
-    assert(
-      (icon == null) != (iconAsset == null),
-      'Provide exactly one of icon or iconAsset.',
-    );
-    final theme = context.conduitTheme;
-    final color = theme.buttonPrimary;
-    return UtilityRow(
-      key: key,
-      onTap: onTap,
-      leading: iconAsset != null
-          ? _buildAssetIconBadge(context, iconAsset, color: color)
-          : _buildIconBadge(context, icon!, color: color),
-      title: title,
-      subtitle: subtitle,
-      showChevron: showChevron,
-      destructive: destructive,
-    );
-  }
-
-  Widget _buildIconBadge(
-    BuildContext context,
-    IconData icon, {
-    required Color color,
-  }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: BorderWidth.thin,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, color: color, size: IconSize.medium),
-    );
-  }
-
-  Widget _buildAssetIconBadge(
-    BuildContext context,
-    String asset, {
-    required Color color,
-  }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: BorderWidth.thin,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Image.asset(
-        asset,
-        key: const Key('hermes-settings-logo'),
-        width: IconSize.medium + 2,
-        height: IconSize.medium + 2,
-        color: color,
-        colorBlendMode: BlendMode.srcIn,
-        filterQuality: FilterQuality.high,
-      ),
-    );
-  }
-
-  // Theme and language controls moved to AppCustomizationPage.
-
-  Widget _buildAboutTile(BuildContext context) {
-    return _buildAccountOption(
-      context,
-      icon: UiUtils.platformIcon(
-        ios: CupertinoIcons.info,
-        android: Icons.info_outline,
-      ),
-      title: AppLocalizations.of(context)!.aboutApp,
-      subtitle: AppLocalizations.of(context)!.aboutAppSubtitle,
-      onTap: () => context.pushNamed(RouteNames.about),
+      onTap: () => _signOut(context, ref),
     );
   }
 
@@ -498,4 +342,20 @@ class ProfilePage extends ConsumerWidget {
       UiUtils.showMessage(context, AppLocalizations.of(context)!.errorMessage);
     }
   }
+}
+
+/// The Hermes mark, tinted like the other glyphs.
+class _HermesLogo extends StatelessWidget {
+  const _HermesLogo();
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/icons/hermes_agent.png',
+    key: const Key('hermes-settings-logo'),
+    width: 24,
+    height: 24,
+    color: HermezChatPalette.forBrightness(Theme.of(context).brightness).muted,
+    colorBlendMode: BlendMode.srcIn,
+    filterQuality: FilterQuality.high,
+  );
 }

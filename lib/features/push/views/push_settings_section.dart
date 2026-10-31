@@ -1,8 +1,6 @@
 import 'dart:async';
 
-import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart'
-    show AdaptiveSwitch;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,7 +8,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../hermes/motion/hermez_select_card.dart';
 import '../../hermes/motion/hermez_dialog_card.dart';
-import '../../../shared/widgets/utility_components.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
+import '../../profile/widgets/settings_sky_page.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../models/push_envelope.dart';
 import '../models/push_health.dart';
@@ -199,91 +198,74 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
     final native = value?.native;
     final distributor = native?.distributor;
 
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
     final healthRows = <Widget>[
-      UtilityRow(
+      SettingsRow(
         title: health == null ? 'Checking push…' : health.headline,
-        subtitle: health?.lastPushAt == null
+        sub: health?.lastPushAt == null
             ? null
             : 'Last push received ${_ago(health!.lastPushAt!)}.',
-        leading: Icon(
-          switch (health?.level) {
-            PushHealthLevel.healthy => Icons.check_circle_rounded,
-            PushHealthLevel.warning => Icons.warning_amber_rounded,
-            PushHealthLevel.problem => Icons.error_rounded,
+        leading: SettingsGlyph(
+          icon: switch (health?.level) {
+            PushHealthLevel.healthy => Icons.check_circle_outline_rounded,
+            PushHealthLevel.problem => Icons.error_outline_rounded,
+            PushHealthLevel.warning => Icons.info_outline_rounded,
             _ => Icons.sync_rounded,
           },
-          color: switch (health?.level) {
-            PushHealthLevel.healthy => const Color(0xFF2E9E5B),
-            PushHealthLevel.warning => const Color(0xFFD99A00),
-            PushHealthLevel.problem => const Color(0xFFD64545),
-            _ => null,
-          },
+          color: health?.level == PushHealthLevel.problem
+              ? palette.failed
+              : palette.ink,
         ),
         semanticLabel: health?.headline ?? 'Checking push',
-        subtitleMaxLines: 3,
       ),
       if (health != null)
         for (final issue in health.issues)
           _issueRow(issue, distributor: distributor),
-      UtilityRow(
+      SettingsRow(
         title: 'Check again',
-        subtitle: _checking ? 'Checking…' : null,
-        showChevron: true,
+        sub: _checking ? 'Checking…' : null,
         enabled: !_checking,
         onTap: _checking ? null : () => unawaited(_check()),
       ),
+    ];
+
+    final pairingRows = <Widget>[
       if (native != null && native.paired)
-        UtilityRow(
+        SettingsRow(
           title: 'Approvals',
-          subtitle: 'Pending requests and history',
-          showChevron: true,
+          sub: 'Pending requests and history',
           onTap: () => context.push(Routes.hermesApprovals),
         ),
-      UtilityRow(
+      SettingsRow(
         title: native != null && native.paired
             ? 'Pair again'
             : 'Pair this phone',
-        subtitle: 'Enter a one-time code from the Umbrel',
-        showChevron: true,
+        sub: 'Enter a one-time code from your Umbrel',
         onTap: () => context.push(Routes.hermesPushPairing),
       ),
       if (native != null && native.paired)
-        UtilityRow(
+        SettingsRow(
           title: 'Unpair this phone',
           destructive: true,
-          showChevron: true,
           onTap: () => unawaited(_unpair()),
         ),
     ];
 
     Widget category(PushCategory c) {
       final on = _enabled && !_disabled.contains(c.name);
-      return UtilityRow(
-        enabled: _enabled && _prefsLoaded,
+      return SettingsSwitchRow(
         title: c.label,
         semanticLabel: '${c.label}. ${on ? 'On' : 'Off'}',
-        trailing: AdaptiveSwitch(
-          value: on,
-          onChanged: _enabled && _prefsLoaded
-              ? (v) {
-                  setState(() {
-                    if (v) {
-                      _disabled.remove(c.name);
-                    } else {
-                      _disabled.add(c.name);
-                    }
-                  });
-                  unawaited(_savePrefs());
-                }
-              : null,
-        ),
-        onTap: _enabled && _prefsLoaded
-            ? () {
+        value: on,
+        onChanged: _enabled && _prefsLoaded
+            ? (v) {
                 setState(() {
-                  if (on) {
-                    _disabled.add(c.name);
-                  } else {
+                  if (v) {
                     _disabled.remove(c.name);
+                  } else {
+                    _disabled.add(c.name);
                   }
                 });
                 unawaited(_savePrefs());
@@ -295,38 +277,30 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InsetGroupedList(title: 'PUSH FROM HERMES', children: healthRows),
-        settingsGap,
-        InsetGroupedList(
-          title: 'PUSH CATEGORIES',
-          footer:
+        SettingsGroup(title: 'Push from Hermes', children: healthRows),
+        SettingsGroup(children: pairingRows),
+        SettingsGroup(
+          title: 'What Hermes can push',
+          note:
               'Approvals and critical alerts stay on whenever push is on. '
               'Critical alerts do not bypass Do Not Disturb.',
           children: [
-            UtilityRow(
+            SettingsSwitchRow(
               title: 'Receive push',
+              sub: 'Master switch for everything below.',
               semanticLabel: 'Receive push. ${_enabled ? 'On' : 'Off'}',
-              trailing: AdaptiveSwitch(
-                value: _enabled,
-                onChanged: _prefsLoaded
-                    ? (v) {
-                        setState(() => _enabled = v);
-                        unawaited(_savePrefs());
-                      }
-                    : null,
-              ),
-              onTap: _prefsLoaded
-                  ? () {
-                      setState(() => _enabled = !_enabled);
+              value: _enabled,
+              onChanged: _prefsLoaded
+                  ? (v) {
+                      setState(() => _enabled = v);
                       unawaited(_savePrefs());
                     }
                   : null,
             ),
             for (final c in switchableCategories) category(c),
-            UtilityRow(
+            SettingsRow(
               title: 'Sound and vibration',
-              subtitle: 'Android settings for each category',
-              showChevron: true,
+              sub: 'Android settings for each category',
               onTap: () => unawaited(_channelSheet()),
             ),
           ],
@@ -382,15 +356,19 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
       case PushIssue.fallbackActive:
         break;
     }
-    return UtilityRow(
-      title: _issueTitle(issue),
-      subtitle: text,
-      subtitleMaxLines: 6,
-      leading: const Icon(Icons.chevron_right_rounded, size: 18),
-      status: actionLabel == null
-          ? null
-          : TextButton(onPressed: action, child: Text(actionLabel)),
-      semanticLabel: '${_issueTitle(issue)}. $text',
+    // Indented under the headline above, so the fix reads as part of it.
+    return Padding(
+      padding: const EdgeInsets.only(left: 40),
+      child: SettingsRow(
+        title: _issueTitle(issue),
+        sub: text,
+        subMaxLines: 6,
+        preserveTrailingSemantics: true,
+        trailing: actionLabel == null
+            ? null
+            : SettingsPill(label: actionLabel, onTap: action),
+        semanticLabel: '${_issueTitle(issue)}. $text',
+      ),
     );
   }
 
@@ -406,7 +384,7 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
     PushIssue.notRegistered => 'Not registered yet',
     PushIssue.uploadPending => 'Delivery address not sent yet',
     PushIssue.uploadFailed => 'Delivery address rejected',
-    PushIssue.appBatteryRestricted => 'Hermez battery use is restricted',
+    PushIssue.appBatteryRestricted => 'Conduit battery use is restricted',
     PushIssue.distributorBatteryRestricted => 'ntfy battery use is restricted',
     PushIssue.distributorTemporarilyDown => 'ntfy server unavailable',
     PushIssue.serverUnreachable => 'Hermes unreachable',
@@ -422,5 +400,3 @@ class _PushSettingsSectionState extends ConsumerState<PushSettingsSection>
     return '${diff.inDays} d ago';
   }
 }
-
-const SizedBox settingsGap = SizedBox(height: 16);

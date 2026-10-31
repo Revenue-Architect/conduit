@@ -11,21 +11,25 @@ import '../../../core/models/server_user_settings.dart';
 import '../../../core/models/server_memory.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/native_sheet_bridge.dart';
-import '../../../core/services/native_sheet_hydration_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/adaptive_selection_sheet.dart';
-import '../../../shared/widgets/themed_sheets.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
-import '../../chat/providers/chat_providers.dart' show restoreDefaultModel;
 import '../widgets/customization_tile.dart';
-import '../widgets/default_model_sheet.dart';
 import '../widgets/expandable_card.dart';
 import '../widgets/settings_page_scaffold.dart';
 import '../../../shared/widgets/utility_components.dart';
+
+/// Whether a model can draw images through OpenRouter, which is what gives
+/// Personalization its image model row.
+bool hasOpenRouterImageModel(List<Model> models) => models.any(
+  (model) =>
+      model.capabilities?['openrouter'] == true &&
+      model.capabilities?['image_generation'] == true,
+);
 
 class PersonalizationPage extends ConsumerStatefulWidget {
   const PersonalizationPage({super.key});
@@ -57,13 +61,6 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
     return UtilityPageScaffold.settings(
       title: l10n.personalization,
       children: [
-        _buildDefaultModelSection(
-          context,
-          ref,
-          currentDefaultModelId: appSettings.defaultModel,
-          modelsAsync: modelsAsync,
-          hasOpenWebUiAccount: hasOpenWebUiAccount,
-        ),
         _buildOpenRouterImageGenerationModelSection(
           context,
           ref,
@@ -71,7 +68,6 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
           modelsAsync: modelsAsync,
         ),
         if (hasOpenWebUiAccount) ...[
-          settingsSectionGap,
           _buildSystemPromptSection(
             context,
             ref,
@@ -89,57 +85,6 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
     );
   }
 
-  Widget _buildDefaultModelSection(
-    BuildContext context,
-    WidgetRef ref, {
-    required String? currentDefaultModelId,
-    required AsyncValue<List<Model>> modelsAsync,
-    required bool hasOpenWebUiAccount,
-  }) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        modelsAsync.when(
-          data: (models) {
-            final resolvedName = _resolveModelName(
-              models,
-              currentDefaultModelId,
-            );
-            return CustomizationTile(
-              leading: SettingsIconBadge(
-                icon: UiUtils.platformIcon(
-                  ios: CupertinoIcons.wand_stars,
-                  android: Icons.auto_awesome,
-                ),
-                color: context.conduitTheme.buttonPrimary,
-              ),
-              title: l10n.defaultModel,
-              subtitle:
-                  resolvedName ??
-                  (hasOpenWebUiAccount
-                      ? l10n.autoSelectDescription
-                      : l10n.autoSelect),
-              onTap: () => _showDefaultModelPicker(
-                context,
-                ref,
-                models: models,
-                currentDefaultModelId: currentDefaultModelId,
-              ),
-            );
-          },
-          loading: () => _buildLoadingTile(context, title: l10n.defaultModel),
-          error: (_, _) => _buildErrorTile(
-            context,
-            title: l10n.defaultModel,
-            subtitle: l10n.failedToLoadModels,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildOpenRouterImageGenerationModelSection(
     BuildContext context,
     WidgetRef ref, {
@@ -150,19 +95,13 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
 
     return modelsAsync.maybeWhen(
       data: (models) {
-        final hasOpenRouterImageTool = models.any(
-          (model) =>
-              model.capabilities?['openrouter'] == true &&
-              model.capabilities?['image_generation'] == true,
-        );
-        if (!hasOpenRouterImageTool) {
+        if (!hasOpenRouterImageModel(models)) {
           return const SizedBox.shrink();
         }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            settingsSectionGap,
             CustomizationTile(
               leading: SettingsIconBadge(
                 icon: UiUtils.platformIcon(
@@ -187,6 +126,7 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
                 },
               ),
             ),
+            settingsSectionGap,
           ],
         );
       },
@@ -441,72 +381,6 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
     );
   }
 
-  Future<void> _showDefaultModelPicker(
-    BuildContext context,
-    WidgetRef ref, {
-    required List<Model> models,
-    required String? currentDefaultModelId,
-  }) async {
-    final l10n = AppLocalizations.of(context)!;
-
-    if (Platform.isIOS) {
-      try {
-        final result = await ref
-            .read(nativeSheetHydrationServiceProvider)
-            .presentModelSelector(
-              context,
-              title: l10n.defaultModel,
-              selectedModelId: currentDefaultModelId ?? 'auto-select',
-              leadingOptions: [
-                NativeSheetModelOption(
-                  id: 'auto-select',
-                  name: l10n.autoSelect,
-                  subtitle: l10n.autoSelectDescription,
-                  sfSymbol: 'wand.and.stars',
-                ),
-              ],
-              models: models,
-              rethrowErrors: true,
-            );
-        if (result == null) return;
-        final selectedId = result == 'auto-select' ? null : result;
-        await ref
-            .read(appSettingsProvider.notifier)
-            .setDefaultModel(selectedId);
-        await restoreDefaultModel(ref);
-        return;
-      } catch (_) {
-        if (!context.mounted) {
-          return;
-        }
-      }
-    }
-
-    if (!context.mounted) {
-      return;
-    }
-
-    // A searchable model list that sizes itself: a content sheet, not the
-    // select card.
-    final result = await ThemedSheets.showCustom<String?>(
-      context: context,
-      isScrollControlled: true,
-      fit: true,
-      builder: (sheetContext) => DefaultModelBottomSheet(
-        models: models,
-        currentDefaultModelId: currentDefaultModelId,
-      ),
-    );
-
-    if (result == null) {
-      return;
-    }
-
-    final selectedId = result == 'auto-select' ? null : result;
-    await ref.read(appSettingsProvider.notifier).setDefaultModel(selectedId);
-    await restoreDefaultModel(ref);
-  }
-
   Future<void> _showTextEditorSheet(
     BuildContext context, {
     required String title,
@@ -659,18 +533,6 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
       subtitle: subtitle,
       showChevron: false,
     );
-  }
-
-  String? _resolveModelName(List<Model> models, String? modelId) {
-    if (modelId == null || modelId.isEmpty) {
-      return null;
-    }
-    for (final model in models) {
-      if (model.id == modelId) {
-        return model.name;
-      }
-    }
-    return modelId;
   }
 
   String _previewText(BuildContext context, String? value) {

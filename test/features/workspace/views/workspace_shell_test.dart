@@ -4,12 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:conduit/core/models/model.dart';
+import 'package:conduit/core/models/socket_transport_availability.dart';
 import 'package:conduit/core/models/user.dart';
 import 'package:conduit/core/providers/app_providers.dart';
 import 'package:conduit/core/services/native_sheet_bridge.dart';
+import 'package:conduit/core/services/optimized_storage_service.dart';
+import 'package:conduit/core/services/settings_service.dart';
 import 'package:conduit/core/services/api_service.dart';
 import 'package:conduit/core/services/navigation_service.dart';
 import 'package:conduit/features/auth/providers/unified_auth_providers.dart';
+import 'package:conduit/features/direct_connections/models/direct_connection_profile.dart';
+import 'package:conduit/features/direct_connections/providers/direct_connection_providers.dart';
+import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/profile/views/profile_page.dart';
 import 'package:conduit/features/workspace/models/workspace_capabilities.dart';
 import 'package:conduit/features/workspace/models/workspace_resources.dart';
@@ -548,6 +555,7 @@ void main() {
           currentUserProvider2.overrideWithValue(_user),
           currentUserProvider.overrideWith((ref) async => _user),
           apiServiceProvider.overrideWithValue(_WorkspaceApiService()),
+          ..._profileRowValueOverrides,
           workspaceCapabilitiesProvider.overrideWith(
             (ref) async => _capabilities,
           ),
@@ -573,10 +581,9 @@ void main() {
     expect(find.byKey(const Key('workspace-entry')), findsOneWidget);
     expect(find.byKey(const Key('data-connection-entry')), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('workspace-entry')),
-      -300,
-    );
+    // The page builds every row, so bring this one on screen to tap it.
+    await tester.ensureVisible(find.byKey(const Key('workspace-entry')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('workspace-entry')));
     await tester.pumpAndSettle();
     expect(find.text('workspace target'), findsOneWidget);
@@ -602,6 +609,7 @@ void main() {
           currentUserProvider2.overrideWithValue(_user),
           currentUserProvider.overrideWith((ref) async => _user),
           apiServiceProvider.overrideWithValue(_WorkspaceApiService()),
+          ..._profileRowValueOverrides,
           workspaceCapabilitiesProvider.overrideWith(
             (ref) async => const WorkspaceCapabilities(),
           ),
@@ -628,6 +636,40 @@ void main() {
 }
 
 final class _WorkspaceApiService extends Mock implements ApiService {}
+
+/// What the settings rows read to show their current value (default model,
+/// theme, bots, direct connections); none of it is under test here.
+final _profileRowValueOverrides = [
+  appSettingsProvider.overrideWithValue(const AppSettings()),
+  optimizedStorageServiceProvider.overrideWithValue(_ThemeStorage()),
+  modelsProvider.overrideWith(_NoModels.new),
+  hermesBotsProvider.overrideWith((ref) async => const []),
+  directConnectionProfilesProvider.overrideWith(_NoProfiles.new),
+];
+
+class _NoModels extends Models {
+  @override
+  Future<List<Model>> build() async => const [];
+}
+
+class _NoProfiles extends DirectConnectionProfilesController {
+  @override
+  Future<List<DirectConnectionProfile>> build() async => const [];
+}
+
+class _ThemeStorage extends Fake implements OptimizedStorageService {
+  @override
+  String? getThemeMode() => null;
+
+  @override
+  String? getThemePaletteId() => null;
+
+  @override
+  String? getLocaleCode() => null;
+
+  @override
+  SocketTransportAvailability? getLocalTransportOptionsSync() => null;
+}
 
 Widget _workspaceHarness({
   WorkspaceCapabilities capabilities = _capabilities,
