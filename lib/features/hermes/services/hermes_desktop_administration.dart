@@ -474,12 +474,11 @@ final class _HermesDesktopAdministration {
     await _owner._requestJson(
       'POST',
       '/api/cron/jobs',
-      body: {
-        'name': name,
-        'prompt': prompt,
-        'schedule': schedule,
-        'deliver': 'local',
-      },
+      body: hermesNewRoutineBody(
+        name: name,
+        prompt: prompt,
+        schedule: schedule,
+      ),
     ),
   );
 
@@ -617,3 +616,19 @@ final class _HermesDesktopAdministration {
     );
   }
 }
+
+/// The body that creates a routine. A new routine starts paused: nothing new
+/// runs until the owner turns it on (docs/app-design-2026-10-30, m14; Hermes
+/// keeps `paused_reason` for the routine's own page).
+Map<String, Object> hermesNewRoutineBody({
+  required String name,
+  required String prompt,
+  required String schedule,
+}) => {
+  'name': name,
+  'prompt': prompt,
+  'schedule': schedule,
+  'deliver': 'local',
+  'paused': true,
+  'paused_reason': 'Created in Conduit; turn it on when it looks right.',
+};
