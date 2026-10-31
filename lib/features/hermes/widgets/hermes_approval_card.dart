@@ -10,6 +10,16 @@ import 'hermez_expandable_section.dart';
 /// message's `metadata['hermesApproval']['state']`.
 enum HermesApprovalState { pending, resolving, approved, denied }
 
+/// The record an answered approval leaves in the run: "Approved by you ·
+/// 7:44" (docs/app-design-2026-10-30, m12; CoWork OS's approval record).
+String approvalRecordLead({required bool approved, DateTime? at}) {
+  final verb = approved ? 'Approved by you' : 'Denied by you';
+  if (at == null) return verb;
+  final local = at.toLocal();
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  return '$verb · $hour:${local.minute.toString().padLeft(2, '0')}';
+}
+
 /// Inline prompt shown when a Hermes run pauses for human approval.
 ///
 /// Presentational only: [onDecision] / [onChoice] is invoked with the user's
@@ -24,12 +34,20 @@ class HermesApprovalCard extends StatefulWidget {
     required this.state,
     required this.onDecision,
     this.summary,
+    this.command,
+    this.decidedAt,
     this.choices = const <String>[],
     this.onChoice,
   });
 
   final HermesApprovalState state;
   final String? summary;
+
+  /// What it asks to run, as Hermes sent it (redacted): the scope.
+  final String? command;
+
+  /// When the owner answered, for the record line.
+  final DateTime? decidedAt;
   final void Function(bool approved) onDecision;
   final List<String> choices;
   final void Function(String choice)? onChoice;
@@ -94,7 +112,10 @@ class _HermesApprovalCardState extends State<HermesApprovalCard> {
                   TextSpan(
                     children: [
                       TextSpan(
-                        text: approved ? 'You approved' : 'You denied',
+                        text: approvalRecordLead(
+                          approved: approved,
+                          at: widget.decidedAt,
+                        ),
                         style: TextStyle(
                           color: palette.ink,
                           fontWeight: FontWeight.w700,
@@ -194,6 +215,21 @@ class _HermesApprovalCardState extends State<HermesApprovalCard> {
       busy: state == HermesApprovalState.resolving || (_sent && !resolved),
       children: [
         HermezCommandBlock(text: widget.summary ?? l10n.hermesApprovalFallback),
+        if ((widget.command ?? '').trim().isNotEmpty &&
+            widget.command!.trim() != (widget.summary ?? '').trim()) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Asks to run',
+            style: TextStyle(color: palette.muted, fontSize: 12),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            widget.command!.trim(),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: palette.ink, fontSize: 14),
+          ),
+        ],
         const SizedBox(height: 10),
         if (resolved)
           Text(

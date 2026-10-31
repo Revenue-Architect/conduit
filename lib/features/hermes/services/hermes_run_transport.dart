@@ -1383,6 +1383,15 @@ void _handleEvent(
       final safeChoices = _boundedHermesDecisionChoices(
         choices.isEmpty ? raw['choices'] : choices,
       );
+      // What it asks to run (Hermes redacts it before sending); shown as the
+      // approval's scope, sanitised like the summary.
+      final command = raw['command'];
+      final safeCommand = command is String && command.trim().isNotEmpty
+          ? _sanitizeHermesApprovalSummary(
+              command,
+              sensitiveValues: sensitiveValues,
+            )
+          : null;
       updateMessage((m) {
         final meta = Map<String, dynamic>.from(m.metadata ?? const {});
         meta[kHermesApprovalMeta] = {
@@ -1391,6 +1400,7 @@ void _handleEvent(
           'runId': safeRunId,
           'storedSessionId': ?safeStoredSessionId,
           'summary': ?safeSummary,
+          'command': ?safeCommand,
           if (safeChoices.isNotEmpty) 'choices': safeChoices,
         };
         return m.copyWith(metadata: meta);

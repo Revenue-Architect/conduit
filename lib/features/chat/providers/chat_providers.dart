@@ -438,6 +438,9 @@ final class _HermesRunProjectionStore {
     metadata[kHermesApprovalMeta] = <String, dynamic>{
       ...current.cast<String, dynamic>(),
       'state': nextState,
+      // The record reads "Approved by you · 7:44".
+      if (nextState == 'approved' || nextState == 'denied')
+        'decidedAt': DateTime.now().toUtc().toIso8601String(),
     };
     final retainedForRecovery = _finalized.contains(projection);
     if (retainedForRecovery) _retainedBytes -= projection.retainedBytes;

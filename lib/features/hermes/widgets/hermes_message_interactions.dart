@@ -236,6 +236,10 @@ class _HermesComposerPromptOverlayState
         summary: approval['summary'] is String
             ? approval['summary'] as String
             : null,
+        command: approval['command'] is String
+            ? approval['command'] as String
+            : null,
+        decidedAt: DateTime.tryParse(approval['decidedAt']?.toString() ?? ''),
         choices: choices,
         onChoice: choices.isEmpty
             ? null
@@ -303,6 +307,10 @@ class _HermesComposerPromptOverlayState
       summary: approval['summary'] is String
           ? approval['summary'] as String
           : null,
+      command: approval['command'] is String
+          ? approval['command'] as String
+          : null,
+      decidedAt: DateTime.tryParse(approval['decidedAt']?.toString() ?? ''),
       choices: choices,
       onChoice: choices.isEmpty
           ? null
