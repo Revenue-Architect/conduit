@@ -20,9 +20,8 @@ import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../widgets/hermes_tab_dock.dart';
 import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
-import '../widgets/hermez_visual_theme.dart';
 import '../motion/hermez_card_stack.dart';
-import '../motion/hermez_motion.dart';
+import '../motion/hermez_card_route.dart';
 import 'hermes_today_copy.dart';
 import 'hermes_work_page.dart';
 
@@ -270,23 +269,12 @@ Future<HermesBot?> _chooseRecipient(
   final palette = HermezChatPalette.forBrightness(
     Theme.of(chipContext).brightness,
   );
-  final origin = HermezMorphOrigin.of(
+  return pushHermezCard<HermesBot>(
     chipContext,
-    radius: 16,
-    color: palette.surface,
-  );
-  // No laid-out chip to grow from: nothing opens.
-  if (origin == null) return Future.value();
-  return pushHermezPanel<HermesBot>(
-    chipContext,
-    origin: origin,
-    surfaceColor: palette.raised,
-    maxWidth: 400,
+    from: chipContext,
     semanticLabel: 'Send to',
-    theme: hermezVisualTheme(Theme.of(chipContext)),
-    faceBuilder: (_, _) => const SizedBox.expand(),
     builder: (panelContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
       child: HermezCardStack(
         root: HermezCardView(
           title: 'Send to',

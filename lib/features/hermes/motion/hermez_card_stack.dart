@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../widgets/hermez_chat_palette.dart';
-import 'hermez_motion.dart';
+import 'hermez_card_route.dart';
 
 /// One step inside a card: its title and its content.
 @immutable
@@ -253,21 +253,11 @@ Future<bool> confirmHermezCard(
       ),
     ),
   );
-  final origin = HermezMorphOrigin.of(
+  final answer = await pushHermezCard<bool>(
     from,
-    radius: 999,
-    color: palette.surface,
+    from: from,
+    builder: content,
+    semanticLabel: title,
   );
-  final bool? answer = origin == null
-      ? await pushHermezSheet<bool>(from, builder: content, heightFactor: 0.4)
-      : await pushHermezPanel<bool>(
-          from,
-          origin: origin,
-          surfaceColor: palette.raised,
-          maxWidth: 400,
-          semanticLabel: title,
-          faceBuilder: (_, _) => const SizedBox.expand(),
-          builder: content,
-        );
   return answer ?? false;
 }

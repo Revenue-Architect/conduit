@@ -68,6 +68,7 @@ import 'shared/widgets/sign_out_options_dialog.dart';
 import 'shared/theme/theme_extensions.dart';
 import 'features/hermes/feedback/hermez_feedback_coordinator.dart';
 import 'features/hermes/services/hermes_run_notifications.dart';
+import 'features/hermes/motion/hermez_card_route.dart';
 
 const bool _enableFlutterDriverExtension = bool.fromEnvironment(
   'ENABLE_FLUTTER_DRIVER_EXTENSION',
@@ -135,6 +136,8 @@ void main() {
       WidgetsFlutterBinding.ensureInitialized();
       // Every animation runs 10 % faster than authored (one global clock).
       HermezMotion.applyAppSpeed();
+      // Cards grow out of the control that was pressed (one card).
+      HermezPressOrigin.install();
       // Conduit intentionally owns separate direct-local and per-server files.
       driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
       RasterMediaPolicy.configureGlobalImageCache();
