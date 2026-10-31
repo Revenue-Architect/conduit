@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon monochrome (themed icons): the Toronto skyline, CN Tower inside the safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <group android:scaleX="0.3723" android:scaleY="0.1929" android:translateX="-40" android:translateY="-7.6">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0 560V512h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V454h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18H412V560z"/>
+  </group>
+  <path android:fillColor="#FFFFFFFF" android:pathData="M0,99.4h108v8.6h-108z"/>
+</vector>
