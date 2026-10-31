@@ -105,7 +105,6 @@ class _CompletedRunSheet extends StatelessWidget {
           const SizedBox(height: 16),
           HermezSurface(
             kind: HermezSurfaceKind.utility,
-            motif: HermezMotif.etched,
             border: Border.all(color: palette.border.withValues(alpha: 0.75)),
             padding: const EdgeInsets.all(14),
             child: Row(

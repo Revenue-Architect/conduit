@@ -197,7 +197,6 @@ class _ExtensionVisualState extends State<ExtensionVisual> {
     return HermesA2uiLocalControl(
       child: HermezSurface(
         kind: HermezSurfaceKind.utility,
-        motif: HermezMotif.etched,
         border: Border.all(color: palette.border),
         child: SizedBox(
           width: double.infinity,

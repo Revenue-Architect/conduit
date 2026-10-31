@@ -238,8 +238,6 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
           children: [
             HermezSurface(
               kind: HermezSurfaceKind.hero,
-              motif: HermezMotif.etched,
-              motifMorphId: hermezMorphPart(morphId, 'motif'),
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +314,6 @@ class _HermesBotDetailPageState extends ConsumerState<HermesBotDetailPage> {
                     order: 0,
                     child: HermezSurface(
                       kind: HermezSurfaceKind.technical,
-                      motif: HermezMotif.slash,
                       semanticLabel: 'Chat with $title',
                       feedbackCue: HermezFeedbackCue.botEngage,
                       onTap: bot == null || _opening

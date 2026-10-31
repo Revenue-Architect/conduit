@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../kanban/hermes_kanban_page.dart' show showHermesKanbanCard;
+import '../sheets/hermes_scheduled_card.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../models/hermes_bot.dart';
@@ -894,14 +896,14 @@ class _Running extends ConsumerWidget {
 
 /// Quiet links to the places Work used to hold: Scheduled, Kanban, and the
 /// rest of the team's tools.
-class _QuietLinks extends StatelessWidget {
+class _QuietLinks extends ConsumerWidget {
   const _QuietLinks({required this.palette, required this.routines});
 
   final HermezChatPalette palette;
   final int? routines;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     Widget link(String label, String? detail, VoidCallback onTap) => Padding(
       padding: const EdgeInsets.only(right: 8, bottom: 8),
       child: InkWell(
@@ -938,9 +940,11 @@ class _QuietLinks extends StatelessWidget {
         link(
           'Scheduled',
           routines == null ? null : '$routines',
-          () => context.pushNamed(RouteNames.hermesJobs),
+          // Scheduled is the routines card (m13).
+          () => showHermesScheduledCard(context, ref),
         ),
-        link('Kanban', null, () => context.pushNamed(RouteNames.hermesKanban)),
+        // Kanban is a card (owner, you-kanban.html k01).
+        link('Kanban', null, () => showHermesKanbanCard(context)),
         link(
           'Team and tools',
           null,

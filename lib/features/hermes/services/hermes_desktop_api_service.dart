@@ -1009,6 +1009,22 @@ final class HermesDesktopApiService
   }) =>
       _administration.createJob(name: name, prompt: prompt, schedule: schedule);
 
+  /// A new routine for [profile]'s bot, limited to [enabledToolsets] when
+  /// given. Like every new routine it starts paused.
+  Future<Map<String, dynamic>> createRoutine({
+    required String name,
+    required String prompt,
+    required String schedule,
+    String? profile,
+    List<String>? enabledToolsets,
+  }) => _administration.createJob(
+    name: name,
+    prompt: prompt,
+    schedule: schedule,
+    profile: profile,
+    enabledToolsets: enabledToolsets,
+  );
+
   @override
   Future<void> updateJob(
     String id, {

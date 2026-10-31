@@ -51,6 +51,7 @@ import '../providers/chat_providers.dart';
 import '../providers/openwebui_chat_prompt_provider.dart';
 import '../../hermes/models/hermes_model.dart';
 import '../../hermes/models/hermes_bot.dart';
+import '../../hermes/sky/hermez_sky_band.dart';
 
 import 'package:go_router/go_router.dart';
 
@@ -290,6 +291,11 @@ const kHermesBotHeaderAvatarFolded = 58.0;
 
 /// Room for the open face, the name under it, and a little air above.
 const kHermesBotHeaderHeight = 10 + kHermesBotHeaderAvatar + 4 + 22 + 6;
+
+/// The sky header's toolbar (face 40 with name and model beside it), and
+/// the radius of the transcript sheet's top under it.
+const kHermesSkyHeaderHeight = 64.0;
+const kHermesSkySheetRadius = 28.0;
 
 class _HermesBotToolbarTitle extends StatelessWidget {
   const _HermesBotToolbarTitle({
@@ -2995,10 +3001,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // Do not attach the primary scroll controller here; the actual message
     // list owns it.
     // Add padding for the floating app bar and overlaid composer skeleton.
-    final topPadding =
-        MediaQuery.paddingOf(context).top +
-        _chatToolbarHeight(context) +
-        Spacing.md;
+    final topPadding = _listTopInset(context);
     final bottomPadding = _messageListBottomPadding();
     return CustomScrollView(
       key: const ValueKey('loading_messages'),
@@ -3082,10 +3085,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final apiService = watchRef.watch(apiServiceProvider);
     final paging = watchRef.watch(chatTranscriptPagingProvider);
 
-    final topPadding =
-        MediaQuery.paddingOf(context).top +
-        _chatToolbarHeight(context) +
-        Spacing.md;
+    final topPadding = _listTopInset(context);
     final bottomPadding = _messageListBottomPadding();
 
     // Watch models once here instead of per-message in the item builder.
@@ -3981,10 +3981,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     // Add top padding for the floating app bar and bottom padding for the
     // overlaid composer section.
-    final topPadding =
-        MediaQuery.paddingOf(context).top +
-        _chatToolbarHeight(context) +
-        Spacing.md;
+    final topPadding = _listTopInset(context);
     final bottomPadding = _messageListBottomPadding();
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -4666,6 +4663,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           isLoadingConversation: isLoadingConversation,
           modelLabel: modelLabel,
           hermesBot: hermesBot,
+          modelName: formattedModelName,
         ),
         body: ColoredBox(
           color: hermezVisuals
@@ -4676,41 +4674,72 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             onTap: _dismissComposerFocus,
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: Consumer(
-                    builder: (context, listRef, _) {
-                      return RepaintBoundary(
-                        child: _buildMessagesList(theme, listRef),
-                      );
-                    },
+                if (_usesSkyHeader) ...[
+                  // The sky band runs under the header and a little past
+                  // it, so the transcript sheet's rounded top sits on it.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: _skySheetTop(context) + kHermesSkySheetRadius,
+                    child: const HermezSkyBand(),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  child: ConduitChromeGradientFade.top(
-                    contentHeight:
-                        MediaQuery.viewPaddingOf(context).top +
-                        (hermesBot == null
-                            ? _chatToolbarHeight(context)
-                            // With the fade below, ends at the middle of the
-                            // folded bot name (face and name are centred).
-                            : _chatToolbarHeight(context) / 2 +
-                                  (kHermesBotHeaderAvatarFolded + 4) / 2 -
-                                  20),
-                    backgroundColor: hermezVisuals
-                        ? hermezPalette.canvas
-                        : null,
-                    // The menu and bot badge float over the transcript:
-                    // a light frost under them that feathers out over
-                    // their lower half and is gone just below them.
-                    // The background colour holds behind the controls, then
-                    // thins out with the frost over a longer fade.
-                    fadeHeight: 20,
-                    blurSigma: 6,
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: _skySheetTop(context),
+                    bottom: 0,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(kHermesSkySheetRadius),
+                      ),
+                      child: ColoredBox(
+                        color: hermezPalette.canvas,
+                        child: Consumer(
+                          builder: (context, listRef, _) => RepaintBoundary(
+                            child: _buildMessagesList(theme, listRef),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ] else
+                  Positioned.fill(
+                    child: Consumer(
+                      builder: (context, listRef, _) {
+                        return RepaintBoundary(
+                          child: _buildMessagesList(theme, listRef),
+                        );
+                      },
+                    ),
+                  ),
+                if (!_usesSkyHeader)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: ConduitChromeGradientFade.top(
+                      contentHeight:
+                          MediaQuery.viewPaddingOf(context).top +
+                          (hermesBot == null
+                              ? _chatToolbarHeight(context)
+                              // With the fade below, ends at the middle of the
+                              // folded bot name (face and name are centred).
+                              : _chatToolbarHeight(context) / 2 +
+                                    (kHermesBotHeaderAvatarFolded + 4) / 2 -
+                                    20),
+                      backgroundColor: hermezVisuals
+                          ? hermezPalette.canvas
+                          : null,
+                      // The menu and bot badge float over the transcript:
+                      // a light frost under them that feathers out over
+                      // their lower half and is gone just below them.
+                      // The background colour holds behind the controls, then
+                      // thins out with the frost over a longer fade.
+                      fadeHeight: 20,
+                      blurSigma: 6,
+                    ),
+                  ),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -4873,8 +4902,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   double _chatToolbarHeight(BuildContext context) {
     final base = conduitAdaptiveToolbarHeightOf(context);
     final bot = _hermesBotPresentation(ref.read(activeConversationProvider));
-    return bot == null ? base : math.max(base, kHermesBotHeaderHeight);
+    if (bot == null) return base;
+    if (_usesSkyHeader) return math.max(base, kHermesSkyHeaderHeight);
+    return math.max(base, kHermesBotHeaderHeight);
   }
+
+  /// A bot chat on Android has the sky header (mockup r4 03): the sky band
+  /// carries back, the bot and its actions, and the transcript is a sheet
+  /// that starts under it.
+  bool get _usesSkyHeader =>
+      !Platform.isIOS &&
+      _hermesBotPresentation(ref.read(activeConversationProvider)) != null;
+
+  /// Where the transcript's sheet starts: under the sky header.
+  double _skySheetTop(BuildContext context) =>
+      MediaQuery.paddingOf(context).top + _chatToolbarHeight(context);
+
+  /// The transcript's top padding. Under the sky header the list already
+  /// starts below it; otherwise it runs under the floating toolbar.
+  double _listTopInset(BuildContext context) => _usesSkyHeader
+      ? Spacing.lg
+      : MediaQuery.paddingOf(context).top +
+            _chatToolbarHeight(context) +
+            Spacing.md;
 
   AdaptiveAppBar _buildAdaptiveChatAppBar({
     required BuildContext context,
@@ -4882,11 +4932,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool isLoadingConversation,
     required String modelLabel,
     required HermesBotChatPresentation? hermesBot,
+    String? modelName,
   }) {
     final activeConversation = ref.watch(activeConversationProvider);
     final isTemporary = ref.watch(temporaryChatEnabledProvider);
     final hasMessages = ref.watch(hasChatMessagesProvider);
     final showNewChatAction = activeConversation != null || hasMessages;
+    if (hermesBot != null && _usesSkyHeader) {
+      return _buildSkyChatAppBar(
+        context: context,
+        hermesBot: hermesBot,
+        activeConversation: activeConversation,
+        modelName: modelName,
+        showNewChatAction: showNewChatAction,
+      );
+    }
     final tintColor = context.conduitTheme.textPrimary;
     final trailingActionCount = (showNewChatAction ? 1 : 0) + 1;
     final maxModelWidth = resolveConduitAdaptiveLeadingPillWidth(
@@ -4965,6 +5025,144 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       cupertinoTrailing: cupertinoTrailing,
       centerTitle: hermesBot != null,
       toolbarHeight: _chatToolbarHeight(context),
+    );
+  }
+
+  /// The sky header (mockup r4 03): back, the bot's face, its name with the
+  /// model or "Working" under it, and new chat and the menu, white on the
+  /// sky band the body paints behind it. Tapping the bot opens its page.
+  AdaptiveAppBar _buildSkyChatAppBar({
+    required BuildContext context,
+    required HermesBotChatPresentation hermesBot,
+    required Conversation? activeConversation,
+    required String? modelName,
+    required bool showNewChatAction,
+  }) {
+    const onSky = Colors.white;
+    final active = _hermesChatWorking(ref);
+    final profile = _hermesChatProfile(activeConversation);
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final model = modelName?.trim();
+    final subtitle = active
+        ? 'Working'
+        : (model == null || model.isEmpty || model == hermesBot.title)
+        ? null
+        : model;
+    final overflow = _buildChatToolbarOverflowAction(
+      context: context,
+      activeConversation: activeConversation,
+      tintColor: onSky,
+    );
+    final title = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        HermesBotAvatar(
+          key: const ValueKey('hermes-bot-toolbar-avatar'),
+          size: 40,
+          label: hermesBot.title,
+          imageUrl: hermesBot.avatar,
+          shape: hermesBot.shape,
+          color: hermesBot.color,
+          imageKind: hermesBot.imageKind,
+          active: active,
+          video: true,
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hermesBot.title,
+                key: const ValueKey('hermes-bot-toolbar-title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.3,
+                  color: onSky,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppTypography.fontFamily,
+                    fontSize: 13,
+                    color: active
+                        ? palette.live
+                        : onSky.withValues(alpha: 0.72),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+    return AdaptiveAppBar(
+      useNativeToolbar: false,
+      tintColor: onSky,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        toolbarHeight: _chatToolbarHeight(context),
+        systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+        ),
+        foregroundColor: onSky,
+        iconTheme: const IconThemeData(color: onSky),
+        titleSpacing: 0,
+        leading: IconButton(
+          key: const ValueKey('chat-back-home'),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          icon: const Icon(Icons.arrow_back_rounded, color: onSky),
+          onPressed: () => _navigateBack(context),
+        ),
+        title: Semantics(
+          label: hermesBot.title,
+          header: true,
+          button: profile != null,
+          excludeSemantics: true,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              key: const ValueKey('hermes-bot-toolbar-open'),
+              borderRadius: BorderRadius.circular(999),
+              onTap: profile == null
+                  ? null
+                  : () => context.pushNamed(
+                      RouteNames.hermesBotDetail,
+                      pathParameters: {'profile': profile},
+                    ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: title,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          if (showNewChatAction)
+            IconButton(
+              tooltip: AppLocalizations.of(context)!.newChat,
+              icon: const Icon(Icons.edit_outlined, color: onSky),
+              onPressed: _handleNewChat,
+            ),
+          if (overflow != null) overflow.widget,
+          const SizedBox(width: 4),
+        ],
+      ),
     );
   }
 

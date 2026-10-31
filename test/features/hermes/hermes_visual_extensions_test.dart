@@ -285,7 +285,6 @@ void main() {
           find.byType(HermezSurface).first,
         );
         expect(surface.kind, HermezSurfaceKind.utility);
-        expect(surface.motif, HermezMotif.etched);
         expect((surface.border as Border).top.color, palette.border);
         final title = tester.widget<Text>(find.text(kind));
         expect(title.style?.color, palette.ink);

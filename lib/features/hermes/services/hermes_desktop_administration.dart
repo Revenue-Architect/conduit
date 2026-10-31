@@ -470,14 +470,18 @@ final class _HermesDesktopAdministration {
     required String name,
     required String prompt,
     required String schedule,
+    String? profile,
+    List<String>? enabledToolsets,
   }) async => _owner._object(
     await _owner._requestJson(
       'POST',
       '/api/cron/jobs',
+      query: {'profile': ?profile},
       body: hermesNewRoutineBody(
         name: name,
         prompt: prompt,
         schedule: schedule,
+        enabledToolsets: enabledToolsets,
       ),
     ),
   );
@@ -624,6 +628,7 @@ Map<String, Object> hermesNewRoutineBody({
   required String name,
   required String prompt,
   required String schedule,
+  List<String>? enabledToolsets,
 }) => {
   'name': name,
   'prompt': prompt,
@@ -631,4 +636,7 @@ Map<String, Object> hermesNewRoutineBody({
   'deliver': 'local',
   'paused': true,
   'paused_reason': 'Created in Conduit; turn it on when it looks right.',
+  // Only the tools the owner ticked; none ticked keeps the bot's own set.
+  if (enabledToolsets != null && enabledToolsets.isNotEmpty)
+    'enabled_toolsets': enabledToolsets,
 };

@@ -12,5 +12,16 @@ void main() {
     );
     expect(body['paused'], isTrue);
     expect(body['schedule'], 'every weekday 8am');
+    // Only the tools the owner ticked; none ticked leaves the bot's own.
+    expect(body.containsKey('enabled_toolsets'), isFalse);
+    expect(
+      hermesNewRoutineBody(
+        name: 'n',
+        prompt: 'p',
+        schedule: '0 8 * * 1-5',
+        enabledToolsets: ['web', 'browser'],
+      )['enabled_toolsets'],
+      ['web', 'browser'],
+    );
   });
 }

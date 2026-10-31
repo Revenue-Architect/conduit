@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/navigation_service.dart';
+import '../models/hermes_bot.dart';
+import '../motion/hermez_card_route.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
 import '../services/hermes_identifier.dart';
@@ -22,7 +24,11 @@ import '../motion/hermez_motion.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import 'hermes_kanban_client.dart';
 import '../widgets/hermez_commit_button.dart';
+import '../widgets/hermez_bot_mark.dart';
+import '../widgets/hermez_relative_time.dart';
 import '../widgets/hermez_skeleton.dart';
+
+part 'hermes_kanban_card.dart';
 
 /// Open the existing native task result and controls from an explicitly linked
 /// delegation. No title lookup, session resume, or new worker is involved.
@@ -1694,11 +1700,15 @@ class _KanbanTaskSheet extends StatefulWidget {
     required this.task,
     required this.client,
     required this.onChanged,
+    this.onBack,
   });
   final String board;
   final KanbanTask task;
   final HermesKanbanClient client;
   final Future<void> Function() onChanged;
+
+  /// In the Kanban card the task is a step: back returns to the list.
+  final VoidCallback? onBack;
 
   @override
   State<_KanbanTaskSheet> createState() => _KanbanTaskSheetState();
@@ -1952,6 +1962,12 @@ class _KanbanTaskSheetState extends State<_KanbanTaskSheet>
           ),
           Row(
             children: [
+              if (widget.onBack != null)
+                IconButton(
+                  tooltip: 'Back',
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
               const Spacer(),
               IconButton(
                 tooltip: 'Close task details',

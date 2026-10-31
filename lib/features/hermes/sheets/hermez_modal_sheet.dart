@@ -81,7 +81,12 @@ class HermezModalSheet extends StatelessWidget {
     this.titleMorphId,
     this.leading,
     this.subtitle,
+    this.onBack,
   });
+
+  /// Set when this sheet is a step inside another card: a back chevron
+  /// returns to the step before.
+  final VoidCallback? onBack;
 
   final String title;
   final String? eyebrow;
@@ -149,6 +154,12 @@ class HermezModalSheet extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (onBack != null)
+                IconButton(
+                  tooltip: 'Back',
+                  onPressed: onBack,
+                  icon: Icon(Icons.chevron_left_rounded, color: palette.ink),
+                ),
               if (leading != null) ...[leading!, const SizedBox(width: 14)],
               Expanded(
                 child: Column(
@@ -191,12 +202,6 @@ class HermezModalSheet extends StatelessWidget {
                       subtitle!,
                     ],
                   ],
-                ),
-              ),
-              IgnorePointer(
-                child: CustomPaint(
-                  size: const Size(28, 36),
-                  painter: _SheetSlashPainter(palette.accent),
                 ),
               ),
               _CloseDisc(onPressed: () => Navigator.pop(sheetContext)),
@@ -254,26 +259,4 @@ class _CloseDisc extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SheetSlashPainter extends CustomPainter {
-  const _SheetSlashPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawLine(
-      Offset(size.width * 0.15, size.height * 0.85),
-      Offset(size.width * 0.85, size.height * 0.1),
-      Paint()
-        ..color = color
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SheetSlashPainter oldDelegate) =>
-      color != oldDelegate.color;
 }

@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conduit, settings, spaces, artifacts, onboarding and the model picker: mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.css">
+<link rel="stylesheet" href="../app-design-2026-10-24/android.css">
+<style>
+  :root {
+    --ground: #F7F7F7; --raised: #FFFFFF; --soft: #F1F2F4; --ink: #0E1116; --ink-2: #5A606B; --ink-3: #6B717B; --rule: #E6E7EA;
+    --live: #FFB020; --live-text: #8A5A00; --neg: #C2362B;
+    --dock: #0E1116; --on-dock: #FFFFFF; --on-dock-2: rgba(255,255,255,.66); --ind: rgba(255,255,255,.16);
+    --m: 20px;
+  }
+  .screen { container-type: size; font-family: "Geist", sans-serif; color: var(--ink); background: var(--ground); }
+  .screen[data-theme="dark"] {
+    --ground: #0B0C0E; --raised: #16181C; --soft: #22252B; --ink: #F2F3F5; --ink-2: #A3A8B2; --ink-3: #8F95A0; --rule: #272A30;
+    --live-text: #FFB020; --neg: #FF7A6E;
+    --dock: #F2F3F5; --on-dock: #0E1116; --on-dock-2: #50555E; --ind: rgba(14,17,22,.1);
+    color: var(--ink);
+  }
+  svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .face { display: block; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: #fff; flex: none; }
+  .body { position: absolute; inset: var(--safe-top) 0 0; display: flex; flex-direction: column; }
+
+  /* Android status bar (replaces the kit's iOS bar) */
+  .ac-status { display: flex !important; justify-content: space-between; align-items: center; padding: 4px 22px 0 26px !important; font: 500 14px/1 "Geist" !important; }
+  .ac-status .sb { display: flex; align-items: center; gap: 7px; }
+  .ac-status .sb svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ac-status .sb svg.f { fill: currentColor; stroke: none; }
+  .ac-status .pct { font: 500 13px/1 "Geist"; }
+
+  /* ---------- sky ---------- */
+  .screen.skyscreen { background: #0F1E33; }
+  .screen.skyscreen.dusk-g { background: #0A1220; }
+  .screen.skyscreen.night-g { background: #070B14; }
+  .sky { position: absolute; inset: 0 0 auto 0; overflow: hidden; }
+  .sky.dawn { background: linear-gradient(#0D2141 0%, #2C4F80 34%, #7E9DC2 64%, #D9D3BE 88%, #EFDDB2 100%); }
+  .sky.dusk { background: linear-gradient(#081224 0%, #14284A 38%, #3B5A82 66%, #B89474 100%); }
+  .sky.night { background: linear-gradient(#05080F 0%, #0B1424 60%, #15253D 100%); }
+  .sky .city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; }
+  .sky .stars circle { fill: #fff; }
+  .sky .rain { position: absolute; inset: 0; background: repeating-linear-gradient(104deg, transparent 0 22px, rgba(255,255,255,.07) 22px 23px); }
+  .top { display: flex; justify-content: space-between; align-items: baseline; padding: 14px var(--m) 0; font: 500 13px/1 "Geist"; color: rgba(255,255,255,.86); }
+  .top b { color: #fff; font-weight: 600; }
+  .display { padding: 30px var(--m) 0; font: 600 40px/1.04 "Geist"; letter-spacing: -.045em; color: #fff; }
+  .display span { color: rgba(255,255,255,.62); }
+
+  /* feeds */
+  .feeds { display: flex; gap: 8px; padding: 22px 0 0 var(--m); overflow: hidden; }
+  .feed { position: relative; width: 52px; height: 52px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.18); flex: none; }
+  .feed > img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block; }
+  .feed.quiet > img { opacity: .5; filter: grayscale(.7); }
+  /* a working bot's tile: its task in words and its steps as a bar, never a tiny terminal */
+  .feed.live { width: 140px; background: var(--raised); box-shadow: inset 0 0 0 2px var(--live); }
+  .feed.live > img { position: absolute; left: 8px; top: 12px; width: 28px; height: 28px; border-radius: 50%; background: #fff; }
+  .feed.live .lt { position: absolute; left: 44px; right: 10px; top: 11px; display: flex; flex-direction: column; gap: 8px; }
+  .feed.live .lt b { font: 600 12px/1.1 "Geist"; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed.live .lt > span { display: flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--live-text); }
+  .prog { display: flex; gap: 3px; flex: 1; }
+  .prog i { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); }
+  .prog i.d { background: var(--ink); }
+  .prog i.now { background: var(--live); }
+  .prog.sm { flex: none; width: 46px; }
+  .tally { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; }
+  .tally::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+  .feedcap { padding: 10px var(--m) 0; color: rgba(255,255,255,.84); font: 400 13px/1.3 "Geist"; }
+  .feedcap b { color: #fff; font-weight: 600; }
+
+  /* composer on the sky */
+  .ask { margin: auto 16px 0; height: 56px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 6px; color: #5A606B; font: 400 16px/1 "Geist"; flex: none; }
+  .screen[data-theme="dark"] .ask { background: #16181C; color: #A3A8B2; border: 1px solid #272A30; }
+  .ask .grow { flex: 1; padding-left: 2px; }
+  .ask .plus { width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .to { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 4px; border-radius: 999px; background: var(--soft); color: var(--ink); font: 600 13px/1 "Geist"; flex: none; }
+  .to .face { width: 24px; height: 24px; }
+  .to svg { width: 14px; height: 14px; color: var(--ink-2); }
+  .mic { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; flex: none; }
+  .mic svg { width: 20px; height: 20px; }
+
+  /* sheet */
+  .sheet { margin-top: 14px; height: 332px; background: var(--raised); border-radius: 28px 28px 0 0; padding: 22px var(--m) 0; flex: none; overflow: hidden; }
+  h3 { margin: 0 0 4px; font: 600 15px/1.2 "Geist"; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
+  .n { font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--soft); border-radius: 999px; padding: 4px 7px; }
+  .need { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .need .face { width: 38px; height: 38px; }
+  .t { flex: 1; min-width: 0; }
+  .t b { display: block; font: 600 15px/1.25 "Geist"; letter-spacing: -.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t span { display: block; font: 400 13px/1.3 "Geist"; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t span .bad { display: inline; color: var(--neg); font-weight: 600; }
+  .go { flex: none; height: 36px; padding: 0 16px; border-radius: 999px; background: var(--ink); color: var(--raised); font: 600 13px/36px "Geist"; }
+  .go.soft { background: var(--soft); color: var(--ink); }
+  .log { margin-top: 18px; }
+  .log .row { display: grid; grid-template-columns: 42px 1fr; padding: 5px 0; font: 400 14px/1.35 "Geist"; }
+  .log time { font: 500 12px/1.6 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .log b { font-weight: 600; }
+  .sheetfade { position: absolute; left: 0; right: 0; bottom: 0; height: 112px; background: linear-gradient(color-mix(in srgb, var(--raised) 0%, transparent), var(--raised) 24px); pointer-events: none; }
+  .say { margin-top: 14px; font: 400 13px/1.4 "Geist"; color: var(--ink-2); }
+  .say b { color: var(--ink); font-weight: 600; }
+
+  /* dock with the Material 3 active indicator */
+  .dock { position: absolute; left: 16px; right: 16px; bottom: 20px; height: 68px; border-radius: 999px; background: var(--dock); display: flex; align-items: center; justify-content: space-around; padding: 0 6px; }
+  .dock a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--on-dock-2); font: 500 12px/1 "Geist"; width: 80px; }
+  .dock a .ind { position: relative; width: 64px; height: 32px; border-radius: 16px; display: grid; place-items: center; }
+  .dock a.on { color: var(--on-dock); font-weight: 600; }
+  .dock a.on .ind { background: var(--ind); }
+  .dock a.on svg { stroke-width: 2.1; }
+  .dock .ind em { position: absolute; top: 0; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--on-dock); color: var(--dock); font: 700 11px/16px "Geist"; font-style: normal; text-align: center; }
+
+  /* Material back button */
+  .back { width: 48px; height: 48px; display: grid; place-items: center; flex: none; }
+  .back svg { width: 24px; height: 24px; }
+
+  /* sky band for the other screens */
+  .band { position: absolute; inset: 0 0 auto 0; height: 152px; overflow: hidden; }
+  .band .city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 64px; }
+  .over { position: relative; }
+  .sheetpage { margin-top: 18px; flex: 1; min-height: 0; background: var(--ground); border-radius: 28px 28px 0 0; overflow: hidden; }
+
+
+  /* sky band carried by the header itself */
+  .bandwrap { position: relative; flex: none; margin-top: calc(-1 * var(--safe-top)); padding-top: var(--safe-top); overflow: hidden;
+              background: linear-gradient(#0D2141 0%, #2C4F80 40%, #7E9DC2 78%, #CFC9B6 100%); }
+  .bandwrap .city { position: absolute; left: 0; right: 0; bottom: 18px; width: 100%; height: 44px; }
+  .bandwrap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: var(--ground); border-radius: 28px 28px 0 0; }
+  .bandwrap .city.base { bottom: 0; height: 18px; }
+
+  /* ---------- live window: the work, in words and one picture; the commands are a tap away ---------- */
+  .lw .head .go { background: #FFFFFF; color: #0E1116; }
+  .lw .head .who .tally { color: #fff; font-weight: 500; }
+  .lw .head .who .tally::before { box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
+  .lw .lede { padding: 2px var(--m) 0; }
+  .lw .lede h1 { margin: 0; font: 600 30px/1.1 "Geist"; letter-spacing: -.04em; }
+  .lw .lede p { margin: 8px 0 0; font: 400 15px/1.4 "Geist"; color: var(--ink-2); }
+  .win { margin: 20px 12px 0; border-radius: 24px; background: var(--raised); box-shadow: inset 0 0 0 2px var(--live); padding: 18px 14px; }
+  .win .wl { display: flex; justify-content: space-between; padding: 0 4px; font: 500 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .win .wl b { font-weight: 600; color: var(--ink); }
+  .path { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 18px; }
+  .path .wire { position: absolute; top: 23px; left: 12.5%; right: 12.5%; height: 2px; display: flex; }
+  .path .wire i { flex: 1; background: var(--ink); }
+  .path .wire i.dash { background: repeating-linear-gradient(90deg, var(--live) 0 6px, transparent 6px 11px); }
+  .path .pkt { position: absolute; top: 18px; left: calc(73% - 6px); width: 12px; height: 12px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 3px var(--raised); }
+  .path .node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .path .ic { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--soft); color: var(--ink); display: grid; place-items: center; }
+  .path .ic svg { width: 22px; height: 22px; }
+  .path .ic .ok { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; box-shadow: 0 0 0 2px var(--raised); }
+  .path .ic .ok svg { width: 11px; height: 11px; stroke-width: 3; }
+  .path .node.now .ic { background: #FFF3DA; box-shadow: inset 0 0 0 2px var(--live); }
+  .path .node b { display: block; font: 600 13px/1.2 "Geist"; letter-spacing: -.01em; }
+  .path .node span { display: block; margin-top: 2px; font: 400 12px/1.3 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .path .node.now span { color: var(--live-text); font-weight: 600; }
+  .win .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 4px 0; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .win .stats span { display: block; font: 400 12px/1.3 "Geist"; color: var(--ink-2); }
+  .win .stats b { display: block; margin-top: 4px; font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .win .stats b s { font-weight: 400; color: var(--ink-3); }
+  .lw .run { padding: 22px var(--m) 0; }
+  .cmds { display: flex; align-items: center; gap: 4px; height: 48px; margin-top: 4px; font: 600 13px/1 "Geist"; color: var(--ink); }
+  .cmds svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .cfade { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(color-mix(in srgb, var(--ground) 0%, transparent), var(--ground) 40px); pointer-events: none; }
+  .turn { display: flex; align-items: center; gap: 8px; font: 600 14px/1.3 "Geist"; letter-spacing: -.01em; }
+  .turn .meta { font-weight: 400; color: var(--ink-2); }
+  .turn svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .pulse { width: 9px; height: 9px; margin: 0 2px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 4px rgba(255,176,32,.22); flex: none; }
+  .steps { margin: 8px 0 0 5px; padding-left: 15px; border-left: 1.5px solid var(--rule); }
+  .step { display: flex; align-items: center; gap: 9px; padding: 5px 0; font: 400 13.5px/1.35 "Geist"; color: var(--ink-2); }
+  .step svg { width: 14px; height: 14px; stroke-width: 2.2; color: var(--ink-3); flex: none; }
+  .step.now { font-weight: 600; color: var(--ink); }
+  .step.now .dot { width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; background: var(--live); flex: none; }
+  .step .ring { width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; border: 1.5px solid var(--ink-3); flex: none; }
+  .meta12 { margin-top: 14px; font: 400 12px/1.4 "Geist"; color: var(--ink-3); }
+  .composer { position: absolute; left: 16px; right: 16px; bottom: 26px; height: 56px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; padding: 0 8px; font: 400 16px/1 "Geist"; color: var(--ink-3); }
+  .composer .grow { flex: 1; }
+  .composer .ic { width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink-2); }
+  .composer .voice { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; }
+
+  /* ---------- chat ---------- */
+  .head { display: flex; align-items: center; gap: 6px; padding: 6px 12px 0 4px; color: #fff; }
+  .head .face { width: 40px; height: 40px; }
+  .head .who { flex: 1; }
+  .head .who b { display: block; font: 600 17px/1.1 "Geist"; letter-spacing: -.02em; }
+  .head .who span { font: 400 12px/1.3 "Geist"; color: rgba(255,255,255,.84); }
+  .head .who .tally { margin-top: 5px; }
+  .chat .scroll { padding: 22px var(--m) 0; }
+  .you { margin-left: 48px; background: var(--soft); border-radius: 20px 20px 6px 20px; padding: 12px 15px; font: 400 15px/1.4 "Geist"; }
+  .chat .turn { margin-top: 22px; }
+  .answer { margin-top: 10px; font: 400 17px/1.45 "Geist"; letter-spacing: -.005em; }
+  /* A2UI DraftReview, kept: its own labels and structure, on the new neutral tokens */
+  .draft { position: relative; margin-top: 16px; background: #FDFDFD; border: 1px solid var(--rule); border-radius: 18px; padding: 18px 18px 26px; }
+  .draft .dt { font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; }
+  .draft .lab { margin-top: 12px; font: 600 11px/1 "Geist"; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .draft .lab.first { margin-top: 8px; }
+  .draft .val { margin-top: 5px; font: 400 15px/1.4 "Geist"; }
+  .draft hr { border: 0; border-top: 1px solid var(--rule); margin: 14px 0 0; }
+  .draft .more { position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--raised); border: 1px solid var(--rule); display: grid; place-items: center; color: var(--ink-2); }
+  .chat .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 170px; background: linear-gradient(rgba(247,247,247,0), #F7F7F7 46%); }
+  .chip { position: absolute; left: 16px; bottom: 92px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); display: flex; align-items: center; gap: 6px; font: 600 13px/1 "Geist"; }
+  .chip span { color: var(--ink-2); font-weight: 400; }
+  .chip svg { width: 14px; height: 14px; color: var(--ink-2); }
+
+  /* ---------- work / chats ---------- */
+  .pagehead { padding: 14px var(--m) 0; color: #fff; display: flex; flex-direction: column; gap: 4px; }
+  .pagehead b { font: 600 30px/1.1 "Geist"; letter-spacing: -.04em; }
+  .pagehead span { font: 400 15px/1.3 "Geist"; color: rgba(255,255,255,.9); }
+  .grp { padding: 22px var(--m) 0; }
+  .grp:first-child { padding-top: 6px; }
+  .runrow { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .runrow .face { width: 42px; height: 42px; }
+  .lring { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--live); }
+  .runrow .tally, .r .tally { color: var(--live-text); }
+  .r { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .r .face { width: 42px; height: 42px; }
+  .r .t b { font-weight: 500; }
+  .r.unread .t b { font-weight: 650; }
+  .side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex: none; }
+  .r time { font: 500 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .r.unread time { color: var(--ink); }
+  .r .ud { min-width: 18px; height: 18px; border-radius: 9px; background: var(--ink); color: var(--raised); font: 700 11px/18px "Geist"; text-align: center; padding: 0 5px; }
+  .r .ud.dot { min-width: 8px; width: 8px; height: 8px; padding: 0; }
+  .r .ud.off { background: transparent; }
+  .r .glyph { width: 42px; height: 42px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .r .glyph svg { width: 20px; height: 20px; }
+  .r .glyph img { width: 24px; height: 24px; border-radius: 50%; display: block; }
+  .search { display: flex; align-items: center; gap: 10px; height: 48px; margin: 6px var(--m) 0; padding: 0 16px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); font: 400 15px/1 "Geist"; color: var(--ink-3); }
+  .search svg { width: 20px; height: 20px; color: var(--ink-2); }
+  .pagehead .act { position: absolute; right: 8px; top: 2px; width: 48px; height: 48px; display: grid; place-items: center; color: #fff; }
+  .pagehead .act svg { width: 22px; height: 22px; }
+  .dockfade { position: absolute; left: 0; right: 0; bottom: 0; height: 112px; background: linear-gradient(color-mix(in srgb, var(--ground) 0%, transparent), var(--ground) 24px); pointer-events: none; }
+  .links { display: flex; gap: 8px; padding: 16px var(--m) 0; }
+  .links a { height: 36px; padding: 0 14px; border-radius: 999px; background: var(--raised); border: 1px solid var(--rule); font: 500 13px/34px "Geist"; color: var(--ink-2); }
+  .links a b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- storyboard ---------- */
+  .story { background: #E4E5E8; }
+  .story .grid { position: absolute; inset: 24px 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; align-content: start; }
+  .story figure { margin: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .story figcaption { font: 500 12px/1.3 "Geist"; color: #3F444C; text-align: center; }
+  .story figcaption b { font: 600 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: #0E1116; display: block; margin-bottom: 3px; }
+  .mini { --mini: .42; }
+  .mini-screen { font-family: "Geist", sans-serif; }
+  .ms-veil { position: absolute; inset: 0; background: var(--ground); }
+  .ms-win { position: absolute; margin: 0; }
+
+  /* ---------- icon ---------- */
+  .app-icon.conduit { background: linear-gradient(#173560 0%, #3E6497 44%, #A9B9C8 74%, #EFDCAF 100%); }
+  .app-icon.conduit svg, .app-icon.mono svg { position: absolute; left: -37%; width: 142%; bottom: 7%; height: 50%; }
+  .app-icon.conduit::after, .app-icon.mono::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8%; background: #0F1E33; }
+  .app-icon.mono::after { background: #31445F; }
+  .app-icon.mono { background: #DCE3EE; }
+
+  @container (max-height: 760px) {
+    .screen .feedcap, .screen .log, .screen .say, .screen .meta12 { display: none; }
+    .screen .display { padding-top: 16px; }
+    .screen .sky.tall { height: 380px !important; }
+    .screen .sky.tall .city { height: 120px !important; }
+    .screen .sheet { height: 230px; }
+  }
+
+  /* ---------- Morphlet card: every menu, modal and form is this one card ---------- */
+  .under { position: absolute; inset: 0; }
+  .scrim { position: absolute; inset: 0; background: rgba(8,10,14,.34); }
+  .mcard { position: absolute; left: 16px; right: 16px; background: var(--raised); color: var(--ink); border-radius: 32px; box-shadow: 0 18px 48px rgba(8,10,14,.24); padding: 8px 0 12px; overflow: hidden; font-family: "Geist", sans-serif; }
+  .mcard.nest { left: 36px; right: 36px; }
+  .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--rule); margin: 0 auto 4px; }
+  .mh { display: flex; align-items: center; gap: 10px; padding: 4px 10px 10px 22px; }
+  .mh.nested { padding-left: 4px; gap: 2px; }
+  .mh .face { width: 28px; height: 28px; }
+  .mh b { flex: 1; min-width: 0; font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; }
+  .mh .x, .mh .bk { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .mh .x { background: var(--soft); width: 36px; height: 36px; margin: 4px; }
+  .mh .x svg, .mh .bk svg { width: 18px; height: 18px; stroke-width: 2.2; }
+  .mh .bk svg { width: 22px; height: 22px; color: var(--ink); }
+  .opt { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 8px; padding: 0 14px; border-radius: 20px; }
+  .opt.sel { background: var(--soft); }
+  .opt .face { width: 36px; height: 36px; }
+  .opt .t b { font-weight: 500; }
+  .opt.sel .t b { font-weight: 600; }
+  .opt .t .lv { color: var(--live-text); font-weight: 500; }
+  .opt .glyph, .fld .glyph { width: 36px; height: 36px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .opt.sel .glyph { background: var(--raised); }
+  .opt .glyph img { width: 22px; height: 22px; border-radius: 50%; display: block; }
+  .opt .glyph svg { width: 18px; height: 18px; }
+  .opt .chk, .opt .chev, .fld .chev { color: var(--ink); flex: none; }
+  .opt .chk svg { width: 20px; height: 20px; stroke-width: 2.4; }
+  .opt .chev svg, .fld .chev svg { width: 20px; height: 20px; color: var(--ink-2); }
+  .sep { height: 1px; background: var(--rule); margin: 6px 22px; }
+  .mbtns { display: flex; gap: 8px; padding: 16px 16px 4px; }
+  .mbtn { flex: 1; height: 52px; border-radius: 999px; display: grid; place-items: center; font: 600 15px/1 "Geist"; background: var(--soft); color: var(--ink); }
+  .mbtn.pri { background: var(--ink); color: var(--raised); }
+  .mbtn.icon { flex: none; width: 52px; color: var(--ink-2); }
+  .mbtn.icon svg { width: 22px; height: 22px; }
+  .mp { margin: 0; padding: 0 22px; font: 400 15px/1.45 "Geist"; color: var(--ink-2); }
+  .mnote { padding: 6px 22px 0; font: 400 12px/1.4 "Geist"; color: var(--ink-3); }
+  .mlab { padding: 2px 22px 8px; font: 500 12px/1 "Geist"; color: var(--ink-2); }
+  .fld { margin: 0 22px 2px; padding: 10px 0 11px; border-bottom: 1px solid var(--rule); }
+  .fld label { display: block; font: 500 12px/1.2 "Geist"; color: var(--ink-2); }
+  .fld > div, .fld .grow > div { margin-top: 4px; font: 400 15px/1.4 "Geist"; color: var(--ink); }
+  .fld .ph { color: var(--ink-3); }
+  .fld.tall { min-height: 92px; }
+  .fld.focus { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+  .fld.focus label { color: var(--ink); }
+  .fld.sel { display: flex; align-items: center; gap: 8px; }
+  .fld .grow { flex: 1; min-width: 0; }
+  .caret { display: inline-block; width: 2px; height: 18px; background: var(--ink); vertical-align: -3px; margin-left: 1px; }
+  .tog { display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0 22px; font: 400 15px/1.3 "Geist"; }
+  .sw { position: relative; width: 52px; height: 32px; border-radius: 16px; background: var(--ink); flex: none; }
+  .sw::after { content: ""; position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--raised); }
+  .pks { display: flex; gap: 4px; padding: 6px 14px 14px; overflow: hidden; }
+  /* while a card is open, the dock steps down out of view: one surface at the bottom */
+  .under:has(~ .scrim) .dock, .under:has(~ .scrim) .composer, .under:has(~ .scrim) .chip { visibility: hidden; }
+  .pk { width: 64px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; font: 500 12px/1.2 "Geist"; color: var(--ink-2); }
+  .pk .face { width: 48px; height: 48px; }
+  .pk.on .face { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink); }
+  .pk.on span { color: var(--ink); font-weight: 600; }
+  .pk.live .face { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--live); }
+  /* the DraftReview A2UI surface, kept in its own structure; the card is its box */
+  .dr { padding: 0 22px 2px; }
+  .dr .dt { font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; }
+  .dr .lab { margin-top: 12px; font: 600 11px/1 "Geist"; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .dr .lab.first { margin-top: 8px; }
+  .dr .val { margin-top: 5px; font: 400 15px/1.4 "Geist"; }
+  .sentpill { display: inline-flex; align-items: center; gap: 4px; }
+  .sentpill svg { width: 16px; height: 16px; stroke-width: 2.4; }
+  .mini-screen .under .dock, .mini-screen .under .sheetfade { position: absolute; }
+  .mcard.morphing { display: grid; place-items: center; box-shadow: 0 10px 30px rgba(8,10,14,.18); }
+  .ghostlabel { display: inline-flex; align-items: center; gap: 6px; font: 600 15px/1 "Geist"; color: #fff; }
+  .ghostlabel.dark { color: var(--ink); }
+  .ghostlabel .face { width: 24px; height: 24px; }
+
+  .att { display: inline-flex; align-items: center; gap: 8px; height: 36px; margin: 0 22px 6px; padding: 0 4px 0 12px; border-radius: 999px; background: var(--soft); font: 500 13px/1 "Geist"; color: var(--ink); }
+  .att svg { width: 16px; height: 16px; color: var(--ink-2); }
+  .att .attx { width: 28px; height: 28px; display: grid; place-items: center; }
+  .att .attx svg { width: 14px; height: 14px; }
+  .att.in { height: 30px; margin: 0 0 8px; background: var(--raised); padding: 0 12px 0 10px; }
+  .crumb { padding: 0 22px 8px; font: 500 12px/1.3 "Geist"; color: var(--ink-2); }
+
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin: 16px 22px 0; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .kv span { display: block; font: 400 12px/1.3 "Geist"; color: var(--ink-2); }
+  .kv b { display: block; margin-top: 3px; font: 500 15px/1.3 "Geist"; }
+  .st { flex: none; height: 28px; padding: 0 11px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 "Geist"; }
+  .st.on { background: var(--soft); color: var(--ink); }
+  .st.need { background: var(--ink); color: var(--raised); }
+  .st.off { box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink-2); font-weight: 500; }
+  .st.live { color: var(--live-text); padding: 0 2px 0 11px; }
+  .st.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+  .st.fail { color: var(--neg); box-shadow: inset 0 0 0 1px var(--rule); }
+  .mlink { display: flex; align-items: center; justify-content: space-between; height: 44px; font: 500 13px/1 "Geist"; color: var(--ink-2); }
+  .mlink .sc svg { width: 18px; height: 18px; }
+  .tchips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 22px 4px; }
+  .tchips span { height: 36px; padding: 0 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 500 14px/1 "Geist"; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+  .tchips span.on { background: var(--ink); color: var(--raised); box-shadow: none; font-weight: 600; }
+  .tchips span svg { width: 15px; height: 15px; stroke-width: 2.4; }
+  .seg { display: flex; margin: 0 16px; padding: 4px; border-radius: 999px; background: var(--soft); }
+  .seg span { flex: 1; height: 40px; border-radius: 999px; display: grid; place-items: center; font: 500 14px/1 "Geist"; color: var(--ink-2); }
+  .seg span.on { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(8,10,14,.12); }
+
+  /* ---------- screens2: settings, spaces, artifacts, onboarding, picker ---------- */
+  .pagehead.sub { padding-top: 2px; }
+  .pagehead.sub .back { margin-left: -14px; margin-bottom: -2px; color: #fff; }
+  .pagehead .acts, .head .acts { display: flex; }
+  .pagehead .acts { position: absolute; right: 8px; top: 2px; }
+  .acts span { width: 48px; height: 48px; display: grid; place-items: center; color: #fff; }
+  .acts svg { width: 22px; height: 22px; }
+  .head .acts.in { margin-right: -8px; }
+  .head .who b.saved { font-size: 16px; }
+  .head .go { height: 40px; line-height: 40px; background: #FFFFFF; color: #0E1116; }
+  .pagefade { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(color-mix(in srgb, var(--ground) 0%, transparent), var(--ground) 80%); pointer-events: none; }
+  .lede2 { padding: 16px var(--m) 0; font: 400 15px/1.4 "Geist"; color: var(--ink-2); }
+  .lede2 + .grp.first { padding-top: 4px; }
+  .grp.first { padding-top: 14px; }
+  .grp .gnote { margin-top: 10px; font: 400 13px/1.4 "Geist"; color: var(--ink-3); }
+  .gnote.pad { padding: 14px var(--m) 0; font: 400 13px/1.4 "Geist"; color: var(--ink-3); }
+  .gsub { margin: 2px 0 0; font: 400 13px/1.35 "Geist"; color: var(--ink-2); }
+  .grp h3 .n { margin-left: auto; }
+  .srow { display: flex; align-items: center; gap: 12px; min-height: 56px; }
+  .srow .glyph { width: 40px; height: 40px; border-radius: 50%; background: var(--raised); box-shadow: inset 0 0 0 1px var(--rule); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .srow .glyph svg { width: 20px; height: 20px; }
+  .srow .glyph img { width: 24px; height: 24px; border-radius: 50%; display: block; }
+  .srow .t span { white-space: normal; overflow: visible; }
+  .srow .sv { font: 500 13px/1 "Geist"; color: var(--ink-2); flex: none; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .srow .sc { color: var(--ink-3); flex: none; }
+  .srow .sc svg { width: 18px; height: 18px; }
+  .srow.danger .t b, .srow.danger .glyph { color: var(--neg); }
+  .srow.big { min-height: 72px; }
+  .srow.big .glyph { width: 44px; height: 44px; }
+  .srow { padding: 4px 0; }
+  .acct { display: flex; align-items: center; gap: 14px; min-height: 64px; }
+  .acct .av { width: 52px; height: 52px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; font: 600 20px/1 "Geist"; flex: none; }
+  .acct .sc { color: var(--ink-3); } .acct .sc svg { width: 18px; height: 18px; }
+  .trow { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 6px 0; }
+  .trow .t span { white-space: normal; overflow: visible; }
+  .trow .t span:empty { display: none; }
+  .trow.slim { min-height: 52px; }
+  .trow .t b { font-weight: 500; }
+  .sw.off { background: var(--soft); box-shadow: inset 0 0 0 2px var(--ink-3); }
+  .sw.off::after { right: auto; left: 8px; top: 8px; width: 16px; height: 16px; background: var(--ink-3); }
+  .stat { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 0; }
+  .stat .t b { font-weight: 500; }
+  .stat .t span { white-space: normal; overflow: visible; }
+  .stat em { font: 500 13px/1 "Geist"; font-style: normal; color: var(--ink-2); flex: none; }
+  .lrow { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 4px 0; }
+  .lrow .t b { font-weight: 500; }
+  .lrow .t span { white-space: normal; overflow: visible; }
+  .lrow .sc { color: var(--ink-3); flex: none; } .lrow .sc svg { width: 18px; height: 18px; }
+  .lrow.danger .t b { color: var(--neg); }
+  .health { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0 8px; }
+  .health .t b { white-space: normal; font-size: 15px; }
+  .gl { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--raised); display: grid; place-items: center; flex: none; }
+  .gl svg { width: 16px; height: 16px; stroke-width: 2.4; }
+  .health .gl { background: var(--soft); color: var(--ink); }
+  .issue { display: flex; align-items: center; gap: 12px; padding: 10px 0 10px 40px; }
+  .issue .t b { white-space: normal; font-weight: 500; }
+  .issue .t span { white-space: normal; overflow: visible; }
+  .issue .go { height: 40px; line-height: 40px; padding: 0 14px; }
+  .qa { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 0; }
+  .qa span { height: 40px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 "Geist"; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+  .qa span.on { background: var(--ink); color: var(--raised); box-shadow: none; font-weight: 600; }
+  .qa span svg { width: 16px; height: 16px; stroke-width: 2.4; }
+  .lnk { height: 44px; display: flex; align-items: center; font: 600 13px/1 "Geist"; color: var(--ink); }
+  .prow { padding: 10px 0 12px; }
+  .prow b { display: block; font: 600 15px/1.25 "Geist"; letter-spacing: -.02em; }
+  .prow p { margin: 4px 0 0; font: 400 13px/1.4 "Geist"; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .prow time { display: block; margin-top: 6px; font: 500 12px/1.3 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .menurow { min-height: 52px; }
+  .menurow .micon { width: 22px; color: var(--ink-2); display: grid; place-items: center; }
+  .menurow .micon svg { width: 20px; height: 20px; }
+  .menurow.danger .t b, .menurow.danger .micon { color: var(--neg); }
+  /* the page editor */
+  .bandwrap.paper::after { background: var(--raised); }
+  .doc { padding: 6px 22px 0; }
+  .doc h1 { margin: 0; font: 600 30px/1.12 "Geist"; letter-spacing: -.035em; }
+  .doc p { margin: 14px 0 0; font: 400 17px/1.45 "Geist"; letter-spacing: -.005em; }
+  .doc h2 { margin: 24px 0 0; font: 600 20px/1.2 "Geist"; letter-spacing: -.025em; }
+  .doc ul { margin: 8px 0 0; padding-left: 22px; font: 400 17px/1.45 "Geist"; }
+  .doc li { padding: 2px 0; }
+  .etool { position: absolute; left: 12px; right: 12px; bottom: 30px; height: 52px; border-radius: 999px; background: var(--raised); box-shadow: inset 0 0 0 1px var(--rule), 0 6px 20px rgba(8,10,14,.12); display: flex; align-items: center; justify-content: space-around; padding: 0 6px; color: var(--ink); }
+  .etool span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; }
+  .etool svg { width: 20px; height: 20px; }
+  .etool .tb { font: 700 17px/1 "Geist"; font-style: normal; text-decoration: none; }
+  .etool i.tb { font-weight: 500; font-style: italic; }
+  .etool s.tb { font-weight: 500; text-decoration: line-through; }
+  .conf { margin: 18px 16px 12px; padding: 14px 16px 14px; border-radius: 20px; background: var(--soft); }
+  .conf b { display: block; font: 600 15px/1.3 "Geist"; }
+  .conf span { display: block; font: 400 13px/1.3 "Geist"; color: var(--ink-2); margin-top: 2px; }
+  .cbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .cbtns .go { height: 44px; line-height: 44px; padding: 0 16px; text-align: center; margin: 0; color: var(--raised); font-size: 13px; }
+  .cbtns .go.soft { background: var(--raised); color: var(--ink); }
+  .doc { padding-top: 12px; }
+  /* artifacts: files are objects you pick up, so tiles are earned here */
+  .fchips { display: flex; gap: 8px; padding: 14px var(--m) 0; }
+  .fchips span { height: 40px; padding: 0 16px; border-radius: 999px; display: grid; place-items: center; font: 500 13px/1 "Geist"; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+  .fchips span.on { background: var(--ink); color: var(--raised); box-shadow: none; font-weight: 600; }
+  .fcount { padding: 14px var(--m) 0; font: 500 12px/1 "Geist"; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px var(--m) 0; }
+  .tile { padding: 0 0 6px; }
+  .tile .th { height: 112px; border-radius: 20px; background: var(--soft); overflow: hidden; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--rule); }
+  .tile .th.glyphth svg { width: 34px; height: 34px; color: var(--ink-2); }
+  .tile b { display: block; margin: 10px 4px 0; font: 600 13px/1.3 "Geist"; letter-spacing: -.01em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; }
+  .tile span { display: block; margin: 3px 4px 0; font: 500 12px/1.2 "Geist"; color: var(--ink-3); }
+  .mcard.tall { display: flex; flex-direction: column; }
+  .mh .ktile { width: 44px; height: 44px; border-radius: 14px; background: var(--soft); display: grid; place-items: center; color: var(--ink); flex: none; }
+  .mh .ktile svg { width: 22px; height: 22px; }
+  .mh .mt { flex: 1; min-width: 0; }
+  .mh .mt b { display: block; font: 600 17px/1.2 "Geist"; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mh .mt span { display: block; margin-top: 2px; font: 400 13px/1.3 "Geist"; color: var(--ink-2); }
+  .preview { margin: 4px 16px 0; height: 200px; border-radius: 20px; background: var(--soft); overflow: hidden; flex: none; }
+  .fctx { margin: 14px 22px 8px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .fctx .fh { display: flex; justify-content: space-between; align-items: center; font: 600 15px/1 "Geist"; margin-bottom: 8px; }
+  .fctx .fh .sc svg { width: 18px; height: 18px; color: var(--ink-2); }
+  .kv2 { display: grid; grid-template-columns: 104px 1fr; gap: 8px; padding: 5px 0; align-items: baseline; }
+  .kv2 span { font: 400 13px/1.3 "Geist"; color: var(--ink-2); }
+  .kv2 b { font: 500 15px/1.3 "Geist"; overflow-wrap: anywhere; }
+  /* onboarding on the sky */
+  .sheet.onb { flex: 1; height: auto; margin-top: 104px; min-height: 0; padding-bottom: 26px; }
+  .sheet.onb h3 { margin-bottom: 6px; }
+  .sheet.onb .fld { margin: 0 0 2px; }
+  .seg { display: flex; padding: 4px; border-radius: 999px; background: var(--soft); margin: 4px 0 14px; }
+  .seg span { flex: 1; height: 40px; border-radius: 999px; display: grid; place-items: center; font: 500 13px/1 "Geist"; color: var(--ink-2); }
+  .seg span.on { background: var(--ink); color: var(--raised); font-weight: 600; }
+  .obtn { padding-top: 20px; }
+  .obtn .mbtn { height: 56px; }
+  .done { display: flex; align-items: center; gap: 12px; min-height: 48px; }
+  .done .t span { white-space: normal; }
+  .pgap { height: 1px; background: var(--rule); margin: 10px 0 18px; }
+  .pp { margin: 0 0 12px; font: 400 15px/1.4 "Geist"; color: var(--ink-2); }
+  .cmd { padding: 12px 14px; border-radius: 14px; background: var(--soft); font: 500 13px/1.3 "Geist"; letter-spacing: 0; margin-bottom: 10px; }
+  .fld .code { font: 600 26px/1.2 "Geist"; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+  .pairsheet .fld { padding: 8px 0 9px; }
+  /* the full-height picker */
+  .msearch { margin: 0 16px 8px; height: 46px; border-radius: 999px; background: var(--soft); display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 400 15px/1 "Geist"; color: var(--ink-2); flex: none; }
+  .msearch svg { width: 20px; height: 20px; color: var(--ink-2); }
+  .mscroll { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .mfade { position: absolute; left: 0; right: 0; bottom: 0; height: 36px; background: linear-gradient(color-mix(in srgb, var(--raised) 0%, transparent), var(--raised)); }
+  .mlab.g { padding-top: 14px; }
+  .mscroll .mlab { padding-left: 22px; }
+  .opt .ln { display: flex; align-items: center; gap: 6px; font: 400 13px/1.3 "Geist"; color: var(--ink-2); white-space: nowrap; overflow: hidden; }
+  .opt .ln em { font-style: normal; overflow: hidden; text-overflow: ellipsis; }
+  .cap { flex: none; font: 500 11px/1 "Geist"; font-style: normal; padding: 4px 7px; border-radius: 999px; background: var(--soft); color: var(--ink-2); }
+  .opt.sel .cap { background: var(--raised); }
+  .opt .pn { color: var(--ink-3); flex: none; display: grid; }
+  .opt .pn svg { width: 16px; height: 16px; }
+  .opt .mact { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .opt .mact svg { width: 18px; height: 18px; }
+  .mfoot { flex: none; border-top: 1px solid var(--rule); margin: 0 0 0; padding-top: 4px; }
+  .mfoot .fld.sel { border-bottom: 0; }
+  .mfoot .tog { min-height: 52px; }
+  .opt .t b { font-size: 15px; }
+  /* 375 x 667: the sky gives way, the sheet comes up */
+  @container (max-height: 760px) {
+    .screen .sky.tall { height: 240px !important; }
+    .screen .sky.tall .city { height: 70px !important; }
+    .screen .display { font-size: 34px; }
+    .screen .sheet.onb { margin-top: 40px; height: auto; padding-top: 18px; padding-bottom: 14px; }
+    .screen .sheet.onb .srow.big { min-height: 64px; }
+    .screen .sheet.onb .obtn { padding-top: 12px; }
+    .screen .sheet.onb .obtn .mbtn { height: 52px; }
+    .screen .sheet.onb .seg { margin-bottom: 6px; }
+    .screen .sheet.onb .pgap { margin: 6px 0 10px; }
+    .screen .sheet.onb .pp { margin-bottom: 8px; }
+    .screen .sheet.onb .cmd { margin-bottom: 4px; padding: 9px 12px; }
+    .screen .pairsheet .mnote { display: none; }
+    .screen .mscroll > :nth-child(n+8):not(.mfade) { display: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="city" viewBox="0 280 412 280" preserveAspectRatio="none">
+    <path d="M0 560V512h22v-18h16v-26h20v34h14v-46h24v58h10v-22h18v-40h8v-14h12v14h8v52h16v-30h22v-58h6v-30h10v30h6v58h12v-36h20v52h10V454h14v-24h4l2-150h2l2 150h4v24h12v76h10v-44h22v-26h16v40h10v-58h20v48h14v-20h14v34h16v-18H412V560z"/>
+  </symbol>
+  <symbol id="lights" viewBox="0 280 412 280" preserveAspectRatio="none">
+    <g fill="#F3E6C8" opacity=".7"><rect x="40" y="520" width="2" height="3"/><rect x="88" y="490" width="2" height="3"/><rect x="92" y="510" width="2" height="3"/><rect x="146" y="470" width="2" height="3"/><rect x="150" y="492" width="2" height="3"/><rect x="214" y="470" width="2" height="3"/><rect x="232" y="500" width="2" height="3"/><rect x="290" y="520" width="2" height="3"/><rect x="320" y="482" width="2" height="3"/><rect x="356" y="506" width="2" height="3"/><rect x="263" y="440" width="2" height="2"/></g>
+  </symbol>
+</svg>
+<section class="screen " data-name="s01-all-settings" data-time="7:49" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>All settings</b></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Kamran · Toronto</div><section class="grp first"><div class="acct"><span class="av">K</span><div class="t"><b>Kamran</b><span>Signed in to Open WebUI on umbrel.local</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Your team</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M6.5 20c.4-3.2 2.7-5 5.5-5s5.1 1.8 5.5 5"/></svg></span><div class="t"><b>Hermes Agent</b><span>Connected to your Umbrel · 6 bots</span></div><span class="sv">On</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span><div class="t"><b>Notifications</b><span>Banners, alerts and push from your team</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Chatting</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span><div class="t"><b>Chat</b><span>Model, quick actions, sending</span></div><span class="sv">gpt-6.1-terra</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/></svg></span><div class="t"><b>Personalization</b><span>Your prompt and server memory</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></span><div class="t"><b>Audio</b><span>Dictation and spoken answers</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>This app</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z"/></svg></span><div class="t"><b>Appearance</b><span>Theme, accent and language</span></div><span class="sv">System</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Servers</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/></svg></span><div class="t"><b>Open WebUI connection</b><span>umbrel.local · live updates</span></div><span class="sv">Healthy</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></span><div class="t"><b>Workspace</b><span>Models, tools and access on the server</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>Direct connections</b><span>OpenAI-compatible APIs and Ollama</span></div><span class="sv">2</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s01b-all-settings-end" data-time="7:50" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:128px;"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg><div class="head over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><div class="who"><b>All settings</b></div><span class="acts in"></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><section class="grp"><h3>Servers</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/></svg></span><div class="t"><b>Open WebUI connection</b><span>umbrel.local · live updates</span></div><span class="sv">Healthy</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></span><div class="t"><b>Workspace</b><span>Models, tools and access on the server</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>Direct connections</b><span>OpenAI-compatible APIs and Ollama</span></div><span class="sv">2</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>About Conduit</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg></span><div class="t"><b>About</b><span>Build 270 · what's new and licences</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Support Conduit</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M5 11h14v9H5zM4 7h16v4H4zM12 7v13"/><path d="M12 7c-2 0-4-1-4-3s3-2 4 3c1-5 4-5 4-3s-2 3-4 3"/></svg></span><div class="t"><b>Buy me a coffee</b><span>A one-time thank you</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M8 16 16 8M9 8h7v7"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></span><div class="t"><b>GitHub Sponsors</b><span>Recurring support for the roadmap</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M8 16 16 8M9 8h7v7"/></svg></span></div><div class="gnote">Conduit stays independent when its users fund it.</div></section><section class="grp"><div class="srow danger"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></svg></span><div class="t"><b>Sign out</b><span>End your Open WebUI session</span></div></div></section><div style="height:64px"></div></div></div>
+</section>
+<section class="screen " data-name="s01-all-settings-dark" data-time="18:52" data-chrome="light" data-home="light" data-theme="dark">
+<div class="body"><div class="bandwrap" style="height:168px;background:linear-gradient(#081224 0%, #14284A 38%, #3B5A82 66%, #B89474 100%);"><svg class="city" style="fill:#0A1220"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>All settings</b></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Kamran · Toronto</div><section class="grp first"><div class="acct"><span class="av">K</span><div class="t"><b>Kamran</b><span>Signed in to Open WebUI on umbrel.local</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Your team</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M6.5 20c.4-3.2 2.7-5 5.5-5s5.1 1.8 5.5 5"/></svg></span><div class="t"><b>Hermes Agent</b><span>Connected to your Umbrel · 6 bots</span></div><span class="sv">On</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span><div class="t"><b>Notifications</b><span>Banners, alerts and push from your team</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Chatting</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span><div class="t"><b>Chat</b><span>Model, quick actions, sending</span></div><span class="sv">gpt-6.1-terra</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/></svg></span><div class="t"><b>Personalization</b><span>Your prompt and server memory</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></span><div class="t"><b>Audio</b><span>Dictation and spoken answers</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>This app</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z"/></svg></span><div class="t"><b>Appearance</b><span>Theme, accent and language</span></div><span class="sv">System</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Servers</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/></svg></span><div class="t"><b>Open WebUI connection</b><span>umbrel.local · live updates</span></div><span class="sv">Healthy</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></span><div class="t"><b>Workspace</b><span>Models, tools and access on the server</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>Direct connections</b><span>OpenAI-compatible APIs and Ollama</span></div><span class="sv">2</span><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s02-settings-chat" data-time="7:51" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Chat</b></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Models, quick actions and sending</div><section class="grp"><h3>Default model</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg></span><div class="t"><b>gpt-6.1-terra</b><span>Used when you start a new chat</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Quick actions in chat <span class="n">3 selected</span></h3>
+          <div class="gsub">The shortcuts that sit above your message box.</div>
+          <div class="qa"><span class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Web</span><span class="">Image Gen</span><span class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Weather</span><span class="">Umbrel files</span><span class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Concise answers</span></div><div class="lnk">Clear all</div></section><section class="grp"><h3>Sending</h3><div class="trow"><div class="t"><b>Send with Enter</b><span>Press Enter to send on a hardware keyboard.</span></div><span class="sw"></span></div><div class="trow"><div class="t"><b>Start temporary chats</b><span>New chats aren't saved unless you keep them.</span></div><span class="sw off"></span></div><div class="trow"><div class="t"><b>Show citation page titles</b><span>Citation badges use page titles, not website names.</span></div><span class="sw"></span></div></section><section class="grp"><h3>Android assistant</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div class="t"><b>Android digital assistant</b><span>Show quick overlay</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>Advanced</h3><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg></span><div class="t"><b>Model system prompts</b><span>14 models you can edit</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s03-notifications" data-time="7:52" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Notifications</b></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Banners, alerts and push</div><section class="grp"><div class="trow"><div class="t"><b>Enable notifications</b><span>Allow banners and system alerts.</span></div><span class="sw"></span></div><div class="srow "><span class="glyph"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg></span><div class="t"><b>Android notification settings</b><span>Permission, sound and banners for Conduit</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>While you use Conduit</h3><div class="trow"><div class="t"><b>In-app banners</b><span>Show a banner while the app is open.</span></div><span class="sw"></span></div><div class="trow"><div class="t"><b>System notifications</b><span>Show an alert when Conduit is in the background.</span></div><span class="sw"></span></div><div class="trow"><div class="t"><b>Sound</b><span>Play a cue when a notification arrives.</span></div><span class="sw"></span></div><div class="trow"><div class="t"><b>Always play sound</b><span>Play it even when the app is open and focused.</span></div><span class="sw off"></span></div></section><section class="grp"><h3>What you hear about</h3><div class="trow"><div class="t"><b>Chat responses</b><span>When an answer finishes in a chat you are not viewing.</span></div><span class="sw"></span></div><div class="trow"><div class="t"><b>Channel messages</b><span>When someone writes in a channel or a direct message.</span></div><span class="sw"></span></div><div class="gnote">Channel messages come from Open WebUI and only show with a server account.</div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s03b-notifications-push" data-time="7:53" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:128px;"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg><div class="head over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><div class="who"><b>Notifications</b></div><span class="acts in"></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><section class="grp"><h3>Check this phone</h3><div class="stat"><div class="t"><b>Conduit notifications</b></div><em>On</em></div><div class="stat"><div class="t"><b>System notifications</b><span>Android alerts while Conduit is in the background</span></div><em>On</em></div><div class="stat"><div class="t"><b>Android permission</b></div><em>Allowed</em></div><div class="stat"><div class="t"><b>Android channel</b></div><em>Enabled</em></div><div class="lrow"><div class="t"><b>Send test notification</b><span>Goes straight to Android, skipping Hermes, to check this phone.</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="gnote">Alerts show inside the app while it is open, and as Android notifications while it is in the background. A fully closed app cannot receive them.</div></section><section class="grp"><h3>Push from Hermes</h3><div class="health"><span class="gl"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg></span><div class="t"><b>Push is set up, with things to check.</b><span>Last push received 4 min ago.</span></div></div><div class="issue"><div class="t"><b>Conduit battery use is restricted</b><span>Set Conduit to Unrestricted battery use, so push arrives with the phone idle.</span></div><span class="go soft">Battery settings</span></div><div class="lrow"><div class="t"><b>Check again</b></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s03c-notifications-categories" data-time="7:54" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:128px;"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg><div class="head over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><div class="who"><b>Notifications</b></div><span class="acts in"></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><section class="grp"><div class="lrow"><div class="t"><b>Approvals</b><span>Pending requests and history</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="lrow"><div class="t"><b>Pair again</b><span>Enter a one-time code from your Umbrel</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="lrow danger"><div class="t"><b>Unpair this phone</b></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><section class="grp"><h3>What Hermes can push</h3><div class="trow"><div class="t"><b>Receive push</b><span>Master switch for everything below.</span></div><span class="sw"></span></div><div class="trow slim"><div class="t"><b>Alerts</b></div><span class="sw"></span></div><div class="trow slim"><div class="t"><b>Proactive</b></div><span class="sw"></span></div><div class="trow slim"><div class="t"><b>Briefs</b></div><span class="sw"></span></div><div class="trow slim"><div class="t"><b>Agent messages</b></div><span class="sw"></span></div><div class="trow slim"><div class="t"><b>Watches</b></div><span class="sw off"></span></div><div class="trow slim"><div class="t"><b>Status</b></div><span class="sw off"></span></div><div class="lrow"><div class="t"><b>Sound and vibration</b><span>Android settings for each category</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="gnote">Approvals and critical alerts stay on whenever push is on. Critical alerts do not bypass Do Not Disturb.</div></section></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s04-spaces" data-time="7:55" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Spaces</b><span class="acts"><span><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Pages you and Hermes keep working on</div><section class="grp first"><div class="srow"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div class="t"><b>Kaizen</b><span>7 pages · 6:12</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div class="t"><b>Maple &amp; Pine</b><span>4 pages · Wed</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div class="t"><b>Hermes</b><span>3 pages · 1:20</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div class="t"><b>Home</b><span>5 pages · Tue</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div class="t"><b>Personal</b><span>2 pages · 22 Oct</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div></section><div class="gnote pad">A Space holds Pages: plans, research and notes you keep improving with Hermes.</div></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s05-space-pages-menu" data-time="7:56" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Kaizen</b><span class="acts"><span><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg></span><span style="visibility:hidden"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">7 pages</div><div class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>Search pages</div><section class="grp first plist"><div class="prow"><b>Holiday theme launch plan</b><p>Goes live Friday at 9:00 once kai's three-size check is done. Open: banner copy, shipping note.</p><time>6:12 · 2 subpages</time></div><div class="prow"><b>Catalogue clean-up rules</b><p>Titles under 70 characters, one vendor per product, no all-caps names.</p><time>Yesterday</time></div><div class="prow"><b>Weekly numbers</b><p>Orders, returns and the two slow collections to watch before Friday.</p><time>Tue · in Holiday theme launch plan</time></div><div class="prow"><b>Checkout extension changes</b><p>Two Shopify changelog entries touch checkout. Nothing breaks the current theme.</p><time>Tue</time></div><div class="prow"><b>Maple &amp; Pine kickoff notes</b><p>Jordan wants Tuesday at 10 on Teams. Still missing: logo files and the shipping zones.</p><time>Mon</time></div></section></div></div><div class="pagefade" data-float></div>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard" data-float style="bottom:16px; padding-top:10px">
+  <div class="mlab">Sort pages</div>
+  <div class="opt menurow"><span class="micon"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><div class="t"><b>Recently updated</b></div><span class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div>
+  <div class="opt menurow"><span class="micon"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h5"/></svg></span><div class="t"><b>Name</b></div></div>
+  <div class="sep"></div>
+  <div class="opt menurow"><span class="micon"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span><div class="t"><b>Rename Space</b></div></div>
+  <div class="opt menurow danger"><span class="micon"><svg class="i" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/></svg></span><div class="t"><b>Delete Space</b></div></div>
+</div>
+</section>
+<section class="screen " data-name="s06-page-editor" data-time="7:57" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap paper" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg><div class="head over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><div class="who"><b class="saved">Saved</b><span>in Kaizen</span></div><span class="go">Ask Hermes</span><span class="acts in"><span><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden; background:var(--raised)"><div class="doc">
+        <h1>Holiday theme launch plan</h1>
+        <p>The theme goes live on Friday at 9:00, once kai has checked it on three phone sizes. Everything below is open until then.</p>
+        <h2>Before Friday</h2>
+        <ul><li>Banner copy: waiting on Jordan</li><li>Shipping note for orders after 18 Dec</li><li>Check out once on the small phone</li></ul>
+        <h2>What to watch</h2>
+        <p>The old theme converted at 2.4% last week. Compare on Monday morning<span class="caret"></span></p>
+      </div></div></div><div class="etool" data-float><span><b class="tb">B</b></span><span><i class="tb">I</i></span><span><s class="tb">S</s></span><span><svg class="i" viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg></span><span><b class="tb h">H</b></span><span><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1v4M4 14h3l-3 3h3"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M5 18v-5h4v5zM5 13c0-3 1-5 4-6M14 18v-5h4v5zM14 13c0-3 1-5 4-6"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span></div>
+</section>
+<section class="screen " data-name="s06b-page-editor-conflict" data-time="7:58" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap paper" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg><div class="head over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><div class="who"><b class="saved">Changed elsewhere</b><span>in Kaizen</span></div><span class="go">Ask Hermes</span><span class="acts in"><span><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden; background:var(--raised)"><div class="conf"><b>This page changed somewhere else.</b><span>Your draft is still safe.</span>
+          <div class="cbtns"><span class="go">Review latest</span><span class="go soft">Keep my draft</span><span class="go soft">Use latest</span><span class="go soft">Copy draft</span></div></div><div class="doc">
+        <h1>Holiday theme launch plan</h1>
+        <p>The theme goes live on Friday at 9:00, once kai has checked it on three phone sizes. Everything below is open until then.</p>
+        <h2>Before Friday</h2>
+        <ul><li>Banner copy: waiting on Jordan</li><li>Shipping note for orders after 18 Dec</li><li>Check out once on the small phone</li></ul>
+        <h2>What to watch</h2>
+        <p>The old theme converted at 2.4% last week. Compare on Monday morning<span class="caret"></span></p>
+      </div></div></div><div class="etool" data-float><span><b class="tb">B</b></span><span><i class="tb">I</i></span><span><s class="tb">S</s></span><span><svg class="i" viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg></span><span><b class="tb h">H</b></span><span><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1v4M4 14h3l-3 3h3"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M5 18v-5h4v5zM5 13c0-3 1-5 4-6M14 18v-5h4v5zM14 13c0-3 1-5 4-6"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span></div>
+</section>
+<section class="screen " data-name="s07-artifacts" data-time="7:59" data-chrome="light" data-home="dark">
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Artifacts</b><span class="acts"><span><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Files Hermes made for you</div><div class="fchips"><span class="on">All</span><span>Images</span><span>Docs</span><span>Media</span></div><div class="fcount">9 files</div><div class="tiles"><div class="tile"><div class="th"><svg viewBox="0 0 160 104" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="160" height="104" fill="#E9DFCB"/><path d="M0 104V84l22-22 18 20 26-36 24 30 20-16 30 26 20-10V104z" fill="#2F4A3C"/><rect x="18" y="16" width="70" height="8" rx="3" fill="#0E1116"/><rect x="18" y="30" width="44" height="5" rx="2.5" fill="#0E1116" opacity=".45"/><circle cx="130" cy="26" r="9" fill="#FFFFFF" opacity=".8"/></svg></div><b>holiday-banner-v3.png</b><span>PNG</span></div><div class="tile"><div class="th"><svg viewBox="0 0 160 104" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="160" height="104" fill="#E3E6EB"/><g fill="#FFFFFF" stroke="#0E1116" stroke-width="2"><rect x="18" y="22" width="34" height="62" rx="6"/><rect x="62" y="16" width="38" height="74" rx="6"/><rect x="110" y="12" width="34" height="80" rx="6"/></g><g stroke="#0E1116" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"><path d="M24 36h22M24 46h16M68 32h26M68 42h18M116 28h22M116 38h14"/></g></svg></div><b>theme-qa-3-sizes.png</b><span>PNG</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div><b>push-relay-split.pdf</b><span>PDF</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div><b>catalogue-sync-oct-29.csv</b><span>CSV</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></div><b>morning-brief-oct-30.m4a</b><span>M4A</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg></div><b>relay-diagram.svg</b><span>SVG</span></div></div></div></div><div class="pagefade" data-float></div>
+</section>
+<section class="screen " data-name="s07b-artifact-card" data-time="8:00" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+<div class="body"><div class="bandwrap" style="height:168px;"><svg class="city" style="fill:#0F1E33"><use href="#city"/></svg><div class="pagehead sub over"><span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span><b>Artifacts</b><span class="acts"><span><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5"/></svg></span></span></div></div><div data-scrolls style="margin-top:-8px; flex:1; min-height:0; overflow:hidden"><div class="lede2">Files Hermes made for you</div><div class="fchips"><span class="on">All</span><span>Images</span><span>Docs</span><span>Media</span></div><div class="fcount">9 files</div><div class="tiles"><div class="tile"><div class="th"><svg viewBox="0 0 160 104" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="160" height="104" fill="#E9DFCB"/><path d="M0 104V84l22-22 18 20 26-36 24 30 20-16 30 26 20-10V104z" fill="#2F4A3C"/><rect x="18" y="16" width="70" height="8" rx="3" fill="#0E1116"/><rect x="18" y="30" width="44" height="5" rx="2.5" fill="#0E1116" opacity=".45"/><circle cx="130" cy="26" r="9" fill="#FFFFFF" opacity=".8"/></svg></div><b>holiday-banner-v3.png</b><span>PNG</span></div><div class="tile"><div class="th"><svg viewBox="0 0 160 104" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="160" height="104" fill="#E3E6EB"/><g fill="#FFFFFF" stroke="#0E1116" stroke-width="2"><rect x="18" y="22" width="34" height="62" rx="6"/><rect x="62" y="16" width="38" height="74" rx="6"/><rect x="110" y="12" width="34" height="80" rx="6"/></g><g stroke="#0E1116" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"><path d="M24 36h22M24 46h16M68 32h26M68 42h18M116 28h22M116 38h14"/></g></svg></div><b>theme-qa-3-sizes.png</b><span>PNG</span></div><div class="tile" style="visibility:hidden"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div><b>push-relay-split.pdf</b><span>PDF</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div><b>catalogue-sync-oct-29.csv</b><span>CSV</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></div><b>morning-brief-oct-30.m4a</b><span>M4A</span></div><div class="tile"><div class="th glyphth"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg></div><b>relay-diagram.svg</b><span>SVG</span></div></div></div></div><div class="pagefade" data-float></div>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard" data-float style="bottom:16px">
+  <div class="grab"></div>
+  <div class="mh"><span class="ktile"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></span><div class="mt"><b>push-relay-split.pdf</b><span>PDF · Hermes artifact</span></div><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+  <div class="preview"><svg viewBox="0 0 220 150" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"><rect x="52" y="6" width="116" height="138" rx="6" fill="#FFFFFF" stroke="#E6E7EA"/><rect x="64" y="20" width="64" height="7" rx="3" fill="#0E1116"/><g fill="#0E1116" opacity=".28"><rect x="64" y="38" width="92" height="4" rx="2"/><rect x="64" y="48" width="88" height="4" rx="2"/><rect x="64" y="58" width="92" height="4" rx="2"/></g><rect x="64" y="76" width="44" height="26" rx="4" fill="#E6E7EA"/><rect x="114" y="76" width="42" height="26" rx="4" fill="#E6E7EA"/><g fill="#0E1116" opacity=".28"><rect x="64" y="112" width="86" height="4" rx="2"/><rect x="64" y="122" width="60" height="4" rx="2"/></g></svg></div>
+  <div class="fctx">
+    <div class="fh"><b>File context</b><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+    <div class="kv2"><span>Source</span><b>architect</b></div>
+    <div class="kv2"><span>Conversation</span><b>Push relay split</b></div>
+    <div class="kv2"><span>Type</span><b>PDF</b></div>
+    <div class="kv2"><span>First seen</span><b>1:20</b></div>
+    <div class="kv2"><span>Saved at</span><b>/opt/data/artifacts/<wbr>push-relay-split.pdf</b></div>
+  </div>
+  <div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span><div class="t"><b>Related conversation</b><span>Push relay split</span></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+</div>
+</section>
+<section class="screen skyscreen" data-name="s08a-onboarding-choose" data-time="7:30" data-chrome="light" data-home="dark">
+  <div class="sky dawn tall" style="height:300px"><svg class="city" style="height:92px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><b>Conduit</b><span>1 of 3</span></div>
+    <div class="display" style="padding-top:26px">Connect your team.<br><span>Pick one to start.</span></div>
+    <div class="sheet onb "><h3>Self-hosted</h3><div class="srow big"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI" style="width:24px;height:24px;border-radius:50%"></span><div class="t"><b>Open WebUI</b><span>Sign in to your server for synced chats, notes and more.</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="srow big"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M6.5 20c.4-3.2 2.7-5 5.5-5s5.1 1.8 5.5 5"/></svg></span><div class="t"><b>Hermes Agent</b><span>Connect your team of bots on a self-hosted Hermes.</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><h3 style="margin-top:22px">Model APIs</h3><div class="srow big"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>Connect directly</b><span>An OpenAI-compatible or Ollama API. Keys stay on this phone.</span></div><span class="sc"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div><div class="mnote" style="padding:22px 0 0">You can add the others later in All settings.</div></div>
+  </div>
+</section>
+<section class="screen skyscreen" data-name="s08b-onboarding-connect" data-time="7:31" data-chrome="light" data-home="dark">
+  <div class="sky dawn tall" style="height:300px"><svg class="city" style="height:92px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><b>Conduit</b><span>2 of 3</span></div>
+    <div class="display" style="padding-top:26px">Connect Hermes.<br><span>Enter its address.</span></div>
+    <div class="sheet onb "><div class="seg"><span class="on">Responses API</span><span>Desktop Gateway</span></div>
+      <div class="fld focus"><label>Server URL</label><div>http://umbrel.local:8642<span class="caret"></span></div></div>
+      <div class="fld"><label>API key</label><div>••••••••••••••••</div></div>
+      <div class="fld"><label>Memory key (optional)</label><div class="ph">Made for you if left blank</div></div>
+      <div class="mnote" style="padding:8px 0 0">The memory key keeps long-term memory tied to you.</div>
+      <div class="obtn"><span class="mbtn pri">Connect Hermes</span></div></div>
+  </div>
+</section>
+<section class="screen skyscreen" data-name="s08-onboarding-pair" data-time="7:33" data-chrome="light" data-home="dark">
+  <div class="sky dawn tall" style="height:300px"><svg class="city" style="height:92px; fill:#0F1E33"><use href="#city"/></svg></div>
+  <div class="body">
+    <div class="top"><b>Conduit</b><span>3 of 3</span></div>
+    <div class="display" style="padding-top:26px">Pair this phone.<br><span>So alerts reach you.</span></div>
+    <div class="sheet onb pairsheet"><div class="done"><span class="gl"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span><div class="t"><b>Umbrel connected</b><span>6 bots found</span></div></div>
+      <div class="pgap"></div>
+      <h3>Pair this phone</h3>
+      <p class="pp">On the Umbrel, run this command. It prints a code that works once, for five minutes.</p>
+      <div class="cmd">docker exec hermes-notify notifyctl pair</div>
+      <div class="fld focus"><label>Pairing code</label><div class="code">K7QM-4D<span class="caret"></span></div></div>
+      <div class="fld"><label>Name for this phone</label><div>S25 Ultra</div></div>
+      <div class="fld"><label>Gateway address</label><div>https://umbrel.tailnet.ts.net:8450</div></div>
+      <div class="obtn"><span class="mbtn pri">Pair</span></div>
+      <div class="mnote" style="padding:8px 0 0; text-align:center">Type the code. Scanning a QR code isn't available yet.</div></div>
+  </div>
+</section>
+<section class="screen chat" data-name="s09-model-picker" data-time="7:44" data-chrome="light" data-home="dark">
+  <div class="under" data-behind>
+  <div class="body">
+    <div class="bandwrap" style="height:128px"><svg class="city" style="height:40px; fill:#0F1E33"><use href="#city"/></svg>
+    <div class="head over">
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></span>
+      <img class="face" src="assets/chief-cut.png" alt="">
+      <div class="who"><b>Chief</b><span>gpt-6.1-terra</span></div>
+      <span class="back"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>
+    </div></div>
+    <div>
+      <div class="scroll" data-scrolls style="padding-top:4px">
+        <div class="you">Draft a short note to Jordan confirming Tuesday's kickoff at 10 on Teams. Don't send it.</div>
+        <div class="turn"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>Read 4 emails and your calendar <span class="meta">· 12s</span></div>
+        <div class="answer">Here's the draft. Tuesday at 10:00 is clear, and Jordan's last email asked for the Teams link, so I put it in.</div>
+        <div class="draft">
+          <div class="dt">Kickoff confirmation</div>
+          <div class="lab first">Draft / not sent</div>
+          <div class="lab">To</div><div class="val">jordan@mapleandpine.ca</div>
+          <div class="lab">Subject</div><div class="val">Tuesday kickoff</div>
+          <hr>
+          <div class="lab">Message</div><div class="val">Hi Jordan, confirming our kickoff Tuesday at 10:00 on Teams. The link is below.</div>
+          <span class="more"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="fade" data-float></div>
+  <div class="chip" data-float style="visibility:hidden">gpt-6.1-terra <span>High</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+  <div class="composer" data-float><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow">Message Chief</span><span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span><span class="voice"><svg class="i" viewBox="0 0 24 24"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"/></svg></span></div>
+  </div>
+  <div class="scrim" data-float></div>
+  <div class="mcard tall" data-float style="bottom:16px; top:52px">
+  <div class="grab"></div><div class="mh"><b>Model for this chat</b><span class="x"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div>
+  <div class="msearch"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>Search models</div>
+  <div class="mscroll" data-scrolls><div class="mlab">Pinned</div><div class="opt sel"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg></span><div class="t"><b>gpt-6.1-terra</b><span class="ln"><em>Chief's default</em><i class="cap">Reasoning</i></span></div><span class="pn"><svg class="i" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></span><span class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg></span><div class="t"><b>gpt-6.1-mini</b><span class="ln"><em>Quicker, lighter work</em><i class="cap">Reasoning</i></span></div><span class="pn"><svg class="i" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></span><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Llama 3.3 70B</b><span class="ln"><em>On your Umbrel</em></span></div><span class="pn"><svg class="i" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></span><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="mlab g">Open WebUI</div><div class="opt"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Qwen 3 32B</b><span class="ln"><em>On your Umbrel · code</em><i class="cap">Reasoning</i></span></div><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Gemma 3 27B</b><span class="ln"><em>On your Umbrel</em><i class="cap">Multimodal</i></span></div><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Mistral Small 3 24B</b><span class="ln"><em>On your Umbrel</em></span></div><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><img src="assets/open-webui.png" alt="Open WebUI"></span><div class="t"><b>Phi-4 14B</b><span class="ln"><em>On your Umbrel · quick</em></span></div><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="mlab g">Direct</div><div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>llama3.2 3B</b><span class="ln"><em>Ollama · this phone</em><i class="cap">Loaded</i></span></div><span class="mact"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></span><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg></span><div class="t"><b>gemma3 12B</b><span class="ln"><em>Ollama · desktop</em><i class="cap">Multimodal</i></span></div><span class="mact"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></span><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="opt"><span class="glyph"><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/></svg></span><div class="t"><b>gpt-6.1-nano</b><span class="ln"><em>Direct endpoint</em></span></div><span class="chk" style=visibility:hidden><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></div><div class="mfade"></div></div>
+  <div class="mfoot" data-float>
+    <div class="fld sel"><div class="grow"><label>Effort</label><div>High</div></div><span class="chev"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+    <div class="tog"><span>Fast tier</span><span class="sw off"></span></div>
+  </div>
+</div>
+</section>
+
+<script src="file:///C:/Users/Kamran/.claude/skills/app-designer/assets/device.js"></script>
+<script>
+  // One UI status bar: time and two notification icons left; wifi, signal, battery % right.
+  document.querySelectorAll('.ac-status').forEach(el => {
+    const host = el.closest('[data-time]'); const t = host ? host.dataset.time : '9:41';
+    el.innerHTML = `<span class="sb">${t}<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span>
+      <span class="sb"><svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M6 12.5a9 9 0 0 1 12 0M9.5 16a4 4 0 0 1 5 0"/></svg><svg class="f" viewBox="0 0 24 24"><path d="M3 20h3v-4H3zM8 20h3v-8H8zM13 20h3V8h-3zM18 20h3V4h-3z"/></svg><span class="pct">84%</span><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="17" rx="2"/><path d="M10 2h4"/><rect x="9" y="8" width="6" height="11" rx="1" style="fill:currentColor;stroke:none"/></svg></span>`;
+  });
+</script>
+</body>
+</html>

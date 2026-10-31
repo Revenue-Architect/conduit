@@ -1,0 +1,460 @@
+[
+  {
+    "name": "s01-all-settings",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Models, tools and access\" (home indicator)",
+      "8 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 29
+      },
+      "sizes": [
+        30,
+        20,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s01b-all-settings-end",
+    "fails": [],
+    "warns": [
+      "Only 3 text sizes across 21 text elements. Hierarchy is flat.",
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "7 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 21
+      },
+      "sizes": [
+        17,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s01-all-settings-dark",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Models, tools and access\" (home indicator)",
+      "8 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 29
+      },
+      "sizes": [
+        30,
+        20,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s02-settings-chat",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Advanced\" (home indicator)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 25
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 4,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s03-notifications",
+    "fails": [],
+    "warns": [
+      "Only 3 text sizes across 21 text elements. Hierarchy is flat."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 21
+      },
+      "sizes": [
+        30,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s03b-notifications-push",
+    "fails": [],
+    "warns": [
+      "Only 3 text sizes across 21 text elements. Hierarchy is flat.",
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 21
+      },
+      "sizes": [
+        17,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s03c-notifications-categories",
+    "fails": [],
+    "warns": [
+      "Only 3 text sizes across 18 text elements. Hierarchy is flat.",
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 18
+      },
+      "sizes": [
+        17,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s04-spaces",
+    "fails": [],
+    "warns": [
+      "Only 3 text sizes across 13 text elements. Hierarchy is flat."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 13
+      },
+      "sizes": [
+        30,
+        15,
+        13
+      ],
+      "weights": [
+        "400",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s05-space-pages-menu",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 23
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        0
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "s06-page-editor",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Saved\" (status bar); \"Ask Hermes\" (status bar)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 15
+      },
+      "sizes": [
+        30,
+        20,
+        17,
+        16,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "s06b-page-editor-conflict",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Changed elsewhere\" (status bar); \"Ask Hermes\" (status bar)"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 21
+      },
+      "sizes": [
+        30,
+        20,
+        17,
+        16,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 4,
+      "accentHues": [],
+      "cards": 1
+    }
+  },
+  {
+    "name": "s07-artifacts",
+    "fails": [],
+    "warns": [
+      "6 card containers on one screen. Is the screen just a stack of boxes?",
+      "9 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 19
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 6
+    }
+  },
+  {
+    "name": "s07b-artifact-card",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals.",
+      "7 card containers on one screen. Is the screen just a stack of boxes?",
+      "9 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 32
+      },
+      "sizes": [
+        30,
+        17,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "900"
+      ],
+      "leftEdges": 6,
+      "accentHues": [],
+      "cards": 7
+    }
+  },
+  {
+    "name": "s08a-onboarding-choose",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 13
+      },
+      "sizes": [
+        40,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [],
+      "cards": 1
+    }
+  },
+  {
+    "name": "s08b-onboarding-connect",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 14
+      },
+      "sizes": [
+        40,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [],
+      "cards": 1
+    }
+  },
+  {
+    "name": "s08-onboarding-pair",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 17
+      },
+      "sizes": [
+        40,
+        26,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [],
+      "cards": 1
+    }
+  },
+  {
+    "name": "s09-model-picker",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)",
+      "7 distinct left edges in the left third. Align to fewer verticals.",
+      "3 gradients. Gradients are a seasoning, not a surface treatment."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 48
+      },
+      "sizes": [
+        17,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 7,
+      "accentHues": [],
+      "cards": 3
+    }
+  }
+]

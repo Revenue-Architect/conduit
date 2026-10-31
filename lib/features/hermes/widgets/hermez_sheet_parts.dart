@@ -162,7 +162,6 @@ class HermezActionTile extends StatelessWidget {
     final muted = primary ? _onDarkMuted : palette.muted;
     return HermezSurface(
       kind: primary ? HermezSurfaceKind.technical : HermezSurfaceKind.utility,
-      motif: primary ? HermezMotif.slash : HermezMotif.none,
       border: primary
           ? null
           : Border.all(color: palette.border.withValues(alpha: 0.75)),

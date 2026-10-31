@@ -31,10 +31,34 @@ Future<HermesSessionSummary?> showHermesScheduledAgentSheet(
   builder: (_) => _ScheduledAgentSheet(job: job, profile: profile),
 );
 
-class _ScheduledAgentSheet extends ConsumerStatefulWidget {
-  const _ScheduledAgentSheet({required this.job, required this.profile});
+/// The scheduled agent as a step inside another card (the Scheduled card):
+/// the same view, with back to the list. Choosing a run pops the card with it.
+class HermesScheduledAgentView extends StatelessWidget {
+  const HermesScheduledAgentView({
+    super.key,
+    required this.job,
+    required this.profile,
+    required this.onBack,
+  });
+
   final HermesJob job;
   final String profile;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) =>
+      _ScheduledAgentSheet(job: job, profile: profile, onBack: onBack);
+}
+
+class _ScheduledAgentSheet extends ConsumerStatefulWidget {
+  const _ScheduledAgentSheet({
+    required this.job,
+    required this.profile,
+    this.onBack,
+  });
+  final HermesJob job;
+  final String profile;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<_ScheduledAgentSheet> createState() =>
@@ -123,6 +147,7 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
     final weekdays = hermezCronWeekdays(job.schedule);
     final scheduleText = describeHermesCronSchedule(job.schedule);
     return HermezModalSheet(
+      onBack: widget.onBack,
       title: job.displayName,
       titleMorphId: hermezMorphPart(
         hermezJobMorphId(widget.profile, job.id),
@@ -218,7 +243,6 @@ class _ScheduledAgentSheetState extends ConsumerState<_ScheduledAgentSheet> {
           const SizedBox(height: 9),
           HermezSurface(
             kind: HermezSurfaceKind.utility,
-            motif: weekdays == null ? HermezMotif.none : HermezMotif.slash,
             border: Border.all(color: palette.border.withValues(alpha: 0.75)),
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Wrap(
