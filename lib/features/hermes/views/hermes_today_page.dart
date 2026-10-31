@@ -409,7 +409,7 @@ class _TopLine extends StatelessWidget {
           '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
           style: _geist(13, FontWeight.w600, Colors.white),
         ),
-        Text('  Toronto', style: soft),
+        Text('  $kHermezCity', style: soft),
         if (right != null)
           Expanded(
             child: Text(

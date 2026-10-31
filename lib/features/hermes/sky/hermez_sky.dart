@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Today's ground: Toronto's sky at this hour (docs/app-design-2026-10-30,
+/// Today's ground: Montreal's sky at this hour (docs/app-design-2026-10-30,
 /// "The sky"). A system, not decoration: the gradient follows the real time
 /// and weather, and dark mode always shows the evening or night version.
 enum HermezSkyPhase { dawn, day, dusk, night }
@@ -32,7 +32,7 @@ class HermezSkyState {
 }
 
 /// The phase at [now]. Dawn is an hour either side of sunrise; dusk runs
-/// from an hour before sunset until 11 pm (the evening); with no sun times, Toronto's late-October hours stand in. In dark
+/// from an hour before sunset until 11 pm (the evening); with no sun times, late-October hours stand in. In dark
 /// mode the sky is never daytime: dusk or night, whichever is nearer.
 HermezSkyPhase hermezSkyPhaseAt(
   DateTime now, {

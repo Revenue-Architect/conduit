@@ -81,19 +81,11 @@ class _HermesChatContextBarState extends ConsumerState<HermesChatContextBar> {
     // is not this chat's pick, its fallback chain stepped in.
     final fellBack =
         picked != null && info?.model != null && info!.model != picked;
-    final model =
-        draft?.model ??
-        info?.model ??
-        // No live session info yet (a new chat): what the profile runs on.
-        ref
-            .watch(
-              hermesModelCatalogProvider((
-                storedId: sessionId,
-                profile: profile,
-              )),
-            )
-            .value
-            ?.currentModel;
+    final model = watchHermesChatModel(
+      ref,
+      sessionId: sessionId,
+      profile: profile,
+    );
     final effort = hermesEffortShort(
       draft?.reasoningEffort ?? info?.reasoningEffort,
     );
@@ -415,4 +407,27 @@ bool hermesLatestTurnUsedPlan(List<ChatMessage> messages) {
     }
   }
   return false;
+}
+
+/// The model this chat runs on: the pick for a new chat, else the model that
+/// served the last turn, else what the profile runs on.
+String? watchHermesChatModel(
+  WidgetRef ref, {
+  required String? sessionId,
+  required String? profile,
+}) {
+  final draft = sessionId == null
+      ? ref.watch(hermesDraftModelChoiceProvider)
+      : null;
+  final info = sessionId == null
+      ? null
+      : ref.watch(hermesAgenticStateProvider(sessionId)).value?.info;
+  return draft?.model ??
+      info?.model ??
+      ref
+          .watch(
+            hermesModelCatalogProvider((storedId: sessionId, profile: profile)),
+          )
+          .value
+          ?.currentModel;
 }

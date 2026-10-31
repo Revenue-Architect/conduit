@@ -74,6 +74,7 @@ import '../../hermes/services/hermes_session_provenance.dart';
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
 import '../../hermes/widgets/hermes_chat_context_bar.dart';
+import '../../hermes/sheets/hermes_model_sheet.dart' show hermesModelShortName;
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_empty_chat_greeting.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -4663,7 +4664,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           isLoadingConversation: isLoadingConversation,
           modelLabel: modelLabel,
           hermesBot: hermesBot,
-          modelName: formattedModelName,
         ),
         body: ColoredBox(
           color: hermezVisuals
@@ -4677,12 +4677,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 if (_usesSkyHeader) ...[
                   // The sky band runs under the header and a little past
                   // it, so the transcript sheet's rounded top sits on it.
+                  // The skyline stands on the sheet's top edge; behind its
+                  // rounded corners is the skyline's own ground colour.
                   Positioned(
                     left: 0,
                     right: 0,
                     top: 0,
-                    height: _skySheetTop(context) + kHermesSkySheetRadius,
+                    height: _skySheetTop(context),
                     child: const HermezSkyBand(),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: _skySheetTop(context),
+                    height: kHermesSkySheetRadius,
+                    child: const HermezSkyGround(),
                   ),
                   Positioned(
                     left: 0,
@@ -4932,7 +4941,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required bool isLoadingConversation,
     required String modelLabel,
     required HermesBotChatPresentation? hermesBot,
-    String? modelName,
   }) {
     final activeConversation = ref.watch(activeConversationProvider);
     final isTemporary = ref.watch(temporaryChatEnabledProvider);
@@ -4943,7 +4951,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         context: context,
         hermesBot: hermesBot,
         activeConversation: activeConversation,
-        modelName: modelName,
         showNewChatAction: showNewChatAction,
       );
     }
@@ -5035,7 +5042,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required BuildContext context,
     required HermesBotChatPresentation hermesBot,
     required Conversation? activeConversation,
-    required String? modelName,
     required bool showNewChatAction,
   }) {
     const onSky = Colors.white;
@@ -5044,12 +5050,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    final model = modelName?.trim();
+    // The model the chat really runs on, as the composer's model pill
+    // names it.
+    final model = watchHermesChatModel(
+      ref,
+      sessionId: ref.watch(hermesActiveSessionProvider),
+      profile: profile,
+    );
     final subtitle = active
         ? 'Working'
-        : (model == null || model.isEmpty || model == hermesBot.title)
+        : model == null
         ? null
-        : model;
+        : hermesModelShortName(model);
     final overflow = _buildChatToolbarOverflowAction(
       context: context,
       activeConversation: activeConversation,

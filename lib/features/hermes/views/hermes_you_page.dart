@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../sky/hermez_weather.dart' show kHermezCity;
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../profile/views/profile_page.dart';
@@ -184,7 +185,7 @@ class HermesYouPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Toronto · ${bots.length} bots',
+                  '$kHermezCity · ${bots.length} bots',
                   style: _geist(
                     15,
                     FontWeight.w400,
@@ -285,7 +286,7 @@ class HermesYouPage extends ConsumerWidget {
             title: 'Sky',
             sub: dark
                 ? 'Dark mode shows the evening sky'
-                : 'Follows Toronto’s time and weather',
+                : 'Follows $kHermezCity’s time and weather',
           ),
           row(
             icon: Icons.tune_rounded,

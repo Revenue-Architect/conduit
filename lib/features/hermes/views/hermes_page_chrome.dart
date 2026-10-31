@@ -29,7 +29,7 @@ class HermesPageChrome extends StatefulWidget {
     this.skyBand = false,
   });
 
-  /// The top bar carries Toronto's sky (docs/app-design-2026-10-30: inner
+  /// The top bar carries Montreal's sky (docs/app-design-2026-10-30: inner
   /// screens wear a band of Today's sky); dark mode shows the evening sky.
   final bool skyBand;
 

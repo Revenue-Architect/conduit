@@ -6,7 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'hermez_sky.dart';
 
-/// Toronto's weather and sun for the sky, from Open-Meteo (no key). Fixed
+/// The owner's city: Today's top line names it and the sky follows its
+/// weather and sun.
+const kHermezCity = 'Montreal';
+
+/// Montreal's weather and sun for the sky, from Open-Meteo (no key). Fixed
 /// coordinates: the phone's location is never read or sent.
 class HermezWeather {
   const HermezWeather({
@@ -73,15 +77,16 @@ class HermezWeather {
   }
 }
 
-const _cacheKey = 'hermez.sky.weather.v1';
+// v2: Montreal. A reading cached for the old city is never shown again.
+const _cacheKey = 'hermez.sky.weather.v2';
 const _ttl = Duration(hours: 1);
 final _endpoint = Uri.parse(
-  'https://api.open-meteo.com/v1/forecast?latitude=43.65&longitude=-79.38'
+  'https://api.open-meteo.com/v1/forecast?latitude=45.50&longitude=-73.57'
   '&current=temperature_2m,weather_code&daily=sunrise,sunset'
-  '&timezone=America%2FToronto&forecast_days=1',
+  '&timezone=auto&forecast_days=1',
 );
 
-/// The latest Toronto weather: the cached reading while it is under an hour
+/// The latest Montreal weather: the cached reading while it is under an hour
 /// old, else a fresh one. Null offline with nothing cached; the sky then
 /// follows the clock alone and Today hides the weather words.
 final hermezWeatherProvider = FutureProvider<HermezWeather?>((ref) async {

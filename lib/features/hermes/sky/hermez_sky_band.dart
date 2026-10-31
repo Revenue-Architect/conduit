@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'hermez_sky.dart';
 import 'hermez_weather.dart';
 
-/// Toronto's sky right now, from the cached Open-Meteo reading; dark mode
+/// Montreal's sky right now, from the cached Open-Meteo reading; dark mode
 /// always gets the evening or night version.
 HermezSkyState watchHermezSky(BuildContext context, WidgetRef ref) {
   final weather = ref.watch(hermezWeatherProvider).value;
@@ -34,4 +34,14 @@ class HermezSkyBand extends ConsumerWidget {
     ),
     child: const SizedBox.expand(),
   );
+}
+
+/// The flat colour under the skyline, for a strip that continues the band
+/// (behind a sheet's rounded corners).
+class HermezSkyGround extends ConsumerWidget {
+  const HermezSkyGround({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      ColoredBox(color: hermezSkyGround(watchHermezSky(context, ref).phase));
 }
