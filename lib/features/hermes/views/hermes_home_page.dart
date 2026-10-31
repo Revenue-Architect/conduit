@@ -172,17 +172,8 @@ Future<void> chooseHermesNewChat(
       context,
       origin: origin,
       surfaceColor: palette.surface,
-      maxWidth: 380,
       semanticLabel: 'Choose a bot',
       theme: hermezVisualTheme(Theme.of(context)),
-      faceBuilder: (faceContext, turn) => SizedBox.expand(
-        child: Center(
-          child: Transform.rotate(
-            angle: turn * HermezPanelMotion.rotate,
-            child: Icon(Icons.add_rounded, color: palette.ink),
-          ),
-        ),
-      ),
       builder: (panelContext) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
         child: Column(

@@ -627,28 +627,13 @@ class _MorphTrigger extends StatelessWidget {
   );
 }
 
-/// The plus, turning into a cross as the panel opens ([turn] 0 to 1): the
-/// reference's `scale(0.97) rotate(45deg)`.
 /// Server event words ("done", "commented") as labels: "Done", "Commented".
 String _sentenceCase(String text) =>
     text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
 
-Widget _turningPlus(IconData icon, Color color, double turn) =>
-    Transform.rotate(
-      angle: turn * HermezPanelMotion.rotate,
-      child: Transform.scale(
-        scale: 1 - (1 - HermezPanelMotion.scale) * turn,
-        child: Icon(icon, size: 24, color: color),
-      ),
-    );
-
-/// The content of the New task button: a plus and its label. Used for the
-/// resting button and for the face the panel grows out of, so the two are the
-/// same picture.
+/// The content of the New task button: a plus and its label.
 class _NewTaskFaceBody extends StatelessWidget {
-  const _NewTaskFaceBody({this.turn = 0});
-
-  final double turn;
+  const _NewTaskFaceBody();
 
   @override
   Widget build(BuildContext context) {
@@ -660,7 +645,7 @@ class _NewTaskFaceBody extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _turningPlus(Icons.add, palette.onAccent, turn),
+          Icon(Icons.add, size: 24, color: palette.onAccent),
           const SizedBox(width: 8),
           Text(
             'New task',
@@ -671,20 +656,6 @@ class _NewTaskFaceBody extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The face the New task panel grows out of when there is no button to
-/// measure: the same picture as the button.
-class _NewTaskFace extends StatelessWidget {
-  const _NewTaskFace({required this.turn});
-
-  final double turn;
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: AlignmentDirectional.centerStart,
-    child: _NewTaskFaceBody(turn: turn),
-  );
 }
 
 /// The floating New task button.
@@ -705,12 +676,9 @@ class _NewTaskPill extends StatelessWidget {
   }
 }
 
-/// The plus on a lane header, and the face the panel grows out of when it is
-/// the button that was tapped.
+/// The plus on a lane header, which the New task card grows out of.
 class _LanePlus extends StatelessWidget {
-  const _LanePlus({this.turn = 0});
-
-  final double turn;
+  const _LanePlus();
 
   @override
   Widget build(BuildContext context) {
@@ -729,7 +697,7 @@ class _LanePlus extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Center(
-          child: _turningPlus(Icons.add_rounded, palette.accent, turn),
+          child: Icon(Icons.add_rounded, size: 24, color: palette.accent),
         ),
       ),
     );
@@ -899,10 +867,8 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
   Future<void> _create({
     bool triage = true,
     HermezMorphOrigin? origin,
-    HermezPanelFaceBuilder? face,
     String source = 'fab',
     double originRadius = 16,
-    double originElevation = 0,
   }) async {
     final board = _board;
     if (board == null || _busy) return;
@@ -943,11 +909,9 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
       final created = await pushHermezPanel<bool>(
         context,
         origin: from,
-        originElevation: originElevation,
         surfaceColor: palette.surface,
         semanticLabel: 'New task',
         theme: _kanbanPanelTheme(context),
-        faceBuilder: face ?? (context, turn) => _NewTaskFace(turn: turn),
         builder: (panelContext) => StatefulBuilder(
           builder: (panelContext, setModalState) => Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -1242,7 +1206,6 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                           origin: origin,
                           source: 'fab',
                           originRadius: 16,
-                          originElevation: 2,
                         ),
                   child: const _NewTaskPill(),
                 ),
@@ -1533,7 +1496,6 @@ class _HermesKanbanPageState extends ConsumerState<HermesKanbanPage>
                   origin: origin,
                   source: 'lane:$lane',
                   originRadius: 18,
-                  face: (context, turn) => _LanePlus(turn: turn),
                 ),
                 child: Tooltip(
                   message: 'New ${_label(lane)} task',
