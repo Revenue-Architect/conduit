@@ -491,6 +491,7 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
     final result = await ThemedSheets.showCustom<String?>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (sheetContext) => DefaultModelBottomSheet(
         models: models,
         currentDefaultModelId: currentDefaultModelId,

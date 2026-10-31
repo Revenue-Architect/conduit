@@ -15,8 +15,7 @@ NAMES = (
     r"showDialog|showGeneralDialog|showModalBottomSheet|showBottomSheet|showMenu|"
     r"PopupMenuButton|DropdownButton|DropdownMenu|AlertDialog|SimpleDialog|"
     r"showCupertino\w*|CupertinoAlertDialog|CupertinoActionSheet|"
-    r"showConduitDialog|"
-    r"ThemedSheets\.(?:showCustom|showRoundedPage|showAdaptive)"
+    r"showConduitDialog"
 )
 pat = re.compile(r"\b(?:" + NAMES + r")\b")
 comment = re.compile(r"//.*$", re.M)
@@ -47,8 +46,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// own dialogs, sheets, menus and dropdowns, and the app wrappers that still
 /// open one on Android. The card's own entry points (pushHermezCard,
 /// pushHermezFullCard, showHermezSelectCard, showHermezDialog, the
-/// ThemedDialogs helpers, AdaptivePopupMenuButton, pushHermezSheetRoute) are
-/// what new code uses instead.
+/// ThemedDialogs and ThemedSheets helpers, AdaptivePopupMenuButton,
+/// pushHermezSheetRoute) are what new code uses instead.
 final _popUp = RegExp(
   r'\\b(?:{NAMES})\\b',
 );
