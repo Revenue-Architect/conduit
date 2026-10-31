@@ -479,13 +479,14 @@ final class HermesDesktopApiService
           : 0;
     }
 
+    // The week's totals are the sum of its days: the daily rows carry the
+    // same field names everywhere (the totals block names them differently).
     final daily = result['daily'];
+    final rows = daily is List ? daily : const <Object?>[];
     return (
-      tokens: tokensOf(result['totals']),
-      cost: costOf(result['totals']),
-      dailyTokens: daily is List
-          ? [for (final row in daily) tokensOf(row)]
-          : const <int>[],
+      tokens: rows.fold<int>(0, (sum, row) => sum + tokensOf(row)),
+      cost: rows.fold<double>(0, (sum, row) => sum + costOf(row)),
+      dailyTokens: [for (final row in rows) tokensOf(row)],
     );
   }
 
