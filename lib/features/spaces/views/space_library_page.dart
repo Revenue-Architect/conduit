@@ -13,7 +13,7 @@ import '../../hermes/widgets/hermez_surfaces.dart';
 import '../models/spaces_models.dart';
 import '../providers/spaces_providers.dart';
 import '../services/hermes_spaces_client.dart';
-import '../widgets/sky_sheet_page.dart';
+import '../../hermes/views/hermes_sky_sheet_page.dart';
 import '../widgets/spaces_state_views.dart';
 
 final _spaceProvider = FutureProvider.autoDispose.family<HermesSpace, String>((

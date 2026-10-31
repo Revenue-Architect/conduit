@@ -11,7 +11,7 @@ import '../../hermes/widgets/hermez_surfaces.dart';
 import '../models/spaces_models.dart';
 import '../providers/spaces_providers.dart';
 import '../services/hermes_spaces_client.dart';
-import '../widgets/sky_sheet_page.dart';
+import '../../hermes/views/hermes_sky_sheet_page.dart';
 import '../widgets/spaces_state_views.dart';
 
 /// Every Space: the containers of Pages the user and Hermes work on.

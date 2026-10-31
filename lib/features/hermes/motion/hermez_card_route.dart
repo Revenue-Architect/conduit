@@ -107,6 +107,7 @@ Future<T?> pushHermezCard<T>(
     originRadius: radius,
     originColor: originColor ?? palette.surface,
     cardColor: palette.raised,
+    screenColor: palette.canvas,
     maxHeightFactor: maxHeightFactor,
     restingFactor: restingFactor,
     scrollsContent: scrollsContent,
@@ -132,6 +133,7 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
     required this.originRadius,
     required this.originColor,
     required this.cardColor,
+    required this.screenColor,
     required this.maxHeightFactor,
     required this.capturedThemes,
     this.semanticLabel,
@@ -160,6 +162,25 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
   final double maxHeightFactor;
   final CapturedThemes capturedThemes;
   final String? semanticLabel;
+
+  /// What the card becomes when it grows into a screen (m11): the canvas.
+  final Color screenColor;
+
+  /// 0 as a card, 1 once it has grown to fill the screen.
+  late final AnimationController _grow = AnimationController(
+    vsync: navigator!,
+    duration: const Duration(milliseconds: 340),
+  );
+
+  Future<void> _growToScreen() => _grow.forward().orCancel.catchError((_) {});
+
+  Future<void> _shrinkToCard() => _grow.reverse().orCancel.catchError((_) {});
+
+  @override
+  void dispose() {
+    _grow.dispose();
+    super.dispose();
+  }
 
   @override
   Color? get barrierColor => const Color(0x570A0C10); // 34% ink
@@ -224,69 +245,83 @@ class _HermezCardRoute<T> extends PopupRoute<T> {
                 ),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                media.padding.top + 12,
-                16,
-                bottom,
-              ),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: 480,
-                    maxHeight: media.size.height * maxHeightFactor,
+            AnimatedBuilder(
+              animation: _grow,
+              builder: (context, card) {
+                // Growing into a screen (m11): the inset, the corners and
+                // the height go, so the card is the screen it opens.
+                final g = Curves.easeInOutCubic.transform(_grow.value);
+                return Padding(
+                  padding: EdgeInsets.lerp(
+                    EdgeInsets.fromLTRB(16, media.padding.top + 12, 16, bottom),
+                    EdgeInsets.zero,
+                    g,
+                  )!,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: lerpDouble(480, media.size.width, g)!,
+                        maxHeight: lerpDouble(
+                          media.size.height * maxHeightFactor,
+                          media.size.height,
+                          g,
+                        )!,
+                        minHeight: media.size.height * g,
+                      ),
+                      child: card,
+                    ),
                   ),
-                  child: AnimatedBuilder(
-                    animation: curved,
-                    builder: (context, child) {
-                      final t = reduce ? 1.0 : curved.value;
-                      // The content is there from the first frame, blurred and
-                      // faint, and sharpens as the card lands.
-                      final clear = t.clamp(0.0, 1.0);
-                      final blur = (1 - clear) * 10;
-                      return _CardReveal(
-                        t: t,
-                        originRect: originRect,
-                        originRadius: originRadius,
-                        originColor: originColor,
-                        cardColor: cardColor,
-                        child: Opacity(
-                          opacity: Curves.easeOut.transform(clear),
-                          // Always the same widget, only switched off, so
-                          // the content keeps its state as the blur clears.
-                          child: ImageFiltered(
-                            enabled: blur >= 0.3,
-                            imageFilter: ImageFilter.blur(
-                              sigmaX: blur,
-                              sigmaY: blur,
-                            ),
-                            child: child,
-                          ),
+                );
+              },
+              child: AnimatedBuilder(
+                animation: Listenable.merge([curved, _grow]),
+                builder: (context, child) {
+                  final t = reduce ? 1.0 : curved.value;
+                  final g = _grow.value;
+                  // The content is there from the first frame, blurred and
+                  // faint, and sharpens as the card lands.
+                  final clear = t.clamp(0.0, 1.0);
+                  final blur = (1 - clear) * 10;
+                  return _CardReveal(
+                    t: t,
+                    grow: g,
+                    originRect: originRect,
+                    originRadius: originRadius,
+                    originColor: originColor,
+                    cardColor: Color.lerp(cardColor, screenColor, g)!,
+                    child: Opacity(
+                      opacity: Curves.easeOut.transform(clear) * (1 - g),
+                      // Always the same widget, only switched off, so
+                      // the content keeps its state as the blur clears.
+                      child: ImageFiltered(
+                        enabled: blur >= 0.3,
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: blur,
+                          sigmaY: blur,
                         ),
-                      );
-                    },
-                    child: Material(
-                      type: MaterialType.transparency,
-                      // The material_ui fork's ink needs its own Material.
-                      child: mui.Material(
-                        type: mui.MaterialType.transparency,
-                        child: restingFactor == null
-                            ? _Grabbed(
-                                scrolls: scrollsContent,
-                                grabber: dismissible,
-                                child: _Unpadded(builder: builder),
-                              )
-                            : _MagneticCard(
-                                resting: media.size.height * restingFactor!,
-                                raised: media.size.height * maxHeightFactor,
-                                onDismiss: () =>
-                                    Navigator.of(context).maybePop(),
-                                child: _Unpadded(builder: builder),
-                              ),
+                        child: child,
                       ),
                     ),
+                  );
+                },
+                child: Material(
+                  type: MaterialType.transparency,
+                  // The material_ui fork's ink needs its own Material.
+                  child: mui.Material(
+                    type: mui.MaterialType.transparency,
+                    child: restingFactor == null
+                        ? _Grabbed(
+                            scrolls: scrollsContent,
+                            grabber: dismissible,
+                            child: _Unpadded(builder: builder),
+                          )
+                        : _MagneticCard(
+                            resting: media.size.height * restingFactor!,
+                            raised: media.size.height * maxHeightFactor,
+                            onDismiss: () => Navigator.of(context).maybePop(),
+                            child: _Unpadded(builder: builder),
+                          ),
                   ),
                 ),
               ),
@@ -386,6 +421,7 @@ class _Grabbed extends StatelessWidget {
 class _CardReveal extends SingleChildRenderObjectWidget {
   const _CardReveal({
     required this.t,
+    this.grow = 0,
     required this.originRect,
     required this.originRadius,
     required this.originColor,
@@ -394,6 +430,7 @@ class _CardReveal extends SingleChildRenderObjectWidget {
   });
 
   final double t;
+  final double grow;
   final Rect? originRect;
   final double originRadius;
   final Color originColor;
@@ -410,6 +447,7 @@ class _CardReveal extends SingleChildRenderObjectWidget {
 
 class _RenderCardReveal extends RenderProxyBox {
   double _t = 0;
+  double _grow = 0;
   Rect? _origin;
   double _originRadius = 16;
   Color _originColor = Colors.transparent;
@@ -417,6 +455,7 @@ class _RenderCardReveal extends RenderProxyBox {
 
   void update(_CardReveal w) {
     _t = w.t;
+    _grow = w.grow;
     _origin = w.originRect;
     _originRadius = w.originRadius;
     _originColor = w.originColor;
@@ -446,7 +485,7 @@ class _RenderCardReveal extends RenderProxyBox {
           )
         : _origin!.shift(offset - globalTopLeft);
     final rect = Rect.lerp(start, finalRect, _t)!;
-    final radius = lerpDouble(_originRadius, _radius, _t)!;
+    final radius = lerpDouble(_originRadius, _radius, _t)! * (1 - _grow);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
     final canvas = context.canvas;
     final color = Color.lerp(_originColor, _cardColor, math.min(1, _t * 1.6))!;
@@ -472,6 +511,20 @@ class _RenderCardReveal extends RenderProxyBox {
       });
     }
   }
+}
+
+/// Grows the card around [context] into the whole screen (m11, "the card
+/// becomes the screen"): call it, then open the screen that takes its place.
+Future<void> growHermezCardToScreen(BuildContext context) {
+  final route = ModalRoute.of(context);
+  return route is _HermezCardRoute ? route._growToScreen() : Future.value();
+}
+
+/// Returns a grown card to its card shape, when the screen it was opening
+/// could not open.
+Future<void> shrinkHermezCardToCard(BuildContext context) {
+  final route = ModalRoute.of(context);
+  return route is _HermezCardRoute ? route._shrinkToCard() : Future.value();
 }
 
 /// The rect the card around [context] grew out of, or null outside a card.

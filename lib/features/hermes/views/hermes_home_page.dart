@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../motion/hermez_card_route.dart';
 import '../../../core/services/navigation_service.dart';
 import '../feedback/hermez_feedback.dart';
 import '../models/hermes_bot.dart';
@@ -163,7 +164,8 @@ Future<void> chooseHermesNewChat(
         title: 'Choose a bot',
         body: _BotChoices(
           bots: bots,
-          onChoose: (choice) => Navigator.pop(sheetContext, choice),
+          onChoose: (choice) =>
+              _startFromCard(sheetContext, context, ref, choice),
         ),
       ),
     );
@@ -191,7 +193,8 @@ Future<void> chooseHermesNewChat(
               child: SingleChildScrollView(
                 child: _BotChoices(
                   bots: bots,
-                  onChoose: (choice) => Navigator.pop(panelContext, choice),
+                  onChoose: (choice) =>
+                      _startFromCard(panelContext, context, ref, choice),
                 ),
               ),
             ),
@@ -202,6 +205,26 @@ Future<void> chooseHermesNewChat(
   }
   if (bot == null || !context.mounted) return;
   await startHermesBotConversation(context, ref, bot);
+}
+
+/// m11: the card grows into the screen while the conversation starts, and
+/// the chat takes its place. If it can't start, the card shrinks back.
+Future<void> _startFromCard(
+  BuildContext cardContext,
+  BuildContext context,
+  WidgetRef ref,
+  HermesBot bot,
+) async {
+  final landed = growHermezCardToScreen(cardContext);
+  final id = await startHermesBotConversation(
+    context,
+    ref,
+    bot,
+    landed: landed,
+  );
+  if (id == null && cardContext.mounted) {
+    await shrinkHermezCardToCard(cardContext);
+  }
 }
 
 /// The bots a new conversation can start with.

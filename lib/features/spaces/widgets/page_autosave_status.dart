@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/page_draft_controller.dart';
-import 'sky_sheet_page.dart';
+import '../../hermes/views/hermes_sky_sheet_page.dart';
 
 /// Saved / Unsaved / Saving / Not saved / Conflict, always visible: the
 /// editor's band title, with the Space the Page is in under it.

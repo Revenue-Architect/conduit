@@ -102,8 +102,14 @@ class HermezModalSheet extends StatelessWidget {
   /// A line under the title, such as who powers a scheduled agent.
   final Widget? subtitle;
 
-  static TextStyle titleStyle(HermezChatPalette palette) =>
-      HermezType.display(palette).copyWith(fontSize: 28);
+  /// The card title (docs/app-design-2026-10-30, the one card): 17/600.
+  static TextStyle titleStyle(HermezChatPalette palette) => TextStyle(
+    color: palette.ink,
+    fontSize: 17,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.3,
+    height: 1.25,
+  );
 
   @override
   Widget build(BuildContext sheetContext) {
@@ -246,15 +252,20 @@ class _CloseDisc extends StatelessWidget {
         weight: HermezMotionWeight.light,
         semanticLabel: 'Close',
         onTap: onPressed,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: palette.canvas,
-            shape: BoxShape.circle,
-            border: Border.all(color: palette.border.withValues(alpha: 0.7)),
+        // A 36 dp disc in a 44 dp target, like the card's other closes.
+        child: SizedBox.square(
+          dimension: 44,
+          child: Center(
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: palette.canvas,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.close_rounded, color: palette.ink, size: 18),
+            ),
           ),
-          child: Icon(Icons.close_rounded, color: palette.ink, size: 22),
         ),
       ),
     );

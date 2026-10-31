@@ -25,7 +25,7 @@ import '../widgets/page_autosave_status.dart';
 import '../widgets/page_chat_picker_sheet.dart';
 import '../widgets/page_conflict_banner.dart';
 import '../widgets/page_move_sheet.dart';
-import '../widgets/sky_sheet_page.dart';
+import '../../hermes/views/hermes_sky_sheet_page.dart';
 import '../widgets/spaces_state_views.dart';
 import '../../hermes/widgets/hermez_status_morph.dart';
 

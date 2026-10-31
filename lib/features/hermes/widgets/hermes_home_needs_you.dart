@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../push/providers/push_providers.dart' show approvalsPendingProvider;
 import '../models/hermes_bot.dart';
 import '../models/hermes_job.dart';
 import '../models/hermes_session.dart';
+import '../motion/hermez_card_route.dart';
 import '../motion/hermez_motion.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
@@ -18,6 +21,7 @@ import '../views/hermes_attention_page.dart'
 import 'hermes_home_avatar.dart';
 import 'hermes_home_presence.dart' show hermesHomePendingDecisionsProvider;
 import 'hermes_session_tile.dart' show openHermesSession;
+import 'hermez_bot_mark.dart';
 import 'hermez_chat_palette.dart';
 import 'hermez_surfaces.dart';
 
@@ -329,8 +333,10 @@ class HermesNeedsYouRow extends ConsumerWidget {
           pathParameters: {'approvalId': approvalId},
           extra: origin,
         );
-      case HermesNeedsYouKind.decision || HermesNeedsYouKind.prepared
-          when sessionId != null:
+      case HermesNeedsYouKind.prepared when sessionId != null:
+        // m03: Review grows the draft card; the draft opens from there.
+        unawaited(_showDraftCard(context, ref, item, sessionId));
+      case HermesNeedsYouKind.decision when sessionId != null:
         final known = hermesSummaryForSession(ref, sessionId, 'Conversation');
         openHermesSession(
           context,
@@ -419,4 +425,119 @@ class HermesNeedsYouRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The draft card (m03): the bot's prepared reply, grown out of its Review
+/// row. Sending or changing it happens where the draft's own controls are,
+/// so "Open the draft" grows this card into its chat (m11).
+Future<void> _showDraftCard(
+  BuildContext context,
+  WidgetRef ref,
+  HermesNeedsYouItem item,
+  String sessionId,
+) async {
+  final summary = hermesSummaryForSession(ref, sessionId, item.title);
+  final known = summary.profile == null && item.profile != null
+      ? HermesSessionSummary(
+          id: summary.id,
+          title: summary.title,
+          preview: summary.preview,
+          source: summary.source,
+          updatedAt: summary.updatedAt,
+          profile: item.profile,
+          messageCount: summary.messageCount,
+        )
+      : summary;
+  final bots = ref.read(hermesBotsProvider).value ?? const <HermesBot>[];
+  final bot = bots.where((b) => b.name == known.profile).firstOrNull;
+  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+  final preview = known.preview?.trim();
+  await pushHermezCard<void>(
+    context,
+    semanticLabel: 'Draft',
+    builder: (cardContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              if (bot != null) ...[
+                ClipOval(
+                  child: SizedBox.square(
+                    dimension: 28,
+                    child: HermezBotMark(
+                      identity: hermezIdentityForBot(bot),
+                      botName: bot.name,
+                      size: 28,
+                      label: bot.title,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Text(
+                  bot == null ? 'Draft' : '${bot.title}’s draft',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                    color: palette.ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Close',
+                onPressed: () => Navigator.pop(cardContext),
+                icon: Icon(Icons.close_rounded, color: palette.ink),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            item.title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: palette.ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Ready for review · not sent',
+            style: TextStyle(fontSize: 12, color: palette.muted),
+          ),
+          if (preview != null && preview.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              preview,
+              maxLines: 12,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 15, height: 1.45, color: palette.ink),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Text(
+            'Nothing is sent until you press Send on the draft.',
+            style: TextStyle(fontSize: 12, color: palette.muted),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            onPressed: () async {
+              // m11: the card becomes the chat the draft lives in.
+              await growHermezCardToScreen(cardContext);
+              if (!context.mounted) return;
+              await openHermesSession(context, ref, known, bot: bot);
+            },
+            child: const Text('Open the draft'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

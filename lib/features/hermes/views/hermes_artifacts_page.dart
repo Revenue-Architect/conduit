@@ -13,7 +13,7 @@ import '../widgets/hermes_session_tile.dart' show openHermesSession;
 import '../motion/hermez_motion.dart';
 import '../widgets/hermez_chat_palette.dart';
 import 'hermes_page_chrome.dart' show HermesPanel;
-import '../../spaces/widgets/sky_sheet_page.dart';
+import 'hermes_sky_sheet_page.dart';
 import '../sheets/hermez_modal_sheet.dart';
 import '../widgets/hermez_expandable_section.dart';
 import '../feedback/hermez_feedback.dart';

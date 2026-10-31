@@ -25,9 +25,28 @@ import '../../direct_connections/providers/direct_connection_providers.dart';
 import '../../direct_connections/services/direct_model_registry.dart';
 import '../../direct_connections/views/ollama_model_actions.dart';
 import '../../hermes/models/hermes_model.dart';
+import '../../hermes/motion/hermez_card_route.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../models/model_selector_layout.dart';
 import '../providers/reasoning_effort_provider.dart';
+
+/// Opens the model picker. On Android it is the full-height one card
+/// (screens2 s09), grown out of the model pill; iOS keeps its sheet.
+Future<void> showModelSelectorCard(BuildContext context, List<Model> models) {
+  if (!Platform.isIOS) {
+    return pushHermezFullCard<void>(
+      context,
+      semanticLabel: 'Model for this chat',
+      builder: (_) => ModelSelectorSheet(models: models),
+    );
+  }
+  return ThemedSheets.showCustom<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => ModelSelectorSheet(models: models),
+  );
+}
 
 class ModelSelectorSheet extends ConsumerStatefulWidget {
   const ModelSelectorSheet({super.key, required this.models});
@@ -48,6 +67,13 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
     _searchController.dispose();
     super.dispose();
   }
+
+  void _setQuery(String value) => setState(() => _searchQuery = value);
+
+  void _clearQuery() => setState(() {
+    _searchQuery = '';
+    _searchController.clear();
+  });
 
   Future<void> _togglePinnedModel(String modelId) => ref
       .read(personalizationSettingsProvider.notifier)
@@ -144,6 +170,16 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
         isHermesModel(selectedModel) &&
         selectedModel.metadata?['hermesFast'] == true;
 
+    if (HermezCardScope.within(context)) {
+      return _card(
+        context,
+        layout: layout,
+        pinned: pinnedModelIds.isNotEmpty,
+        l10n: l10n,
+        showEffort: effortPolicy.visible,
+        supportsHermesFast: supportsHermesFast,
+      );
+    }
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.72,
@@ -264,6 +300,155 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+extension on ModelSelectorSheetState {
+  /// The picker as the one card (screens2 s09): search always there, every
+  /// model in place by where it comes from, and effort and fast tier below.
+  Widget _card(
+    BuildContext context, {
+    required ModelSelectorLayout layout,
+    required bool pinned,
+    required AppLocalizations l10n,
+    required bool showEffort,
+    required bool supportsHermesFast,
+  }) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final query = _searchQuery.trim().toLowerCase();
+    bool matches(Model model) => modelSelectorQueryMatches(model, query);
+    final featured = layout.featured.where(matches).toList(growable: false);
+    final more = layout.more.where(matches).toList(growable: false);
+    final direct = [
+      for (final model in more)
+        if (directModelSourceLabel(model) != null) model,
+    ];
+    final served = [
+      for (final model in more)
+        if (directModelSourceLabel(model) == null) model,
+    ];
+    Widget section(String label) => Padding(
+      padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
+      child: Text(label, style: TextStyle(fontSize: 12, color: palette.muted)),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 2),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: palette.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 6, 10, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Model for this chat',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                    color: palette.ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.close_rounded, color: palette.ink),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: ConduitGlassSearchField(
+            controller: _searchController,
+            hintText: l10n.searchModels,
+            query: _searchQuery,
+            onChanged: _setQuery,
+            onClear: _clearQuery,
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            children: [
+              if (featured.isEmpty && more.isEmpty)
+                _ModelGroup(
+                  models: const [],
+                  onTogglePinnedModel: _togglePinnedModel,
+                ),
+              if (featured.isNotEmpty) ...[
+                section(pinned ? 'Pinned' : 'Yours'),
+                _ModelGroup(
+                  models: featured,
+                  onTogglePinnedModel: _togglePinnedModel,
+                ),
+              ],
+              if (served.isNotEmpty) ...[
+                section('All models'),
+                _ModelGroup(
+                  models: served,
+                  onTogglePinnedModel: _togglePinnedModel,
+                ),
+              ],
+              if (direct.isNotEmpty) ...[
+                section('Direct'),
+                _ModelGroup(
+                  models: direct,
+                  onTogglePinnedModel: _togglePinnedModel,
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (showEffort || supportsHermesFast)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            child: Column(
+              children: [
+                if (showEffort)
+                  _ActionCard(
+                    icon: Icons.schedule_rounded,
+                    title: l10n.reasoningEffort,
+                    subtitle: _effortLabel(
+                      l10n,
+                      ref.watch(reasoningEffortProvider),
+                    ),
+                    onTap: _showEffortSelector,
+                  ),
+                if (showEffort && supportsHermesFast)
+                  const SizedBox(height: Spacing.sm),
+                if (supportsHermesFast)
+                  _ActionCard(
+                    icon: Icons.bolt_rounded,
+                    title: l10n.hermesFastTier,
+                    subtitle: ref.watch(hermesFastTierSelectionProvider)
+                        ? l10n.hermesFastTierOn
+                        : l10n.hermesFastTierOff,
+                    onTap: () {
+                      final enabled = ref.read(hermesFastTierSelectionProvider);
+                      ref
+                          .read(hermesFastTierSelectionProvider.notifier)
+                          .set(!enabled);
+                    },
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

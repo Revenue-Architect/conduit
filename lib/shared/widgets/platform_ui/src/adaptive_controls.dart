@@ -889,15 +889,12 @@ class AdaptivePopupMenuButton<T> {
           Icon(fallbackIcon, size: 20, color: color),
           const SizedBox(width: 10),
         ],
-        if (item.checked) ...[
-          Icon(
-            material ? Icons.check : CupertinoIcons.check_mark,
-            size: 18,
-            color: color,
-          ),
+        if (item.checked && !material) ...[
+          Icon(CupertinoIcons.check_mark, size: 18, color: color),
           const SizedBox(width: 8),
         ],
         Flexible(
+          fit: material ? FlexFit.tight : FlexFit.loose,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: material
@@ -918,6 +915,12 @@ class AdaptivePopupMenuButton<T> {
             ],
           ),
         ),
+        // In the menu card the check sits at the right edge, as in the
+        // select card.
+        if (item.checked && material) ...[
+          const SizedBox(width: 8),
+          Icon(Icons.check_rounded, size: 20, color: color),
+        ],
       ],
     );
   }

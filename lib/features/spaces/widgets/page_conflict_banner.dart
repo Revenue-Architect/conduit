@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../hermes/widgets/hermez_chat_palette.dart';
-import 'sky_sheet_page.dart';
+import '../../hermes/views/hermes_sky_sheet_page.dart';
 
 /// Shown while the Page changed somewhere else. The draft is never touched
 /// until the user picks what to do.

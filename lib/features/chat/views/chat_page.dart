@@ -5504,12 +5504,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     if (!context.mounted) return;
 
-    await ThemedSheets.showCustom<void>(
-      context: context,
-      isScrollControlled: true,
-      fit: true,
-      builder: (context) => ModelSelectorSheet(models: models),
-    );
+    await showModelSelectorCard(context, models);
     await restoreFocusIfNeeded();
   }
 }

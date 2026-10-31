@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
-import '../../hermes/sky/hermez_sky_band.dart';
-import '../../hermes/widgets/hermez_chat_palette.dart';
-import '../../hermes/widgets/hermez_visual_theme.dart';
+import '../sky/hermez_sky_band.dart';
+import '../widgets/hermez_chat_palette.dart';
+import '../widgets/hermez_visual_theme.dart';
 
 /// Geist at [size] with tabular figures, the redesign's text (DIRECTION.md).
 TextStyle skyText(double size, FontWeight weight, Color color) => TextStyle(

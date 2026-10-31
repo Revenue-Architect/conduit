@@ -18,12 +18,14 @@ import 'hermez_chat_palette.dart';
 import 'hermez_surfaces.dart';
 
 /// Starts a new, independent conversation with [bot] and opens it. Returns
-/// the new session's id, or null when it could not be started.
+/// the new session's id, or null when it could not be started. With
+/// [landed], the chat opens only once it completes (a card growing into it).
 Future<String?> startHermesBotConversation(
   BuildContext context,
   WidgetRef ref,
-  HermesBot bot,
-) async {
+  HermesBot bot, {
+  Future<void>? landed,
+}) async {
   final service = ref.read(hermesApiServiceProvider);
   if (service is! HermesDesktopApiService) return null;
   try {
@@ -35,6 +37,8 @@ Future<String?> startHermesBotConversation(
     ref.invalidate(hermesBotSessionsProvider(bot.name));
     ref.invalidate(hermesSessionsProvider);
     ref.invalidate(hermesSessionTotalsProvider);
+    if (landed != null) await landed;
+    if (!context.mounted) return null;
     await openHermesSession(
       context,
       ref,
