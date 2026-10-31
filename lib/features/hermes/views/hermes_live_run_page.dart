@@ -14,6 +14,7 @@ import '../models/hermes_subagent.dart';
 import '../widgets/hermes_delegated_worker_card.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
+import '../widgets/hermes_bot_screen_view.dart' show HermesBotScreenPage;
 import '../services/hermes_live_activity.dart';
 import '../services/hermes_run_history.dart';
 import '../services/hermes_media_parser.dart';
@@ -428,6 +429,7 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
                           ),
                         ),
                         if (!widget.inline) const SizedBox(height: 18),
+                        if (!widget.inline && running) const _BotScreenWindow(),
                         if (activeAnswer)
                           _PendingRunRequests(sessionId: widget.sessionId),
                         // Inline, the answer's line already offers it.
@@ -1223,4 +1225,78 @@ class _InlinePlanState extends State<HermesInlinePlan> {
             ),
     ),
   );
+}
+
+/// Whether the bot's screen is running, asked without starting it.
+final _botScreenStatusProvider =
+    FutureProvider.autoDispose<
+      ({bool supported, bool installed, bool running})?
+    >((ref) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return null;
+      try {
+        return await service.botScreenStatus();
+      } catch (_) {
+        return null;
+      }
+    });
+
+/// The live window's picture of the work when the bot is using its own
+/// computer: an amber frame (a bot working now) that opens its screen to
+/// watch. Shown only when Hermes says the screen is running
+/// (docs/app-design-2026-10-30/SPEC.md, Phase 3, source 2).
+class _BotScreenWindow extends ConsumerWidget {
+  const _BotScreenWindow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(_botScreenStatusProvider).value;
+    if (status == null || !status.running) return const SizedBox.shrink();
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Material(
+        color: palette.raised,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: palette.live, width: 2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const HermesBotScreenPage(),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+            child: Row(
+              children: [
+                Icon(Icons.desktop_windows_outlined, color: palette.ink),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Its screen is open',
+                        style: HermezType.section(palette),
+                      ),
+                      Text(
+                        'Watch what it is doing. Take over from there.',
+                        style: HermezType.meta(palette),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: palette.muted),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

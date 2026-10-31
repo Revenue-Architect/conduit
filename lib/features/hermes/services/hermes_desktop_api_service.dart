@@ -420,6 +420,21 @@ final class HermesDesktopApiService
   Stream<HermesAgenticSnapshot> agenticStateFor(String storedId) =>
       _agentic.watch(storedId);
 
+  /// Whether this Hermes has a Bot Screen and whether it is running, without
+  /// starting it: `display.status` (a Linux host with the desktop installed).
+  /// The live window offers the screen only when it is running.
+  Future<({bool supported, bool installed, bool running})>
+  botScreenStatus() async {
+    await _ensureConnected();
+    final result = _object(await _rpc.request<Object?>('display.status'));
+    bool flag(String key) => result[key] == true;
+    return (
+      supported: flag('supported'),
+      installed: flag('installed'),
+      running: flag('running'),
+    );
+  }
+
   /// A single-use (30 s) noVNC socket for the Bot Screen, and the viewer id
   /// that names this connection when it takes control. Take-over and hand-back
   /// must run on the same connection: Hermes only honours ids it minted there.
