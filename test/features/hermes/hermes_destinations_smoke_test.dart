@@ -43,14 +43,14 @@ void main() {
                 onSelect: (value) => setState(() => index = value),
                 destinations: const [
                   HermesDockDestination(
-                    label: 'Home',
-                    icon: Icons.home_outlined,
-                    selectedIcon: Icons.home_rounded,
+                    label: 'Today',
+                    icon: Icons.wb_sunny_outlined,
+                    selectedIcon: Icons.wb_sunny_rounded,
                   ),
                   HermesDockDestination(
-                    label: 'Work',
-                    icon: Icons.layers_outlined,
-                    selectedIcon: Icons.layers_rounded,
+                    label: 'Chats',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    selectedIcon: Icons.chat_bubble_rounded,
                     badge: true,
                   ),
                 ],
@@ -61,14 +61,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('HOME'), findsOneWidget);
-    expect(find.bySemanticsLabel('Work, needs you'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.bySemanticsLabel('Chats, needs you'), findsOneWidget);
 
-    await tester.tap(find.text('WORK'));
+    await tester.tap(find.text('Chats'));
     await tester.pumpAndSettle();
     expect(index, 1);
     // A second tap on the shown destination changes nothing.
-    await tester.tap(find.text('WORK'));
+    await tester.tap(find.text('Chats'));
     await tester.pumpAndSettle();
     expect(index, 1);
     expect(tester.takeException(), isNull);

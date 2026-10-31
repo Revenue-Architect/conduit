@@ -312,13 +312,13 @@ class _DockItemState extends State<_DockItem> {
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 180),
                 style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
                   color: color,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+                  fontSize: 12,
+                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
                 ),
                 child: Text(
-                  d.label.toUpperCase(),
+                  d.label,
                   maxLines: 1,
                   overflow: TextOverflow.fade,
                   softWrap: false,

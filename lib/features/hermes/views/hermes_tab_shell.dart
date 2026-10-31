@@ -12,10 +12,9 @@ import '../providers/hermes_unread_providers.dart'
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
 import 'hermes_home_page.dart';
-import 'hermes_work_page.dart';
 
-/// Phone home of the Hermes app: Home, Chats, Work and You behind one floating
-/// bottom dock. Each tab keeps its own state and scroll position; switching
+/// Phone home of the Hermes app: Today, Chats and You behind one floating
+/// bottom dock (docs/app-design-2026-10-30: Work folds into Today). Each tab keeps its own state and scroll position; switching
 /// settles the arriving tab into place from the side it came from.
 /// The tab the shell showed last, for this app session.
 int _lastHermesTab = 0;
@@ -48,20 +47,25 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
     _lastHermesTab = index;
   }
 
+  /// Today's icon follows the sky: the moon from 19:00 to 6:00.
+  bool get _night {
+    final hour = DateTime.now().hour;
+    return hour >= 19 || hour < 6;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // The same list Work's Needs you shows, so the dot and the section agree.
+    // The same list Today's Needs you shows, so the dot and the section agree.
     final needsYou = watchHermesNeedsYou(ref).any((item) => item.actionable);
     // Work's inbox holds Chief's Bot Chat and the other conversations.
     final unread = ref.watch(
       hermesUnreadSessionIdsProvider.select((ids) => ids.length),
     );
     final pages = const <Widget>[
-      // Home is the hub; Work is what needs the owner and what is running.
-      HermesWorkPage(),
+      // Today: what happened and what needs the owner, then what is running.
+      HermesHomePage(),
       // Chats is the character selector: pick a bot, give it a task.
       MangaPickTab(),
-      HermesHomePage(),
       ProfilePage(),
     ];
     // The shell owns its system bars: arriving from the side navigation (drawn
@@ -74,7 +78,7 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
             systemNavigationBarColor: Colors.transparent,
           ),
       child: PopScope(
-        // Back on another tab returns Home before it leaves the app.
+        // Back on another tab returns to Today before it leaves the app.
         canPop: _index == 0,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _select(0);
@@ -105,21 +109,20 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
                   index: _index,
                   onSelect: _select,
                   destinations: [
-                    const HermesDockDestination(
-                      label: 'Home',
-                      icon: Icons.home_outlined,
-                      selectedIcon: Icons.home_rounded,
+                    HermesDockDestination(
+                      label: 'Today',
+                      icon: _night
+                          ? Icons.dark_mode_outlined
+                          : Icons.wb_sunny_outlined,
+                      selectedIcon: _night
+                          ? Icons.dark_mode_rounded
+                          : Icons.wb_sunny_rounded,
+                      badge: needsYou && _index != 0,
                     ),
-                    const HermesDockDestination(
+                    HermesDockDestination(
                       label: 'Chats',
                       icon: Icons.chat_bubble_outline_rounded,
                       selectedIcon: Icons.chat_bubble_rounded,
-                    ),
-                    HermesDockDestination(
-                      label: 'Work',
-                      icon: Icons.layers_outlined,
-                      selectedIcon: Icons.layers_rounded,
-                      badge: needsYou && _index != 2,
                       unread: unread,
                     ),
                     const HermesDockDestination(

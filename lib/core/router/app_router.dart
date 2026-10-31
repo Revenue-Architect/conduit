@@ -825,8 +825,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   openPick: state.uri.queryParameters['pick'] != null,
                   initialIndex: switch (state.uri.queryParameters['tab']) {
                     'chats' => 1,
-                    'work' => 2,
-                    'you' => 3,
+                    'you' => 2,
+                    // Work folded into Today.
                     _ => 0,
                   },
                 ),
