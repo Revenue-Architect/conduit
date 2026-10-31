@@ -435,6 +435,60 @@ final class HermesDesktopApiService
     );
   }
 
+  /// The memory Hermes keeps about the owner: the active provider and the
+  /// sizes of its built-in USER.md and MEMORY.md (`GET /api/memory`).
+  Future<({String provider, int userBytes, int memoryBytes})>
+  memoryStatus() async {
+    final result = _object(await _requestJson('GET', '/api/memory'));
+    final files = result['builtin_files'];
+    int size(String key) =>
+        files is Map && files[key] is num ? (files[key] as num).toInt() : 0;
+    return (
+      provider: result['active']?.toString() ?? '',
+      userBytes: size('user'),
+      memoryBytes: size('memory'),
+    );
+  }
+
+  /// Token and cost totals for the last [days] days, and one row per day
+  /// (`GET /api/analytics/usage`).
+  Future<({int tokens, double cost, List<int> dailyTokens})> usageAnalytics({
+    int days = 7,
+  }) async {
+    final result = _object(
+      await _requestJson('GET', '/api/analytics/usage', query: {'days': days}),
+    );
+    int tokensOf(Object? row) {
+      if (row is! Map) return 0;
+      var sum = 0;
+      for (final key in const ['input_tokens', 'output_tokens']) {
+        final v = row[key];
+        if (v is num) sum += v.toInt();
+      }
+      return sum;
+    }
+
+    double costOf(Object? row) {
+      if (row is! Map) return 0;
+      final actual = row['actual_cost'];
+      final estimated = row['estimated_cost'];
+      return actual is num && actual > 0
+          ? actual.toDouble()
+          : estimated is num
+          ? estimated.toDouble()
+          : 0;
+    }
+
+    final daily = result['daily'];
+    return (
+      tokens: tokensOf(result['totals']),
+      cost: costOf(result['totals']),
+      dailyTokens: daily is List
+          ? [for (final row in daily) tokensOf(row)]
+          : const <int>[],
+    );
+  }
+
   /// A single-use (30 s) noVNC socket for the Bot Screen, and the viewer id
   /// that names this connection when it takes control. Take-over and hand-back
   /// must run on the same connection: Hermes only honours ids it minted there.

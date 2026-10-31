@@ -5,13 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
-import '../../profile/views/profile_page.dart';
 import '../providers/hermes_unread_providers.dart'
     show hermesUnreadSessionIdsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
 import 'hermes_chats_page.dart';
 import 'hermes_today_page.dart';
+import 'hermes_you_page.dart';
 
 /// Phone home of the Hermes app: Today, Chats and You behind one floating
 /// bottom dock (docs/app-design-2026-10-30: Work folds into Today). Each tab keeps its own state and scroll position; switching
@@ -67,7 +67,7 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
       HermesTodayPage(),
       // Chats: every conversation, the team first.
       HermesChatsPage(),
-      ProfilePage(),
+      HermesYouPage(),
     ];
     // The shell owns its system bars: arriving from the side navigation (drawn
     // in the opposite theme) must not leave its icon colours behind.
