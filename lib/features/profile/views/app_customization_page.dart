@@ -9,24 +9,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/model.dart';
 import '../../../core/services/ios_native_dropdown_bridge.dart';
 import '../../../core/services/native_sheet_bridge.dart';
+import '../../../core/services/native_sheet_hydration_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../core/utils/tts_voice_utils.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/theme/tweakcn_themes.dart';
 import '../../../shared/widgets/adaptive_selection_sheet.dart';
+import '../../../shared/widgets/themed_sheets.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../../../core/models/tool.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/backend_mode_providers.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../chat/providers/chat_providers.dart' show restoreDefaultModel;
 import '../../chat/providers/text_to_speech_provider.dart';
 import '../../chat/services/voice_input_service.dart';
 import '../widgets/adaptive_segmented_selector.dart';
 import '../widgets/customization_tile.dart';
+import '../widgets/default_model_sheet.dart';
 import '../widgets/expandable_card.dart';
-import '../widgets/settings_page_scaffold.dart';
+import '../widgets/settings_sky_page.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../widgets/socket_health_card.dart';
 import '../widgets/stt_language_picker.dart';
@@ -54,6 +59,9 @@ class AppCustomizationPage extends ConsumerWidget {
 
     final settings = ref.watch(appSettingsProvider);
     final hasOpenWebUiAccount = ref.watch(openWebUiAccountAvailableProvider);
+    if (section == AppCustomizationSection.chat) {
+      return _buildChatPage(context, ref, settings, hasOpenWebUiAccount);
+    }
     final themeMode = ref.watch(appThemeModeProvider);
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
     final l10n = AppLocalizations.of(context)!;
@@ -90,17 +98,8 @@ class AppCustomizationPage extends ConsumerWidget {
         _sectionGap,
         _buildLanguageSection(context, ref, currentLanguageCode, languageLabel),
       ],
-      AppCustomizationSection.chat => <Widget>[
-        if (hasOpenWebUiAccount) ...[
-          _buildQuickPillsSection(context, ref, settings),
-          _sectionGap,
-        ],
-        _buildChatSection(context, ref, settings),
-        if (hasOpenWebUiAccount) ...[
-          _sectionGap,
-          _buildSystemPromptsSection(context, ref),
-        ],
-      ],
+      // Built by _buildChatPage.
+      AppCustomizationSection.chat => const <Widget>[],
       AppCustomizationSection.dataConnection => <Widget>[
         _buildDataConnectionSection(context, ref, settings),
         _sectionGap,
@@ -232,11 +231,124 @@ class AppCustomizationPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickPillsSection(
+  /// Chat (docs/app-design-2026-10-30, s02): how a chat starts and how
+  /// sending behaves, on one page, with the quick actions unfolded in place.
+  Widget _buildChatPage(
     BuildContext context,
     WidgetRef ref,
     AppSettings settings,
+    bool hasOpenWebUiAccount,
   ) {
+    final l10n = AppLocalizations.of(context)!;
+    final directPrimary =
+        ref.watch(preferredBackendProvider) == PreferredBackend.direct;
+    return SettingsSkyPage(
+      title: l10n.chatSettings,
+      lede: 'Models, quick actions and sending',
+      children: [
+        // The default model is Personalization's no longer; it shows with the
+        // same accounts that offered it there.
+        if (hasOpenWebUiAccount || directPrimary)
+          _buildDefaultModelSection(context, ref, hasOpenWebUiAccount),
+        if (hasOpenWebUiAccount) _buildQuickPillsSection(context, ref),
+        SettingsGroup(
+          title: 'Sending',
+          children: [
+            SettingsSwitchRow(
+              title: l10n.sendOnEnter,
+              sub: 'Press Enter to send on a hardware keyboard.',
+              value: settings.sendOnEnter,
+              onChanged: (value) =>
+                  ref.read(appSettingsProvider.notifier).setSendOnEnter(value),
+            ),
+            SettingsSwitchRow(
+              title: l10n.temporaryChatByDefault,
+              sub: 'New chats aren’t saved unless you keep them.',
+              value: settings.temporaryChatByDefault,
+              onChanged: (value) => ref
+                  .read(appSettingsProvider.notifier)
+                  .setTemporaryChatByDefault(value),
+            ),
+            SettingsSwitchRow(
+              title: l10n.citationShowTitles,
+              sub: 'Citation badges use page titles, not website names.',
+              value: settings.citationShowTitles,
+              onChanged: (value) => ref
+                  .read(appSettingsProvider.notifier)
+                  .setCitationShowTitles(value),
+            ),
+          ],
+        ),
+        if (Platform.isAndroid)
+          SettingsGroup(
+            title: 'Android assistant',
+            children: [
+              SettingsRow(
+                leading: const SettingsGlyph(icon: Icons.smartphone_outlined),
+                title: l10n.androidAssistantTitle,
+                sub: _androidAssistantTriggerLabel(
+                  l10n,
+                  settings.androidAssistantTrigger,
+                ),
+                onTap: () =>
+                    _showAndroidAssistantTriggerSheet(context, ref, settings),
+              ),
+            ],
+          ),
+        if (hasOpenWebUiAccount) _buildSystemPromptsSection(context, ref),
+      ],
+    );
+  }
+
+  Widget _buildDefaultModelSection(
+    BuildContext context,
+    WidgetRef ref,
+    bool hasOpenWebUiAccount,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final currentDefaultModelId = ref.watch(
+      appSettingsProvider.select((s) => s.defaultModel),
+    );
+    final row = ref
+        .watch(modelsProvider)
+        .when(
+          data: (models) {
+            final resolvedName = currentDefaultModelId == null
+                ? null
+                : models
+                          .where((m) => m.id == currentDefaultModelId)
+                          .map((m) => m.name)
+                          .firstOrNull ??
+                      currentDefaultModelId;
+            return SettingsRow(
+              leading: const SettingsGlyph(icon: Icons.cloud_outlined),
+              title: resolvedName ?? l10n.autoSelect,
+              sub: resolvedName == null && hasOpenWebUiAccount
+                  ? l10n.autoSelectDescription
+                  : 'Used when you start a new chat',
+              onTap: () => _showDefaultModelPicker(
+                context,
+                ref,
+                models: models,
+                currentDefaultModelId: currentDefaultModelId,
+              ),
+            );
+          },
+          loading: () => const SettingsRow(
+            leading: SettingsGlyphShell(
+              child: ConduitLoadingIndicator(isCompact: true),
+            ),
+            title: 'Loading models…',
+          ),
+          error: (_, _) => SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.warning_amber_rounded),
+            title: l10n.failedToLoadModels,
+          ),
+        );
+    return SettingsGroup(title: l10n.defaultModel, children: [row]);
+  }
+
+  Widget _buildQuickPillsSection(BuildContext context, WidgetRef ref) {
     // Allow unlimited selections on all platforms
     final maxPills = 999;
 
@@ -271,8 +383,6 @@ class AppCustomizationPage extends ConsumerWidget {
       );
     }
 
-    final selectedCount = selected.length;
-
     Future<void> toggle(String id) async {
       final next = List<String>.from(selected);
       if (next.contains(id)) {
@@ -285,199 +395,44 @@ class AppCustomizationPage extends ConsumerWidget {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final selectedCountText = l10n.quickActionsSelectedCount(selectedCount);
-    final options = <({String id, String label, IconData icon})>[
-      (
-        id: 'web',
-        label: l10n.web,
-        icon: Platform.isIOS ? CupertinoIcons.search : Icons.search,
-      ),
-      (
-        id: 'image',
-        label: l10n.imageGen,
-        icon: Platform.isIOS ? CupertinoIcons.photo : Icons.image,
-      ),
-      for (final tool in tools)
-        (id: tool.id, label: tool.name, icon: Icons.extension),
+    final options = <({String id, String label})>[
+      (id: 'web', label: l10n.web),
+      (id: 'image', label: l10n.imageGen),
+      for (final tool in tools) (id: tool.id, label: tool.name),
       for (final filter in filters)
-        (
-          id: 'filter:${filter.id}',
-          label: filter.name,
-          icon: Platform.isIOS ? CupertinoIcons.sparkles : Icons.auto_awesome,
-        ),
+        (id: 'filter:${filter.id}', label: filter.name),
     ];
 
-    return ExpandableCard(
+    return SettingsGroup(
       title: l10n.quickActionsDescription,
-      subtitle: selectedCountText,
-      icon: UiUtils.platformIcon(
-        ios: CupertinoIcons.bolt,
-        android: Icons.flash_on,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // These rows sit directly on the enclosing disclosure section's
-          // grouped surface; a nested card here would stack surface on surface.
-          Material(
-            color: Colors.transparent,
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Column(
-                children: [
-                  for (var i = 0; i < options.length; i++) ...[
-                    AdaptiveListTile(
-                      leading: Icon(options[i].icon, size: IconSize.small),
-                      title: Text(
-                        options[i].label,
-                        style: AppTypography.bodyMediumStyle.copyWith(
-                          color: context.conduitTheme.textPrimary,
-                        ),
-                      ),
-                      trailing: Checkbox.adaptive(
-                        value: selected.contains(options[i].id),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        onChanged:
-                            (selectedCount < maxPills ||
-                                selected.contains(options[i].id))
-                            ? (_) => toggle(options[i].id)
-                            : null,
-                      ),
-                      onTap:
-                          (selectedCount < maxPills ||
-                              selected.contains(options[i].id))
-                          ? () => toggle(options[i].id)
-                          : null,
-                    ),
-                    if (i != options.length - 1)
-                      Divider(
-                        height: BorderWidth.thin,
-                        thickness: BorderWidth.thin,
-                        color: context.conduitTheme.dividerColor,
-                      ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (selected.isNotEmpty) ...[
-            const SizedBox(height: Spacing.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: AdaptiveButton.child(
-                onPressed: () => ref
-                    .read(appSettingsProvider.notifier)
-                    .setQuickPills(const []),
-                style: AdaptiveButtonStyle.plain,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
-                      size: IconSize.small,
-                    ),
-                    const SizedBox(width: Spacing.xs),
-                    Text(l10n.clear),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatSection(
-    BuildContext context,
-    WidgetRef ref,
-    AppSettings settings,
-  ) {
-    final theme = context.conduitTheme;
-    final l10n = AppLocalizations.of(context)!;
-    final assistantTriggerLabel = _androidAssistantTriggerLabel(
-      l10n,
-      settings.androidAssistantTrigger,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      count: '${selected.length} selected',
+      sub: 'The shortcuts that sit above your message box.',
       children: [
-        CustomizationTile(
-          leading: _buildIconBadge(
-            context,
-            Platform.isIOS ? CupertinoIcons.paperplane : Icons.keyboard_return,
-            color: theme.buttonPrimary,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in options)
+                SettingsChip(
+                  label: option.label,
+                  selected: selected.contains(option.id),
+                  onTap:
+                      (selected.length < maxPills ||
+                          selected.contains(option.id))
+                      ? () => toggle(option.id)
+                      : null,
+                ),
+            ],
           ),
-          title: l10n.sendOnEnter,
-          subtitle: l10n.sendOnEnterDescription,
-          trailing: AdaptiveSwitch(
-            value: settings.sendOnEnter,
-            onChanged: (value) =>
-                ref.read(appSettingsProvider.notifier).setSendOnEnter(value),
-          ),
-          showChevron: false,
-          onTap: () => ref
-              .read(appSettingsProvider.notifier)
-              .setSendOnEnter(!settings.sendOnEnter),
         ),
-        const SizedBox(height: Spacing.sm),
-        CustomizationTile(
-          leading: _buildIconBadge(
-            context,
-            Icons.history_toggle_off,
-            color: theme.buttonPrimary,
-          ),
-          title: l10n.temporaryChatByDefault,
-          subtitle: l10n.temporaryChatByDefaultDescription,
-          trailing: AdaptiveSwitch(
-            value: settings.temporaryChatByDefault,
-            onChanged: (value) => ref
-                .read(appSettingsProvider.notifier)
-                .setTemporaryChatByDefault(value),
-          ),
-          showChevron: false,
-          onTap: () => ref
-              .read(appSettingsProvider.notifier)
-              .setTemporaryChatByDefault(!settings.temporaryChatByDefault),
-        ),
-        const SizedBox(height: Spacing.sm),
-        CustomizationTile(
-          leading: _buildIconBadge(
-            context,
-            Icons.link_rounded,
-            color: theme.buttonPrimary,
-          ),
-          title: l10n.citationShowTitles,
-          subtitle: l10n.citationShowTitlesDescription,
-          trailing: AdaptiveSwitch(
-            value: settings.citationShowTitles,
-            onChanged: (value) => ref
-                .read(appSettingsProvider.notifier)
-                .setCitationShowTitles(value),
-          ),
-          showChevron: false,
-          onTap: () => ref
-              .read(appSettingsProvider.notifier)
-              .setCitationShowTitles(!settings.citationShowTitles),
-        ),
-        if (Platform.isAndroid) ...[
-          const SizedBox(height: Spacing.sm),
-          CustomizationTile(
-            leading: _buildIconBadge(
-              context,
-              Icons.assistant,
-              color: theme.buttonPrimary,
-            ),
-            title: l10n.androidAssistantTitle,
-            subtitle: assistantTriggerLabel,
+        if (selected.isNotEmpty)
+          SettingsLink(
+            label: 'Clear all',
             onTap: () =>
-                _showAndroidAssistantTriggerSheet(context, ref, settings),
+                ref.read(appSettingsProvider.notifier).setQuickPills(const []),
           ),
-        ],
       ],
     );
   }
@@ -566,27 +521,24 @@ class AppCustomizationPage extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final models = ref.watch(modelsProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsGroup(
+      title: 'Advanced',
       children: [
-        SettingsSectionHeader(title: l10n.advancedPromptOverrides),
-        const SizedBox(height: Spacing.sm),
-        ExpandableCard(
+        SettingsDisclosure(
+          leading: const SettingsGlyph(icon: Icons.view_in_ar_outlined),
           title: l10n.modelSystemPrompts,
-          subtitle: models.maybeWhen(
+          sub: models.maybeWhen(
             data: (items) => l10n.accessibleModelsCount(items.length),
             orElse: () => l10n.openWebuiModelSettings,
           ),
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.cube_box,
-            android: Icons.smart_toy_outlined,
-          ),
-          child: models.when(
-            data: (items) => _buildModelPromptList(context, ref, items),
-            loading: () => _buildCenteredProgress(),
-            error: (_, _) =>
-                _buildPromptErrorText(context, l10n.unableToLoadModels),
-          ),
+          children: [
+            models.when(
+              data: (items) => _buildModelPromptList(context, ref, items),
+              loading: () => _buildCenteredProgress(),
+              error: (_, _) =>
+                  _buildPromptErrorText(context, l10n.unableToLoadModels),
+            ),
+          ],
         ),
       ],
     );
@@ -604,22 +556,13 @@ class AppCustomizationPage extends ConsumerWidget {
 
     return Column(
       children: [
-        for (var i = 0; i < models.length; i++) ...[
-          CustomizationTile(
-            leading: _buildIconBadge(
-              context,
-              UiUtils.platformIcon(
-                ios: CupertinoIcons.cube_box,
-                android: Icons.smart_toy_outlined,
-              ),
-              color: context.conduitTheme.buttonPrimary,
-            ),
-            title: models[i].name,
-            subtitle: l10n.tapToLoadServerPromptSettings,
-            onTap: () => _showModelSystemPromptEditor(context, ref, models[i]),
+        for (final model in models)
+          SettingsRow(
+            leading: const SettingsGlyph(icon: Icons.smart_toy_outlined),
+            title: model.name,
+            sub: l10n.tapToLoadServerPromptSettings,
+            onTap: () => _showModelSystemPromptEditor(context, ref, model),
           ),
-          if (i != models.length - 1) const SizedBox(height: Spacing.xs),
-        ],
       ],
     );
   }
@@ -681,6 +624,72 @@ class AppCustomizationPage extends ConsumerWidget {
         style: theme.bodySmall?.copyWith(color: theme.textSecondary),
       ),
     );
+  }
+
+  Future<void> _showDefaultModelPicker(
+    BuildContext context,
+    WidgetRef ref, {
+    required List<Model> models,
+    required String? currentDefaultModelId,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+
+    if (Platform.isIOS) {
+      try {
+        final result = await ref
+            .read(nativeSheetHydrationServiceProvider)
+            .presentModelSelector(
+              context,
+              title: l10n.defaultModel,
+              selectedModelId: currentDefaultModelId ?? 'auto-select',
+              leadingOptions: [
+                NativeSheetModelOption(
+                  id: 'auto-select',
+                  name: l10n.autoSelect,
+                  subtitle: l10n.autoSelectDescription,
+                  sfSymbol: 'wand.and.stars',
+                ),
+              ],
+              models: models,
+              rethrowErrors: true,
+            );
+        if (result == null) return;
+        final selectedId = result == 'auto-select' ? null : result;
+        await ref
+            .read(appSettingsProvider.notifier)
+            .setDefaultModel(selectedId);
+        await restoreDefaultModel(ref);
+        return;
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+      }
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    // A searchable model list that sizes itself: a content sheet, not the
+    // select card.
+    final result = await ThemedSheets.showCustom<String?>(
+      context: context,
+      isScrollControlled: true,
+      fit: true,
+      builder: (sheetContext) => DefaultModelBottomSheet(
+        models: models,
+        currentDefaultModelId: currentDefaultModelId,
+      ),
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final selectedId = result == 'auto-select' ? null : result;
+    await ref.read(appSettingsProvider.notifier).setDefaultModel(selectedId);
+    await restoreDefaultModel(ref);
   }
 
   Future<void> _showGlobalSystemPromptEditor(

@@ -1,6 +1,10 @@
 import 'package:conduit/core/models/model.dart';
+import 'package:conduit/core/models/socket_transport_availability.dart';
 import 'package:conduit/core/providers/app_providers.dart';
+import 'package:conduit/core/providers/backend_mode_providers.dart';
+import 'package:conduit/core/services/optimized_storage_service.dart';
 import 'package:conduit/core/services/settings_service.dart';
+import 'package:conduit/features/profile/views/app_customization_page.dart';
 import 'package:conduit/features/profile/views/personalization_page.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
@@ -9,36 +13,47 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('direct-only Personalization exposes only the default model', (
+  testWidgets('the default model is set from Chat, not Personalization', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          openWebUiAccountAvailableProvider.overrideWithValue(false),
-          appSettingsProvider.overrideWithValue(const AppSettings()),
-          apiServiceProvider.overrideWithValue(null),
-          modelsProvider.overrideWith(_DirectModels.new),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: conduitLocalizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: PersonalizationPage(),
-        ),
+    final overrides = [
+      openWebUiAccountAvailableProvider.overrideWithValue(false),
+      preferredBackendProvider.overrideWith(_DirectBackend.new),
+      appSettingsProvider.overrideWithValue(const AppSettings()),
+      apiServiceProvider.overrideWithValue(null),
+      modelsProvider.overrideWith(_DirectModels.new),
+      optimizedStorageServiceProvider.overrideWithValue(
+        _FakeOptimizedStorageService(),
       ),
+      socketServiceProvider.overrideWithValue(null),
+    ];
+    Widget app(Widget home) => ProviderScope(
+      key: UniqueKey(),
+      overrides: overrides,
+      child: MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        localizationsDelegates: conduitLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: home,
+      ),
+    );
+
+    await tester.pumpWidget(
+      app(const AppCustomizationPage(section: AppCustomizationSection.chat)),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Default model'), findsWidgets);
-    expect(find.text('Your System Prompt'), findsNothing);
-    expect(find.text('Memory'), findsNothing);
-    expect(find.text('Advanced prompt overrides'), findsNothing);
-
-    await tester.tap(find.text('Default model').last);
+    expect(find.text('Default model'), findsOneWidget);
+    await tester.tap(find.text('Server provided'));
     await tester.pumpAndSettle();
-
     expect(find.text('Direct Alpha'), findsOneWidget);
     expect(find.text('Direct Beta'), findsOneWidget);
+
+    await tester.pumpWidget(app(const PersonalizationPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Default model'), findsNothing);
+    expect(find.text('Server provided'), findsNothing);
   });
 
   testWidgets('OpenRouter Personalization exposes the image generation model', (
@@ -96,4 +111,24 @@ class _OpenRouterModels extends Models {
       metadata: {'backend': 'direct'},
     ),
   ];
+}
+
+class _DirectBackend extends PreferredBackendController {
+  @override
+  PreferredBackend build() => PreferredBackend.direct;
+}
+
+class _FakeOptimizedStorageService extends Fake
+    implements OptimizedStorageService {
+  @override
+  String? getThemeMode() => null;
+
+  @override
+  String? getThemePaletteId() => null;
+
+  @override
+  String? getLocaleCode() => null;
+
+  @override
+  SocketTransportAvailability? getLocalTransportOptionsSync() => null;
 }
