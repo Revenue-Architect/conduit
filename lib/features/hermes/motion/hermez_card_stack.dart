@@ -61,8 +61,12 @@ class HermezCardStackState extends State<HermezCardStack>
 
   int get depth => _views.length - 1;
 
+  /// Deeper steps rise into place; going back settles from above.
+  bool _forward = true;
+
   void push(HermezCardView view) {
     setState(() {
+      _forward = true;
       _leaving = _views.last;
       _views.add(view);
     });
@@ -71,7 +75,10 @@ class HermezCardStackState extends State<HermezCardStack>
 
   void pop() {
     if (_views.length < 2) return;
-    setState(() => _leaving = _views.removeLast());
+    setState(() {
+      _forward = false;
+      _leaving = _views.removeLast();
+    });
     _start();
   }
 
@@ -79,9 +86,14 @@ class HermezCardStackState extends State<HermezCardStack>
     if (MediaQuery.of(context).disableAnimations) {
       _swap.value = 1;
       _leaving = null;
-    } else {
-      _swap.forward(from: 0);
+      return;
     }
+    // As in HermezCardMorph: hold through the new step's first (heavy)
+    // build and run from the next frame, so the motion doesn't jump.
+    _swap.value = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _leaving != null) _swap.forward(from: 0);
+    });
   }
 
   @override
@@ -185,7 +197,20 @@ class HermezCardStackState extends State<HermezCardStack>
             child: AnimatedBuilder(
               animation: _swap,
               builder: (context, _) {
-                final v = Curves.easeOut.transform(_swap.value);
+                final t = _swap.value;
+                final into = const Interval(
+                  0.1,
+                  1,
+                  curve: Cubic(0.23, 1, 0.32, 1),
+                ).transform(t);
+                final out = const Interval(
+                  0,
+                  0.6,
+                  curve: Curves.easeOut,
+                ).transform(t);
+                final rise =
+                    (1 - const Cubic(0.23, 1, 0.32, 1).transform(t)) *
+                    (_forward ? 10 : -10);
                 return Stack(
                   clipBehavior: Clip.hardEdge,
                   children: [
@@ -195,14 +220,17 @@ class HermezCardStackState extends State<HermezCardStack>
                         Offstage(
                           child: TickerMode(enabled: false, child: _step(view)),
                         ),
-                    _fade(leaving == null ? 1 : v, _step(top)),
+                    Transform.translate(
+                      offset: Offset(0, leaving == null ? 0 : rise),
+                      child: _fade(leaving == null ? 1 : into, _step(top)),
+                    ),
                     if (leaving != null)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
                         child: IgnorePointer(
-                          child: _fade(1 - v, _step(leaving)),
+                          child: _fade(1 - out, _step(leaving)),
                         ),
                       ),
                   ],

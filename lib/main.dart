@@ -1014,6 +1014,9 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
       },
       material: (_, _) => const MaterialAppData(
         debugShowCheckedModeBanner: false,
+        // Diagnostic builds only (--dart-define=CONDUIT_PERF=true): Flutter's
+        // UI and raster frame graphs, readable from a screen recording.
+        showPerformanceOverlay: bool.fromEnvironment('CONDUIT_PERF'),
         // Android stretch overscroll without the offscreen layer.
         scrollBehavior: HermezScrollBehavior(),
       ),
