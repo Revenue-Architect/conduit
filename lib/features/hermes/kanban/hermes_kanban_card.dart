@@ -178,7 +178,8 @@ class _KanbanCardState extends ConsumerState<_KanbanCard> {
     // its height; back folds the step into the row it came from.
     return HermezCardMorph(
       depth: _view == _KanbanCardView.list ? 0 : 1,
-      raised: _view != _KanbanCardView.list,
+      // Forms stay put: the keyboard already reshapes the card for them.
+      raised: _view == _KanbanCardView.task,
       child: body,
     );
   }
@@ -479,6 +480,7 @@ class _KanbanCardCreate extends StatefulWidget {
 class _KanbanCardCreateState extends State<_KanbanCardCreate> {
   final _title = TextEditingController();
   final _body = TextEditingController();
+  final _titleFocus = FocusNode();
   List<KanbanProfile>? _profiles;
   String? _assignee;
   bool _ready = false;
@@ -488,6 +490,10 @@ class _KanbanCardCreateState extends State<_KanbanCardCreate> {
   @override
   void initState() {
     super.initState();
+    // The keyboard comes up once the form has landed.
+    Future<void>.delayed(kHermezCardMorphDuration, () {
+      if (mounted) _titleFocus.requestFocus();
+    });
     unawaited(
       _kanbanProfiles(context, widget.client)
           .then((p) {
@@ -501,6 +507,7 @@ class _KanbanCardCreateState extends State<_KanbanCardCreate> {
 
   @override
   void dispose() {
+    _titleFocus.dispose();
     _title.dispose();
     _body.dispose();
     super.dispose();
@@ -581,7 +588,7 @@ class _KanbanCardCreateState extends State<_KanbanCardCreate> {
             children: [
               TextField(
                 controller: _title,
-                autofocus: true,
+                focusNode: _titleFocus,
                 enabled: !_saving,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(labelText: 'What'),

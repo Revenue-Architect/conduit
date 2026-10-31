@@ -101,7 +101,8 @@ class _HermesScheduledCardState extends ConsumerState<HermesScheduledCard> {
     // its height; back folds the step into the row it came from.
     return HermezCardMorph(
       depth: _view == _ScheduledView.list ? 0 : 1,
-      raised: _view != _ScheduledView.list,
+      // Forms stay put: the keyboard already reshapes the card for them.
+      raised: _view == _ScheduledView.routine,
       child: body,
     );
   }
@@ -395,6 +396,7 @@ class _NewRoutine extends ConsumerStatefulWidget {
 class _NewRoutineState extends ConsumerState<_NewRoutine> {
   final _what = TextEditingController();
   final _custom = TextEditingController();
+  final _whatFocus = FocusNode();
   String? _who;
   String _when = _whens[2].$2;
   bool _customWhen = false;
@@ -403,7 +405,17 @@ class _NewRoutineState extends ConsumerState<_NewRoutine> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // The keyboard comes up once the form has landed.
+    Future<void>.delayed(kHermezCardMorphDuration, () {
+      if (mounted) _whatFocus.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
+    _whatFocus.dispose();
     _what.dispose();
     _custom.dispose();
     super.dispose();
@@ -492,7 +504,7 @@ class _NewRoutineState extends ConsumerState<_NewRoutine> {
             children: [
               TextField(
                 controller: _what,
-                autofocus: true,
+                focusNode: _whatFocus,
                 enabled: !_saving,
                 minLines: 1,
                 maxLines: 4,

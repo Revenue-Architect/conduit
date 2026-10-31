@@ -68,7 +68,7 @@ void main() {
 
     await tester.tap(find.text('Routine'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump(const Duration(milliseconds: 8));
     // Early on, the step is still about the size of the row it came from.
     final clip = tester.renderObject<RenderClipRRect>(
       find.descendant(of: card, matching: find.byType(ClipRRect)).first,

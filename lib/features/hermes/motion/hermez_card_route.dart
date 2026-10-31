@@ -591,6 +591,12 @@ class _MagneticCardState extends State<_MagneticCard>
     damping: 26,
   );
 
+  static const _settle = SpringDescription(
+    mass: 1,
+    stiffness: 380,
+    damping: 39,
+  );
+
   @override
   void dispose() {
     _height.dispose();
@@ -630,7 +636,9 @@ class _MagneticCardState extends State<_MagneticCard>
       _height.value = target;
       return;
     }
-    _height.animateWith(SpringSimulation(_spring, _height.value, target, 0));
+    // A step changing the height settles without give: critically damped,
+    // so it never wobbles against the step growing inside it.
+    _height.animateWith(SpringSimulation(_settle, _height.value, target, 0));
   }
 
   @override

@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 
 import '../widgets/hermez_chat_palette.dart';
@@ -13,6 +11,10 @@ import 'hermez_card_route.dart';
 /// [child] must carry a key that changes with the step; [depth] says which
 /// way the card is going (deeper grows, shallower folds). In a full-height
 /// card [raised] springs the card up for this step, or back to resting.
+/// How long a step takes to grow in. A form focuses its first field after
+/// this, so the keyboard doesn't reshape the card while the step lands.
+const kHermezCardMorphDuration = Duration(milliseconds: 280);
+
 class HermezCardMorph extends StatefulWidget {
   const HermezCardMorph({
     super.key,
@@ -50,8 +52,7 @@ class _HermezCardMorphState extends State<HermezCardMorph>
   late final AnimationController _t =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 380),
-        reverseDuration: const Duration(milliseconds: 300),
+        duration: kHermezCardMorphDuration,
         value: 1,
       )..addStatusListener((status) {
         if (status == AnimationStatus.completed && _leaving != null) {
@@ -61,8 +62,6 @@ class _HermezCardMorphState extends State<HermezCardMorph>
           });
         }
       });
-
-  static const Curve _land = Cubic(0.34, 1.28, 0.64, 1);
 
   @override
   void didUpdateWidget(HermezCardMorph old) {
@@ -119,15 +118,9 @@ class _HermezCardMorphState extends State<HermezCardMorph>
     super.dispose();
   }
 
-  static Widget _soft(double sigma, double opacity, Widget child) {
-    final faded = Opacity(opacity: opacity.clamp(0.0, 1.0), child: child);
-    return sigma < 0.3
-        ? faded
-        : ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-            child: faded,
-          );
-  }
+  // Strong ease-out: the step is under the finger at once and settles
+  // without overshoot (a bounce here read as a stutter on the phone).
+  static const Curve _out = Cubic(0.23, 1, 0.32, 1);
 
   @override
   Widget build(BuildContext context) {
@@ -136,46 +129,61 @@ class _HermezCardMorphState extends State<HermezCardMorph>
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return AnimatedBuilder(
-      animation: _t,
-      builder: (context, _) {
-        final raw = _t.value;
-        // The shape travels with the springy landing; the content clears
-        // on a plain ease so it never overshoots into a blur.
-        final shape = _forward
-            ? _land.transform(raw)
-            : 1 - Curves.easeInCubic.transform(raw);
-        final clear = Curves.easeOut.transform(raw);
-        final grown = _forward ? _current : leaving;
-        final under = _forward ? leaving : _current;
-        final grownClear = _forward
-            ? Curves.easeOut.transform((raw * 1.4).clamp(0.0, 1.0))
-            : 1 - Curves.easeIn.transform((raw * 1.6).clamp(0.0, 1.0));
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: _forward,
-                child: _soft(
-                  _forward ? clear * 8 : (1 - clear) * 8,
-                  _forward ? 1 - clear * 0.7 : 0.3 + clear * 0.7,
-                  _keep(under),
-                ),
+    final grown = _forward ? _current : leaving;
+    final under = _forward ? leaving : _current;
+    // Only the compositor works per frame: the clip and two opacities follow
+    // [_t] directly; neither step rebuilds, relays out or repaints, and
+    // nothing is blurred (a full-card blur dropped frames at 1440p).
+    final shape = _forward
+        ? CurvedAnimation(parent: _t, curve: _out)
+        : ReverseAnimation(CurvedAnimation(parent: _t, curve: _out));
+    final grownOpacity = _forward
+        ? CurvedAnimation(
+            parent: _t,
+            curve: const Interval(0, 0.55, curve: Curves.easeOut),
+          )
+        : ReverseAnimation(
+            CurvedAnimation(
+              parent: _t,
+              curve: const Interval(0, 0.6, curve: Curves.easeOut),
+            ),
+          );
+    final underOpacity = _forward
+        ? Tween<double>(begin: 1, end: 0).animate(
+            CurvedAnimation(
+              parent: _t,
+              curve: const Interval(0, 0.7, curve: Curves.easeOut),
+            ),
+          )
+        : CurvedAnimation(
+            parent: _t,
+            curve: const Interval(0.2, 1, curve: Curves.easeOut),
+          );
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: _forward,
+            child: FadeTransition(
+              opacity: underOpacity,
+              child: RepaintBoundary(child: _keep(under)),
+            ),
+          ),
+        ),
+        ClipRRect(
+          clipper: _MorphClip(_rect, shape),
+          child: IgnorePointer(
+            ignoring: !_forward,
+            child: ColoredBox(
+              color: palette.raised,
+              child: FadeTransition(
+                opacity: grownOpacity,
+                child: RepaintBoundary(child: _keep(grown)),
               ),
             ),
-            ClipRRect(
-              clipper: _MorphClip(_rect, shape),
-              child: IgnorePointer(
-                ignoring: !_forward,
-                child: ColoredBox(
-                  color: palette.raised,
-                  child: _soft((1 - grownClear) * 8, grownClear, _keep(grown)),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -183,17 +191,18 @@ class _HermezCardMorphState extends State<HermezCardMorph>
 /// The growing step's outline: the pressed row's rect at 0, the card's
 /// whole inside at 1, its corners rounding from a row's to the card's.
 class _MorphClip extends CustomClipper<RRect> {
-  _MorphClip(this.from, this.t);
+  _MorphClip(this.from, this.t) : super(reclip: t);
 
   final Rect? from;
-  final double t;
+  final Animation<double> t;
 
   @override
   RRect getClip(Size size) {
     final end = Offset.zero & size;
     final start = from ?? end;
-    final rect = Rect.lerp(start, end, t)!;
-    final radius = 16 + (24 - 16) * t.clamp(0.0, 1.0);
+    final v = t.value;
+    final rect = Rect.lerp(start, end, v)!;
+    final radius = 16 + (24 - 16) * v.clamp(0.0, 1.0);
     return RRect.fromRectAndRadius(rect, Radius.circular(radius));
   }
 
