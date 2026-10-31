@@ -6,11 +6,11 @@ import '../../../shared/theme/theme_extensions.dart';
 import '../../navigation/widgets/physical_side_nav.dart'
     show kSideNavCurve, snapToDevicePixels;
 import '../../profile/views/profile_page.dart';
-import '../manga/manga_pick_launch.dart' show MangaPickTab;
 import '../providers/hermes_unread_providers.dart'
     show hermesUnreadSessionIdsProvider;
 import '../widgets/hermes_home_needs_you.dart' show watchHermesNeedsYou;
 import '../widgets/hermes_tab_dock.dart';
+import 'hermes_chats_page.dart';
 import 'hermes_today_page.dart';
 
 /// Phone home of the Hermes app: Today, Chats and You behind one floating
@@ -65,8 +65,8 @@ class _HermesTabShellState extends ConsumerState<HermesTabShell> {
     final pages = const <Widget>[
       // Today: what happened and what needs the owner, then what is running.
       HermesTodayPage(),
-      // Chats is the character selector: pick a bot, give it a task.
-      MangaPickTab(),
+      // Chats: every conversation, the team first.
+      HermesChatsPage(),
       ProfilePage(),
     ];
     // The shell owns its system bars: arriving from the side navigation (drawn
