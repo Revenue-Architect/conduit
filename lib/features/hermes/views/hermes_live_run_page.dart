@@ -45,6 +45,8 @@ import '../providers/hermes_live_run_providers.dart';
 import '../widgets/hermes_steel_live_view.dart';
 import '../widgets/hermes_unified_activity_timeline.dart';
 import '../../chat/providers/chat_providers.dart' show chatMessagesProvider;
+import '../motion/hermez_card_route.dart';
+import '../motion/hermez_card_stack.dart';
 
 HermesSessionSummary? matchingOriginatingHermesSession(
   List<HermesSessionSummary> sessions,
@@ -614,6 +616,8 @@ class _HermesLiveRunPageState extends ConsumerState<HermesLiveRunPage> {
     // In the answer itself: the same run, unfolded under its line.
     if (widget.inline) return body;
     return HermesPageChrome(
+      // The live window wears the sky band (screen 02).
+      skyBand: true,
       // A new chat has no server title yet; never headline a placeholder.
       title: current.title == 'Untitled session'
           ? 'Run details'
@@ -856,6 +860,22 @@ class _LiveHero extends ConsumerWidget {
               ],
             ),
           ],
+          // The raw commands stay one tap away, never the default view.
+          if (rows.any(_isCommand))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: palette.ink,
+                  padding: EdgeInsets.zero,
+                ),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: Text(_commandsLabel(rows.where(_isCommand).length)),
+                onPressed: () =>
+                    _showCommands(context, rows.where(_isCommand).toList()),
+              ),
+            ),
           if (plan != null) ...[
             const SizedBox(height: 14),
             HermesPlanPreview(
@@ -1299,4 +1319,63 @@ class _BotScreenWindow extends ConsumerWidget {
       ),
     );
   }
+}
+
+bool _isCommand(HermesActivityRow row) =>
+    row.family == HermesActivityFamily.command ||
+    row.family == HermesActivityFamily.code;
+
+/// "Show the 6 commands it ran" (one: "Show the command it ran").
+String _commandsLabel(int count) =>
+    count == 1 ? 'Show the command it ran' : 'Show the $count commands it ran';
+
+/// The commands a run executed, as one card grown out of the link.
+Future<void> _showCommands(BuildContext context, List<HermesActivityRow> rows) {
+  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+  return pushHermezCard<void>(
+    context,
+    builder: (cardContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: HermezCardStack(
+        root: HermezCardView(
+          title: _commandsLabel(rows.length).replaceFirst('Show the ', ''),
+          builder: (_) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final row in rows)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        row.verb,
+                        style: HermezType.body(palette)
+                            .copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if ((row.object ?? '').isNotEmpty)
+                        Text(
+                          row.object!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: HermezType.meta(palette),
+                        ),
+                      if (row.duration != null)
+                        Text(
+                          formatHermesRunDuration(row.duration!),
+                          style: HermezType.meta(palette).copyWith(
+                            color: palette.faint,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

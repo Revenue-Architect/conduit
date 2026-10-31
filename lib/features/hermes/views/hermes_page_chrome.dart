@@ -26,7 +26,12 @@ class HermesPageChrome extends StatefulWidget {
     this.titleMorphId,
     this.leading,
     this.brandHeader = false,
+    this.skyBand = false,
   });
+
+  /// The top bar carries Toronto's sky (docs/app-design-2026-10-30: inner
+  /// screens wear a band of Today's sky); dark mode shows the evening sky.
+  final bool skyBand;
 
   /// The title as the app's own masthead: large, at the left of the top bar
   /// beside its actions, over the page's construction marks. Nothing scrolls
@@ -160,11 +165,29 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
-              systemOverlayStyle: overlay,
+              systemOverlayStyle: widget.skyBand
+                  ? SystemUiOverlayStyle.light.copyWith(
+                      statusBarColor: Colors.transparent,
+                    )
+                  : overlay,
+              foregroundColor: widget.skyBand ? Colors.white : null,
               leading: widget.leading,
               actions: widget.actions,
               centerTitle: true,
-              flexibleSpace: widget.showHeader
+              flexibleSpace: widget.skyBand
+                  ? DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? const [Color(0xFF081224), Color(0xFF3B5A82)]
+                              : const [Color(0xFF0D2141), Color(0xFF7E9DC2)],
+                        ),
+                      ),
+                    )
+                  : widget.showHeader
                   ? ValueListenableBuilder<double>(
                       valueListenable: _collapsed,
                       builder: (context, t, _) => IgnorePointer(
@@ -202,7 +225,9 @@ class _HermesPageChromeState extends State<HermesPageChrome> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: palette.ink,
+                                color: widget.skyBand
+                                    ? Colors.white
+                                    : palette.ink,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.3,
