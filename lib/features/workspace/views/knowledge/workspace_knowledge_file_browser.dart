@@ -263,6 +263,7 @@ class _Browser extends ConsumerWidget {
     await ThemedSheets.showCustom<void>(
       context: context,
       isScrollControlled: true,
+      fit: true,
       builder: (_) => ServerFilePickerSheet(
         onSelected: (FileInfo file) async {
           await _guard(

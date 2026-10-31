@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
@@ -301,9 +303,7 @@ void main() {
     expect(shape.side.width, BorderWidth.regular);
   });
 
-  testWidgets('adaptive sheets use the plain package route off iOS', (
-    tester,
-  ) async {
+  testWidgets('adaptive sheets open as the one card off iOS', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(TweakcnThemes.t3Chat)
@@ -328,19 +328,24 @@ void main() {
     await tester.pumpAndSettle();
 
     final route = ModalRoute.of(tester.element(find.text('Adaptive content')));
-    expect(route, isA<StupidSimpleSheetRoute<void>>());
-    expect(find.byType(SheetBackground), findsOneWidget);
+    expect(route, isNot(isA<StupidSimpleSheetRoute<void>>()));
+    expect(route, isA<PopupRoute<void>>());
+    expect(find.byType(SheetBackground), findsNothing);
     final contentContext = tester.element(find.text('Adaptive content'));
     expect(
       DefaultTextStyle.of(contentContext).style.decoration,
       TextDecoration.none,
-      reason: 'The package popup route must not leak WidgetsApp debug text.',
+      reason: 'The card route must not leak WidgetsApp debug text.',
     );
+
+    Navigator.of(contentContext).pop();
+    await tester.pumpAndSettle();
+    expect(ThemedSheets.hasActiveSheet, isFalse);
   });
 
+  // Android opens the one card, reduced motion or not.
   for (final entry in <TargetPlatform, double>{
     TargetPlatform.iOS: 36,
-    TargetPlatform.android: 24,
   }.entries) {
     testWidgets(
       'reduced-motion adaptive sheets keep the ${entry.key.name} shape',
@@ -475,7 +480,9 @@ void main() {
     expect(ThemedSheets.hasActiveSheet, isFalse);
   });
 
-  testWidgets('draggable custom sheets remain edge-to-edge', (tester) async {
+  testWidgets('Android custom sheets land as the inset one card', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(402, 874);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -513,9 +520,75 @@ void main() {
     await tester.pumpAndSettle();
 
     final surface = find.byKey(const ValueKey<String>('custom-sheet-surface'));
-    expect(tester.getSize(surface).width, 402);
-    expect(tester.getTopLeft(surface).dx, 0);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.getSize(surface).width, 402 - 32);
+    expect(tester.getTopLeft(surface).dx, 16);
+
+    Navigator.of(tester.element(surface)).pop();
+    await tester.pumpAndSettle();
+    expect(ThemedSheets.hasActiveSheet, isFalse);
   });
+
+  testWidgets(
+    'Android custom sheets open the full-height card; must-answer ones keep '
+    'the bottom sheet',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(402, 874);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      late BuildContext pageContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          home: Builder(
+            builder: (context) {
+              pageContext = context;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+      const contentKey = ValueKey<String>('full-card-content');
+      Future<String?> open({required bool isDismissible}) =>
+          ThemedSheets.showCustom<String>(
+            context: pageContext,
+            isDismissible: isDismissible,
+            builder: (_) => const SizedBox.expand(key: contentKey),
+          );
+
+      final result = open(isDismissible: true);
+      await tester.pumpAndSettle();
+      final content = find.byKey(contentKey);
+      expect(find.byType(BottomSheet), findsNothing);
+      // It rests at 62% of the screen, below its raised height...
+      expect(tester.getSize(content).height, closeTo(874 * 0.62, 0.5));
+
+      // ...and springs up when its top band is dragged up.
+      await tester.dragFrom(
+        tester.getTopLeft(content) + const Offset(100, 20),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(content).height, closeTo(874 * 0.91, 0.5));
+
+      Navigator.of(tester.element(content)).pop('done');
+      await tester.pumpAndSettle();
+      expect(await result, 'done');
+      expect(ThemedSheets.hasActiveSheet, isFalse);
+
+      unawaited(open(isDismissible: false));
+      await tester.pumpAndSettle();
+      expect(
+        ModalRoute.of(tester.element(content)),
+        isA<ModalBottomSheetRoute<String>>(),
+      );
+      Navigator.of(tester.element(content)).pop();
+      await tester.pumpAndSettle();
+      expect(ThemedSheets.hasActiveSheet, isFalse);
+    },
+  );
 
   testWidgets('iOS sheets use the native sheet radius, not display radius', (
     tester,
@@ -559,7 +632,7 @@ void main() {
     );
   });
 
-  testWidgets('large previews use the shared rounded bottom-sheet route', (
+  testWidgets('large previews open as the inset one card on Android', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -592,22 +665,19 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
-    final route = ModalRoute.of(
-      tester.element(
-        find.byKey(const ValueKey<String>('preview-sheet-header')),
-      ),
-    );
-    expect(route, isA<ModalBottomSheetRoute<void>>());
-    final bottomSheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+    expect(find.byType(BottomSheet), findsNothing);
     final header = find.byKey(const ValueKey<String>('preview-sheet-header'));
     expect(
-      bottomSheet.shape,
-      ThemedSheets.roundedShapeFor(tester.element(header)),
+      ModalRoute.of(tester.element(header)),
+      isNot(isA<ModalBottomSheetRoute<void>>()),
     );
-    expect(bottomSheet.clipBehavior, Clip.antiAlias);
-    expect(tester.getSize(header).width, 402);
-    expect(tester.getTopLeft(header).dx, 0);
+    expect(tester.getSize(header).width, 402 - 32);
+    expect(tester.getTopLeft(header).dx, 16);
+
+    Navigator.of(tester.element(header)).pop();
+    await tester.pumpAndSettle();
+    expect(header, findsNothing);
+    expect(ThemedSheets.hasActiveSheet, isFalse);
   });
 
   testWidgets('shared modal headers paint a divider below the title row', (
@@ -698,6 +768,11 @@ void main() {
       expect(find.byType(AdaptiveButton), findsNothing);
     }
     expect(ThemedSheets.hasActiveSheet, isTrue);
+
+    // Close it so the shared sheet tracker is clear for the next test.
+    Navigator.of(tester.element(find.text('Open'))).pop();
+    await tester.pumpAndSettle();
+    expect(ThemedSheets.hasActiveSheet, isFalse);
   });
 
   testWidgets(
