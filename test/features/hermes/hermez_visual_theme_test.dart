@@ -10,7 +10,7 @@ void main() {
       final themed = hermezVisualTheme(base);
       final palette = HermezChatPalette.forBrightness(brightness);
       if (brightness == Brightness.light) {
-        expect(palette.canvas, const Color(0xFFFDFDFD));
+        expect(palette.canvas, const Color(0xFFF7F7F7));
         // Generated panels sit on the near-white canvas, border only.
         expect(hermezGenerativeTheme(base).cardTheme.color, palette.canvas);
       }

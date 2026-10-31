@@ -63,7 +63,7 @@ class HermezStatusDot extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: running ? palette.accent : palette.muted,
+        color: running ? palette.live : palette.muted,
         shape: BoxShape.circle,
       ),
     );

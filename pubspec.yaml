@@ -184,7 +184,19 @@ flutter:
   # Manga redesign faces (OFL; licences in assets/fonts/). Bricolage is
   # variable (wght, wdth, opsz); Archivo is a static Black Italic Expanded
   # instance used only for the bot's name on Pick.
+  # Geist (OFL, assets/fonts/Geist-OFL.txt) is the app face from the 2026-10-30
+  # redesign: static weights, so FontWeight picks a real cut on every engine.
   fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Geist-Bold.ttf
+          weight: 700
     - family: BricolageGrotesque
       fonts:
         - asset: assets/fonts/BricolageGrotesque.ttf

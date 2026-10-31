@@ -135,7 +135,7 @@ class _HermesLiveActivityDisclosureState
                               running
                                   ? Icons.radio_button_checked_rounded
                                   : Icons.timeline_rounded,
-                              color: running ? palette.accent : palette.muted,
+                              color: running ? palette.live : palette.muted,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -242,7 +242,7 @@ class HermesLiveActivityTimeline extends StatelessWidget {
             leading: Icon(
               Icons.circle,
               size: 8,
-              color: index == 0 && running ? palette.accent : palette.muted,
+              color: index == 0 && running ? palette.live : palette.muted,
             ),
             title: Text(event.title, maxLines: 2),
             trailing: Text(

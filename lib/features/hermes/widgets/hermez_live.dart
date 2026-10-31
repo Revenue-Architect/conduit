@@ -92,9 +92,9 @@ class _HermezLiveDotState extends State<HermezLiveDot>
       Theme.of(context).brightness,
     );
     final color = switch (widget.state) {
-      HermezLiveState.working ||
-      HermezLiveState.attention ||
-      HermezLiveState.failed => palette.accent,
+      HermezLiveState.working => palette.live,
+      HermezLiveState.attention => palette.ink,
+      HermezLiveState.failed => palette.failed,
       HermezLiveState.done => widget.ink ?? palette.ink,
       HermezLiveState.idle =>
         widget.ink?.withValues(alpha: 0.5) ?? palette.muted,
@@ -118,7 +118,7 @@ class _HermezLiveDotState extends State<HermezLiveDot>
                                   0.5 * math.cos(_breath.value * 2 * math.pi))
                     : 1,
                 ring: widget.state == HermezLiveState.attention,
-                ringColor: palette.accent.withValues(alpha: 0.45),
+                ringColor: palette.ink.withValues(alpha: 0.45),
               ),
             ),
           ),
@@ -382,9 +382,9 @@ class _HermezPlanBarState extends State<HermezPlanBar>
               size: Size.infinite,
               painter: _PlanBarPainter(
                 statuses: statuses,
-                done: palette.accent,
-                live: palette.accent,
-                band: Color.lerp(palette.accent, palette.ink, 0.35)!,
+                done: palette.ink,
+                live: palette.live,
+                band: palette.live,
                 track: Color.lerp(palette.surface, palette.ink, 0.09)!,
                 travel: _travel.isAnimating
                     ? Curves.easeInOutSine.transform(_travel.value)
@@ -504,8 +504,8 @@ class HermezTodoGlyph extends StatelessWidget {
           painter: _TodoGlyphPainter(
             status: status,
             t: t,
-            ink: palette.accent,
-            accent: palette.accent,
+            ink: palette.ink,
+            accent: palette.live,
             muted: palette.muted,
             surface: palette.surface,
           ),

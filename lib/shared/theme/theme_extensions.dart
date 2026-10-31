@@ -1139,7 +1139,7 @@ bool _usesAppleTypographyRamp(TargetPlatform platform) {
 ///
 /// Content and product UI use one stable hierarchy on every platform.
 class AppTypography {
-  static const String? fontFamily = null;
+  static const String fontFamily = 'Geist';
   static String get monospaceFontFamily =>
       _usesAppleTypographyRamp(defaultTargetPlatform) ? 'Menlo' : 'monospace';
 
@@ -1156,7 +1156,8 @@ class AppTypography {
       ? _appleScale
       : _materialScale;
 
-  static TextStyle _primaryFont(TextStyle style) => style;
+  static TextStyle _primaryFont(TextStyle style) =>
+      style.copyWith(fontFamily: fontFamily);
 
   static TextStyle _monospaceFont(TextStyle style) =>
       style.copyWith(fontFamily: monospaceFontFamily);

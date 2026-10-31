@@ -70,6 +70,36 @@ abstract final class HermezMotion {
     damping: 37.8,
   );
 
+  // The one card (DIRECTION.md, "One card"): Morphlet's springs at KaizenOS's
+  // speed. Authored at Morphlet × 0.885 so that [appSpeed] lands them on
+  // KaizenOS's Morphlet × 0.7. Converted from SwiftUI's (response, damping
+  // ratio): stiffness = (2π / response)², damping = 4π · ratio / response.
+  // Opening keeps a touch of give (0.86); closing is quicker and settles flat.
+  static const springCardOpen = NibSpringDescription(
+    mass: 1,
+    stiffness: 203.9, // response 0.44 s
+    damping: 24.56, // ratio 0.86
+  );
+  static const springCardClose = NibSpringDescription(
+    mass: 1,
+    stiffness: 410.8, // response 0.31 s
+    damping: 40.54, // ratio 1
+  );
+  // A nested step resizing the same card.
+  static const springCardReshape = NibSpringDescription(
+    mass: 1,
+    stiffness: 246.7, // response 0.40 s
+    damping: 27.02, // ratio 0.86
+  );
+  // Content handing over inside the card.
+  static const springCardContent = NibSpringDescription(
+    mass: 1,
+    stiffness: 541.5, // response 0.27 s
+    damping: 46.54, // ratio 1
+  );
+  /// The control giving under the finger before it becomes the card.
+  static const pressCardTrigger = 0.94;
+
   static const staggerFast = Duration(milliseconds: 25);
   static const staggerNormal = Duration(milliseconds: 35);
 

@@ -96,7 +96,7 @@ Material _buttonMaterial(WidgetTester tester) => tester.widget<Material>(
 );
 
 void main() {
-  final signals = {'orange': HermezSignal.orange, 'red': HermezSignal.red};
+  final signals = {'ink': HermezSignal.ink, 'red': HermezSignal.red};
   final previous = HermezChatPalette.signal;
   tearDown(() => HermezChatPalette.signal = previous);
 

@@ -801,7 +801,7 @@ class _LiveHero extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: HermezType.technical(
-                    running ? palette.accent : palette.muted,
+                    running ? palette.live : palette.muted,
                   ),
                 ),
               ),

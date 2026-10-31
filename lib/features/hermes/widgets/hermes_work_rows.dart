@@ -182,7 +182,7 @@ class HermesWorkTeamRow extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       // Accent only while Hermes reports a live turn.
                       style: HermezType.meta(palette).copyWith(
-                        color: running ? palette.accent : palette.muted,
+                        color: running ? palette.live : palette.muted,
                       ),
                     ),
                   ],

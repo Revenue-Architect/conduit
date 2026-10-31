@@ -323,7 +323,7 @@ Widget _buildTaskTile(CatalogItemContext context) {
   final statusColors = hermezStatusColorsOf(build);
   final (statusLabel, statusIcon, statusColor) = switch (status) {
     'todo' => ('TO DO', Icons.radio_button_unchecked_rounded, palette.muted),
-    'in_progress' => ('IN PROGRESS', Icons.timelapse_rounded, palette.accent),
+    'in_progress' => ('IN PROGRESS', Icons.timelapse_rounded, palette.liveText),
     'blocked' => ('BLOCKED', Icons.block_rounded, statusColors.danger),
     'done' => ('DONE', Icons.check_circle_rounded, statusColors.success),
     _ => ('UNKNOWN', Icons.help_outline_rounded, palette.muted),

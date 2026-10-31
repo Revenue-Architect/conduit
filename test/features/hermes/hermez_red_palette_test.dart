@@ -40,7 +40,7 @@ void main() {
     }
   });
 
-  test('the Hermez palette follows the active theme, orange by default', () {
+  test('the Hermez palette follows the active theme, ink by default', () {
     for (final brightness in Brightness.values) {
       HermezChatPalette.useThemeId('conduit');
       final orange = HermezChatPalette.forBrightness(brightness);
@@ -58,6 +58,6 @@ void main() {
       expect(red.border, orange.border);
     }
     HermezChatPalette.useThemeId('catppuccin');
-    expect(HermezChatPalette.signal, HermezSignal.orange);
+    expect(HermezChatPalette.signal, HermezSignal.ink);
   });
 }
