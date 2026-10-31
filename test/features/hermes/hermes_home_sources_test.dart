@@ -78,7 +78,7 @@ Future<void> _pumpHome(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('the + turns into a bot menu; choosing closes it', (
+  testWidgets('the + turns into a bot menu; a chat that cannot start keeps it', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
@@ -106,7 +106,9 @@ void main() {
       find.bySemanticsLabel(RegExp('^Start a conversation with Kai')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('NEW CONVERSATION'), findsNothing);
+    // No Hermes to start it with here: the card grew toward the chat and
+    // shrank back, still offering the bots.
+    expect(find.text('NEW CONVERSATION'), findsOneWidget);
     expect(tester.takeException(), isNull);
     handle.dispose();
   });

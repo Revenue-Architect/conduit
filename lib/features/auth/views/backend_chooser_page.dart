@@ -14,6 +14,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import '../../../shared/widgets/utility_components.dart';
+import '../../hermes/sheets/hermes_connect_card.dart';
+import '../../hermes/sky/hermez_sky_band.dart';
+import '../../hermes/widgets/hermez_chat_palette.dart';
 
 /// First-run screen letting a fresh install choose its chat backend.
 class BackendChooserPage extends ConsumerWidget {
@@ -22,6 +25,10 @@ class BackendChooserPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    // Debug builds keep the full list, Apple models included, for testing.
+    if (!PlatformInfo.isIOS && !debugShowAllAppleBackends) {
+      return _SkyChooser(l10n: l10n);
+    }
     final theme = context.conduitTheme;
     final appleOnDeviceStatus = PlatformInfo.isIOS
         ? ref.watch(appleOnDeviceStatusProvider)
@@ -312,6 +319,187 @@ class _AppleModelIcon extends StatelessWidget {
                   : Icons.smartphone_rounded),
         color: theme.buttonPrimary,
         size: IconSize.medium,
+      ),
+    );
+  }
+}
+
+/// First run on Android (screens2 s08a): Montreal's sky with what to do,
+/// over a sheet of the three ways in. Hermes grows into its own card
+/// (connect, then pair); the others keep their pages.
+class _SkyChooser extends StatelessWidget {
+  const _SkyChooser({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = HermezChatPalette.forBrightness(
+      Theme.of(context).brightness,
+    );
+    final top = MediaQuery.paddingOf(context).top;
+    final sky = MediaQuery.sizeOf(context).height * 0.4;
+    Widget section(String label) => Padding(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: palette.ink,
+        ),
+      ),
+    );
+    Widget row({
+      required Widget leading,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+    }) => InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        child: Row(
+          children: [
+            SizedBox.square(dimension: 40, child: Center(child: leading)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: palette.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: palette.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: palette.muted),
+          ],
+        ),
+      ),
+    );
+    return Scaffold(
+      backgroundColor: palette.canvas,
+      body: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: sky + 28,
+            child: const HermezSkyBand(skylineHeight: 90),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(22, top + 16, 22, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Conduit',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Text(
+                  'Connect your team.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -1.2,
+                    height: 1.08,
+                  ),
+                ),
+                Text(
+                  'Pick one to start.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -1.2,
+                    height: 1.08,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned.fill(
+            top: sky,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              child: ColoredBox(
+                color: palette.raised,
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  children: [
+                    section(l10n.backendChooserSelfHostedSectionTitle),
+                    row(
+                      leading: const _ProviderLogo(
+                        assetName: 'assets/icons/open_webui.png',
+                        kind: _ProviderLogoKind.openWebUI,
+                      ),
+                      title: l10n.backendChooserOpenWebUITitle,
+                      subtitle: l10n.backendChooserOpenWebUISubtitle,
+                      onTap: () => context.go(Routes.serverConnection),
+                    ),
+                    row(
+                      leading: const _ProviderLogo(
+                        assetName: 'assets/icons/hermes_agent.png',
+                        kind: _ProviderLogoKind.hermes,
+                      ),
+                      title: l10n.backendChooserHermesTitle,
+                      subtitle: l10n.backendChooserHermesSubtitle,
+                      onTap: () async {
+                        // The row grows into the connect card; connected,
+                        // the app opens on the chat.
+                        if (await showHermesConnectCard(context) &&
+                            context.mounted) {
+                          context.go(Routes.chat);
+                        }
+                      },
+                    ),
+                    section(l10n.backendChooserModelApisSectionTitle),
+                    row(
+                      leading: const _DirectConnectionIcon(),
+                      title: l10n.backendChooserDirectTitle,
+                      subtitle: l10n.backendChooserDirectSubtitle,
+                      onTap: () => context.goNamed(
+                        RouteNames.directConnections,
+                        queryParameters: const {'onboarding': 'true'},
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
+                      child: Text(
+                        'You can add the others later in All settings.',
+                        style: TextStyle(fontSize: 12, color: palette.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
