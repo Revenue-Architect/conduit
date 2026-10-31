@@ -5,13 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../hermes/motion/hermez_motion.dart';
-import '../../hermes/views/hermes_page_chrome.dart';
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_relative_time.dart';
 import '../../hermes/widgets/hermez_surfaces.dart';
 import '../models/spaces_models.dart';
 import '../providers/spaces_providers.dart';
 import '../services/hermes_spaces_client.dart';
+import '../widgets/sky_sheet_page.dart';
 import '../widgets/spaces_state_views.dart';
 
 /// Every Space: the containers of Pages the user and Hermes work on.
@@ -49,9 +49,8 @@ class SpacesPage extends ConsumerWidget {
     final palette = HermezChatPalette.forBrightness(
       Theme.of(context).brightness,
     );
-    return HermesPageChrome(
+    return SkySheetPage(
       title: 'Spaces',
-      subtitle: 'Pages you and Hermes keep working on',
       actions: [
         IconButton(
           tooltip: 'New Space',
@@ -59,38 +58,63 @@ class SpacesPage extends ConsumerWidget {
           icon: const Icon(Icons.add_rounded),
         ),
       ],
-      child: RefreshIndicator(
-        onRefresh: () => ref.refresh(spacesListProvider.future),
-        child: switch (spaces) {
-          AsyncValue(:final value?) when value.isEmpty => SpacesEmptyState(
-            title: 'No Spaces yet',
-            message:
-                'A Space holds Pages: plans, research, notes you keep '
-                'improving with Hermes.',
-            actionLabel: 'New Space',
-            onAction: () => _create(context, ref),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
+            child: Text(
+              'Pages you and Hermes keep working on',
+              style: skyText(15, FontWeight.w400, palette.muted),
+            ),
           ),
-          AsyncValue(:final value?) => ListView.separated(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 96),
-            itemCount: value.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) =>
-                _SpaceTile(space: value[index], palette: palette),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(spacesListProvider.future),
+              child: switch (spaces) {
+                AsyncValue(:final value?) when value.isEmpty =>
+                  SpacesEmptyState(
+                    title: 'No Spaces yet',
+                    message:
+                        'A Space holds Pages: plans, research, notes you keep '
+                        'improving with Hermes.',
+                    actionLabel: 'New Space',
+                    onAction: () => _create(context, ref),
+                  ),
+                AsyncValue(:final value?) => ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 96),
+                  children: [
+                    for (final space in value)
+                      _SpaceRow(space: space, palette: palette),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                      child: Text(
+                        'A Space holds Pages: plans, research and notes you '
+                        'keep improving with Hermes.',
+                        style: skyText(15, FontWeight.w400, palette.muted),
+                      ),
+                    ),
+                  ],
+                ),
+                AsyncValue(:final error?) => SpacesErrorState(
+                  error: error,
+                  onRetry: () => ref.invalidate(spacesListProvider),
+                ),
+                _ => const SpacesLoadingState(),
+              },
+            ),
           ),
-          AsyncValue(:final error?) => SpacesErrorState(
-            error: error,
-            onRetry: () => ref.invalidate(spacesListProvider),
-          ),
-          _ => const SpacesLoadingState(),
-        },
+        ],
       ),
     );
   }
 }
 
-class _SpaceTile extends StatelessWidget {
-  const _SpaceTile({required this.space, required this.palette});
+/// One Space, as a Chats-style row: the folder, its name, pages and time.
+/// A Space's own icon is not shown for now (owner): always the folder.
+class _SpaceRow extends StatelessWidget {
+  const _SpaceRow({required this.space, required this.palette});
 
   final HermesSpace space;
   final HermezChatPalette palette;
@@ -101,7 +125,7 @@ class _SpaceTile extends StatelessWidget {
     return HermezSurface(
       kind: HermezSurfaceKind.list,
       semanticLabel: '${space.name}, $count ${count == 1 ? 'page' : 'pages'}',
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       onOpen: (origin) => context.pushNamed(
         RouteNames.spaceLibrary,
         pathParameters: {'spaceId': space.id},
@@ -110,19 +134,17 @@ class _SpaceTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: palette.canvas,
-              borderRadius: BorderRadius.circular(12),
+              color: palette.raised,
+              shape: BoxShape.circle,
               border: Border.all(color: palette.border),
             ),
-            child: space.icon != null
-                ? Text(space.icon!, style: const TextStyle(fontSize: 20))
-                : Icon(Icons.folder_open_rounded, color: palette.accent),
+            child: Icon(Icons.folder_outlined, color: palette.muted, size: 22),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,14 +153,16 @@ class _SpaceTile extends StatelessWidget {
                   space.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: HermezType.body(palette)
-                      .copyWith(fontWeight: FontWeight.w800, fontSize: 16),
+                  style: skyText(
+                    17,
+                    FontWeight.w600,
+                    palette.ink,
+                  ).copyWith(letterSpacing: -0.3),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   '$count ${count == 1 ? 'page' : 'pages'} · '
                   '${hermezRelativeLabel(space.updatedAt)}',
-                  style: HermezType.meta(palette),
+                  style: skyText(13, FontWeight.w400, palette.muted),
                 ),
               ],
             ),

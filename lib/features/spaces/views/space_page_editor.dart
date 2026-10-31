@@ -9,12 +9,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
-import '../../hermes/views/hermes_page_chrome.dart';
 import '../../notes/views/note_editor_page.dart'
     show buildNoteEditorFleatherTheme;
 import '../../hermes/widgets/hermez_chat_palette.dart';
 import '../../hermes/widgets/hermez_surfaces.dart';
-import '../../hermes/widgets/hermez_visual_theme.dart';
+import '../../hermes/views/hermes_page_chrome.dart' show HermesPanel;
 import '../models/spaces_models.dart';
 import '../providers/spaces_providers.dart';
 import '../services/hermes_spaces_client.dart';
@@ -26,6 +25,7 @@ import '../widgets/page_autosave_status.dart';
 import '../widgets/page_chat_picker_sheet.dart';
 import '../widgets/page_conflict_banner.dart';
 import '../widgets/page_move_sheet.dart';
+import '../widgets/sky_sheet_page.dart';
 import '../widgets/spaces_state_views.dart';
 import '../../hermes/widgets/hermez_status_morph.dart';
 
@@ -401,90 +401,82 @@ class _SpacePageEditorPageState extends ConsumerState<SpacePageEditorPage> {
       Theme.of(context).brightness,
     );
     final draft = _draft;
+    // From the Spaces list when it is already loaded; no line otherwise.
+    final spaceName = ref
+        .watch(spacesListProvider)
+        .value
+        ?.where((space) => space.id == widget.spaceId)
+        .firstOrNull
+        ?.name;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_leave());
       },
-      child: Theme(
-        data: hermezVisualTheme(Theme.of(context)),
-        child: HermezRouteCanvas(
-          color: palette.canvas,
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            resizeToAvoidBottomInset: true,
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              surfaceTintColor: Colors.transparent,
-              scrolledUnderElevation: 0,
-              leading: BackButton(onPressed: _leave),
-              titleSpacing: 0,
-              title: draft == null
-                  ? null
-                  : PageAutosaveStatus(
-                      status: draft.status,
-                      revision: draft.savedRevision,
-                    ),
-              actions: [
-                if (draft != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: FilledButton.icon(
-                      onPressed: _asking ? null : _ask,
-                      icon: _asking
-                          ? HermezStatusMorph(
-                              state: HermezMorphState.working,
-                              size: 16,
-                              tint: Theme.of(context).colorScheme.onPrimary,
-                              ink: Theme.of(context).colorScheme.onPrimary,
-                            )
-                          : const Icon(Icons.auto_awesome_rounded, size: 18),
-                      label: const Text('Ask Hermes'),
-                    ),
+      child: SkySheetPage(
+        onBack: _leave,
+        // White, the page to write on (s06); the list pages use the canvas.
+        sheetColor: palette.raised,
+        toolbarTitle: draft == null
+            ? const SizedBox.shrink()
+            : PageAutosaveStatus(
+                status: draft.status,
+                revision: draft.savedRevision,
+                spaceName: spaceName,
+              ),
+        actions: [
+          if (draft != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: _AskHermesPill(busy: _asking, onPressed: _ask),
+            ),
+          if (draft != null)
+            // The ⋯ grows into its menu card.
+            AdaptivePopupMenuButton.icon<_PageAction>(
+              icon: Icons.more_vert_rounded,
+              tooltip: 'Page options',
+              tint: Colors.white,
+              buttonStyle: PopupButtonStyle.plain,
+              onSelected: (_, entry) => _onAction(entry.value!),
+              items: [
+                const AdaptivePopupMenuItem(
+                  value: _PageAction.subpage,
+                  icon: Icons.note_add_outlined,
+                  label: 'New subpage',
+                ),
+                const AdaptivePopupMenuItem(
+                  value: _PageAction.move,
+                  icon: Icons.drive_file_move_outlined,
+                  label: 'Move page',
+                ),
+                if (_sourceMode)
+                  const AdaptivePopupMenuItem(
+                    value: _PageAction.visual,
+                    icon: Icons.edit_note_rounded,
+                    label: 'Visual editor',
+                  )
+                else
+                  const AdaptivePopupMenuItem(
+                    value: _PageAction.source,
+                    icon: Icons.code_rounded,
+                    label: 'Markdown source',
                   ),
-                if (draft != null)
-                  // The ⋯ grows into its menu card.
-                  AdaptivePopupMenuButton.icon<_PageAction>(
-                    icon: Icons.more_vert_rounded,
-                    tooltip: 'Page options',
-                    buttonStyle: PopupButtonStyle.plain,
-                    onSelected: (_, entry) => _onAction(entry.value!),
-                    items: [
-                      const AdaptivePopupMenuItem(
-                        value: _PageAction.subpage,
-                        label: 'New subpage',
-                      ),
-                      const AdaptivePopupMenuItem(
-                        value: _PageAction.move,
-                        label: 'Move page',
-                      ),
-                      if (_sourceMode)
-                        const AdaptivePopupMenuItem(
-                          value: _PageAction.visual,
-                          label: 'Visual editor',
-                        )
-                      else
-                        const AdaptivePopupMenuItem(
-                          value: _PageAction.source,
-                          label: 'Markdown source',
-                        ),
-                      const AdaptivePopupMenuItem(
-                        value: _PageAction.copy,
-                        label: 'Copy Markdown',
-                      ),
-                      const AdaptivePopupMenuDivider(),
-                      const AdaptivePopupMenuItem(
-                        value: _PageAction.delete,
-                        label: 'Delete page',
-                        isDestructive: true,
-                      ),
-                    ],
-                  ),
+                const AdaptivePopupMenuItem(
+                  value: _PageAction.copy,
+                  icon: Icons.content_copy_rounded,
+                  label: 'Copy Markdown',
+                ),
+                const AdaptivePopupMenuDivider(),
+                const AdaptivePopupMenuItem(
+                  value: _PageAction.delete,
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete page',
+                  isDestructive: true,
+                ),
               ],
             ),
-            body: _body(context, palette, draft),
-          ),
-        ),
+        ],
+        child: _body(context, palette, draft),
       ),
     );
   }
@@ -529,7 +521,7 @@ class _SpacePageEditorPageState extends ConsumerState<SpacePageEditorPage> {
         Expanded(
           child: ListView(
             controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(22, 4, 22, 120),
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 120),
             children: [
               TextField(
                 controller: _title,
@@ -537,8 +529,11 @@ class _SpacePageEditorPageState extends ConsumerState<SpacePageEditorPage> {
                 maxLength: SpacesLimits.pageTitle,
                 maxLines: null,
                 textCapitalization: TextCapitalization.sentences,
-                style: HermesPageChrome.titleStyle(palette)
-                    .copyWith(fontSize: 28),
+                style: skyText(
+                  30,
+                  FontWeight.w600,
+                  palette.ink,
+                ).copyWith(letterSpacing: -1.2, height: 1.1),
                 decoration: const InputDecoration(
                   hintText: 'Untitled',
                   border: InputBorder.none,
@@ -620,26 +615,89 @@ class _SpacePageEditorPageState extends ConsumerState<SpacePageEditorPage> {
           ),
         ),
         if (showToolbar)
-          Material(
-            color: palette.surface,
-            child: SafeArea(
-              top: false,
-              child: FleatherTheme(
-                data: buildNoteEditorFleatherTheme(context),
-                // Only formatting that survives the Markdown round trip.
-                child: FleatherToolbar.basic(
-                  controller: visual,
-                  hideUnderLineButton: true,
-                  hideBackgroundColor: true,
-                  hideForegroundColor: true,
-                  hideAlignment: true,
-                  hideIndentation: true,
-                  hideDirection: true,
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.raised,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: palette.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.ink.withValues(alpha: 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Theme(
+                    // The buttons fill with the canvas colour: the pill's.
+                    data: Theme.of(context)
+                        .copyWith(canvasColor: palette.raised),
+                    child: FleatherTheme(
+                      data: buildNoteEditorFleatherTheme(context),
+                      // Only formatting that survives the Markdown round trip.
+                      child: FleatherToolbar.basic(
+                        controller: visual,
+                        hideUnderLineButton: true,
+                        hideBackgroundColor: true,
+                        hideForegroundColor: true,
+                        hideAlignment: true,
+                        hideIndentation: true,
+                        hideDirection: true,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Ask Hermes as a white pill in the band; no sparkle (s06).
+class _AskHermesPill extends StatelessWidget {
+  const _AskHermesPill({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF0E1116);
+    return FilledButton(
+      onPressed: busy ? null : onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: ink,
+        disabledBackgroundColor: Colors.white.withValues(alpha: 0.8),
+        disabledForegroundColor: ink,
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        shape: const StadiumBorder(),
+        textStyle: skyText(14, FontWeight.w600, ink),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (busy) ...[
+            const HermezStatusMorph(
+              state: HermezMorphState.working,
+              size: 16,
+              tint: ink,
+              ink: ink,
+            ),
+            const SizedBox(width: 8),
+          ],
+          const Text('Ask Hermes'),
+        ],
+      ),
     );
   }
 }
