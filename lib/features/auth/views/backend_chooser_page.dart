@@ -88,18 +88,19 @@ class BackendChooserPage extends ConsumerWidget {
             title: l10n.backendChooserSelfHostedSectionTitle,
             dividerIndent: _providerDividerIndent,
             children: [
-              UtilitySelectionRow(
-                leading: const _ProviderLogo(
-                  assetName: 'assets/icons/open_webui.png',
-                  kind: _ProviderLogoKind.openWebUI,
+              if (kShowOpenWebUi)
+                UtilitySelectionRow(
+                  leading: const _ProviderLogo(
+                    assetName: 'assets/icons/open_webui.png',
+                    kind: _ProviderLogoKind.openWebUI,
+                  ),
+                  title: l10n.backendChooserOpenWebUITitle,
+                  subtitle: l10n.backendChooserOpenWebUISubtitle,
+                  selected: false,
+                  showSelectionIndicator: false,
+                  trailing: _chooserChevron(context),
+                  onTap: () => context.go(Routes.serverConnection),
                 ),
-                title: l10n.backendChooserOpenWebUITitle,
-                subtitle: l10n.backendChooserOpenWebUISubtitle,
-                selected: false,
-                showSelectionIndicator: false,
-                trailing: _chooserChevron(context),
-                onTap: () => context.go(Routes.serverConnection),
-              ),
               UtilitySelectionRow(
                 leading: const _ProviderLogo(
                   assetName: 'assets/icons/hermes_agent.png',
@@ -452,15 +453,16 @@ class _SkyChooser extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
                     section(l10n.backendChooserSelfHostedSectionTitle),
-                    row(
-                      leading: const _ProviderLogo(
-                        assetName: 'assets/icons/open_webui.png',
-                        kind: _ProviderLogoKind.openWebUI,
+                    if (kShowOpenWebUi)
+                      row(
+                        leading: const _ProviderLogo(
+                          assetName: 'assets/icons/open_webui.png',
+                          kind: _ProviderLogoKind.openWebUI,
+                        ),
+                        title: l10n.backendChooserOpenWebUITitle,
+                        subtitle: l10n.backendChooserOpenWebUISubtitle,
+                        onTap: () => context.go(Routes.serverConnection),
                       ),
-                      title: l10n.backendChooserOpenWebUITitle,
-                      subtitle: l10n.backendChooserOpenWebUISubtitle,
-                      onTap: () => context.go(Routes.serverConnection),
-                    ),
                     row(
                       leading: const _ProviderLogo(
                         assetName: 'assets/icons/hermes_agent.png',

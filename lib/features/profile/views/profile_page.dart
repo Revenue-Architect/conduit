@@ -265,14 +265,14 @@ class ProfilePage extends ConsumerWidget {
       SettingsGroup(
         title: 'Servers',
         children: [
-          if (!hasOpenWebUiAccount)
+          if (kShowOpenWebUi && !hasOpenWebUiAccount)
             SettingsRow(
               leading: const SettingsGlyph(icon: Icons.add_circle_outline),
               title: 'Connect to Open WebUI',
               sub: 'Add a self-hosted Open WebUI server',
               onTap: () => context.goNamed(RouteNames.serverConnection),
             ),
-          if (hasOpenWebUiAccount)
+          if (kShowOpenWebUi && hasOpenWebUiAccount)
             SettingsRow(
               key: const Key('data-connection-entry'),
               leading: const SettingsGlyph(icon: Icons.sensors),
@@ -280,7 +280,7 @@ class ProfilePage extends ConsumerWidget {
               sub: l10n.connectionHealth,
               onTap: () => context.pushNamed(RouteNames.dataConnectionSettings),
             ),
-          if (canManageWorkspace)
+          if (kShowOpenWebUi && canManageWorkspace)
             SettingsRow(
               key: const Key('workspace-entry'),
               leading: const SettingsGlyph(icon: Icons.grid_view_outlined),

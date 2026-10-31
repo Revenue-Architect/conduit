@@ -1,3 +1,4 @@
+import 'package:conduit/core/providers/backend_mode_providers.dart';
 import 'package:checks/checks.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -588,7 +589,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('workspace target'), findsOneWidget);
     ErrorWidget.builder = originalErrorWidgetBuilder;
-  });
+  }, skip: !kShowOpenWebUi);
 
   testWidgets('ProfilePage hides workspace entry without workspace access', (
     tester,
@@ -632,7 +633,7 @@ void main() {
     expect(find.byKey(const Key('workspace-entry')), findsNothing);
     expect(find.byKey(const Key('data-connection-entry')), findsOneWidget);
     ErrorWidget.builder = originalErrorWidgetBuilder;
-  });
+  }, skip: !kShowOpenWebUi);
 }
 
 final class _WorkspaceApiService extends Mock implements ApiService {}

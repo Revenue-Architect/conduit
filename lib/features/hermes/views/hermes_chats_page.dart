@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../sky/hermez_sky_band.dart';
+import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart' show conversationsProvider;
 import '../../../core/services/navigation_service.dart';
@@ -206,7 +207,11 @@ class _HermesChatsPageState extends ConsumerState<HermesChatsPage> {
               live: working.containsKey(bot.name),
               onTap: () => startHermesBotConversation(context, ref, bot),
             ),
-          if (others.isNotEmpty) _Heading('Open WebUI and direct', palette),
+          if (others.isNotEmpty)
+            _Heading(
+              kShowOpenWebUi ? 'Open WebUI and direct' : 'Direct',
+              palette,
+            ),
           for (final c in others)
             _Row(
               palette: palette,

@@ -70,7 +70,10 @@ void main() {
     await tester.scrollUntilVisible(find.text('Direct connections'), 300);
     expect(find.text('Direct connections'), findsOneWidget);
     expect(find.text('OpenAI-compatible APIs and Ollama'), findsOneWidget);
-    expect(find.text('Connect to Open WebUI'), findsOneWidget);
+    expect(
+      find.text('Connect to Open WebUI'),
+      kShowOpenWebUi ? findsOneWidget : findsNothing,
+    );
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings-donations')),

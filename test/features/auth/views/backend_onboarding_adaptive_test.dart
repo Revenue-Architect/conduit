@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:conduit/core/providers/backend_mode_providers.dart';
 import 'package:checks/checks.dart';
 import 'package:conduit/core/persistence/preferences_store.dart';
 import 'package:conduit/core/models/server_config.dart';
@@ -61,7 +62,10 @@ void main() {
       expect(find.text('Self-hosted services'), findsOneWidget);
       expect(find.text('Apple Intelligence'), findsOneWidget);
       expect(find.text('Model APIs'), findsOneWidget);
-      expect(find.text('Open WebUI'), findsOneWidget);
+      expect(
+        find.text('Open WebUI'),
+        kShowOpenWebUi ? findsOneWidget : findsNothing,
+      );
       expect(find.text('Connect directly'), findsOneWidget);
       expect(find.text('Apple On-Device'), findsOneWidget);
       expect(find.text('Apple Private Cloud Compute'), findsOneWidget);
@@ -70,24 +74,28 @@ void main() {
       expect(find.byIcon(CupertinoIcons.device_phone_portrait), findsOneWidget);
       expect(find.byIcon(CupertinoIcons.cloud_fill), findsOneWidget);
       expect(find.byIcon(Icons.hub), findsNothing);
-      expect(find.byType(Image), findsNWidgets(2));
+      expect(find.byType(Image), findsNWidgets(kShowOpenWebUi ? 2 : 1));
       expect(
         find.image(const AssetImage('assets/icons/open_webui.png')),
-        findsOneWidget,
+        kShowOpenWebUi ? findsOneWidget : findsNothing,
       );
       expect(
         find.image(const AssetImage('assets/icons/hermes_agent.png')),
         findsOneWidget,
       );
-      final openWebUiSemantics = tester.getSemantics(
-        find.bySemanticsLabel(
-          'Open WebUI. Sign in to your server for synced chats, notes, and more.',
-        ),
-      );
-      expect(
-        openWebUiSemantics.getSemanticsData().hasAction(ui.SemanticsAction.tap),
-        isTrue,
-      );
+      if (kShowOpenWebUi) {
+        final openWebUiSemantics = tester.getSemantics(
+          find.bySemanticsLabel(
+            'Open WebUI. Sign in to your server for synced chats, notes, and more.',
+          ),
+        );
+        expect(
+          openWebUiSemantics.getSemanticsData().hasAction(
+            ui.SemanticsAction.tap,
+          ),
+          isTrue,
+        );
+      }
 
       await harness.unmount(tester);
     } finally {
@@ -112,7 +120,10 @@ void main() {
     expect(find.text('Apple Intelligence'), findsOneWidget);
     expect(find.text('Apple On-Device'), findsOneWidget);
     expect(find.text('Apple Private Cloud Compute'), findsOneWidget);
-    expect(find.text('Open WebUI'), findsOneWidget);
+    expect(
+      find.text('Open WebUI'),
+      kShowOpenWebUi ? findsOneWidget : findsNothing,
+    );
     expect(find.text('Connect directly'), findsOneWidget);
 
     await harness.unmount(tester);
@@ -138,7 +149,10 @@ void main() {
     expect(find.text('Apple Intelligence'), findsNothing);
     expect(find.text('Apple On-Device'), findsNothing);
     expect(find.text('Apple Private Cloud Compute'), findsNothing);
-    expect(find.text('Open WebUI'), findsOneWidget);
+    expect(
+      find.text('Open WebUI'),
+      kShowOpenWebUi ? findsOneWidget : findsNothing,
+    );
     expect(find.text('Connect directly'), findsOneWidget);
 
     await harness.unmount(tester);

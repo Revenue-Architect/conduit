@@ -6,6 +6,10 @@ import '../persistence/preferences_store.dart';
 /// Which backend the user has onboarded against. Drives boot-deterministic
 /// routing so a Hermes-only install never bounces to the OpenWebUI server
 /// connection screen while async state (active server / Hermes secrets) loads.
+/// Hermes is the canonical backend: Open WebUI is hidden from first run,
+/// settings and the lists. Its code stays; set true to bring it back.
+const kShowOpenWebUi = false;
+
 enum PreferredBackend { unset, owui, direct, hermes }
 
 /// Synchronous, persisted preferred-backend signal. Read by the router.
