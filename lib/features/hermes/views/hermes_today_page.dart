@@ -24,6 +24,7 @@ import '../widgets/hermez_bot_mark.dart';
 import '../widgets/hermez_chat_palette.dart';
 import '../motion/hermez_card_stack.dart';
 import '../motion/hermez_card_route.dart';
+import '../motion/hermez_motion.dart';
 import 'hermes_today_copy.dart';
 import 'hermes_work_page.dart';
 
@@ -116,14 +117,17 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
     final stale = watchHermesHomeStale(ref);
     final since = hermesTodayDoneSince(now);
     final workingIds = {for (final w in working) w.storedId};
-    final done = sessions
-        .where(
-          (s) =>
-              s.updatedAt != null &&
-              s.updatedAt!.isAfter(since) &&
-              !workingIds.contains(s.id),
-        )
-        .length;
+    final doneSessions =
+        sessions
+            .where(
+              (s) =>
+                  s.updatedAt != null &&
+                  s.updatedAt!.isAfter(since) &&
+                  !workingIds.contains(s.id),
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!));
+    final done = doneSessions.length;
     final headline = hermesTodayHeadline(
       done: done,
       needs: needs,
@@ -169,7 +173,20 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
                 children: [
                   _TopLine(now: now, weather: weather, phase: sky.phase),
                   const SizedBox(height: 30),
-                  _Headline(done: headline.done, needs: headline.needs),
+                  _Headline(
+                    done: headline.done,
+                    needs: headline.needs,
+                    onOpenDone: done == 0
+                        ? null
+                        : (from) => _showDone(
+                            context,
+                            ref,
+                            from: from,
+                            title: headline.done.replaceAll('.', ''),
+                            sessions: doneSessions,
+                            bots: bots,
+                          ),
+                  ),
                   const SizedBox(height: 22),
                   _TeamStrip(
                     bots: bots,
@@ -268,6 +285,102 @@ class _HermesTodayPageState extends ConsumerState<HermesTodayPage>
       ),
     );
   }
+}
+
+/// What got done today (or overnight), as a card grown out of the
+/// headline's line: each conversation with its bot and when it finished.
+/// A row becomes the conversation it names (m11).
+Future<void> _showDone(
+  BuildContext context,
+  WidgetRef ref, {
+  required BuildContext from,
+  required String title,
+  required List<HermesSessionSummary> sessions,
+  required List<HermesBot> bots,
+}) {
+  final palette = HermezChatPalette.forBrightness(Theme.of(context).brightness);
+  String at(DateTime time) {
+    final t = time.toLocal();
+    final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    return '$h:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  return pushHermezCard<void>(
+    context,
+    from: from,
+    semanticLabel: title,
+    builder: (cardContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+      child: HermezCardStack(
+        root: HermezCardView(
+          title: title,
+          builder: (_) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final session in sessions)
+                Builder(
+                  builder: (rowContext) {
+                    final bot = session.profile == null
+                        ? null
+                        : _botNamed(bots, session.profile!);
+                    return ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      leading: ClipOval(
+                        child: SizedBox.square(
+                          dimension: 36,
+                          child: bot == null
+                              ? ColoredBox(
+                                  color: palette.surface,
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    color: palette.muted,
+                                    size: 18,
+                                  ),
+                                )
+                              : HermezBotMark(
+                                  identity: hermezIdentityForBot(bot),
+                                  botName: bot.name,
+                                  size: 36,
+                                ),
+                        ),
+                      ),
+                      title: Text(
+                        session.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _geist(15, FontWeight.w500, palette.ink),
+                      ),
+                      subtitle: Text(
+                        [
+                          bot?.title ?? session.profile ?? 'Hermes',
+                          at(session.updatedAt!),
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _geist(13, FontWeight.w400, palette.muted),
+                      ),
+                      onTap: () async {
+                        // m11: the card becomes the conversation.
+                        await growHermezCardToScreen(rowContext);
+                        if (!context.mounted) return;
+                        await openHermesSession(
+                          context,
+                          ref,
+                          session,
+                          bot: bot,
+                        );
+                      },
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 HermesBot? _botNamed(List<HermesBot> bots, String name) {
@@ -426,10 +539,13 @@ class _TopLine extends StatelessWidget {
 }
 
 class _Headline extends StatelessWidget {
-  const _Headline({required this.done, required this.needs});
+  const _Headline({required this.done, required this.needs, this.onOpenDone});
 
   final String done;
   final String needs;
+
+  /// Opens what got done, grown out of the line itself.
+  final ValueChanged<BuildContext>? onOpenDone;
 
   @override
   Widget build(BuildContext context) {
@@ -440,17 +556,40 @@ class _Headline extends StatelessWidget {
       spacing: -1.8,
       height: 1.04,
     );
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: '$done\n'),
-          TextSpan(
-            text: needs,
-            style: style.copyWith(color: Colors.white.withValues(alpha: 0.62)),
+    final open = onOpenDone;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Builder(
+          builder: (lineContext) => Semantics(
+            button: open != null,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: open == null ? null : () => open(lineContext),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Flexible(child: Text(done, style: style)),
+                  if (open != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, bottom: 4),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 34,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      style: style,
+        ),
+        Text(
+          needs,
+          style: style.copyWith(color: Colors.white.withValues(alpha: 0.62)),
+        ),
+      ],
     );
   }
 }
@@ -904,32 +1043,38 @@ class _QuietLinks extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    Widget link(String label, String? detail, VoidCallback onTap) => Padding(
+    Widget link(
+      String label,
+      String? detail,
+      void Function(BuildContext pill) onTap,
+    ) => Padding(
       padding: const EdgeInsets.only(right: 8, bottom: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: palette.raised,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: palette.border),
-          ),
-          child: Center(
-            widthFactor: 1,
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: label,
-                    style: _geist(13, FontWeight.w600, palette.ink),
-                  ),
-                  if (detail != null) TextSpan(text: ' · $detail'),
-                ],
+      child: Builder(
+        builder: (pill) => InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => onTap(pill),
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: palette.raised,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: palette.border),
+            ),
+            child: Center(
+              widthFactor: 1,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: label,
+                      style: _geist(13, FontWeight.w600, palette.ink),
+                    ),
+                    if (detail != null) TextSpan(text: ' · $detail'),
+                  ],
+                ),
+                style: _geist(13, FontWeight.w500, palette.muted),
               ),
-              style: _geist(13, FontWeight.w500, palette.muted),
             ),
           ),
         ),
@@ -941,15 +1086,26 @@ class _QuietLinks extends ConsumerWidget {
           'Scheduled',
           routines == null ? null : '$routines',
           // Scheduled is the routines card (m13).
-          () => showHermesScheduledCard(context, ref),
+          (_) => showHermesScheduledCard(context, ref),
         ),
         // Kanban is a card (owner, you-kanban.html k01).
-        link('Kanban', null, () => showHermesKanbanCard(context)),
+        link('Kanban', null, (_) => showHermesKanbanCard(context)),
         link(
           'Team and tools',
           null,
-          () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const HermesWorkPage()),
+          // The pill grows into the page, as every row in it does.
+          (pill) => Navigator.of(context).push(
+            HermezRoute<void>(
+              motion: HermezRouteMotion.expand,
+              reducedMotion: MediaQuery.of(context).disableAnimations,
+              origin: HermezMorphOrigin.of(
+                pill,
+                radius: 20,
+                color: palette.raised,
+                borderColor: palette.border,
+              ),
+              builder: (_) => const HermesWorkPage(),
+            ),
           ),
         ),
       ],

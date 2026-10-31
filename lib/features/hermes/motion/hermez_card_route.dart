@@ -625,30 +625,61 @@ class _MagneticCardState extends State<_MagneticCard>
     _height.animateWith(SpringSimulation(_spring, h, target, v));
   }
 
+  void _springTo(double target) {
+    if (MediaQuery.of(context).disableAnimations) {
+      _height.value = target;
+      return;
+    }
+    _height.animateWith(SpringSimulation(_spring, _height.value, target, 0));
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _height,
     builder: (context, child) =>
         SizedBox(height: _height.value.clamp(0.0, widget.raised), child: child),
-    child: Stack(
-      children: [
-        Positioned.fill(child: widget.child),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: 44,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) {
-              _height.stop();
-              _start = _height.value;
-            },
-            onVerticalDragUpdate: _drag,
-            onVerticalDragEnd: _release,
+    child: HermezCardDetents._(
+      raise: () => _springTo(widget.raised),
+      rest: () => _springTo(widget.resting),
+      child: Stack(
+        children: [
+          Positioned.fill(child: widget.child),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 44,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragStart: (_) {
+                _height.stop();
+                _start = _height.value;
+              },
+              onVerticalDragUpdate: _drag,
+              onVerticalDragEnd: _release,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
+}
+
+/// A full-height card's two heights, for a step inside it (a detail, a
+/// form) that needs the card taller, and the step back that rests it again.
+class HermezCardDetents extends InheritedWidget {
+  const HermezCardDetents._({
+    required this.raise,
+    required this.rest,
+    required super.child,
+  });
+
+  final VoidCallback raise;
+  final VoidCallback rest;
+
+  static HermezCardDetents? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<HermezCardDetents>();
+
+  @override
+  bool updateShouldNotify(HermezCardDetents oldWidget) => false;
 }

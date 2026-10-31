@@ -174,12 +174,11 @@ class _KanbanCardState extends ConsumerState<_KanbanCard> {
       ),
       _ => _list(context, palette),
     };
-    // The same card reshapes: the next view sharpens in as the last blurs
-    // out, as in the one-card stack.
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+    // The pressed row grows into the next step and the card springs to
+    // its height; back folds the step into the row it came from.
+    return HermezCardMorph(
+      depth: _view == _KanbanCardView.list ? 0 : 1,
+      raised: _view != _KanbanCardView.list,
       child: body,
     );
   }

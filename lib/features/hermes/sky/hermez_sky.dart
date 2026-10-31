@@ -160,10 +160,23 @@ class HermezSkyPainter extends CustomPainter {
         canvas.drawCircle(Offset(x * size.width, y * size.height), 1.4, flake);
       }
     }
-    // The skyline: 412 × 280 design units, stretched to the width.
+    // The skyline: 412 × 280 design units across the width. Where the
+    // canvas leaves it room (Today) it fills [skylineHeight]; in a short
+    // band it keeps its proportions and the band's bottom edge crops it,
+    // so the towers rise [skylineHeight] and are never squashed flat.
+    final sx = size.width / 412;
+    final natural = sx * _skylineAspect;
+    final fills = skylineHeight / 280 >= natural;
+    final sy = fills ? skylineHeight / 280 : natural;
     canvas.save();
-    canvas.translate(0, size.height - skylineHeight);
-    canvas.scale(size.width / 412, skylineHeight / 280);
+    canvas.clipRect(rect);
+    canvas.translate(
+      0,
+      fills
+          ? size.height - skylineHeight
+          : size.height - skylineHeight - _skylineTop * sy,
+    );
+    canvas.scale(sx, sy);
     canvas.drawPath(_skyline, Paint()..color = hermezSkyGround(state.phase));
     if (state.lit) {
       final window = Paint()..color = const Color(0xB3F3E6C8);
@@ -183,6 +196,13 @@ class HermezSkyPainter extends CustomPainter {
 /// 1000 de La Gauchetière's copper peak, 1250 René-Lévesque's stepped
 /// crown) and the Olympic Stadium's leaning tower. Coordinates in a
 /// 412 × 280 box, origin top-left.
+/// Today's proportions (172 tall on a 412 wide phone): the shape every
+/// band draws at too.
+const _skylineAspect = 172 / 280;
+
+/// The tallest tower's top, in design units.
+final double _skylineTop = _skyline.getBounds().top;
+
 final Path _skyline = _parse(
   'M0 280V236l10-6l12-10l14-14l12-12h6h2v-20h-5v-4h5v-10h4v10h5v4h-5v20h8'
   'l14 10l14 12l12 10h4v-50h16v20h6v-68h30v68h4v-82l8-22l8 22v40h6v-44h4v-8'

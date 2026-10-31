@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../sky/hermez_sky_band.dart';
+import '../sky/hermez_weather.dart';
 import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart' show conversationsProvider;
@@ -147,6 +148,7 @@ class _HermesChatsPageState extends ConsumerState<HermesChatsPage> {
         .toList();
     final totalUnread = unread.values.fold<int>(0, (a, b) => a + b);
     final top = MediaQuery.of(context).padding.top;
+    final weather = ref.watch(hermezWeatherProvider).value;
 
     return Material(
       color: palette.canvas,
@@ -156,8 +158,17 @@ class _HermesChatsPageState extends ConsumerState<HermesChatsPage> {
           _Band(
             top: top,
             title: 'Chats',
-            subtitle:
-                '${bots.length} bots${totalUnread > 0 ? ' · $totalUnread unread' : ''}',
+            subtitle: [
+              '${bots.length} bots',
+              if (working.isNotEmpty) '${working.length} working',
+              if (totalUnread > 0) '$totalUnread unread',
+              if (weather != null)
+                '$kHermezCity ${weather.temperatureC.round()}°',
+            ].join(' · '),
+            bots: team,
+            working: working.keys.toSet(),
+            palette: palette,
+            onOpenBot: (bot) => startHermesBotConversation(context, ref, bot),
             onNewChat: () => chooseHermesNewChat(context, ref),
           ),
           Padding(
@@ -260,66 +271,161 @@ class _HermesChatsPageState extends ConsumerState<HermesChatsPage> {
   }
 }
 
-/// The page's sky band: the dawn gradient and the skyline's base, with the
-/// title, the count and the new-chat pencil.
+/// The page's sky band (mockup r4 02): Montreal's sky with its towers
+/// rising out of the list's rounded top, the title, a live line, and the
+/// team's faces: a working bot wears the amber ring and sits forward.
 class _Band extends StatelessWidget {
   const _Band({
     required this.top,
     required this.title,
     required this.subtitle,
+    required this.bots,
+    required this.working,
+    required this.palette,
+    required this.onOpenBot,
     required this.onNewChat,
   });
 
   final double top;
   final String title;
   final String subtitle;
+  final List<HermesBot> bots;
+  final Set<String> working;
+  final HermezChatPalette palette;
+  final ValueChanged<HermesBot> onOpenBot;
   final VoidCallback onNewChat;
+
+  static const _sheet = 28.0;
 
   @override
   Widget build(BuildContext context) {
+    final faces = [
+      ...bots.where((b) => working.contains(b.name)),
+      ...bots.where((b) => !working.contains(b.name)),
+    ].take(7).toList();
     return Stack(
       children: [
-        const Positioned.fill(child: HermezSkyBand(skylineHeight: 34)),
+        const Positioned.fill(child: HermezSkyBand(skylineHeight: 104)),
         Padding(
-          padding: EdgeInsets.fromLTRB(20, top + 14, 8, 34),
-          child: Row(
+          padding: EdgeInsets.fromLTRB(20, top + 18, 8, _sheet + 64),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
                       title,
                       style: _geist(
-                        30,
+                        44,
                         FontWeight.w600,
                         Colors.white,
-                      ).copyWith(letterSpacing: -1.2),
+                      ).copyWith(letterSpacing: -2, height: 1.02),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: _geist(
-                        15,
-                        FontWeight.w400,
-                        Colors.white.withValues(alpha: 0.9),
-                      ),
+                  ),
+                  IconButton(
+                    tooltip: 'New chat',
+                    onPressed: onNewChat,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
                     ),
-                  ],
+                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: _geist(
+                  15,
+                  FontWeight.w500,
+                  Colors.white.withValues(alpha: 0.88),
                 ),
               ),
-              IconButton(
-                tooltip: 'New chat',
-                onPressed: onNewChat,
-                icon: const Icon(Icons.edit_outlined, color: Colors.white),
-              ),
+              if (faces.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 40,
+                  child: Stack(
+                    children: [
+                      for (final (i, bot) in faces.indexed.toList().reversed)
+                        Positioned(
+                          left: i * 28.0,
+                          child: _BandFace(
+                            bot: bot,
+                            live: working.contains(bot.name),
+                            palette: palette,
+                            onTap: () => onOpenBot(bot),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ],
+          ),
+        ),
+        // The list's rounded top: the towers stand on it, as on Today.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: _sheet,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette.canvas,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(_sheet),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+class _BandFace extends StatelessWidget {
+  const _BandFace({
+    required this.bot,
+    required this.live,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final HermesBot bot;
+  final bool live;
+  final HermezChatPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: live ? '${bot.name}, working' : bot.name,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: live ? palette.live : Colors.white,
+        ),
+        child: ClipOval(
+          child: ColoredBox(
+            color: Colors.white,
+            child: HermezBotMark(
+              identity: hermezIdentityForBot(bot),
+              botName: bot.name,
+              size: 36,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Heading extends StatelessWidget {

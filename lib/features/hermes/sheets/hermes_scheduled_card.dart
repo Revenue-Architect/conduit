@@ -6,6 +6,7 @@ import '../../../core/services/navigation_service.dart';
 import '../models/hermes_bot.dart';
 import '../models/hermes_job.dart';
 import '../models/hermes_session.dart';
+import '../motion/hermez_card_morph.dart';
 import '../motion/hermez_card_route.dart';
 import '../providers/hermes_providers.dart';
 import '../services/hermes_desktop_api_service.dart';
@@ -96,10 +97,11 @@ class _HermesScheduledCardState extends ConsumerState<HermesScheduledCard> {
       ),
       _ => _list(context),
     };
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+    // The pressed row grows into the next step and the card springs to
+    // its height; back folds the step into the row it came from.
+    return HermezCardMorph(
+      depth: _view == _ScheduledView.list ? 0 : 1,
+      raised: _view != _ScheduledView.list,
       child: body,
     );
   }
