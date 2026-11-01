@@ -396,14 +396,20 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _color(c, severity).withValues(alpha: .08),
-            border: Border(
-              left: BorderSide(color: _color(c, severity), width: 3),
-            ),
+            // Generated content uses quiet surfaces; severity is a text signal,
+            // never a decorative side rail or a tinted background slab.
+            color: theme.colorScheme.surface,
+            border: Border.all(color: theme.colorScheme.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           child: _column([
-            _badge(c, severity, severity),
+            if (severity.isNotEmpty && severity != 'neutral')
+              Text(
+                severity,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: _color(c, severity),
+                ),
+              ),
             _title(c, s(type == 'Status' ? 'label' : 'title')),
             Text(s(type == 'Status' ? 'detail' : 'message')),
           ]),
@@ -991,7 +997,7 @@ class _HermesOpenuiSurfaceState extends State<HermesOpenuiSurface> {
       children: [
         TableRow(
           decoration: BoxDecoration(
-            color: Theme.of(c).colorScheme.primary.withValues(alpha: .07),
+            color: Theme.of(c).colorScheme.surfaceContainerLow,
           ),
           children: [
             for (final label in columns)
