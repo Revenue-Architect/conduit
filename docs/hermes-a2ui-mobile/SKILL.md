@@ -1,7 +1,7 @@
 ---
 name: a2ui-mobile
-description: "Platform tui/Conduit: load for native status, plans, tables, citations, drafts, charts, schedules, choices, scenarios, maps, comparisons, journeys or evidence views when structure helps. Plain short answers stay text."
-version: 0.12.0
+description: "Conduit or capability-enabled Hermes Desktop: load for native status, plans, tables, citations, drafts, charts, schedules, choices, scenarios, maps, comparisons, journeys or evidence views when structure helps. Plain short answers stay text."
+version: 0.13.0
 author: Kamranur Rahman, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,13 +13,13 @@ metadata:
 
 # A2UI Mobile Skill
 
-Conduit sessions show `Platform: tui` in the Hermes runtime section. On WhatsApp, Teams, webhooks, cron, and other platforms, do not emit A2UI; answer in the platform's normal format.
+Conduit sessions show `Platform: tui` in the Hermes runtime section. Official Hermes Desktop also supports this catalog when the current turn includes `[Client capability: Hermes Desktop A2UI v0.9]`. That capability applies only to the originating desktop chat/profile and clears when the renderer is disabled or another client submits. Do not infer support merely from a desktop connection or a previous turn. On WhatsApp, Teams, webhooks, cron, and other unsupported clients, answer in the platform's normal format.
 
 If the user explicitly requests A2UI or GenUI, produce a native surface. The output contract is a closed fenced `a2ui` block with one complete v0.9 JSON message per line: `createSurface` followed by `updateComponents`. A `json` or `jsonl` fence is displayed as code in Conduit. Legacy messages named `surfaceUpdate`, `beginRendering`, or `dataModelUpdate` are not supported. Check those four details before answering, regardless of the subject of the surface.
 
-Create concise, visual-first native interfaces that Hermes can render in Conduit. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Reach for A2UI when interaction, scanning, comparison, or a native control materially improves on Markdown. For plain explanations and short answers, Markdown stays the default; ordinary prose does not become a decorative card.
+Create concise, visual-first native interfaces that Hermes can render in Conduit and capability-enabled Hermes Desktop. Consider an A2UI surface for an actionable plan, schedule, budget, choice, comparison, checklist, form, itinerary, or status view even when the user does not request a visual. Reach for A2UI when interaction, scanning, comparison, or a native control materially improves on Markdown. For plain explanations and short answers, Markdown stays the default; ordinary prose does not become a decorative card.
 
-## Extended native catalog (Hermez 4.1.7 build 152+)
+## Extended native catalog (Hermez 4.1.7 build 152+ / Hermes Desktop A2UI plugin 1.0+)
 
 Read `references/extended-component-guide.md` before using a new type. The exact bounded schemas are in `references/extension-schemas.json`; never invent properties or component names.
 
@@ -30,6 +30,15 @@ For source evidence, preserve the excerpt and page/location. InfoRow detail shou
 The renderer owns Hermez surfaces, type, palette, outlines and motion; do not supply colors or fake them with Markdown. DataTable offers local Records / Compare columns modes and preserves every supplied cell. DraftReview separates recipient, subject and full message, always marked not sent. CitationCard keeps the source, page/location, excerpt and finding distinct.
 
 CitationCard, DataTable and DraftReview optionally accept `actionChild`, referencing an ordinary Button or a Column of Buttons. Only tapping that explicit action starts a normal Hermes turn; use a descriptive event name and context identifying the source/row/draft and requested operation. Local selection, expansion, table modes and sliders are not submitted and do not automatically become event context. If the next turn needs a chosen value, use the existing ChoicePicker/form binding or put a separate explicit Button on each fixed option. A review/edit request is not consent to send an email. Read `references/review-response-demo.md` for a complete synthetic conversational example.
+### Follow-up requests from the review widgets
+
+An explicit chat Button sends one ordinary Hermes request prefixed `[A2UI_INTERACTION]` through the originating conversation/profile. Read its event name, source component, surface ID and context together with the original surface; respond to the requested operation using that evidence.
+
+- `document.explain_citation`: preserve the correct document/source, page or location, and exact supplied excerpt. Keep interpretation separate from the quotation; do not invent a source or retrieve a different document silently.
+- `table.compare_options`: compare the supplied rows, units and notes, and compute differences accurately. Records / Compare columns, horizontal scrolling and row expansion are local presentation controls; only an explicit chat Button asks for a comparison reply.
+- `draft.request_edit`: identify the draft from context and the original surface; preserve recipient and subject unless the request changes them. Return the requested revision as a complete unsent DraftReview with a new surface ID. An edit button never sends the draft.
+
+The other new widgets use the same distinction: browsing dates, branches, scenarios, maps, before/after views, journeys or evidence is local. Place separate ordinary Buttons beside them when a conversational follow-up is useful; do not invent `actionChild` on components whose schema lacks it. Use form binding or fixed-option Buttons for values that must be submitted. No chat action is sent from a busy or read-only surface.
 
 Before emitting a surface, write its complete JSONL to a temporary file and run `/opt/data/scripts/a2ui_check.py` on that file. Correct every error and rerun. Do not claim validation unless the command actually returned zero errors. Keep one complete fenced `a2ui` payload and the v0.9 envelope.
 
@@ -67,7 +76,7 @@ This is the principal presentation rule. Before drafting, classify the answer as
 
 ### Markdown tables
 
-Avoid Markdown tables in Conduit chat whenever the same information fits native rows, cards, metrics, or a comparison surface. Tables such as `Owner | Status`, `Service | Health | Detail`, `Task | Assignee | State`, or `Option | Price | Difference` do not fit a ~300 px column; use InfoRows, stacked comparison cards, or a short metric row. A table is acceptable only when the user asks for one or tabular form is materially clearer, and even then keep it narrow.
+Avoid Markdown tables in Conduit chat whenever the same information fits native rows, cards, metrics, or a comparison surface. Tables such as `Owner | Status`, `Service | Health | Detail`, `Task | Assignee | State`, or `Option | Price | Difference` do not fit a ~300 px column; use InfoRows, stacked comparison cards, or a short metric row for small summaries. For real multi-row tabular data, use DataTable with its local Records / Compare columns views and horizontal scrolling. Use a Markdown table only when explicitly requested or the native catalog is unavailable; keep it narrow.
 
 ### Avoid visual spam
 
@@ -105,7 +114,7 @@ After: one `StatusBadge` per service with its own details `Button` (`service.her
 - Use Markdown for ordinary explanations and short answers.
 - Use Mermaid for architecture, sequence, and dependency diagrams.
 - Use A2UI for a scannable native view or meaningful interaction: status, comparison, choices, forms, checklists, lists, grouped details, and simple trends. The subject can be any domain, not just services.
-- Use Conduit's existing Chart.js renderer for a chart that needs more than one simple series or detailed axes.
+- Use MultiSeriesChart for bounded, aligned observed series. Use Conduit's existing Chart.js renderer when detailed axes or a more complex visualization require it.
 - Use an authenticated `MEDIA:` artifact for an actual generated image, screenshot, or report. Do not put image URLs in A2UI.
 - Combine formats only when each adds useful information; for example, one sentence, a Mermaid diagram, and a small action surface.
 
@@ -121,7 +130,7 @@ Infer the user's task and select the smallest useful composition. These are star
 | Review a checklist or sequence | List or Column of short items; CheckBox only if the user must mark items; no fake completion state |
 | Compare items | Equal-weight Row for short MetricTiles, or stacked Cards/List for longer descriptions; state the basis and units |
 | Explore grouped details | Tabs when groups are distinct and each has useful content; otherwise a Column or specific details action |
-| See change over time | MiniChart for one series of 2-60 observed samples; MetricTile for one value; Chart.js for complex visualization |
+| See change over time | MiniChart for one series of 2-60 observed samples; MultiSeriesChart for aligned observed series; MetricTile for one value; Chart.js for complex visualization |
 | Get a diagram, image, or report | Mermaid, `MEDIA:`, or a document artifact respectively; A2UI may complement but should not replace the actual artifact |
 
 Exact required/optional props for every component are in `references/component-guide.md` (raw catalog JSONs sit beside it).
@@ -260,7 +269,7 @@ Use a short, unique action name and only the context needed to understand the us
 - Every row fits a phone. Prefer stacked service/action layouts.
 - Charts use two or more actual samples; absent and single-sample data do not become an invented trend.
 - No A2UI component contains a remote asset URL or executable code.
-- Ran `python3 /opt/data/scripts/a2ui_check.py --from-md <file>` (or on the JSONL payload): prints OK for every payload with zero errors.
+- Validate with the bundled `a2ui_check.py` in this skill directory: `python a2ui_check.py --from-md <file>` (or on the JSONL payload). On Umbrel, the existing `/opt/data/scripts/a2ui_check.py` entry point is also available. Every payload must print OK with zero errors.
 
 <!-- conduit-openui-v1 -->
 ## OpenUI alongside A2UI
