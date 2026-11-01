@@ -1,0 +1,100 @@
+[
+  {
+    "name": "a-character-select",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Archivo": 17
+      },
+      "sizes": [
+        76,
+        17,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800",
+        "900"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "b-manga-chapter",
+    "fails": [],
+    "warns": [
+      "9 distinct text sizes. A type scale has 5 to 7 steps: 44, 40, 30, 19, 17, 16, 14, 13, 12",
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 18
+      },
+      "sizes": [
+        44,
+        40,
+        30,
+        19,
+        17,
+        16,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "c-dispatch-board",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Barlow Condensed": 13,
+        "Barlow": 18
+      },
+      "sizes": [
+        40,
+        34,
+        17,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        24
+      ],
+      "cards": 1
+    }
+  }
+]

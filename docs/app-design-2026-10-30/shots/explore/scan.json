@@ -1,0 +1,101 @@
+[
+  {
+    "name": "a-sky",
+    "fails": [],
+    "warns": [
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 24,
+        "Geist Mono": 4
+      },
+      "sizes": [
+        40,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        144
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "b-control-room",
+    "fails": [],
+    "warns": [
+      "6 gradients. Gradients are a seasoning, not a surface treatment."
+    ],
+    "facts": {
+      "fonts": {
+        "IBM Plex Mono": 26,
+        "Big Shoulders Display": 4
+      },
+      "sizes": [
+        76,
+        21,
+        20,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        48
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c-desk-radio",
+    "fails": [],
+    "warns": [
+      "11 elements cast shadows. Depth should come from one or two layers, not every tile."
+    ],
+    "facts": {
+      "fonts": {
+        "Unbounded": 3,
+        "Instrument Sans": 16
+      },
+      "sizes": [
+        92,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        144
+      ],
+      "cards": 1
+    }
+  }
+]

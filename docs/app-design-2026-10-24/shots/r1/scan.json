@@ -1,0 +1,250 @@
+[
+  {
+    "name": "1-today",
+    "fails": [],
+    "warns": [
+      "9 distinct text sizes. A type scale has 5 to 7 steps: 44, 40, 28, 19, 17, 15, 14, 13, 12"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        40,
+        28,
+        19,
+        17,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "2-pick-chief",
+    "fails": [
+      "Text below 11pt (iOS floor): 10.5px \"Chief\"; 10.5px \"kai\"; 10.5px \"ops\"; 10.5px \"herm\"",
+      "5 saturated hue families (24°, 216°, 0°, 336°, 264°). One accent, maybe one semantic colour. This is confetti."
+    ],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 9,
+        "Archivo": 7
+      },
+      "sizes": [
+        78,
+        17,
+        15,
+        13,
+        12,
+        10.5
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        24,
+        216,
+        0,
+        336,
+        264
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "4-chat-live",
+    "fails": [
+      "Text below 11pt (iOS floor): 10px \"Plan · 2 of 4\""
+    ],
+    "warns": [
+      "9 distinct text sizes. A type scale has 5 to 7 steps: 19, 17, 16, 15, 14, 13.5, 13, 12, 10",
+      "Largest text is 19px. No element owns the screen. (Mark data-dense if this is deliberate.)"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 23
+      },
+      "sizes": [
+        19,
+        17,
+        16,
+        15,
+        14,
+        13.5,
+        13,
+        12,
+        10
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "5-chats",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 22
+      },
+      "sizes": [
+        44,
+        19,
+        16,
+        14,
+        13
+      ],
+      "weights": [
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "6-work",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 23
+      },
+      "sizes": [
+        44,
+        19,
+        16,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "7-today-dark",
+    "fails": [
+      "Contrast below WCAG on solid ground: 2.57:1 40px \"1\""
+    ],
+    "warns": [
+      "9 distinct text sizes. A type scale has 5 to 7 steps: 44, 40, 28, 19, 17, 15, 14, 13, 12"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        40,
+        28,
+        19,
+        17,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "8-pick-kai",
+    "fails": [
+      "Text below 11pt (iOS floor): 10.5px \"Chief\"; 10.5px \"kai\"; 10.5px \"ops\"; 10.5px \"herm\"",
+      "5 saturated hue families (216°, 24°, 0°, 336°, 264°). One accent, maybe one semantic colour. This is confetti."
+    ],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 9,
+        "Archivo": 7
+      },
+      "sizes": [
+        78,
+        17,
+        15,
+        13,
+        12,
+        10.5
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        216,
+        24,
+        0,
+        336,
+        264
+      ],
+      "cards": 0
+    }
+  }
+]

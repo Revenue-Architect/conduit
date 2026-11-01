@@ -1,0 +1,227 @@
+[
+  {
+    "name": "01-today-morning",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"5:40\" (home indicator); \"scout read 14 Shopify ch\" (home indicator); \"scout\" (home indicator)",
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 31,
+        "Geist Mono": 4
+      },
+      "sizes": [
+        40,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        144,
+        0
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "02-live-window",
+    "fails": [],
+    "warns": [
+      "Largest text is 16px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"ops\" (status bar)",
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 10,
+        "Geist Mono": 13
+      },
+      "sizes": [
+        16,
+        14,
+        13.5,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        48,
+        144
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "03-chat-chief",
+    "fails": [],
+    "warns": [
+      "Largest text is 17px. No element owns the screen. (Mark data-dense if this is deliberate.)",
+      "Text inside the system's safe areas: \"Chief\" (status bar)",
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 17
+      },
+      "sizes": [
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "600"
+      ],
+      "leftEdges": 7,
+      "accentHues": [],
+      "cards": 2
+    }
+  },
+  {
+    "name": "04-work",
+    "fails": [],
+    "warns": [
+      "8 distinct left edges in the left third. Align to fewer verticals.",
+      "Three saturated hue families (0°, 144°, 48°). Is each one earning its place?"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 33,
+        "Geist Mono": 4
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "650",
+        "700"
+      ],
+      "leftEdges": 8,
+      "accentHues": [
+        0,
+        144,
+        48
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "05-chats",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 26,
+        "Geist Mono": 8
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "650",
+        "700"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        48
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "07-today-evening-dark",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals.",
+      "3 gradients. Gradients are a seasoning, not a surface treatment."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 24,
+        "Geist Mono": 3
+      },
+      "sizes": [
+        40,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        144
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "08-today-quiet-night",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Geist": 21,
+        "Geist Mono": 3
+      },
+      "sizes": [
+        40,
+        16,
+        15,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 5,
+      "accentHues": [],
+      "cards": 2
+    }
+  }
+]

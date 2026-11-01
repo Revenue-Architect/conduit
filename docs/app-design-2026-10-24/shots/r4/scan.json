@@ -1,0 +1,247 @@
+[
+  {
+    "name": "1-today",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        28,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "2-pick-chief",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 8,
+        "Archivo": 2
+      },
+      "sizes": [
+        78,
+        17,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "4-chat-live",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 23
+      },
+      "sizes": [
+        19,
+        17,
+        14,
+        13.5,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        24
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "5-chats",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Moodboard for the Kaizen\" (home indicator)"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 29
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "6-work",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Artifacts\" (home indicator); \"Files Hermes made\" (home indicator)",
+      "6 distinct left edges in the left third. Align to fewer verticals.",
+      "3 gradients. Gradients are a seasoning, not a surface treatment."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 25
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "7-today-dark",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        28,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "8-pick-kai",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 8,
+        "Archivo": 2
+      },
+      "sizes": [
+        78,
+        17,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        216,
+        24
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "9-you",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"About\" (home indicator)"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 24
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        13
+      ],
+      "weights": [
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 3,
+      "accentHues": [],
+      "cards": 0
+    }
+  }
+]

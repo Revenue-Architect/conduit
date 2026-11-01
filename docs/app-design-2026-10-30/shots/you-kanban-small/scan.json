@@ -1,0 +1,62 @@
+[
+  {
+    "name": "y01-you",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"This week\" (home indicator)",
+      "Lines of text touching vertically (ink under 2pt apart): \"Risky commands are blocked, ne\" / \"Blocked\"; \"Bots ask before changing what \" / \"Ask me\""
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 24
+      },
+      "sizes": [
+        30,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 4,
+      "accentHues": [],
+      "cards": 1
+    }
+  },
+  {
+    "name": "k01-kanban-card",
+    "fails": [],
+    "warns": [
+      "8 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 34
+      },
+      "sizes": [
+        40,
+        17,
+        16,
+        15,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "leftEdges": 8,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 2
+    }
+  }
+]

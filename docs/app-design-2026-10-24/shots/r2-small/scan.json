@@ -1,0 +1,226 @@
+[
+  {
+    "name": "1-today",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        28,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "2-pick-chief",
+    "fails": [],
+    "warns": [
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 9,
+        "Archivo": 7
+      },
+      "sizes": [
+        78,
+        17,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "4-chat-live",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Looks right\" (home indicator); \"Change it\" (home indicator)",
+      "Lines of text touching vertically (ink under 2pt apart): \"WedClose 4 stale threads\" / \"Reply to Chief\""
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 23
+      },
+      "sizes": [
+        19,
+        17,
+        14,
+        13.5,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "5-chats",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Restart core-litellm aft\" (home indicator); \"4d · 6 messages\" (home indicator)"
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 22
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        14,
+        13
+      ],
+      "weights": [
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "6-work",
+    "fails": [],
+    "warns": [
+      "Text inside the system's safe areas: \"Kanban\" (home indicator); \"7 tasks · 7 done\" (home indicator)",
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 21
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "500",
+        "600",
+        "800"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "7-today-dark",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 16
+      },
+      "sizes": [
+        44,
+        28,
+        19,
+        17,
+        14,
+        13,
+        12
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        24
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "8-pick-kai",
+    "fails": [],
+    "warns": [
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 9,
+        "Archivo": 7
+      },
+      "sizes": [
+        78,
+        17,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "800",
+        "900"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        216,
+        24
+      ],
+      "cards": 0
+    }
+  }
+]

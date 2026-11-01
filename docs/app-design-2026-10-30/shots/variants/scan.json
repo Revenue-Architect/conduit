@@ -1,0 +1,133 @@
+[
+  {
+    "name": "a1-sky-feeds",
+    "fails": [],
+    "warns": [
+      "6 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 25,
+        "Geist Mono": 4
+      },
+      "sizes": [
+        40,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 6,
+      "accentHues": [
+        144
+      ],
+      "cards": 2
+    }
+  },
+  {
+    "name": "a2-sky-dusk-panels",
+    "fails": [],
+    "warns": [
+      "7 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 24
+      },
+      "sizes": [
+        36,
+        28,
+        16,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 7,
+      "accentHues": [
+        48
+      ],
+      "cards": 5
+    }
+  },
+  {
+    "name": "b1-control-room-calm",
+    "fails": [],
+    "warns": [
+      "6 gradients. Gradients are a seasoning, not a surface treatment.",
+      "7 card containers on one screen. Is the screen just a stack of boxes?"
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 25,
+        "Geist Mono": 8
+      },
+      "sizes": [
+        34,
+        16,
+        15,
+        13,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        48
+      ],
+      "cards": 7
+    }
+  },
+  {
+    "name": "b2-program-monitor",
+    "fails": [],
+    "warns": [
+      "8 distinct left edges in the left third. Align to fewer verticals."
+    ],
+    "facts": {
+      "fonts": {
+        "Geist": 19,
+        "Geist Mono": 10
+      },
+      "sizes": [
+        34,
+        15,
+        13,
+        12,
+        11.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 8,
+      "accentHues": [
+        144,
+        48
+      ],
+      "cards": 2
+    }
+  }
+]
